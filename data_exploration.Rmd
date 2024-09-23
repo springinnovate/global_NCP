@@ -1,0 +1,181 @@
+---
+title: "DaTa Preparation NBS"
+output: html_notebook
+---
+
+I will use this project to peprare and extract insights from the raster data for the polygons in the 5 prioritized areas.
+
+
+1. Prepare Environemnt (Load necessary libraries)
+```{r load libraries}
+packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
+           'here', 'gdalUtilities', 'jsonlite', 'devtools')
+sapply(packs, require, character.only = TRUE, warning = FALSE)
+```
+
+
+2. Load The polygos with the areas
+```{r}
+
+poly <- st_read('/Volumes/Jero_HDD/WWF/NBS_OPS/vector/areas_nbs.geojson') 
+#Split the vector into a list of individual polygons
+#create vector with names
+nam <- poly$COUNTR
+nam <- sort(nam)
+poly <- poly%>%split(.$COUNTR)
+```
+
+Test with one raster
+```{r load rst}
+
+esamod <- rast('/Volumes/Jero_HDD/WWF/global_outputs/ESAmodVCFv2_md5_05407ed305c24604eb5a38551cddb031.tif')
+
+esamod <- map(1:length(poly), function(x) crop(esamod, poly[[x]]))
+esamod <- map(1:length(esamod), function(x) mask(esamod[[x]], poly[[x]]))
+
+map(1:length(esamod), function(x) writeRaster(esamod[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'esaLC_', nam[x], '.tif'), overwrite=TRUE))
+
+access_nature<- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif')
+
+
+access_nature <- map(1:length(poly), function(x) crop(access_nature, poly[[x]]))
+access_nature <- map(1:length(access_nature), function(x) mask(access_nature[[x]], poly[[x]]))
+
+map(1:length(access_nature), function(x) writeRaster(access_nature[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'nature_access_ESA_2020', nam[x], '.tif'), overwrite=TRUE))
+
+
+acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_diff_Sc3v1_PNVnoag-esa2020.tif')
+acces_rest <- project(acces_rest, acc2, method='bilinear')
+
+acces_rest <- map(1:length(poly), function(x) crop(acces_rest, poly[[x]]))
+acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
+
+map(1:length(access_nature), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'nature_access_diff_Sc3v1_PNVnoag-esa2020_', nam[x], '.tif'), overwrite=TRUE))
+
+acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/global_people_access_population_2019_60.0m_md5_d264d371bd0d0a750b002a673abbb383.tif')
+acces_rest <- project(acces_rest, acc2, method='bilinear')
+
+acces_rest <- map(1:length(poly), function(x) crop(acces_rest, poly[[x]]))
+acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
+
+map(1:length(access_nature), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'global_people_access_population_2019_60.0m_', nam[x], '.tif'), overwrite=TRUE))
+
+```
+
+
+# Iterate over all rasters
+
+```{r iterate crop}
+wd <- '/Volumes/Jero_HDD/WWF/global_outputs'
+setwd(wd)
+
+tiffes <- list.files(wd, pattern= 'downstream')
+#tiffes <- tiffes[-c(5,7)]
+paths <- file.path(wd, tiffes)
+
+clean_filename <- function(filename) {
+  sub("_md5.*", "", filename)
+}
+
+output_path <- '/Volumes/Jero_HDD/WWF/NBS_OPS/raster/'
+
+# Remove faulty data
+#tiffes <- tiffes[-1]
+
+# Loop through each geotiff file
+for (i in seq_along(tiffes)) {
+  
+  # Get the current tiff file
+  tiff_file <- paths[i]
+  
+  # Load the current geotiff (don't load all at once)
+  access <- rast(tiff_file)
+  
+  # Apply crop and mask operations to each polygon
+  cropped <- map(1:length(poly), function(x) crop(access, poly[[x]]))
+  masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
+  
+  # Extract the base filename before 'md5'
+  base_filename <- clean_filename(basename(tiff_file))
+  
+  # Write the cropped and masked rasters to files
+  map(1:length(masked), function(x) {
+    writeRaster(masked[[x]], paste0(output_path, base_filename, "_", nam[x], ".tif"), overwrite = TRUE)
+  })
+  # Optionally, clear the variable to free up memory
+  rm(access, cropped, masked)
+  gc()  # Garbage collection to clear memory
+}
+
+```
+
+
+# Reproj Accesibility Raster
+
+```{r reproj access}
+acc <- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb.tif')
+acc
+
+acc2 <- rast('/Volumes/Jero_HDD/WWF/global_outputs/temp/access_WGS84.tif')
+
+acc <- project(acc,acc2)
+writeRaster(acc, '/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif')
+```
+# Explore rasters
+(max min values, unique, frequencies)
+```{r explore rasters}
+sediment <- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/raster/sediment_ESAmod2-Sc3v1_MEXICO.tif')
+```
+
+#summaries
+
+For summarizing geotiff raster files and comparing values across protected areas or different land covers for an initial assessment, especially for an audience without geospatial expertise, here are some accessible metrics you can use:
+1. Basic Statistical Summaries:
+
+    Mean: The average value within each zone (e.g., inside/outside protected areas or across land cover types). This provides a simple understanding of the central tendency.
+    Median: The middle value when data is ordered, useful when your data has outliers that could skew the mean.
+    Standard Deviation: Indicates the variation or dispersion from the average, helping show if values are clustered or spread out.
+    Min/Max: The range of values, showing the extremes within each zone.
+
+2. Zonal Statistics (Per Category):
+
+    Sum: The total value across a zone, particularly useful for variables like ecosystem services (e.g., total nitrogen retention within protected areas).
+    Count of Pixels: The number of pixels in each zone, which could give an idea of the area covered by specific land covers.
+    Percentage Area Contribution: For each zone or land cover class, express the variable as a percentage of the total landscape (e.g., “30% of nitrogen retention occurs in protected areas”).
+
+3. Comparisons by Category:
+
+    Inside vs. Outside Protected Areas:
+        You can calculate mean, sum, and standard deviation inside and outside protected areas to compare the effectiveness of protection measures in preserving ecosystem services.
+    Land Cover Comparison:
+        Use zonal means to compare how different land cover types contribute to ecosystem services like sediment retention or distance to beneficiaries.
+        Express results as percentages, e.g., “Forests account for 60% of nitrogen retention.”
+
+4. Histogram or Distribution Analysis:
+
+    A frequency distribution showing how the values of each variable are distributed across the entire study area or within protected vs. unprotected zones.
+    This can help show if most of the service is concentrated in a few high-value areas or spread out.
+
+5. Change Detection (If Time Series Exists):
+
+    If your rasters cover different time periods, you could show net changes in ecosystem service values (e.g., changes in nitrogen retention) inside and outside protected areas or across different land covers.
+
+6. Normalized or Standardized Scores:
+
+    Convert variables into percentile ranks or Z-scores to facilitate comparisons across variables that might have different units (e.g., how “high” or “low” the ecosystem service is in relation to the mean).
+
+7. Threshold Analysis:
+
+    For variables where a threshold is meaningful (e.g., distance to beneficiaries < 10 km), you can count the number of pixels above or below the threshold in each category (protected areas, land covers).
+    For example, "80% of the people dependent on agriculture live within 5 km of high-sediment retention areas."
+
+8. Spatial Autocorrelation (Advanced):
+
+    If you're dealing with spatially explicit relationships, calculating spatial autocorrelation (Moran’s I) might help quantify clustering patterns of ecosystem services inside and outside protected areas.
+
+9. Cumulative Impact Maps:
+
+    Create a composite map where multiple variables are aggregated to show high- vs. low-value areas for ecosystem services. This could simplify complex data into an easily interpretable map for non-specialists.
+
+These summaries will provide enough detail to highlight key insights, while also being interpretable by those without technical expertise. Let me know if you'd like to dive deeper into any specific metric or approach!
+
