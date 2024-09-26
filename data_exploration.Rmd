@@ -10,11 +10,11 @@ I will use this project to peprare and extract insights from the raster data for
 ```{r load libraries}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'here', 'gdalUtilities', 'jsonlite', 'devtools')
-sapply(packs, require, character.only = TRUE, warning = FALSE)
+sapply(packs, require, character.only = TRUE)
 ```
 
 
-2. Load The polygos with the areas
+2. Load The polygons with the NBS areas
 ```{r}
 
 poly <- st_read('/Volumes/Jero_HDD/WWF/NBS_OPS/vector/areas_nbs.geojson') 
@@ -60,10 +60,21 @@ acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[
 
 map(1:length(access_nature), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'global_people_access_population_2019_60.0m_', nam[x], '.tif'), overwrite=TRUE))
 
+    
+    
+access_nature<- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d.tif')
+
+access_nature <- map(1:length(poly), function(x) crop(access_nature, poly[[x]]))
+access_nature <- map(1:length(access_nature), function(x) mask(access_nature[[x]], poly[[x]]))
+
+map(1:length(access_nature), function(x) writeRaster(access_nature[[x]], paste0('/Users/sputnik/Documents/Natural_capital/NBS_OP/data/raster/', 'coastal_risk_reduction', nam[x], '.tif'), overwrite=TRUE))
+
+
+
 ```
 
 
-# Iterate over all rasters
+# Iterate over all rasters (this has been annoying)
 
 ```{r iterate crop}
 wd <- '/Volumes/Jero_HDD/WWF/global_outputs'
@@ -132,6 +143,155 @@ sediment <- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/
 For summarizing geotiff raster files and comparing values across protected areas or different land covers for an initial assessment, especially for an audience without geospatial expertise, here are some accessible metrics you can use:
 1. Basic Statistical Summaries:
 
+```{r basiv summaries}
+
+here('data', 'raster')
+
+lc <- list.files(here('data', 'raster'), pattern= 'LC')
+lc <- file.path(here('data', 'raster'),lc)
+cls <- lapply(lc, rast)
+fr <- lapply(cls, freq)
+
+lsmet <- lapply(cls, function(r){
+  mets <- lsm_c_ai(r)
+})
+
+
+lsmet <- lapply(seq_along(lsmet), function(i) {
+  lsmet[[i]]$AREA <- nam[i]
+  return(lsmet[[i]])
+})
+```
+
+
+Beneficiaries and coastal protection pop< 10 dowstreams
+
+```{r load coastal}
+
+wd <- '/Users/sputnik/Documents/Natural_capital/NBS_OP/data/vector/'
+
+gt <- list.files(wd, pattern='geojson')
+
+gt <- gt[-c(1,2,8)]
+
+gt <- file.path(gt)
+
+cp <- lapply(gt, st_read)
+
+```
+
+
+
+45 - 19 (calculate the values) for coastal riske reduction
+
+Substract these columnns, and map this thing again 
+Add legenf (in terms of hig-low)
+
+include access change
+
+then, go throuhg these change rasterd (priority 4 and take al ook at them and think waht can be done here, and show differences for land covers), inside7outside protected areas (UICN cat National park Ia , Ib, II, III, IV , V, VI)
+
+
+
+#######################################################################
+
+Second part with justin.
+
+# Explore Data. 
+
+The ecorregiosn Raster is not suited, 830 different values. Could be done but does not make a lot of sense
+```{r explore data}
+
+ecoregions <- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/Ecoregions2017_compressed_md5_316061.tif')
+
+ec_uniqe <- unique(ecoregions)
+```
+
+Use vector file, just the main biomes. 
+
+# PA 
+
+```{r filter out PAs}
+
+pa <- st_read('/Users/sputnik/Documents/Natural_capital/NBS_OP/data/vector/global-2024-05-08.gpkg')
+
+att <- unique(pa$IUCN_CAT)
+
+filt <- c("Not Reported", "Not Assigned", "Not Applicable")
+pa <- pa %>% filter(!(IUCN_CAT %in% filt))
+
+st_write(pa, '/Users/sputnik/Documents/Natural_capital/NBS_OP/data/vector/PA_filt.gpkg')
+
+
+
+countries <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/cartographic_ee_ee_r264_correspondence.gpkg')
+
+pa <- st_transform(pa, crs=st_crs(countries))
+
+```
+
+split the rasters by biomes
+
+```{r split countries}
+wd. <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products'
+
+tf <- list.files(wd., pattern='1992')
+tf <- clean_filename(tf)
+
+tf <- tf[-c(2,3,5)]
+
+
+tiffes <- file.path(wd., list.files(wd., pattern='1992'))
+rs <- lapply(tiffes, rast) 
+
+rs <- rs[-3]
+
+biomes <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/global_products/biomes_WWF.gpkg')
+
+
+nam <- sort(biomes$BIOME)
+
+biomes <- biomes %>% split(.$BIOME)
+
+# Apply cropping and masking recursively using lapply and map
+rs_msk <- lapply(rs, function(raster) {
+  map(biomes, function(polygon) {
+    # Crop the raster to the extent of the polygon
+    cropped_raster <- crop(raster, polygon)
+    masked_raster <- mask(cropped_raster, polygon)
+    return(masked_raster)
+  })
+})
+
+outpath <- '~/Documents/Natural_capital/Global_mapping/rest_masked_biomes'
+# Use lapply to iterate over each list in nested_list
+lapply(seq_along(rs_msk), function(i) {
+  # For each outer list, iterate through the inner list (rasters)
+  lapply(seq_along(rs_msk[[i]]), function(j) {
+    
+    # Construct the filename using vector_1 and vector_2
+    file_name <- paste0(outpath, tf[[i]], '_', nam[[j]], '.tif')
+    
+    # Write the raster to the file
+    writeRaster(rs_msk[[i]][[j]], file_name, overwrite = TRUE)
+  })
+})
+
+
+```
+
+
+# Split by Countries/continents
+# mask by protected areas (all togeter, chategories I-VI)
+
+# Reclassify Land Cover maps. 
+
+So, now what does this mean?
+
+
+
+Add column with the class names with multiple aggregation levels (ESA)
+
     Mean: The average value within each zone (e.g., inside/outside protected areas or across land cover types). This provides a simple understanding of the central tendency.
     Median: The middle value when data is ordered, useful when your data has outliers that could skew the mean.
     Standard Deviation: Indicates the variation or dispersion from the average, helping show if values are clustered or spread out.
@@ -178,4 +338,24 @@ For summarizing geotiff raster files and comparing values across protected areas
     Create a composite map where multiple variables are aggregated to show high- vs. low-value areas for ecosystem services. This could simplify complex data into an easily interpretable map for non-specialists.
 
 These summaries will provide enough detail to highlight key insights, while also being interpretable by those without technical expertise. Let me know if you'd like to dive deeper into any specific metric or approach!
+
+
+Produyces forest loss maps/gain permanences
+
+
+Country/continent
+
+Biomes. (Köppen)
+
+
+Population.
+
+Acess Population access. With the change un land covers. 
+
+National park Ia , 1b, 2, III, IV , V, VI.
+
+
+
+
+
 
