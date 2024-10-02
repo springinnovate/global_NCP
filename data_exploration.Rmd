@@ -25,6 +25,29 @@ nam <- sort(nam)
 poly <- poly%>%split(.$COUNTR)
 ```
 
+
+3. Prepare Inventory to organize data 
+
+I am having to many issues with the data ialready have and the one i don't and it gests confusing, so I am workin on a table that shhould make this easier
+
+```{r organzie inventory}
+
+tab <- as_tibble(read.csv('/Volumes/Jero_HDD/POSDOC/Downloaded_data_ES/inventory_global_products.csv'))
+library(dplyr)
+
+# Assuming your tibble is called 'data'
+tab <- tab %>%
+  select(-matches("^X(\\.\\d+)?$"))
+
+# Print the cleaned tibble
+print(cleaned_data)
+
+tab <- tab %>% slice(1:218)
+tab <- tab %>% mutate(Filename= basename(Link))
+
+write.csv(tab, file= '/Volumes/Jero_HDD/POSDOC/Downloaded_data_ES/inventory_global_products.csv')
+
+```
 Test with one raster
 ```{r load rst}
 
@@ -143,7 +166,7 @@ sediment <- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/
 For summarizing geotiff raster files and comparing values across protected areas or different land covers for an initial assessment, especially for an audience without geospatial expertise, here are some accessible metrics you can use:
 1. Basic Statistical Summaries:
 
-```{r basiv summaries}
+```{r basic summaries}
 
 here('data', 'raster')
 
@@ -155,7 +178,6 @@ fr <- lapply(cls, freq)
 lsmet <- lapply(cls, function(r){
   mets <- lsm_c_ai(r)
 })
-
 
 lsmet <- lapply(seq_along(lsmet), function(i) {
   lsmet[[i]]$AREA <- nam[i]
@@ -183,6 +205,41 @@ cp <- lapply(gt, st_read)
 
 
 45 - 19 (calculate the values) for coastal riske reduction
+
+```{r coastal risk red}
+
+wd <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector'
+
+coastal_risk_reduction_MEXICO.geojson
+
+pat <- file.path(wd, list.files(wd, pattern="coastal_risk"))
+pat <- pat[c(1,3,5,7,9)]
+
+vat <- lapply(pat, st_read)
+vat <- lapply(vat, function(v){
+  v <- v %>% mutate(rt_fin=Rt_nohab_all-Rt)
+})
+
+
+library(sf)
+library(janitor)
+
+# Standardize column names and save each sf object
+lapply(seq_along(vat), function(i) {
+  # Clean column names to ensure compatibility
+  vat[[i]] <- clean_names(vat[[i]])
+  
+  # Save the sf object to the specified path
+  st_write(vat[[i]], pat[i], append = FALSE, delete_layer = TRUE)
+})
+
+
+lapply(seq_along(vat), function(i) {
+  st_write(vat[[i]], pat[i], append = TRUE)
+})
+
+
+```
 
 Substract these columnns, and map this thing again 
 Add legenf (in terms of hig-low)
