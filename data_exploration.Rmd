@@ -9,15 +9,15 @@ I will use this project to peprare and extract insights from the raster data for
 1. Prepare Environemnt (Load necessary libraries)
 ```{r load libraries}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
-           'here', 'gdalUtilities', 'jsonlite', 'devtools')
+           'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr', 'parallel', 'dplyr', 'tidyr')
 sapply(packs, require, character.only = TRUE)
+rm(packs)
 ```
-
 
 2. Load The polygons with the NBS areas
 ```{r}
 
-poly <- st_read('/Volumes/Jero_HDD/WWF/NBS_OPS/vector/areas_nbs.geojson') 
+poly <- st_read('/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector/areas_nbs.geojson') 
 #Split the vector into a list of individual polygons
 #create vector with names
 nam <- poly$COUNTR
@@ -25,12 +25,11 @@ nam <- sort(nam)
 poly <- poly%>%split(.$COUNTR)
 ```
 
-
 3. Prepare Inventory to organize data 
 
 I am having to many issues with the data ialready have and the one i don't and it gests confusing, so I am workin on a table that shhould make this easier
 
-```{r organzie inventory}
+```{r organize inventory, eval=FALSE, include=FALSE}
 
 tab <- as_tibble(read.csv('/Volumes/Jero_HDD/POSDOC/Downloaded_data_ES/inventory_global_products.csv'))
 library(dplyr)
@@ -49,8 +48,9 @@ write.csv(tab, file= '/Volumes/Jero_HDD/POSDOC/Downloaded_data_ES/inventory_glob
 
 ```
 Test with one raster
-```{r load rst}
-
+I already did this, it is quite annoying but anyway, no need to do again
+```{r load rst, eval=FALSE, include=FALSE}
+#Land cover
 esamod <- rast('/Volumes/Jero_HDD/WWF/global_outputs/ESAmodVCFv2_md5_05407ed305c24604eb5a38551cddb031.tif')
 
 esamod <- map(1:length(poly), function(x) crop(esamod, poly[[x]]))
@@ -58,22 +58,22 @@ esamod <- map(1:length(esamod), function(x) mask(esamod[[x]], poly[[x]]))
 
 map(1:length(esamod), function(x) writeRaster(esamod[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'esaLC_', nam[x], '.tif'), overwrite=TRUE))
 
+# Access
 access_nature<- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif')
-
 
 access_nature <- map(1:length(poly), function(x) crop(access_nature, poly[[x]]))
 access_nature <- map(1:length(access_nature), function(x) mask(access_nature[[x]], poly[[x]]))
 
 map(1:length(access_nature), function(x) writeRaster(access_nature[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'nature_access_ESA_2020', nam[x], '.tif'), overwrite=TRUE))
 
-
+# Access restoration
 acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_diff_Sc3v1_PNVnoag-esa2020.tif')
 acces_rest <- project(acces_rest, acc2, method='bilinear')
 
 acces_rest <- map(1:length(poly), function(x) crop(acces_rest, poly[[x]]))
 acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
-
 map(1:length(access_nature), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'nature_access_diff_Sc3v1_PNVnoag-esa2020_', nam[x], '.tif'), overwrite=TRUE))
+
 
 acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/global_people_access_population_2019_60.0m_md5_d264d371bd0d0a750b002a673abbb383.tif')
 acces_rest <- project(acces_rest, acc2, method='bilinear')
@@ -83,8 +83,6 @@ acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[
 
 map(1:length(access_nature), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'global_people_access_population_2019_60.0m_', nam[x], '.tif'), overwrite=TRUE))
 
-    
-    
 access_nature<- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d.tif')
 
 access_nature <- map(1:length(poly), function(x) crop(access_nature, poly[[x]]))
@@ -92,26 +90,35 @@ access_nature <- map(1:length(access_nature), function(x) mask(access_nature[[x]
 
 map(1:length(access_nature), function(x) writeRaster(access_nature[[x]], paste0('/Users/sputnik/Documents/Natural_capital/NBS_OP/data/raster/', 'coastal_risk_reduction', nam[x], '.tif'), overwrite=TRUE))
 
-
-
 ```
 
 
 # Iterate over all rasters (this has been annoying)
 
 ```{r iterate crop}
-wd <- '/Volumes/Jero_HDD/WWF/global_outputs'
+wd <- '/Volumes/Jero_HDD/POSDOC/Downloaded_data_ES'
 setwd(wd)
 
-tiffes <- list.files(wd, pattern= 'downstream')
-#tiffes <- tiffes[-c(5,7)]
+tiffes <- list.files(wd, pattern= '2020-1992')
+tiffes <- tiffes[-2]
 paths <- file.path(wd, tiffes)
+n <- 3
 
+t <- rast(paths[[n]])
 clean_filename <- function(filename) {
   sub("_md5.*", "", filename)
 }
 
-output_path <- '/Volumes/Jero_HDD/WWF/NBS_OPS/raster/'
+output_path <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data/'
+
+ cropped <- map(1:length(poly), function(x) crop(t, poly[[x]]))
+  masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
+  
+  # Extract the base filename before 'md5'
+  base_filename <- clean_filename(basename(paths[[n]]))
+  
+  # Write the cropped and masked rasters to files
+  map(1:length(masked), function(x) (writeRaster(masked[[x]], paste0(output_path, base_filename, "_", nam[x], ".tif"), overwrite = TRUE)))
 
 # Remove faulty data
 #tiffes <- tiffes[-1]
@@ -155,6 +162,7 @@ acc2 <- rast('/Volumes/Jero_HDD/WWF/global_outputs/temp/access_WGS84.tif')
 acc <- project(acc,acc2)
 writeRaster(acc, '/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif')
 ```
+
 # Explore rasters
 (max min values, unique, frequencies)
 ```{r explore rasters}
@@ -166,16 +174,79 @@ sediment <- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/
 For summarizing geotiff raster files and comparing values across protected areas or different land covers for an initial assessment, especially for an audience without geospatial expertise, here are some accessible metrics you can use:
 1. Basic Statistical Summaries:
 
+# set class names and colors
+
+```{r set symbols}
+lb <- data.frame(
+  Class <- c("Cultivated", "Forest", "Shrubs and Grasses", "Sparse",
+            "Mangroves", "Urban", "Bare", "Water"),
+  color=c("#dcf064", "#00b809", "#d29000", "#ffebaf", "#009678", "#c31400", 
+            "#fff5d7", "#0046c8"),
+  value=c(1:8))
+names(lb) <- c("Class", "color", "value")
+```
+
+#Summaries Land cover
 ```{r basic summaries}
 
-here('data', 'raster')
+path_lc <- '/Volumes/Jero_HDD/POSDOC/ESA_LC'
+# load reclassified land cover map
+tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
+lc <- lapply(tf,rast)
 
-lc <- list.files(here('data', 'raster'), pattern= 'LC')
-lc <- file.path(here('data', 'raster'),lc)
-cls <- lapply(lc, rast)
-fr <- lapply(cls, freq)
+#this needs to be converted into projected coordinates before extracting the metrics
+props <- lapply(lc, function(r){
+  mets <- freq(r)
+})
+props <- lapply(seq_along(props), function(i) {
+  props[[i]]$AREA <- nam[i]
+  return(props[[i]])
+})
 
-lsmet <- lapply(cls, function(r){
+props <- do.call(rbind, props)
+
+props <- as_tibble(props)
+lb <- as_tibble(lb)
+props <- left_join(props, lb)
+
+
+# Assume your data is stored in a tibble called `data`
+props <- props %>%
+  group_by(AREA, layer) %>%
+  mutate(percentage = count / sum(count) * 100) %>%  # Calculate percentage
+  ungroup()
+
+# Create the bar plot using ggplot2
+ggplot(props, aes(x = Class, y = percentage, fill = color)) +
+  geom_bar(stat = "identity") +  # Use identity since we are plotting pre-calculated values
+  scale_fill_identity() +  # Use the exact colors provided in the `color` column
+  facet_grid(layer ~ AREA) +  # Create a grid with rows for `AREA` and columns for `layer`
+  labs(title = "Class Distribution by Area and Year",
+       x = "Class",
+       y = "Percentage") +
+  #theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for readability
+
+
+color_mapping <- props %>% 
+  distinct(Class, color) %>% 
+  pull(color, name = Class)
+# By Region
+
+t <- ggplot(props, aes(x=Class, y=value, fill=Class)+
+              geom_bar()+
+              scale_fill_manual(values=color_mapping)+
+            facet_grid(AREA~layer)+
+              labs(
+                x= "Class",
+                y= "pix",
+                color="Class"
+              )
+)
+              
+
+#this needs to be converted into projected coordinates before extracting the metrics
+lsmet <- lapply(lc, function(r){
   mets <- lsm_c_ai(r)
 })
 
@@ -184,27 +255,16 @@ lsmet <- lapply(seq_along(lsmet), function(i) {
   return(lsmet[[i]])
 })
 ```
-
-
-Beneficiaries and coastal protection pop< 10 dowstreams
-
-```{r load coastal}
-
-wd <- '/Users/sputnik/Documents/Natural_capital/NBS_OP/data/vector/'
-
-gt <- list.files(wd, pattern='geojson')
-
-gt <- gt[-c(1,2,8)]
-
-gt <- file.path(gt)
-
-cp <- lapply(gt, st_read)
-
-```
+Get the restoration and send the charts 
 
 
 
-45 - 19 (calculate the values) for coastal riske reduction
+
+
+Beneficiaries and coastal protection pop< 10 downstreams
+I already produced the map.
+
+45 - 19 (calculate the values) for coastal risk reduction
 
 ```{r coastal risk red}
 
@@ -213,7 +273,8 @@ wd <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector'
 coastal_risk_reduction_MEXICO.geojson
 
 pat <- file.path(wd, list.files(wd, pattern="coastal_risk"))
-pat <- pat[c(1,3,5,7,9)]
+
+pat <- pat[-5]
 
 vat <- lapply(pat, st_read)
 vat <- lapply(vat, function(v){
@@ -238,16 +299,357 @@ lapply(seq_along(vat), function(i) {
   st_write(vat[[i]], pat[i], append = TRUE)
 })
 
-
 ```
 
 Substract these columnns, and map this thing again 
-Add legenf (in terms of hig-low)
+Add legend (in terms of hig-low)
 
 include access change
 
-then, go throuhg these change rasterd (priority 4 and take al ook at them and think waht can be done here, and show differences for land covers), inside7outside protected areas (UICN cat National park Ia , Ib, II, III, IV , V, VI)
+then, go through these change raster (priority 4 and take a look at them and think what can be done here, and show differences for land covers), inside outside protected areas (UICN cat National park Ia , Ib, II, III, IV , V, VI)
 
+# Get summaries
+
+Barplots/distributions outisde inside protected areas/land cover classes as a way to see if protected areas are abnormally represented.
+## Get summaries per PA.
+
+```{r get summaries}
+#load protected areas
+poly = st_read('/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector/wdpa_nbs.gpkg')
+#remove those without UICN cathegory
+filt <- c("Not Reported", "Not Assigned", "Not Applicable")
+poly <- poly %>% filter(!(IUCN_CAT %in% filt))
+poly <- poly%>%split(.$COUNTR)
+
+#Get baseline values for ecosystem services. Will use the 2020baseline values
+# set inpath
+wd <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data'
+wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/cropped_rasters'
+lab <- list.files(wd, pattern="tif")
+lab <- lab[c(11:15,21:25,41:45)]
+lab <- sapply(lab, function(x) {
+  basename(tools::file_path_sans_ext(x))
+})
+
+
+
+
+tiffes <- file.path(wd, list.files(wd, pattern="tif"))
+tiffes <- tiffes[c(11:15,21:25,41:45)]
+# 
+baseES <- lapply(tiffes, rast)
+
+  # Extract only the file name without the extension
+tfs <- sapply(tiffes, function(x) {
+  basename(tools::file_path_sans_ext(x))
+})
+
+tfs <- as_tibble(tfs)
+
+
+# Define a function to compute the total sum for each SpatRaster
+compute_sum <- function(raster) {
+  total_sum <- global(raster, fun = "sum", na.rm = TRUE)[,1]  # Use global() to get the sum
+  return(total_sum)
+}
+
+# This has the total ES per site
+totSE <-  mclapply(baseES, compute_sum, mc.cores = detectCores() - 4)
+totSE <- as_tibble(unlist(totSE))
+
+totSE <- cbind(tfs,totSE)
+
+
+ap <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/pa_nbs.shp')
+
+filt <- c("Not Reported", "Not Assigned", "Not Applicable")
+ap <- ap %>% filter(!(IUCN_CAT %in% filt))
+ap <- ap%>%split(.$COUNTR)
+
+s1 <- list(baseES[[1]],baseES[[6]],baseES[[11]])
+s2 <- list(baseES[[2]],baseES[[7]],baseES[[12]])
+s3 <- list(baseES[[3]],baseES[[8]],baseES[[13]])
+s4 <- list(baseES[[4]],baseES[[9]],baseES[[14]])
+s5 <- list(baseES[[5]],baseES[[10]],baseES[[15]])
+
+s1 <- lapply(s1, function(r){
+  r <- mask(r,ap[[1]])
+})
+s2 <- lapply(s2, function(r){
+  r <- mask(r,ap[[2]])
+})
+s3 <- lapply(s3, function(r){
+  r <- mask(r,ap[[3]])
+})
+s4 <- lapply(s4, function(r){
+  r <- mask(r,ap[[4]])
+})
+s5 <- lapply(s5, function(r){
+  r <- mask(r,ap[[5]])
+})
+
+baseES_ap <- list(s1[[1]],s2[[1]],s3[[1]],s4[[1]],s5[[1]],s1[[2]],s2[[2]],s3[[2]],s4[[2]],s5[[2]],s1[[3]],s2[[3]],s3[[3]],s4[[3]],s5[[3]])
+
+# Assume you have a list of SpatRasters called raster_list
+msk_all <- lapply(baseES, function(r) {
+  # Replace all non-NA values with 1 using ifel()
+  ifel(!is.na(r), 1, NA)
+})
+
+
+msk_ap <- lapply(baseES_ap, function(r) {
+  # Replace all non-NA values with 1 using ifel()
+  r <- ifel(!is.na(r), 1, NA)
+})
+
+
+# msk_all <- mclapply(baseES, function(r){
+#   r <- subst(r, from = c(1: 1000000), to =1)
+# },mc.cores = detectCores() - 4)
+# 
+# 
+# 
+freq_a <- lapply(msk_all, function(r){
+  f <- freq(r)
+})
+freq_a <- do.call(rbind, freq_a)
+
+freq_ap <- lapply(msk_ap, function(r){
+  f <- freq(r)
+})
+
+freq_ap <- do.call(rbind, freq_ap)
+
+freq_a <- freq_a %>% select(3)
+freq_ap <- freq_ap %>% select(3)
+
+
+totSE_ap <-  lapply(baseES_ap, compute_sum)#, mc.cores = detectCores() - 4)
+totSE_ap <- as_tibble(unlist(totSE_ap))
+
+
+totSE <- cbind(totSE, totSE_ap)
+
+totSE <- cbind(totSE, freq_a, freq_ap)
+names(totSE) <- c("Service", "WholeArea", "PArea", "pix_count_area", "pix_count_pa")
+
+#Calcualte share protected area/total
+totSE <- totSE %>% mutate(share_service= (PArea/WholeArea)*100)
+totSE <- totSE %>% mutate(share_area= (pix_count_pa/pix_count_area)*100)
+
+totSE <- totSE%>% mutate(Country = str_extract(Service, "[^_]+$")) %>%  # Extract the text after the last '_'
+  # Step 2: Remove the last '_' and country name from the original value column
+  mutate(Service = str_remove(Service, "_[^_]+$"))
+
+totSE_l <- totSE %>%
+  # Create a new column with simplified service names
+  mutate(Service = case_when(
+    Service == "global_n_retention_esamod2_compressed" ~ "Nitrogen Retention",
+    Service == "global_sed_retention_esamod2_compressed" ~ "Sediment Retention",
+    Service == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
+    TRUE ~ Service  # Keep other names unchanged, if any
+  )) %>%
+  # Select relevant columns and reshape the data into long format
+  select(Service, share_service, share_area, Country) %>%
+  pivot_longer(cols = c(share_service, share_area),
+               names_to = "Metric",
+               values_to = "Value")
+
+write.csv(totSE, file=here('data', "totSE.csv"))
+
+# Get the histograms
+baseES_v <- lapply(baseES, function(r){
+  t <- values(r, na.rm=TRUE)
+})
+
+baseESap_v <- lapply(baseES_ap, function(r){
+  t <- values(r, na.rm=TRUE)
+})
+
+baseES_v <- lapply(baseES_v, function(r){
+  t <- as_tibble(r)
+})
+
+baseESap_v <- lapply(baseESap_v, function(r){
+  t <- as_tibble(r)
+})
+
+baseES_v <- lapply(seq_along(baseES_v), function(i) {
+  cbind(baseES_v[[i]], NewColumn = lab[i])
+})
+
+baseESap_v <- lapply(seq_along(baseESap_v), function(i) {
+  cbind(baseESap_v[[i]], NewColumn = lab[i])
+})
+
+new_col <- "Value"
+# Use lapply to rename the first column of each tibble
+baseES_v <- lapply(baseES_v, function(tbl) {
+  tbl %>%
+    rename(!!new_col := 1)  # Rename first column using column position
+})
+
+baseESap_v <- lapply(baseESap_v, function(tbl) {
+  tbl %>%
+    rename(!!new_col := 1)  # Rename first column using column position
+})
+
+
+baseES_v <- do.call(rbind, baseES_v)
+baseESap_v <- do.call(rbind, baseESap_v)
+
+names(baseES_v) <- c("Value", "Service")
+names(baseESap_v) <- c("Value", "Service")
+
+baseES_v <- baseES_v%>% mutate(Country = str_extract(Service, "[^_]+$")) %>%  # Extract the text after the last '_'
+  # Step 2: Remove the last '_' and country name from the original value column
+  mutate(Service = str_remove(Service, "_[^_]+$"))
+
+baseES_v <- baseES_v%>% mutate(set = "all")
+
+
+baseESap_v <- baseESap_v%>% mutate(Country = str_extract(Service, "[^_]+$")) %>%  # Extract the text after the last '_'
+  # Step 2: Remove the last '_' and country name from the original value column
+  mutate(Service = str_remove(Service, "_[^_]+$"))
+
+baseESap_v <- baseESap_v%>% mutate(set = "protected_areas")
+
+baseES_vf <- rbind(baseES_v, baseESap_v)
+
+baseES_vf <- baseES_vf %>%
+  # Create a new column with simplified service names
+  mutate(Service = case_when(
+    Service == "global_n_retention_esamod2_compressed" ~ "Nitrogen Retention",
+    Service == "global_sed_retention_esamod2_compressed" ~ "Sediment Retention",
+    Service == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
+    TRUE ~ Service  # Keep other names unchanged, if any
+  )) 
+
+write.csv(baseES_vf, here('data', "distributionServ.csv"))
+# Calculate the 98th percentile for each combination of Service and Country
+percentile_98 <- baseES_vf %>%
+  group_by(Service, Country) %>%
+  summarize(threshold_98 = quantile(Value, 0.98)) %>%
+  ungroup()
+percentile_95 <- baseES_vf %>%
+  group_by(Service, Country) %>%
+  summarize(threshold_95 = quantile(Value, 0.95)) %>%
+  ungroup()
+
+
+# Join the threshold back to the original data and filter values up to the 98th percentile
+baseES_vf_filtered <- baseES_vf %>%
+  left_join(percentile_98, by = c("Service", "Country")) %>%
+  filter(Value <= threshold)
+
+baseES_vf_filtered <- baseES_vf %>%
+  left_join(percentile_95, by = c("Service", "Country")) %>%
+  filter(Value <= threshold)
+
+
+# Create the faceted density plot
+ggplot(baseES_vf_filtered, aes(x = Value, fill = set)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_grid(Service ~ Country, scales = "free") +  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `set` variable
+  labs(title = "Density Plot of Services by Country and Set",
+       x = "Value",
+       y = "Density",
+       fill = "Set") +  # Label for the fill legend
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+
+
+Country <- c("BRAZIL", "MADAGASCAR", "MEXICO", "PERU","VIETNAM")
+
+C <- 5
+
+t2 <- baseES_vf_filtered %>% filter(Country=="VIETNAM")
+
+t# Create the faceted density plot
+ggplot(t2, aes(x = Value, fill = set)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_wrap(~Service, scales = "free") +  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `set` variable
+  labs(title = paste("Density Plot of Services Inside and Outside Protected Areas -", Country[C]),
+       x = "Value",
+       y = "Density",
+       fill = "Set") +  # Label for the fill legend
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+
+```
+# Plot the shares
+
+```{r ggplot, h=8, w=8}
+
+# Step 2: Create the bar plot
+ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7)) +  # Side-by-side bars
+  facet_wrap(~ Country, ncol = 5) +  # Create 5 columns (one for each country)
+  scale_fill_brewer(palette = "Set3") +  # Use a color palette for services
+  labs(title = "Share of the protected areas and of the total ES provided inside them",
+       x = "Metric",
+       y = "%",
+       fill = "Service") +
+  #theme_minimal() +
+   theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels for readability
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal",  # Arrange legend items horizontally
+    legend.spacing.x = unit(0.1, 'cm'),  # Add horizontal spacing between legend items
+    legend.title = element_text(size = 12, face = "bold"),  # Adjust legend title size
+    legend.text = element_text(size = 10),  # Adjust legend text size
+    legend.box.just = "center"  # Center the legend items
+  )
+
+
+
+```
+# Restorastion Areas Griscom
+
+```{r resto}
+wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/global_products/Restoration'
+
+```
+
+# Produce land cover change maps
+```{r land cover change}
+
+#path to lc classifications
+path_lc <- '/Volumes/Jero_HDD/POSDOC/ESA_LC'
+# load reclassified land cover map
+tf <- file.path(path_lc, list.files(path_lc, pattern= "all"))
+lc <- lapply(tf,rast)
+lc <- c(lc[[1]],lc[[2]])
+
+#load study areas
+poly <- st_read('/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector/areas_nbs.geojson')
+nam <- poly$COUNTR
+nam <- sort(nam)
+poly <- poly%>%split(.$COUNTR)
+lc <-map(1:length(poly), function(x) crop(lc, poly[[x]]))
+lc <-map(1:length(poly), function(x) mask(lc[[x]], poly[[x]]))
+map(1:length(poly), function(x) writeRaster(lc[[x]], paste0(path_lc, '/', 'ESA_LC_rec_', nam[x], '.tif')))
+
+chmaps <- lapply(lc, function(r){
+  ch_mapR(r)
+})
+
+map(1:length(chmaps), function(x) writeRaster(chmaps[[x]][[1]], paste0(path_lc, '/', 'ESA_LC_change', nam[x], '.tif')), overwite=TRUE)
+
+
+# pending: set a rule to deal wit those combinations that have to few pixels, not worth the time and effort,
+
+```
 
 
 #######################################################################
@@ -417,7 +819,11 @@ mat_1 <- crosstabm(esas[[1]],esas[[2]])
 
 diffs_p <-  diffTablej(mat, digits=3, analysis = "change")
 
+```
 
+
+# Get Sankey Diagrams
+```{r Sankey Diagram}
 classes <- c("Cultivated", "Forests", "Grasses/shrubs", "Sparse", "Mangroves", "Urban", "Bare", "Water")
 groupColor <- c("#dcf064","#00b809","#8ca000","#ffebaf",'#009678', "#c31400", "#fff5d7", "#0046c8")
 
@@ -465,6 +871,9 @@ sankeyNetwork(Links = linkInfo, Nodes = nodeInfo,
               nodeWidth = nodeWidth,
               colourScale = JS(colorScaleJS))
 ```
+
+
+
 # Next step
 1. Zonal Countries. one per service
 
@@ -588,11 +997,6 @@ Country/continent
 Biomes. (Köppen)
 
 
-Population.
-
-Acess Population access. With the change un land covers. 
-
-National park Ia , 1b, 2, III, IV , V, VI.
 
 
 
