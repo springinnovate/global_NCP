@@ -9,8 +9,9 @@ I will use this project to peprare and extract insights from the raster data for
 1. Prepare Environemnt (Load necessary libraries)
 ```{r load libraries}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
-           'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr', 'parallel', 'dplyr', 'tidyr')
-sapply(packs, require, character.only = TRUE)
+           'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
+           'parallel', 'dplyr', 'tidyr', 'ggplot2')
+sapply(packs, require, character.only = TRUE, quietly=TRUE)
 rm(packs)
 ```
 
@@ -258,9 +259,6 @@ lsmet <- lapply(seq_along(lsmet), function(i) {
 Get the restoration and send the charts 
 
 
-
-
-
 Beneficiaries and coastal protection pop< 10 downstreams
 I already produced the map.
 
@@ -332,31 +330,27 @@ lab <- sapply(lab, function(x) {
 })
 
 
-
-
 tiffes <- file.path(wd, list.files(wd, pattern="tif"))
 tiffes <- tiffes[c(11:15,21:25,41:45)]
-# 
+#
+#This will be done for access for 2020 to add
+tiffes <- tiffes[c(66:70)] 
 baseES <- lapply(tiffes, rast)
 
   # Extract only the file name without the extension
 tfs <- sapply(tiffes, function(x) {
   basename(tools::file_path_sans_ext(x))
 })
-
 tfs <- as_tibble(tfs)
-
 
 # Define a function to compute the total sum for each SpatRaster
 compute_sum <- function(raster) {
-  total_sum <- global(raster, fun = "sum", na.rm = TRUE)[,1]  # Use global() to get the sum
-  return(total_sum)
+  total_sum <- global(raster, fun = "sum", na.rm = TRUE)[,1]  # Use global() to get   return(total_sum)
 }
 
 # This has the total ES per site
 totSE <-  mclapply(baseES, compute_sum, mc.cores = detectCores() - 4)
 totSE <- as_tibble(unlist(totSE))
-
 totSE <- cbind(tfs,totSE)
 
 
@@ -366,11 +360,16 @@ filt <- c("Not Reported", "Not Assigned", "Not Applicable")
 ap <- ap %>% filter(!(IUCN_CAT %in% filt))
 ap <- ap%>%split(.$COUNTR)
 
+# This is very bad work, and i did not even document it correctly. Terrible practices here.
+# This was to fix the order of the lists of ecosystem services ws the list of protected areas. I don;'t remeber why this happened and why i decided this was a good way to  fixing it. 
 s1 <- list(baseES[[1]],baseES[[6]],baseES[[11]])
 s2 <- list(baseES[[2]],baseES[[7]],baseES[[12]])
 s3 <- list(baseES[[3]],baseES[[8]],baseES[[13]])
 s4 <- list(baseES[[4]],baseES[[9]],baseES[[14]])
 s5 <- list(baseES[[5]],baseES[[10]],baseES[[15]])
+
+
+st <- map2(baseES, ap, mask)
 
 s1 <- lapply(s1, function(r){
   r <- mask(r,ap[[1]])
@@ -618,6 +617,18 @@ ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
 
 ```{r resto}
 wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/global_products/Restoration'
+
+tiffes <- file.path(wd,list.files(wd, pattern = "\\.tif$", full.names = FALSE))
+tiffes <- tiffes[-5]
+
+rest <- lapply(tiffes, rast)
+plot(rest[[1]])
+
+
+scale_offset <- terra::sources(rest[[1]])
+print(scale_offset)
+categories(rest[[1]])
+hist(values(rest[[1]]), breaks = 100, main = "Distribution of Raster Values", xlab = "Value")
 
 ```
 
