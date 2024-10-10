@@ -9,3 +9,21 @@ extract_summary <- function(raster, polygon, polygon_attribute, fun = fun) {
   )
   return(result)
 }
+
+# Function to extract summary statistics (mean, min, max) for each SpatRaster
+extract_raster_summary <- function(spat_raster, outer_label) {
+  
+  # Extract pixel values, removing NAs
+  pixel_values <- values(spat_raster, na.rm = TRUE)
+  
+  # Calculate summary statistics
+  summary_stats <- data.frame(
+    mean_value = mean(pixel_values, na.rm = TRUE),
+    min_value = min(pixel_values, na.rm = TRUE),
+    max_value = max(pixel_values, na.rm = TRUE),
+    raster_name = names(spat_raster),
+    outer_list_label = outer_label
+  )
+  
+  return(summary_stats)
+}

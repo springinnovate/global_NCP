@@ -1,0 +1,59 @@
+---
+title: "Scratch"
+author: "Jeronimo Rodriguez-Escobar"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+help me out here, I have a set of geotiff files. when I load them into Qgis it shows the values going between 10000 and around 910.000.000 (but there are not that many different values). Datatype in qgis is Int32 - Thirty two bit signed integer an the description is this: "Band 1	
+RepresentationType=THEMATIC
+STATISTICS_MAXIMUM=904140102
+STATISTICS_MEAN=174443073.29641
+STATISTICS_MINIMUM=10000
+STATISTICS_STDDEV=332060166.19559
+STATISTICS_VALID_PERCENT=54.46
+Scale: 1
+Offset: 0
+More information	
+AREA_OR_POINT=Area
+DataType=Generic. ". 
+However, when I load them as SpatRaster objects into R 
+it looks like this: 
+"class       : SpatRaster 
+dimensions  : 3518, 3093, 1  (nrow, ncol, nlyr)
+resolution  : 739.3026, 739.2924  (x, y)
+extent      : -6159837, -3873174, -3169460, -568629  (xmin, xmax, ymin, ymax)
+coord. ref. : World_Cylindrical_Equal_Area 
+source      : Restoration_Potential_Brazil.tif 
+categories  : NCS_Refor, Restore 
+name        : NCS_Refor 
+min value   :         0 
+max value   :         0" . To make things ever more confusing minmax returns this: minmax(rest[[1]])
+    NCS_Refor
+min     10000
+max 905010192 
+
+and getting the frequences yields this:
+> freq(rest[[1]])
+    layer value  count
+1       1     0   1068
+2       1     1      7
+3       1     1     34
+4       1     0     23
+5       1     0     40
+6       1     0      2
+7       1     0 134330
+8       1     1   8174
+9       1     1  15740
+10      1     0   1548
+11      1     0   8835
+
+and many more lines. summary yields this: > summary(rest[[1]])
+ NCS_Refor   
+ 0   : 9833  
+ 1   : 8812  
+ NA's:81741
+ I am confused on why this is happening. I suspect it has to be with the datatype and the way terra in R and qgis handle the data, but can you help me understand this? 
