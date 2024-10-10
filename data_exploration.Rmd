@@ -323,18 +323,15 @@ poly <- poly%>%split(.$COUNTR)
 # set inpath
 wd <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data'
 wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/cropped_rasters'
-lab <- list.files(wd, pattern="tif")
-lab <- lab[c(11:15,21:25,41:45)]
-lab <- sapply(lab, function(x) {
-  basename(tools::file_path_sans_ext(x))
-})
 
 
 tiffes <- file.path(wd, list.files(wd, pattern="tif"))
-tiffes <- tiffes[c(11:15,21:25,41:45)]
-#
-#This will be done for access for 2020 to add
-tiffes <- tiffes[c(66:70)] 
+#tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
+tiffes <-  tiffes[c(1:5, 11:15, 21:25, 41:45)]
+lab <- sapply(tiffes, function(x) {
+  basename(tools::file_path_sans_ext(x))
+})
+
 baseES <- lapply(tiffes, rast)
 
   # Extract only the file name without the extension
@@ -355,22 +352,20 @@ totSE <- cbind(tfs,totSE)
 
 
 ap <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/pa_nbs.shp')
-
 filt <- c("Not Reported", "Not Assigned", "Not Applicable")
 ap <- ap %>% filter(!(IUCN_CAT %in% filt))
 ap <- ap%>%split(.$COUNTR)
-
 # This is very bad work, and i did not even document it correctly. Terrible practices here.
-# This was to fix the order of the lists of ecosystem services ws the list of protected areas. I don;'t remeber why this happened and why i decided this was a good way to  fixing it. 
-s1 <- list(baseES[[1]],baseES[[6]],baseES[[11]])
-s2 <- list(baseES[[2]],baseES[[7]],baseES[[12]])
-s3 <- list(baseES[[3]],baseES[[8]],baseES[[13]])
-s4 <- list(baseES[[4]],baseES[[9]],baseES[[14]])
-s5 <- list(baseES[[5]],baseES[[10]],baseES[[15]])
+# This was to fix the order of the lists of ecosystem services ws the list of protected areas. I don;'t remeber why this happened and why i decided this was a good way to  fixing 
+#baseES <- as.list(as.vector(matrix(baseES, nrow = 5, byrow = FALSE)))
 
+s1 <- list(baseES[[1]],baseES[[6]],baseES[[11]], baseES[[16]])
+s2 <- list(baseES[[2]],baseES[[7]],baseES[[12]], baseES[[17]])
+s3 <- list(baseES[[3]],baseES[[8]],baseES[[13]], baseES[[18]])
+s4 <- list(baseES[[4]],baseES[[9]],baseES[[14]], baseES[[19]])
+s5 <- list(baseES[[5]],baseES[[10]],baseES[[15]], baseES[[20]])
 
-st <- map2(baseES, ap, mask)
-
+#baseEs_ap <- map(baseES, ap, mask)
 s1 <- lapply(s1, function(r){
   r <- mask(r,ap[[1]])
 })
@@ -387,7 +382,9 @@ s5 <- lapply(s5, function(r){
   r <- mask(r,ap[[5]])
 })
 
-baseES_ap <- list(s1[[1]],s2[[1]],s3[[1]],s4[[1]],s5[[1]],s1[[2]],s2[[2]],s3[[2]],s4[[2]],s5[[2]],s1[[3]],s2[[3]],s3[[3]],s4[[3]],s5[[3]])
+
+# this is becasue it is a list, not a multiband raster, but we can fix that
+baseES_ap <- list(s1[[1]],s2[[1]],s3[[1]],s4[[1]],s5[[1]],s1[[2]],s2[[2]],s3[[2]],s4[[2]],s5[[2]],s1[[3]],s2[[3]],s3[[3]],s4[[3]],s5[[3]], s1[[4]],s2[[4]],s3[[4]],s4[[4]], s5[[4]])
 
 # Assume you have a list of SpatRasters called raster_list
 msk_all <- lapply(baseES, function(r) {
@@ -395,19 +392,12 @@ msk_all <- lapply(baseES, function(r) {
   ifel(!is.na(r), 1, NA)
 })
 
-
 msk_ap <- lapply(baseES_ap, function(r) {
   # Replace all non-NA values with 1 using ifel()
   r <- ifel(!is.na(r), 1, NA)
 })
 
 
-# msk_all <- mclapply(baseES, function(r){
-#   r <- subst(r, from = c(1: 1000000), to =1)
-# },mc.cores = detectCores() - 4)
-# 
-# 
-# 
 freq_a <- lapply(msk_all, function(r){
   f <- freq(r)
 })
@@ -422,10 +412,9 @@ freq_ap <- do.call(rbind, freq_ap)
 freq_a <- freq_a %>% select(3)
 freq_ap <- freq_ap %>% select(3)
 
-
+#calculate ES output
 totSE_ap <-  lapply(baseES_ap, compute_sum)#, mc.cores = detectCores() - 4)
 totSE_ap <- as_tibble(unlist(totSE_ap))
-
 
 totSE <- cbind(totSE, totSE_ap)
 
@@ -440,12 +429,15 @@ totSE <- totSE%>% mutate(Country = str_extract(Service, "[^_]+$")) %>%  # Extrac
   # Step 2: Remove the last '_' and country name from the original value column
   mutate(Service = str_remove(Service, "_[^_]+$"))
 
+write.csv(totSE, file=here('data', "totSE.csv"))
+
 totSE_l <- totSE %>%
   # Create a new column with simplified service names
   mutate(Service = case_when(
     Service == "global_n_retention_esamod2_compressed" ~ "Nitrogen Retention",
     Service == "global_sed_retention_esamod2_compressed" ~ "Sediment Retention",
     Service == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
+    Service == "nature_access_ESA" ~ "Access",
     TRUE ~ Service  # Keep other names unchanged, if any
   )) %>%
   # Select relevant columns and reshape the data into long format
@@ -454,7 +446,8 @@ totSE_l <- totSE %>%
                names_to = "Metric",
                values_to = "Value")
 
-write.csv(totSE, file=here('data', "totSE.csv"))
+##########################################################################
+##########################################################################
 
 # Get the histograms
 baseES_v <- lapply(baseES, function(r){
@@ -472,15 +465,23 @@ baseES_v <- lapply(baseES_v, function(r){
 baseESap_v <- lapply(baseESap_v, function(r){
   t <- as_tibble(r)
 })
-
+# waht the fuck does this freaking line do???/ It adds the id for the service
 baseES_v <- lapply(seq_along(baseES_v), function(i) {
   cbind(baseES_v[[i]], NewColumn = lab[i])
+})
+
+baseES_v <- lapply(baseES_v, function(r){
+  r <- as_tibble(r)
 })
 
 baseESap_v <- lapply(seq_along(baseESap_v), function(i) {
   cbind(baseESap_v[[i]], NewColumn = lab[i])
 })
 
+
+baseESap_v <- lapply(baseESap_v, function(r){
+  r <- as_tibble(r)
+})
 new_col <- "Value"
 # Use lapply to rename the first column of each tibble
 baseES_v <- lapply(baseES_v, function(tbl) {
@@ -496,9 +497,11 @@ baseESap_v <- lapply(baseESap_v, function(tbl) {
 
 baseES_v <- do.call(rbind, baseES_v)
 baseESap_v <- do.call(rbind, baseESap_v)
-
+##################### do not run inside the Rmd!!!!!!!!
 names(baseES_v) <- c("Value", "Service")
 names(baseESap_v) <- c("Value", "Service")
+###########################################################
+###########################################################
 
 baseES_v <- baseES_v%>% mutate(Country = str_extract(Service, "[^_]+$")) %>%  # Extract the text after the last '_'
   # Step 2: Remove the last '_' and country name from the original value column
@@ -512,7 +515,6 @@ baseESap_v <- baseESap_v%>% mutate(Country = str_extract(Service, "[^_]+$")) %>%
   mutate(Service = str_remove(Service, "_[^_]+$"))
 
 baseESap_v <- baseESap_v%>% mutate(set = "protected_areas")
-
 baseES_vf <- rbind(baseES_v, baseESap_v)
 
 baseES_vf <- baseES_vf %>%
@@ -521,18 +523,21 @@ baseES_vf <- baseES_vf %>%
     Service == "global_n_retention_esamod2_compressed" ~ "Nitrogen Retention",
     Service == "global_sed_retention_esamod2_compressed" ~ "Sediment Retention",
     Service == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
+    Service == "nature_access_ESA" ~ "Nature Access",
+    Service == "nature_access_ESA_2020" ~ "Nature Access",
     TRUE ~ Service  # Keep other names unchanged, if any
   )) 
+
 
 write.csv(baseES_vf, here('data', "distributionServ.csv"))
 # Calculate the 98th percentile for each combination of Service and Country
 percentile_98 <- baseES_vf %>%
   group_by(Service, Country) %>%
-  summarize(threshold_98 = quantile(Value, 0.98)) %>%
+  summarize(threshold = quantile(Value, 0.98)) %>%
   ungroup()
 percentile_95 <- baseES_vf %>%
   group_by(Service, Country) %>%
-  summarize(threshold_95 = quantile(Value, 0.95)) %>%
+  summarize(threshold = quantile(Value, 0.95)) %>%
   ungroup()
 
 
@@ -546,52 +551,40 @@ baseES_vf_filtered <- baseES_vf %>%
   filter(Value <= threshold)
 
 
-# Create the faceted density plot
-ggplot(baseES_vf_filtered, aes(x = Value, fill = set)) +
+
+Count <- c("BRAZIL", "MADAGASCAR", "MEXICO", "PERU","VIETNAM")
+
+C <- 1
+
+df <- baseES_vf_filtered %>% filter(Country==Count[C]) %>% filter(Service!="Nature Access")
+
+df <- baseES_vf_filtered %>% filter(Service=="Nature Access")
+
+t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  facet_grid(Service ~ Country, scales = "free") +  # Set both x and y axes to be free for each facet
+  #facet_wrap(~Service, scales = "free") +
+  facet_wrap(~Country, scales = "free") +
+  # Set both x and y axes to be free for each facet
   scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `set` variable
-  labs(title = "Density Plot of Services by Country and Set",
+  labs(title = paste("Density Plot of Services Inside and Outside Protected Areas -", Count[C]),
        x = "Value",
        y = "Density",
-       fill = "Set") +  # Label for the fill legend
+       fill = "Set") +
+  #scale_y_continuous(trans = 'log10')# Label for the fill legend
   theme_minimal() +
   theme(
     strip.text = element_text(size = 12),  # Increase facet labels' font size
     legend.position = "bottom",  # Place the legend at the bottom
     legend.box = "horizontal"  # Arrange legend items horizontally
   )
-
-
-Country <- c("BRAZIL", "MADAGASCAR", "MEXICO", "PERU","VIETNAM")
-
-C <- 5
-
-t2 <- baseES_vf_filtered %>% filter(Country=="VIETNAM")
-
-t# Create the faceted density plot
-ggplot(t2, aes(x = Value, fill = set)) +
-  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  facet_wrap(~Service, scales = "free") +  # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `set` variable
-  labs(title = paste("Density Plot of Services Inside and Outside Protected Areas -", Country[C]),
-       x = "Value",
-       y = "Density",
-       fill = "Set") +  # Label for the fill legend
-  theme_minimal() +
-  theme(
-    strip.text = element_text(size = 12),  # Increase facet labels' font size
-    legend.position = "bottom",  # Place the legend at the bottom
-    legend.box = "horizontal"  # Arrange legend items horizontally
-  )
-
+t
 ```
 # Plot the shares
 
 ```{r ggplot, h=8, w=8}
 
 # Step 2: Create the bar plot
-ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
+p <- ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.7)) +  # Side-by-side bars
   facet_wrap(~ Country, ncol = 5) +  # Create 5 columns (one for each country)
   scale_fill_brewer(palette = "Set3") +  # Use a color palette for services
@@ -613,16 +606,115 @@ ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
 
 
 ```
+
 # Restorastion Areas Griscom
 
 ```{r resto}
 wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/global_products/Restoration'
 
+
+
 tiffes <- file.path(wd,list.files(wd, pattern = "\\.tif$", full.names = FALSE))
 tiffes <- tiffes[-5]
 
+
+wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/global_products/Restoration/test'
+
+
 rest <- lapply(tiffes, rast)
-plot(rest[[1]])
+               
+               # This function extracts the 1 and 0 for mthe categorical rasters from restoration and corrects the weird values. did this because i had no metadata. Add the function to a new package eventully
+process_raster <- function(raster) {
+  # Step 1: Extract unique values
+  unique_values <- unique(values(raster, na.rm = TRUE))
+  unique_values <- as.vector(unique_values)  # Convert to vector
+
+  # Step 2: Get frequency counts of each unique value
+  value_frequencies <- freq(raster)
+  val_f <- as.numeric(value_frequencies[, 2])  # Get the frequencies
+
+  # Step 3: Convert raster to numeric
+  raster_numeric <- as.numeric(raster)
+
+  # Step 4: Substitute the values with the frequencies
+  raster_subst <- subst(raster_numeric, from = unique_values, to = val_f)
+
+  # Return the reclassified raster
+  return(raster_subst)
+}
+
+rest  <- lapply(rest, process_raster)
+#reorganize the list by countries, not by products. 
+
+# Step 1: Extract country names from the "source" attribute of each SpatRaster object
+get_country <- function(r) {
+  # Extract the source file path
+  source_name <- sources(r)[1]  # Extract the first source (in case there are multiple)
+
+  # Use a regular expression to extract the country name from the file name
+  # Assuming the file name format is "something_COUNTRY.tif"
+  country <- sub(".*_([^_]+)\\.tif$", "\\1", source_name)
+  return(country)
+}
+
+country_names <- unique(sapply(baseES, get_country))  # Get unique country names
+country_list <- setNames(vector("list", length(country_names)), country_names)
+
+# Step 3: Group SpatRasters by country and populate the nested list
+for (i in seq_along(baseES)) {
+  country <- get_country(baseES[[i]])
+  country_list[[country]] <- c(country_list[[country]], list(baseES[[i]]))
+}
+
+baseES <- country_list
+rm(country_list)
+
+baseES_rp <- lapply(seq_along(baseES), function(i) {
+  # Get the current sublist of SpatRasters from baseES
+  current_sublist <- baseES[[i]]
+  # Get the corresponding template SpatRaster for reprojection
+  template_raster <- rest[[i]]
+  # Use lapply to reproject each SpatRaster in the sublist using the template raster
+  reprojected_sublist <- lapply(current_sublist, function(r) {
+    # Reproject the SpatRaster to match the CRS and extent of the template raster
+    project(r, template_raster, method = "bilinear")
+  })
+  # Return the reprojected sublist
+  return(reprojected_sublist)
+})
+
+
+baseES <- baseES_rp
+rm(baseES_rp)
+
+baseES_0 <- lapply(seq_along(baseES), function(i) {
+  # Get the current sublist of SpatRasters from baseES
+  current_sublist <- baseES[[i]]
+  # Get the corresponding template SpatRaster for reprojection
+  template_raster <- rest[[i]]
+  # Use lapply to reproject each SpatRaster in the sublist using the template raster
+  masked_sublist <- lapply(current_sublist, function(r) {
+    # Reproject the SpatRaster to match the CRS and extent of the template raster
+    mask(r, template_raster, maskvalues=0)
+  })
+  # Return the reprojected sublist
+  return(masked_sublist)
+})
+# ok so far so good, but of course resolution with freaking access is always an issue
+baseES_1 <- lapply(seq_along(baseES), function(i) {
+  # Get the current sublist of SpatRasters from baseES
+  current_sublist <- baseES[[i]]
+  # Get the corresponding template SpatRaster for reprojection
+  template_raster <- rest[[i]]
+  # Use lapply to reproject each SpatRaster in the sublist using the template raster
+  masked_sublist <- lapply(current_sublist, function(r) {
+    # Reproject the SpatRaster to match the CRS and extent of the template raster
+    mask(r, template_raster, maskvalues=1)
+  })
+  # Return the reprojected sublist
+  return(masked_sublist)
+})
+
 
 
 scale_offset <- terra::sources(rest[[1]])
@@ -631,6 +723,41 @@ categories(rest[[1]])
 hist(values(rest[[1]]), breaks = 100, main = "Distribution of Raster Values", xlab = "Value")
 
 ```
+
+```{r get prportions restoration}
+
+rest <- lapply(rest, function(r){
+  r <- project(r, baseES[[1]])
+  })
+
+
+s1 <- list(baseES[[1]],baseES[[6]],baseES[[11]], baseES[[16]])
+s2 <- list(baseES[[2]],baseES[[7]],baseES[[12]], baseES[[17]])
+s3 <- list(baseES[[3]],baseES[[8]],baseES[[13]], baseES[[18]])
+s4 <- list(baseES[[4]],baseES[[9]],baseES[[14]], baseES[[19]])
+s5 <- list(baseES[[5]],baseES[[10]],baseES[[15]], baseES[[20]])
+
+#baseEs_ap <- map(baseES, ap, mask)
+s11 <- lapply(s1, function(r){
+  r <- mask(r,rest[[1]],maskvalues=0)
+})
+s12 <- lapply(s1, function(r){
+  r <- mask(r,rest[[1]],maskvalues=1)
+})
+s2 <- lapply(s2, function(r){
+  r <- mask(r,ap[[2]])
+})
+s3 <- lapply(s3, function(r){
+  r <- mask(r,ap[[3]])
+})
+s4 <- lapply(s4, function(r){
+  r <- mask(r,ap[[4]])
+})
+s5 <- lapply(s5, function(r){
+  r <- mask(r,ap[[5]])
+})
+
+
 
 # Produce land cover change maps
 ```{r land cover change}
