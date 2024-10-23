@@ -9,7 +9,7 @@ I will use this project to peprare and extract insights from the raster data for
 ```{r load libraries, include=FALSE}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
-           'parallel', 'dplyr', 'tidyr', 'ggplot2')
+           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor')
 sapply(packs, require, character.only = TRUE, quietly=TRUE)
 rm(packs)
 ```
@@ -25,20 +25,11 @@ lb <- data.frame(
             "#fff5d7", "#0046c8"),
   value=c(1:8))
 names(lb) <- c("Class", "color", "value")
-lb <- data.frame(
-  Class <- c("Cultivated", "Forest", "Shrubs and Grasses", "Sparse",
-            "Mangroves", "Urban", "Bare", "Water"),
-  color=c("#dcf064", "#00b809", "#d29000", "#ffebaf", "#009678", "#c31400", 
-            "#fff5d7", "#0046c8"),
-  value=c(1:8))
-names(lb) <- c("Class", "color", "value")
 ```
 
 
-
-## 1.2 Load The polygons with the NBS areas
-```{r}
-
+## 2 Crop the Data for the target areas
+```{r load target area polygons}
 poly <- st_read('/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector/areas_nbs.geojson') 
 #Split the vector into a list of individual polygons
 #create vector with names
@@ -46,13 +37,9 @@ nam <- poly$COUNTR
 nam <- sort(nam)
 poly <- poly%>%split(.$COUNTR)
 ```
-
-
-# 2. Crop and mask for the 4 Areas
 ## 2.1 Test with one raster
-This isto process one single raster and thos that require reprojection (access related )
-
-```{r load rst, eval=FALSE, include=FALSE}
+This is to process one single raster and ths that require reprojection (access related )
+```{r crop rast, eval=FALSE, include=FALSE}
 
 #Prepare Land Covers 
 esamod <- rast('/Volumes/Jero_HDD/WWF/global_outputs/ESAmodVCFv2_md5_05407ed305c24604eb5a38551cddb031.tif')
@@ -65,16 +52,15 @@ c_risk_red<- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity
 
 c_risk_red <- map(1:length(poly), function(x) crop(c_risk_red, poly[[x]]))
 c_risk_red <- map(1:length(c_risk_red), function(x) mask(c_risk_red[[x]], poly[[x]]))
-#Que es esto?
-map(1:length(access_nature), function(x) writeRaster(access_nature[[x]], paste0('/Users/sputnik/Documents/Natural_capital/NBS_OP/data/raster/', 'coastal_risk_reduction', nam[x], '.tif'), overwrite=TRUE))
+map(1:length(c_risk_red), function(x) writeRaster(c_risk_red[[x]], paste0('/Users/sputnik/Documents/Natural_capital/NBS_OP/data/raster/', 'coastal_risk_reduction', nam[x], '.tif'), overwrite=TRUE))
 #remeber that the layer as such, keeps the name in a slot and that we are using that. 
 ```
 
-## 2.2 Iterate over all rasters 
+## 2.2 Iterate over Restoration   all rasters 
 
-Restoration Data is being processed here I designed this process because it hought it would be bettr to oad and process each raster indivdually to avoid memory issues, but now i think i am an idiot because the rasters are not totally loaded anyway. 
+Restoration Data is being processed here I designed this process because i thought it would be better to oad and process each raster individually to avoid memory issues, but now i think i am an idiot because the rasters are not totally loaded anyway. 
 
-```{r iterate cropMaks}
+```{r iterate cropMask}
 wd <- '/Volumes/Jero_HDD/POSDOC/Downloaded_data_ES'
 setwd(wd)
 
@@ -123,7 +109,7 @@ for (i in seq_along(tiffes)) {
 
 ```
 
-# 2.3. Reproj and CropMask Accesibility Raster
+## 2.3. Reproj and CropMask Accesibility Raster
 
 ```{r reproj access}
 
@@ -154,14 +140,15 @@ acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/global_people_access_po
 map(1:length(access_rest), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'global_people_access_population_2019_60.0m_', nam[x], '.tif'), overwrite=TRUE))
 ```
 
-So far here i have laoded, reprojected when necessary and cropmasked the global ecosystem reasters for each one of the study areas. (NBS) and exported them back to map in Qgis. 
+##  2.4. Coastal Risk Reduction 
+So far here i have loaded, reprojected when necessary and cropmasked the global ecosystem reasters for each one of the study areas. (NBS) and exported them back to map in Qgis. 
 
 # 3 Explore rasters
 
 For summarizing geotiff raster files and comparing values across protected areas or different land covers for an initial assessment, especially for an audience without geospatial expertise, here are some accessible metrics you can use:
 1. Basic Statistical Summaries:
 
-#Summaries Land cover
+## 3.1 Summaries Land cover
 ```{r basic summaries}
 
 path_lc <- '/Volumes/Jero_HDD/POSDOC/ESA_LC'
@@ -169,111 +156,60 @@ path_lc <- '/Volumes/Jero_HDD/POSDOC/ESA_LC'
 tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
 lc <- lapply(tf,rast)
 
-#this needs to be converted into projected coordinates before extracting the metrics
-props <- lapply(lc, function(r){
-  mets <- freq(r)
-})
-props <- lapply(seq_along(props), function(i) {
-  props[[i]]$AREA <- nam[i]
-  return(props[[i]])
+# Set the target CRS to Equal Earth (EPSG:8857)
+equal_earth_crs <- "EPSG:8857"
+lc <- lapply(lc, function(r){
+  r <- project(r, equal_earth_crs, method='near')
 })
 
-props <- do.call(rbind, props)
-
-props <- as_tibble(props)
-lb <- as_tibble(lb)
-props <- left_join(props, lb)
-
-# Assume your data is stored in a tibble called `data`
-props <- props %>%
-  group_by(AREA, layer) %>%
-  mutate(percentage = count / sum(count) * 100) %>%  # Calculate percentage
-  ungroup()
-
+lsmet <- lapply(lc, function(r){
+  mets <- lsm_c_ca(r)
+})
+lsmet <- lapply(seq_along(lsmet), function(i) {
+  lsmet[[i]]$AREA <- nam[i]
+  return(lsmet[[i]])
+})
+lsmet <- do.call(rbind, lsmet)
+lsmet <- left_join(lsmet, lb, by= join_by(class == value))
+lsmet <- lsmet %>% select(!c(level,id,metric))
+lsmet <-  lsmet %>% group_by(AREA, layer) %>%
+  mutate(percentage = value / sum(value) * 100) %>%  # Calculate percentage
+  ungroup() %>% mutate(year=case_when(
+    layer == 1 ~ 1992,
+    layer == 2 ~ 2020
+  ))
 # Create the bar plot using ggplot2
-ggplot(props, aes(x = Class, y = percentage, fill = color)) +
+t <- ggplot(lsmet, aes(x = Class, y = percentage, fill = color)) +
   geom_bar(stat = "identity") +  # Use identity since we are plotting pre-calculated values
   scale_fill_identity() +  # Use the exact colors provided in the `color` column
-  facet_grid(layer ~ AREA) +  # Create a grid with rows for `AREA` and columns for `layer`
+  facet_grid(year ~ AREA) +  # Create a grid with rows for `AREA` and columns for `layer`
   labs(title = "Class Distribution by Area and Year",
        x = "Class",
        y = "Percentage") +
   #theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for readability
 
-
-color_mapping <- props %>% 
-  distinct(Class, color) %>% 
-  pull(color, name = Class)
-# By Region
-
-t <- ggplot(props, aes(x=Class, y=value, fill=Class)+
-              geom_bar()+
-              scale_fill_manual(values=color_mapping)+
-            facet_grid(AREA~layer)+
-              labs(
-                x= "Class",
-                y= "pix",
-                color="Class"
-              )
-)
-              
-
-#this needs to be converted into projected coordinates before extracting the metrics
-lsmet <- lapply(lc, function(r){
-  mets <- lsm_c_ai(r)
-})
-
-lsmet <- lapply(seq_along(lsmet), function(i) {
-  lsmet[[i]]$AREA <- nam[i]
-  return(lsmet[[i]])
-})
+print(t)
 ```
-Get the restoration and send the charts 
+
+
+This is the data that we have ready:
+
+- Land Cover ESA
+  - Area Proportion for both years
+- Coastal Risk Reduction
+- Restoration
+  - Nitrogen Export
+  - nature access restoration
+  - pollination restoration
+  - sediment export
+- Conservation?
+
 
 
 Beneficiaries and coastal protection pop< 10 downstreams
-I already produced the map.
-
-45 - 19 (calculate the values) for coastal risk reduction
-
-```{r coastal risk red}
-
-wd <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector'
-
-pat <- file.path(wd, list.files(wd, pattern="coastal_risk"))
-
-pat <- pat[-5]
-
-vat <- lapply(pat, st_read)
-vat <- lapply(vat, function(v){
-  v <- v %>% mutate(rt_fin=Rt_nohab_all-Rt)
-})
 
 
-library(sf)
-library(janitor)
-
-# Standardize column names and save each sf object
-lapply(seq_along(vat), function(i) {
-  # Clean column names to ensure compatibility
-  vat[[i]] <- clean_names(vat[[i]])
-  
-  # Save the sf object to the specified path
-  st_write(vat[[i]], pat[i], append = FALSE, delete_layer = TRUE)
-})
-
-
-lapply(seq_along(vat), function(i) {
-  st_write(vat[[i]], pat[i], append = TRUE)
-})
-
-```
-
-Substract these columnns, and map this thing again 
-Add legend (in terms of hig-low)
-
-include access change
 
 then, go through these change raster (priority 4 and take a look at them and think what can be done here, and show differences for land covers), inside outside protected areas (UICN cat National park Ia , Ib, II, III, IV , V, VI)
 
@@ -284,11 +220,11 @@ Barplots/distributions outisde inside protected areas/land cover classes as a wa
 
 ```{r get summaries}
 #load protected areas
-poly = st_read('/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector/wdpa_nbs.gpkg')
+pa = st_read('/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector/wdpa_nbs.gpkg')
 #remove those without UICN cathegory
 filt <- c("Not Reported", "Not Assigned", "Not Applicable")
-poly <- poly %>% filter(!(IUCN_CAT %in% filt))
-poly <- poly%>%split(.$COUNTR)
+pa <- pa %>% filter(!(IUCN_CAT %in% filt))
+pa <- pa%>%split(.$COUNTR)
 
 #Get baseline values for ecosystem services. Will use the 2020baseline values
 # set inpath
@@ -296,9 +232,11 @@ wd <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data'
 wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/cropped_rasters'
 
 
+
 tiffes <- file.path(wd, list.files(wd, pattern="tif"))
 #tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
 tiffes <-  tiffes[c(1:5, 11:15, 21:25, 41:45)]
+tiffes <- tiffes[-c(1:5)] # removethe access becasue fucking distances
 # lab <- sapply(tiffes, function(x) {
 #   basename(tools::file_path_sans_ext(x))
 # })
@@ -326,8 +264,17 @@ file_info <- file_info %>%
 # Step 4: Extract the sorted file paths
 tiffes <- file_info$FilePath
 
-
 baseES <- lapply(tiffes, rast)
+# Reproject to equal_+earth_crs
+
+
+baseES <- lapply(baseES, function(r){
+  r <- project(r, equal_earth_crs, method='cubic')
+})
+
+lc <- lapply(lc, function(r){
+  r <- project(r, equal_earth_crs, method = 'near')
+})
 
 #   # Extract only the file name without the extension
 # tfs <- sapply(tiffes, function(x) {
@@ -339,13 +286,28 @@ baseES <- lapply(tiffes, rast)
 ap <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/pa_nbs.shp')
 filt <- c("Not Reported", "Not Assigned", "Not Applicable")
 ap <- ap %>% filter(!(IUCN_CAT %in% filt))
+ap <- st_transform(ap, equal_earth_crs)
 ap <- ap%>%split(.$COUNTR)
 
-# Assuming `rasters_list` is your list of 20 SpatRaster objects, organized by country
-# Assuming `vector_list` is your list of 5 SpatVector objects (one for each country)
+# Step 1: Split the rasters list into a list of lists, where each sublist contains 4 SpatRasters maldita sea. Otra vez yo peleando con una puta lista 
+baseES <- split(baseES, rep(1:length(ap), each = 3))
 
-# Step 1: Split the rasters list into a list of lists, where each sublist contains 4 SpatRasters
-baseES <- split(baseES, rep(1:length(ap), each = 4))
+lcm <- lapply(lc, function(r){
+  r <- app(r, min)
+})
+lcm <- lapply(lcm,function(r){
+  r <- subst(r,from=c(1:10), to =1)
+  })
+
+baseES <- map2(
+  baseES,   # The list of raster sublists
+  lcm,     # The list of country polygons
+  function(rasters, bkg) {
+    # Apply mask to each raster in the sublist using the corresponding country vector
+    lapply(rasters, function(raster) merge(raster, bkg))
+  }
+)
+
 
 # Step 2: Apply mask for each group of rasters using the corresponding country vector
 baseES_ap <- map2(
@@ -379,6 +341,15 @@ msk_ap <- lapply(baseES_ap, function(r) {
 msk_no_ap <- lapply(baseES_api, function(r) {
   # Replace all non-NA values with 1 using ifel()
   r <- ifel(!is.na(r), 1, NA)
+})
+
+# Set the target CRS to Equal Earth (EPSG:8857)
+equal_earth_crs <- "EPSG:8857"
+msk_ap <- lapply(msk_ap, function(r){
+  r <- project(r, equal_earth_crs, method='near')
+})
+msk_api <- lapply(msk_api, function(r){
+  r <- project(r, equal_earth_crs, method='near')
 })
 
 
