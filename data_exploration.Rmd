@@ -56,7 +56,7 @@ map(1:length(c_risk_red), function(x) writeRaster(c_risk_red[[x]], paste0('/User
 #remeber that the layer as such, keeps the name in a slot and that we are using that. 
 ```
 
-## 2.2 Iterate over Restoration   all rasters 
+## 2.2 Iterate over Restoration all rasters 
 
 Restoration Data is being processed here I designed this process because i thought it would be better to oad and process each raster individually to avoid memory issues, but now i think i am an idiot because the rasters are not totally loaded anyway. 
 
@@ -151,7 +151,7 @@ For summarizing geotiff raster files and comparing values across protected areas
 ## 3.1 Summaries Land cover
 ```{r basic summaries}
 
-path_lc <- '/Volumes/Jero_HDD/POSDOC/ESA_LC'
+path_lc <- '/Users/sputnik/Documents/Natural_capital/NBS_OP/data_import/ESA_LC'
 # load reclassified land cover map
 tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
 lc <- lapply(tf,rast)
@@ -215,7 +215,7 @@ then, go through these change raster (priority 4 and take a look at them and thi
 
 # Get summaries
 
-Barplots/distributions outisde inside protected areas/land cover classes as a way to see if protected areas are abnormally represented.
+Barplots/distributions outisde inside protected areas/land cover classes as a way to see if protected areas are abnormally represented. This is for cosnervation. Once i get this done, i need the same for griscom
 ## Get summaries per PA.
 
 ```{r get summaries}
@@ -232,11 +232,17 @@ wd <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data'
 wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/cropped_rasters'
 
 
+# Drop the second band. There must be an easier way. Now i have th background to put to the ecosystem service rasters. Somethin  
+bkg <- lapply(lc, function(r){
+  r <- r[[1]]
+  r <- subst(r, from = c(1:8), to =1)
+})
+
 
 tiffes <- file.path(wd, list.files(wd, pattern="tif"))
 #tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
 tiffes <-  tiffes[c(1:5, 11:15, 21:25, 41:45)]
-tiffes <- tiffes[-c(1:5)] # removethe access becasue fucking distances
+tiffes <- tiffes[-c(1:5)] # removethe access becasue fucking distances. Deal with this when we´re done with the first one. We need to resample becasue of the pixel resolution. That´s annoying. just get the first ones done,then we deal with that one 
 # lab <- sapply(tiffes, function(x) {
 #   basename(tools::file_path_sans_ext(x))
 # })
@@ -265,6 +271,22 @@ file_info <- file_info %>%
 tiffes <- file_info$FilePath
 
 baseES <- lapply(tiffes, rast)
+
+# Group the list of ES as nested list, one for eah country
+baseES <- split(baseES, rep(1:length(lc), each = 3))
+
+# Step 5: Add the backgrounds
+
+baseES <- map2(
+  baseES,   # The list of raster sublists
+  bkg,     # The list of backgrounds
+  function(rasters, bkg) {
+    # Apply mask to each raster in the sublist using the corresponding country vector
+    lapply(rasters, function(raster) merge(raster, bkg))
+  }
+)
+
+
 # Reproject to equal_+earth_crs
 
 
@@ -276,37 +298,15 @@ lc <- lapply(lc, function(r){
   r <- project(r, equal_earth_crs, method = 'near')
 })
 
-#   # Extract only the file name without the extension
-# tfs <- sapply(tiffes, function(x) {
-#   basename(tools::file_path_sans_ext(x))
-# })
-# tfs <- as_tibble(tfs)
-
 
 ap <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/pa_nbs.shp')
 filt <- c("Not Reported", "Not Assigned", "Not Applicable")
 ap <- ap %>% filter(!(IUCN_CAT %in% filt))
-ap <- st_transform(ap, equal_earth_crs)
+#ap <- st_transform(ap, equal_earth_crs)
 ap <- ap%>%split(.$COUNTR)
 
 # Step 1: Split the rasters list into a list of lists, where each sublist contains 4 SpatRasters maldita sea. Otra vez yo peleando con una puta lista 
 baseES <- split(baseES, rep(1:length(ap), each = 3))
-
-lcm <- lapply(lc, function(r){
-  r <- app(r, min)
-})
-lcm <- lapply(lcm,function(r){
-  r <- subst(r,from=c(1:10), to =1)
-  })
-
-baseES <- map2(
-  baseES,   # The list of raster sublists
-  lcm,     # The list of country polygons
-  function(rasters, bkg) {
-    # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) merge(raster, bkg))
-  }
-)
 
 
 # Step 2: Apply mask for each group of rasters using the corresponding country vector
@@ -328,11 +328,11 @@ baseES_api <- map2(
   }
 )
 
-# Step 3: Flatten the list if you want a single list of masked rasters
+# Step 3: Flatten back the list to get a single list of masked rasters
 baseES_ap <- unlist(baseES_ap, recursive = FALSE)
 baseES_api <- unlist(baseES_api, recursive = FALSE)
 ################################
-
+# I think this is not necessary anymore. 
 msk_ap <- lapply(baseES_ap, function(r) {
   # Replace all non-NA values with 1 using ifel()
   ifel(!is.na(r), 1, NA)
@@ -566,7 +566,13 @@ tiffes <- tiffes[-5]
 
 
 rest <- lapply(tiffes, rast)
-               
+rest <- lapply(rest, function(r){
+  r <- as.numeric(r)
+  r <- subst(r, from= c(20101:921140192), to= 1, others = 0)
+})
+
+rest <- 
+
                # This function extracts the 1 and 0 for mthe categorical rasters from restoration and corrects the weird values. did this because i had no metadata. Add the function to a new package eventully
 process_raster <- function(raster) {
   # Step 1: Extract unique values
