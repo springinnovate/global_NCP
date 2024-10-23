@@ -235,7 +235,7 @@ wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal fi
 # Drop the second band. There must be an easier way. Now i have th background to put to the ecosystem service rasters. Somethin  
 bkg <- lapply(lc, function(r){
   r <- r[[1]]
-  r <- subst(r, from = c(1:8), to =1)
+  r <- subst(r, from = c(1:8), to =0)
 })
 
 
@@ -286,23 +286,19 @@ baseES <- map2(
   }
 )
 
-
+# split again. We are going to use this a lot
+baseES <- unlist(baseES, recursive=FALSE)
 # Reproject to equal_+earth_crs
-
-
 baseES <- lapply(baseES, function(r){
   r <- project(r, equal_earth_crs, method='cubic')
 })
 
-lc <- lapply(lc, function(r){
-  r <- project(r, equal_earth_crs, method = 'near')
-})
 
 
 ap <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/pa_nbs.shp')
 filt <- c("Not Reported", "Not Assigned", "Not Applicable")
 ap <- ap %>% filter(!(IUCN_CAT %in% filt))
-#ap <- st_transform(ap, equal_earth_crs)
+ap <- st_transform(ap, equal_earth_crs)
 ap <- ap%>%split(.$COUNTR)
 
 # Step 1: Split the rasters list into a list of lists, where each sublist contains 4 SpatRasters maldita sea. Otra vez yo peleando con una puta lista 
@@ -318,7 +314,7 @@ baseES_ap <- map2(
     lapply(rasters, function(raster) mask(raster, vector))
   }
 )
-
+# "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
 baseES_api <- map2(
   baseES,   # The list of raster sublists
   ap,     # The list of country polygons
@@ -333,55 +329,141 @@ baseES_ap <- unlist(baseES_ap, recursive = FALSE)
 baseES_api <- unlist(baseES_api, recursive = FALSE)
 ################################
 # I think this is not necessary anymore. 
-msk_ap <- lapply(baseES_ap, function(r) {
+
+msk_ap <- baseES_ap[c(1,4,7,10,13)]
+msk_api <- baseES_api[c(1,4,7,10,13)]
+
+
+msk_ap <- lapply(msk_ap, function(r) {
   # Replace all non-NA values with 1 using ifel()
   ifel(!is.na(r), 1, NA)
 })
 
-msk_no_ap <- lapply(baseES_api, function(r) {
+msk_no_ap <- lapply(msk_api, function(r) {
   # Replace all non-NA values with 1 using ifel()
   r <- ifel(!is.na(r), 1, NA)
 })
 
-# Set the target CRS to Equal Earth (EPSG:8857)
-equal_earth_crs <- "EPSG:8857"
-msk_ap <- lapply(msk_ap, function(r){
-  r <- project(r, equal_earth_crs, method='near')
-})
-msk_api <- lapply(msk_api, function(r){
+
+bkg <- lapply(bkg, function(r){
   r <- project(r, equal_earth_crs, method='near')
 })
 
+
+msk_ap <- map2(msk_ap, bkg, merge)
+
+# Set the target CRS to Equal Earth (EPSG:8857)
+equal_earth_crs <- "EPSG:8857"
+
+baseES_ap <- lapply(baseES_ap, function(r){
+  r <- project(r, equal_earth_crs, method='bilinear')
+})
+
+baseES_api <- lapply(baseES_api, function(r){
+  r <- project(r, equal_earth_crs, method='bilinear')
+})
+
+msk_ap <- lapply(baseES_ap, function(r){
+  r <- classify(r, cbind(0, Inf, 1), others = NA)
+})
+
+msk_api <- lapply(baseES_api, function(r){
+  r <- classify(r, cbind(0, Inf, 1), others = NA)
+})
+
+# split again to have nested lists
+msk_ap <- split(msk_ap, rep(1:length(bkg), each = 3))
+msk_api <- split(msk_api, rep(1:length(bkg), each = 3))3
+#Add the background
+
+msk_ap <- map2(
+  msk_ap,   # The list of raster sublists
+  ,     # The list of country polygons
+  function(rasters, vector) {
+    # Apply mask to each raster in the sublist using the corresponding country vector
+    lapply(rasters, function(raster) mask(raster, vector, inverse=TRUE))
+  }
+)
 
 freq_ap <- lapply(msk_ap, function(r){
   f <- freq(r)
 })
+# get the names of the countries 
+country_names <- unique(country_names)
+
+freq_ap <- lapply(seq_along(freq_ap), function(i) {
+  freq_ap[[i]]$country <- country_names[i]  # Add country column
+  freq_ap[[i]]  # Return the modified dataframe
+})
+
+
 freq_ap <- do.call(rbind, freq_ap)
+
+freq_all <- lapply(bkg, function(r){
+  f <- freq(r)
+})
+
+freq_all <- lapply(seq_along(freq_all), function(i) {
+  freq_all[[i]]$country <- country_names[i]  # Add country column
+  freq_all[[i]]  # Return the modified dataframe
+})
+
+freq_all <- do.call(rbind, freq_all)
+freq_all <- freq_all %>% mutate(layer = 3)
+
+##################################
+################################## This has the count inside outside
+
+freq_ap <- rbind(freq_ap,freq_all)
+
+
+#################################
+#################################
 
 freq_no_ap <- lapply(msk_no_ap, function(r){
   f <- freq(r)
 })
 
-freq_no_ap <- do.call(rbind, freq_no_ap)
+freq_no_ap <- do.call(cbind, freq_no_ap)
 
 freq_ap <- freq_ap %>% select(3)
 freq_no_ap <- freq_no_ap %>% select(3)
-# Here, we just have the number of pixels for each service inside/outside the PA
+
 ##################################################################
 ##################################################################
 
 #calculate ES output
-#
+# Define a function to compute the total sum for each SpatRaster
+compute_sum <- function(raster) {
+  total_sum <- global(raster, fun = "sum", na.rm = TRUE)[,1]  # Use global() to get the sum
+  return(total_sum)
+}
 #
 totSE_ap <-  lapply(baseES_ap, compute_sum)#, mc.cores = detectCores() - 4)
 totSE_api <-  lapply(baseES_api, compute_sum)#, mc.cores = detectCores() - 4)
 
 totSE_ap <- as_tibble(unlist(totSE_ap))
 totSE_api <- as_tibble(unlist(totSE_api))
-totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap, freq_no_ap, freq_ap)
+totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap)
 
-names(totSE) <- c("Service", "Country", "WholeArea", "PArea", "pix_count_area", "pix_count_pa")#, "Share_Service", "Share_Area", "Country")
-#Calcualte share protected area/total
+freq_ap <- freq_ap %>% filter(layer == 1)  %>%  filter(value == 1)
+
+freq_ap <- rbind(freq_ap,freq_ap,freq_ap)
+freq_ap <- freq_ap %>% arrange(country)
+freq_ap <- freq_ap %>% select(!c(1,2))
+freq_all <- rbind(freq_all,freq_all,freq_all)
+freq_all <- freq_all %>% arrange(country)
+freq_all <- freq_all %>% select(!c(1,2))
+
+names(freq_f) <- c("pix_count_pa", "Country","pix_count_area")
+
+freq_f <- freq_f %>% select(c(3,1,2))
+names(totSE) <- c("Service", "Country","WholeArea", "PArea")
+
+totSE <- left_join(totSE,freq_f)
+totSE <- totSE %>%distinct()
+
+
 totSE <- totSE %>% mutate(share_service= (PArea/WholeArea)*100)
 totSE <- totSE %>% mutate(share_area= (pix_count_pa/pix_count_area)*100)
 
@@ -404,11 +486,28 @@ totSE_l <- totSE %>%
   pivot_longer(cols = c(Share_Service, Share_Area),
                names_to = "Metric",
                values_to = "Value")
+totSE_l <- totSE_l %>%
+  filter(!(Metric == "Share_Area" & duplicated(paste(Country, Metric))))
 
+totSE_l <- totSE_l %>% mutate(Service = case_when(
+  Metric == "Share_Area" ~ "Share Area",
+  TRUE ~ Service
+))
+
+totSE_l <- totSE_l %>%
+  mutate(Service = fct_relevel(Service, 
+                               "Share Area",
+                               "Nitrogen Retention", 
+                               "Sediment Retention", 
+                               "Pollination" 
+                               ))
+```
 ##########################################################################
 ##########################################################################
 
 # Get the histograms
+
+```{r histograms}
 baseES_api_v <- lapply(baseES_api, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
 })
@@ -477,6 +576,9 @@ baseES_vf <- baseES_vf %>%
 
 
 write.csv(baseES_vf, here('data', "distributionServ.csv"))
+
+baseES_vf <- read.csv(here('data', "distributionServ.csv"))
+
 # Calculate the 98th percentile for each combination of Service and Country
 percentile_98 <- baseES_vf %>%
   group_by(Service, Country) %>%
@@ -531,7 +633,8 @@ t
 
 # Step 2: Create the bar plot
 p <- ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.7)) +  # Side-by-side bars
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7)) + 
+  #scale_y_continuous(limits = c(0, 100))+
   facet_wrap(~ Country, ncol = 5) +  # Create 5 columns (one for each country)
   scale_fill_brewer(palette = "Set3") +  # Use a color palette for services
   labs(title = "Share of the protected areas and of the total ES provided inside them",
@@ -568,9 +671,10 @@ tiffes <- tiffes[-5]
 rest <- lapply(tiffes, rast)
 rest <- lapply(rest, function(r){
   r <- as.numeric(r)
-  r <- subst(r, from= c(20101:921140192), to= 1, others = 0)
+  r <- classify(r, cbind(20101, Inf, 1), others = 0)
 })
 
+  r <- classify(r, cbind(0, Inf, 1), others = NA)
 rest <- 
 
                # This function extracts the 1 and 0 for mthe categorical rasters from restoration and corrects the weird values. did this because i had no metadata. Add the function to a new package eventully
