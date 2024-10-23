@@ -1,21 +1,42 @@
 ---
-title: "DaTa Preparation NBS"
+title: "DaTa Preparation NBS"    
 output: html_notebook
 ---
 
 I will use this project to peprare and extract insights from the raster data for the polygons in the 5 prioritized areas.
 
-
-1. Prepare Environemnt (Load necessary libraries)
-```{r load libraries}
+# 1. Prepare Environemnt (Load necessary libraries)
+```{r load libraries, include=FALSE}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
            'parallel', 'dplyr', 'tidyr', 'ggplot2')
 sapply(packs, require, character.only = TRUE, quietly=TRUE)
 rm(packs)
 ```
+## 1.1 set class names and colors
 
-2. Load The polygons with the NBS areas
+```{r set symbols, include=FALSE}
+#create vector with the country names
+nam <- c("BRAZIL","MADAGASCAR","MEXICO","PERU","VIETNAM") 
+lb <- data.frame(
+  Class <- c("Cultivated", "Forest", "Shrubs and Grasses", "Sparse",
+            "Mangroves", "Urban", "Bare", "Water"),
+  color=c("#dcf064", "#00b809", "#d29000", "#ffebaf", "#009678", "#c31400", 
+            "#fff5d7", "#0046c8"),
+  value=c(1:8))
+names(lb) <- c("Class", "color", "value")
+lb <- data.frame(
+  Class <- c("Cultivated", "Forest", "Shrubs and Grasses", "Sparse",
+            "Mangroves", "Urban", "Bare", "Water"),
+  color=c("#dcf064", "#00b809", "#d29000", "#ffebaf", "#009678", "#c31400", 
+            "#fff5d7", "#0046c8"),
+  value=c(1:8))
+names(lb) <- c("Class", "color", "value")
+```
+
+
+
+## 1.2 Load The polygons with the NBS areas
 ```{r}
 
 poly <- st_read('/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector/areas_nbs.geojson') 
@@ -26,86 +47,41 @@ nam <- sort(nam)
 poly <- poly%>%split(.$COUNTR)
 ```
 
-3. Prepare Inventory to organize data 
 
-I am having to many issues with the data ialready have and the one i don't and it gests confusing, so I am workin on a table that shhould make this easier
+# 2. Crop and mask for the 4 Areas
+## 2.1 Test with one raster
+This isto process one single raster and thos that require reprojection (access related )
 
-```{r organize inventory, eval=FALSE, include=FALSE}
-
-tab <- as_tibble(read.csv('/Volumes/Jero_HDD/POSDOC/Downloaded_data_ES/inventory_global_products.csv'))
-library(dplyr)
-
-# Assuming your tibble is called 'data'
-tab <- tab %>%
-  select(-matches("^X(\\.\\d+)?$"))
-
-# Print the cleaned tibble
-print(cleaned_data)
-
-tab <- tab %>% slice(1:218)
-tab <- tab %>% mutate(Filename= basename(Link))
-
-write.csv(tab, file= '/Volumes/Jero_HDD/POSDOC/Downloaded_data_ES/inventory_global_products.csv')
-
-```
-Test with one raster
-I already did this, it is quite annoying but anyway, no need to do again
 ```{r load rst, eval=FALSE, include=FALSE}
-#Land cover
-esamod <- rast('/Volumes/Jero_HDD/WWF/global_outputs/ESAmodVCFv2_md5_05407ed305c24604eb5a38551cddb031.tif')
 
+#Prepare Land Covers 
+esamod <- rast('/Volumes/Jero_HDD/WWF/global_outputs/ESAmodVCFv2_md5_05407ed305c24604eb5a38551cddb031.tif')
 esamod <- map(1:length(poly), function(x) crop(esamod, poly[[x]]))
 esamod <- map(1:length(esamod), function(x) mask(esamod[[x]], poly[[x]]))
-
 map(1:length(esamod), function(x) writeRaster(esamod[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'esaLC_', nam[x], '.tif'), overwrite=TRUE))
 
-# Access
-access_nature<- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif')
+#Coastal risk reduction This was addewd later. Check if there are some missing that i need to add.
+c_risk_red<- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d.tif')
 
-access_nature <- map(1:length(poly), function(x) crop(access_nature, poly[[x]]))
-access_nature <- map(1:length(access_nature), function(x) mask(access_nature[[x]], poly[[x]]))
-
-map(1:length(access_nature), function(x) writeRaster(access_nature[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'nature_access_ESA_2020', nam[x], '.tif'), overwrite=TRUE))
-
-# Access restoration
-acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_diff_Sc3v1_PNVnoag-esa2020.tif')
-acces_rest <- project(acces_rest, acc2, method='bilinear')
-
-acces_rest <- map(1:length(poly), function(x) crop(acces_rest, poly[[x]]))
-acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
-map(1:length(access_nature), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'nature_access_diff_Sc3v1_PNVnoag-esa2020_', nam[x], '.tif'), overwrite=TRUE))
-
-
-acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/global_people_access_population_2019_60.0m_md5_d264d371bd0d0a750b002a673abbb383.tif')
-acces_rest <- project(acces_rest, acc2, method='bilinear')
-
-acces_rest <- map(1:length(poly), function(x) crop(acces_rest, poly[[x]]))
-acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
-
-map(1:length(access_nature), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'global_people_access_population_2019_60.0m_', nam[x], '.tif'), overwrite=TRUE))
-
-access_nature<- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d.tif')
-
-access_nature <- map(1:length(poly), function(x) crop(access_nature, poly[[x]]))
-access_nature <- map(1:length(access_nature), function(x) mask(access_nature[[x]], poly[[x]]))
-
+c_risk_red <- map(1:length(poly), function(x) crop(c_risk_red, poly[[x]]))
+c_risk_red <- map(1:length(c_risk_red), function(x) mask(c_risk_red[[x]], poly[[x]]))
+#Que es esto?
 map(1:length(access_nature), function(x) writeRaster(access_nature[[x]], paste0('/Users/sputnik/Documents/Natural_capital/NBS_OP/data/raster/', 'coastal_risk_reduction', nam[x], '.tif'), overwrite=TRUE))
-
+#remeber that the layer as such, keeps the name in a slot and that we are using that. 
 ```
 
+## 2.2 Iterate over all rasters 
 
-# Iterate over all rasters (this has been annoying)
+Restoration Data is being processed here I designed this process because it hought it would be bettr to oad and process each raster indivdually to avoid memory issues, but now i think i am an idiot because the rasters are not totally loaded anyway. 
 
-```{r iterate crop}
+```{r iterate cropMaks}
 wd <- '/Volumes/Jero_HDD/POSDOC/Downloaded_data_ES'
 setwd(wd)
 
-tiffes <- list.files(wd, pattern= '2020-1992')
-tiffes <- tiffes[-2]
-paths <- file.path(wd, tiffes)
+#This is for the restoration data I
+tiffes <- file.path(wd, list.files(wd, pattern= '2020-1992'))
 n <- 3
-
-t <- rast(paths[[n]])
+t <- rast(tiffes[[n]])
 clean_filename <- function(filename) {
   sub("_md5.*", "", filename)
 }
@@ -113,7 +89,7 @@ clean_filename <- function(filename) {
 output_path <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data/'
 
  cropped <- map(1:length(poly), function(x) crop(t, poly[[x]]))
-  masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
+ masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
   
   # Extract the base filename before 'md5'
   base_filename <- clean_filename(basename(paths[[n]]))
@@ -121,12 +97,8 @@ output_path <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data/'
   # Write the cropped and masked rasters to files
   map(1:length(masked), function(x) (writeRaster(masked[[x]], paste0(output_path, base_filename, "_", nam[x], ".tif"), overwrite = TRUE)))
 
-# Remove faulty data
-#tiffes <- tiffes[-1]
-
 # Loop through each geotiff file
 for (i in seq_along(tiffes)) {
-  
   # Get the current tiff file
   tiff_file <- paths[i]
   
@@ -151,41 +123,43 @@ for (i in seq_along(tiffes)) {
 
 ```
 
-
-# Reproj Accesibility Raster
+# 2.3. Reproj and CropMask Accesibility Raster
 
 ```{r reproj access}
+
+# Nature access: number of people within 1 hour travel
 acc <- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb.tif')
-acc
-
+#Load template. Where did I get it from? 
 acc2 <- rast('/Volumes/Jero_HDD/WWF/global_outputs/temp/access_WGS84.tif')
-
 acc <- project(acc,acc2)
 writeRaster(acc, '/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif')
+
+
+# Nature Accessibility Data Becsuse i have to reproejcxt. check if there are some left to do. 
+# Hast to be reprojected, so that is a bit annoying but no big deal, alrady done. I think the issue is that one is still pending
+acc<- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif')
+acc <- map(1:length(poly), function(x) crop(acc, poly[[x]]))
+acc <- map(1:length(acc), function(x) mask(acc[[x]], poly[[x]]))
+map(1:length(acc), function(x) writeRaster(acc[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'nature_access_ESA_2020', nam[x], '.tif'), overwrite=TRUE))
+
+# Access restoration
+acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_diff_Sc3v1_PNVnoag-esa2020.tif')
+acces_rest <- project(acces_rest, acc2, method='bilinear')
+acces_rest <- map(1:length(poly), function(x) crop(acces_rest, poly[[x]]))
+acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
+map(1:length(access_nature), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/extracted/', 'nature_access_diff_Sc3v1_PNVnoag-esa2020_', nam[x], '.tif'), overwrite=TRUE))
+
+acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/global_people_access_population_2019_60.0m_md5_d264d371bd0d0a750b002a673abbb383.tif')
+
+map(1:length(access_rest), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'global_people_access_population_2019_60.0m_', nam[x], '.tif'), overwrite=TRUE))
 ```
 
-# Explore rasters
-(max min values, unique, frequencies)
-```{r explore rasters}
-sediment <- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/raster/sediment_ESAmod2-Sc3v1_MEXICO.tif')
-```
+So far here i have laoded, reprojected when necessary and cropmasked the global ecosystem reasters for each one of the study areas. (NBS) and exported them back to map in Qgis. 
 
-#summaries
+# 3 Explore rasters
 
 For summarizing geotiff raster files and comparing values across protected areas or different land covers for an initial assessment, especially for an audience without geospatial expertise, here are some accessible metrics you can use:
 1. Basic Statistical Summaries:
-
-# set class names and colors
-
-```{r set symbols}
-lb <- data.frame(
-  Class <- c("Cultivated", "Forest", "Shrubs and Grasses", "Sparse",
-            "Mangroves", "Urban", "Bare", "Water"),
-  color=c("#dcf064", "#00b809", "#d29000", "#ffebaf", "#009678", "#c31400", 
-            "#fff5d7", "#0046c8"),
-  value=c(1:8))
-names(lb) <- c("Class", "color", "value")
-```
 
 #Summaries Land cover
 ```{r basic summaries}
@@ -209,7 +183,6 @@ props <- do.call(rbind, props)
 props <- as_tibble(props)
 lb <- as_tibble(lb)
 props <- left_join(props, lb)
-
 
 # Assume your data is stored in a tibble called `data`
 props <- props %>%
@@ -267,8 +240,6 @@ I already produced the map.
 ```{r coastal risk red}
 
 wd <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector'
-
-coastal_risk_reduction_MEXICO.geojson
 
 pat <- file.path(wd, list.files(wd, pattern="coastal_risk"))
 
@@ -328,106 +299,122 @@ wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal fi
 tiffes <- file.path(wd, list.files(wd, pattern="tif"))
 #tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
 tiffes <-  tiffes[c(1:5, 11:15, 21:25, 41:45)]
-lab <- sapply(tiffes, function(x) {
-  basename(tools::file_path_sans_ext(x))
-})
+# lab <- sapply(tiffes, function(x) {
+#   basename(tools::file_path_sans_ext(x))
+# })
+
+
+# Step 1: Extract file names, product names, and country names
+file_names <- basename(tiffes)  # Extract file names from paths
+
+# Extract product names and country names
+product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
+country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
+
+# Step 2: Create a dataframe to organize the information
+file_info <- data.frame(
+  FilePath = tiffes,
+  Product = product_names,
+  Country = country_names,
+  stringsAsFactors = FALSE
+)
+
+# Step 3: Sort the dataframe by Country first, then by Product
+file_info <- file_info %>%
+  arrange(Country, Product)
+
+# Step 4: Extract the sorted file paths
+tiffes <- file_info$FilePath
+
 
 baseES <- lapply(tiffes, rast)
 
-  # Extract only the file name without the extension
-tfs <- sapply(tiffes, function(x) {
-  basename(tools::file_path_sans_ext(x))
-})
-tfs <- as_tibble(tfs)
-
-# Define a function to compute the total sum for each SpatRaster
-compute_sum <- function(raster) {
-  total_sum <- global(raster, fun = "sum", na.rm = TRUE)[,1]  # Use global() to get   return(total_sum)
-}
-
-# This has the total ES per site
-totSE <-  mclapply(baseES, compute_sum, mc.cores = detectCores() - 4)
-totSE <- as_tibble(unlist(totSE))
-totSE <- cbind(tfs,totSE)
+#   # Extract only the file name without the extension
+# tfs <- sapply(tiffes, function(x) {
+#   basename(tools::file_path_sans_ext(x))
+# })
+# tfs <- as_tibble(tfs)
 
 
 ap <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/pa_nbs.shp')
 filt <- c("Not Reported", "Not Assigned", "Not Applicable")
 ap <- ap %>% filter(!(IUCN_CAT %in% filt))
 ap <- ap%>%split(.$COUNTR)
-# This is very bad work, and i did not even document it correctly. Terrible practices here.
-# This was to fix the order of the lists of ecosystem services ws the list of protected areas. I don;'t remeber why this happened and why i decided this was a good way to  fixing 
-#baseES <- as.list(as.vector(matrix(baseES, nrow = 5, byrow = FALSE)))
 
-s1 <- list(baseES[[1]],baseES[[6]],baseES[[11]], baseES[[16]])
-s2 <- list(baseES[[2]],baseES[[7]],baseES[[12]], baseES[[17]])
-s3 <- list(baseES[[3]],baseES[[8]],baseES[[13]], baseES[[18]])
-s4 <- list(baseES[[4]],baseES[[9]],baseES[[14]], baseES[[19]])
-s5 <- list(baseES[[5]],baseES[[10]],baseES[[15]], baseES[[20]])
+# Assuming `rasters_list` is your list of 20 SpatRaster objects, organized by country
+# Assuming `vector_list` is your list of 5 SpatVector objects (one for each country)
 
-#baseEs_ap <- map(baseES, ap, mask)
-s1 <- lapply(s1, function(r){
-  r <- mask(r,ap[[1]])
-})
-s2 <- lapply(s2, function(r){
-  r <- mask(r,ap[[2]])
-})
-s3 <- lapply(s3, function(r){
-  r <- mask(r,ap[[3]])
-})
-s4 <- lapply(s4, function(r){
-  r <- mask(r,ap[[4]])
-})
-s5 <- lapply(s5, function(r){
-  r <- mask(r,ap[[5]])
-})
+# Step 1: Split the rasters list into a list of lists, where each sublist contains 4 SpatRasters
+baseES <- split(baseES, rep(1:length(ap), each = 4))
 
+# Step 2: Apply mask for each group of rasters using the corresponding country vector
+baseES_ap <- map2(
+  baseES,   # The list of raster sublists
+  ap,     # The list of country polygons
+  function(rasters, vector) {
+    # Apply mask to each raster in the sublist using the corresponding country vector
+    lapply(rasters, function(raster) mask(raster, vector))
+  }
+)
 
-# this is becasue it is a list, not a multiband raster, but we can fix that
-baseES_ap <- list(s1[[1]],s2[[1]],s3[[1]],s4[[1]],s5[[1]],s1[[2]],s2[[2]],s3[[2]],s4[[2]],s5[[2]],s1[[3]],s2[[3]],s3[[3]],s4[[3]],s5[[3]], s1[[4]],s2[[4]],s3[[4]],s4[[4]], s5[[4]])
+baseES_api <- map2(
+  baseES,   # The list of raster sublists
+  ap,     # The list of country polygons
+  function(rasters, vector) {
+    # Apply mask to each raster in the sublist using the corresponding country vector
+    lapply(rasters, function(raster) mask(raster, vector, inverse=TRUE))
+  }
+)
 
-# Assume you have a list of SpatRasters called raster_list
-msk_all <- lapply(baseES, function(r) {
+# Step 3: Flatten the list if you want a single list of masked rasters
+baseES_ap <- unlist(baseES_ap, recursive = FALSE)
+baseES_api <- unlist(baseES_api, recursive = FALSE)
+################################
+
+msk_ap <- lapply(baseES_ap, function(r) {
   # Replace all non-NA values with 1 using ifel()
   ifel(!is.na(r), 1, NA)
 })
 
-msk_ap <- lapply(baseES_ap, function(r) {
+msk_no_ap <- lapply(baseES_api, function(r) {
   # Replace all non-NA values with 1 using ifel()
   r <- ifel(!is.na(r), 1, NA)
 })
 
 
-freq_a <- lapply(msk_all, function(r){
-  f <- freq(r)
-})
-freq_a <- do.call(rbind, freq_a)
-
 freq_ap <- lapply(msk_ap, function(r){
   f <- freq(r)
 })
-
 freq_ap <- do.call(rbind, freq_ap)
 
-freq_a <- freq_a %>% select(3)
+freq_no_ap <- lapply(msk_no_ap, function(r){
+  f <- freq(r)
+})
+
+freq_no_ap <- do.call(rbind, freq_no_ap)
+
 freq_ap <- freq_ap %>% select(3)
+freq_no_ap <- freq_no_ap %>% select(3)
+# Here, we just have the number of pixels for each service inside/outside the PA
+##################################################################
+##################################################################
 
 #calculate ES output
+#
+#
 totSE_ap <-  lapply(baseES_ap, compute_sum)#, mc.cores = detectCores() - 4)
+totSE_api <-  lapply(baseES_api, compute_sum)#, mc.cores = detectCores() - 4)
+
 totSE_ap <- as_tibble(unlist(totSE_ap))
+totSE_api <- as_tibble(unlist(totSE_api))
+totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap, freq_no_ap, freq_ap)
 
-totSE <- cbind(totSE, totSE_ap)
-
-totSE <- cbind(totSE, freq_a, freq_ap)
-names(totSE) <- c("Service", "WholeArea", "PArea", "pix_count_area", "pix_count_pa")
-
+names(totSE) <- c("Service", "Country", "WholeArea", "PArea", "pix_count_area", "pix_count_pa")#, "Share_Service", "Share_Area", "Country")
 #Calcualte share protected area/total
 totSE <- totSE %>% mutate(share_service= (PArea/WholeArea)*100)
 totSE <- totSE %>% mutate(share_area= (pix_count_pa/pix_count_area)*100)
 
-totSE <- totSE%>% mutate(Country = str_extract(Service, "[^_]+$")) %>%  # Extract the text after the last '_'
-  # Step 2: Remove the last '_' and country name from the original value column
-  mutate(Service = str_remove(Service, "_[^_]+$"))
+names(totSE) <- c("Service", "Country", "WholeArea", "PArea", "pix_count_area", "pix_count_pa", "Share_Service", "Share_Area")
 
 write.csv(totSE, file=here('data', "totSE.csv"))
 
@@ -438,11 +425,12 @@ totSE_l <- totSE %>%
     Service == "global_sed_retention_esamod2_compressed" ~ "Sediment Retention",
     Service == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
     Service == "nature_access_ESA" ~ "Access",
+    Service == "access_ESA_2020" ~ "Access",
     TRUE ~ Service  # Keep other names unchanged, if any
   )) %>%
   # Select relevant columns and reshape the data into long format
-  select(Service, share_service, share_area, Country) %>%
-  pivot_longer(cols = c(share_service, share_area),
+  select(Service, Share_Service, Share_Area, Country) %>%
+  pivot_longer(cols = c(Share_Service, Share_Area),
                names_to = "Metric",
                values_to = "Value")
 
@@ -450,66 +438,59 @@ totSE_l <- totSE %>%
 ##########################################################################
 
 # Get the histograms
-baseES_v <- lapply(baseES, function(r){
+baseES_api_v <- lapply(baseES_api, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
 })
 
-baseESap_v <- lapply(baseES_ap, function(r){
+baseES_ap_v <- lapply(baseES_ap, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
 })
 
 # waht the fuck does this freaking line do???/ It adds the id for the service
 # There is a better way to do it, check the next part 
-baseES_v <- lapply(seq_along(baseES_v), function(i) {
-  cbind(baseES_v[[i]], NewColumn = lab[i])
+file_info[1] <- NULL
+baseES_api_v <- lapply(seq_along(baseES_api_v), function(i) {
+  cbind(baseES_api_v[[i]], file_info[i,])
 })
 
-baseES_v <- lapply(baseES_v, function(r){
+baseES_api_v <- lapply(baseES_api_v, function(r){
   r <- as_tibble(r)
 })
 
-baseESap_v <- lapply(seq_along(baseESap_v), function(i) {
-  cbind(baseESap_v[[i]], NewColumn = lab[i])
+baseES_ap_v <- lapply(seq_along(baseES_ap_v), function(i) {
+  cbind(baseES_ap_v[[i]], file_info[i,])
 })
 
-
-baseESap_v <- lapply(baseESap_v, function(r){
+baseES_ap_v <- lapply(baseES_ap_v, function(r){
   r <- as_tibble(r)
 })
 new_col <- "Value"
 # Use lapply to rename the first column of each tibble
-baseES_v <- lapply(baseES_v, function(tbl) {
+baseES_api_v <- lapply(baseES_api_v, function(tbl) {
   tbl %>%
     rename(!!new_col := 1)  # Rename first column using column position
 })
 
-baseESap_v <- lapply(baseESap_v, function(tbl) {
+baseES_ap_v <- lapply(baseES_ap_v, function(tbl) {
   tbl %>%
     rename(!!new_col := 1)  # Rename first column using column position
 })
 
-
-baseES_v <- do.call(rbind, baseES_v)
-baseESap_v <- do.call(rbind, baseESap_v)
 ##################### do not run inside the Rmd!!!!!!!!
-names(baseES_v) <- c("Value", "Service")
-names(baseESap_v) <- c("Value", "Service")
+baseES_api_v <- do.call(rbind, baseES_api_v)
+baseES_ap_v <- do.call(rbind, baseES_ap_v)
+##################### do not run inside the Rmd!!!!!!!!
 ###########################################################
 ###########################################################
 
-baseES_v <- baseES_v%>% mutate(Country = str_extract(Service, "[^_]+$")) %>%  # Extract the text after the last '_'
-  # Step 2: Remove the last '_' and country name from the original value column
-  mutate(Service = str_remove(Service, "_[^_]+$"))
 
-baseES_v <- baseES_v%>% mutate(set = "all")
+baseES_v <- baseES_api_v%>% mutate(set = "outside")
 
-
-baseESap_v <- baseESap_v%>% mutate(Country = str_extract(Service, "[^_]+$")) %>%  # Extract the text after the last '_'
-  # Step 2: Remove the last '_' and country name from the original value column
-  mutate(Service = str_remove(Service, "_[^_]+$"))
-
-baseESap_v <- baseESap_v%>% mutate(set = "protected_areas")
+baseESap_v <- baseES_ap_v%>% mutate(set = "inside")
 baseES_vf <- rbind(baseES_v, baseESap_v)
+
+baseES_vf <- baseES_vf %>% rename(Service = Product)
+
 
 baseES_vf <- baseES_vf %>%
   # Create a new column with simplified service names
@@ -519,6 +500,7 @@ baseES_vf <- baseES_vf %>%
     Service == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
     Service == "nature_access_ESA" ~ "Nature Access",
     Service == "nature_access_ESA_2020" ~ "Nature Access",
+    Service == "access_ESA_2020" ~ "Nature Access",
     TRUE ~ Service  # Keep other names unchanged, if any
   )) 
 
@@ -546,18 +528,17 @@ baseES_vf_filtered <- baseES_vf %>%
 
 
 
-Count <- c("BRAZIL", "MADAGASCAR", "MEXICO", "PERU","VIETNAM")
+Count <- unique(country_names) 
 
-C <- 1
+C <- 5
 
 df <- baseES_vf_filtered %>% filter(Country==Count[C]) %>% filter(Service!="Nature Access")
 
-df <- baseES_vf_filtered %>% filter(Service=="Nature Access")
 
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
   #facet_wrap(~Service, scales = "free") +
-  facet_wrap(~Country, scales = "free") +
+  facet_wrap(~Service, scales = "free") +
   # Set both x and y axes to be free for each facet
   scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `set` variable
   labs(title = paste("Density Plot of Services Inside and Outside Protected Areas -", Count[C]),
@@ -612,8 +593,6 @@ tiffes <- file.path(wd,list.files(wd, pattern = "\\.tif$", full.names = FALSE))
 tiffes <- tiffes[-5]
 
 
-wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/global_products/Restoration/test'
-
 
 rest <- lapply(tiffes, rast)
                
@@ -637,8 +616,11 @@ process_raster <- function(raster) {
   return(raster_subst)
 }
 
+names <- basename(tiffes)
+
 rest  <- lapply(rest, process_raster)
 #reorganize the list by countries, not by products. 
+map(1:length(rest), function(x) writeRaster(rest[[x]], here('data', 'griscom_areas', names[x])))
 
 # Step 1: Extract country names from the "source" attribute of each SpatRaster object
 get_country <- function(r) {
@@ -885,7 +867,7 @@ s5 <- lapply(s5, function(r){
   r <- mask(r,ap[[5]])
 })
 
-
+```
 
 # Produce land cover change maps
 ```{r land cover change}
