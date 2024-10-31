@@ -32,7 +32,7 @@ names(lb) <- c("Class", "color", "value")
 
 ## 2 Crop the Data for the target areas
 ```{r load target area polygons}
-poly <- st_read('/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector/areas_nbs.geojson') 
+poly <- st_read(here("vector", "areas_nbs.geojson")) 
 #Split the vector into a list of individual polygons
 #create vector with names
 nam <- poly$COUNTR
@@ -41,40 +41,48 @@ poly <- poly%>%split(.$COUNTR)
 ```
 ## 2.1 Test with one raster
 This is to process one single raster and ths that require reprojection (access related )
-```{r crop rast, eval=FALSE, include=FALSE}
 
+
+Here i extracted ESAs land cover maps, and coastal riske reduction. No need to run again
+
+```{r crop rast, eval=FALSE, include=FALSE}
+#set path to downloaded data
+
+inpath <- "Downloaded_data_ES"
+outpath <- "cropped_raster_data"
 #Prepare Land Covers 
-esamod <- rast('/Volumes/Jero_HDD/WWF/global_outputs/ESAmodVCFv2_md5_05407ed305c24604eb5a38551cddb031.tif')
+esamod <- rast(here(inpath, 'ESAmodVCFv2_md5_05407ed305c24604eb5a38551cddb031.tif'))
 esamod <- map(1:length(poly), function(x) crop(esamod, poly[[x]]))
 esamod <- map(1:length(esamod), function(x) mask(esamod[[x]], poly[[x]]))
-map(1:length(esamod), function(x) writeRaster(esamod[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'esaLC_', nam[x], '.tif'), overwrite=TRUE))
+map(1:length(esamod), function(x) writeRaster(esamod[[x]], paste0(here("ESA_LC"), 'esaLC_', nam[x], '.tif'), overwrite=TRUE))
 
 #Coastal risk reduction This was addewd later. Check if there are some missing that i need to add.
-c_risk_red<- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d.tif')
+c_risk_red<- rast(here(inpath, "ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d.tif"))
 
 c_risk_red <- map(1:length(poly), function(x) crop(c_risk_red, poly[[x]]))
 c_risk_red <- map(1:length(c_risk_red), function(x) mask(c_risk_red[[x]], poly[[x]]))
-map(1:length(c_risk_red), function(x) writeRaster(c_risk_red[[x]], paste0('/Users/sputnik/Documents/Natural_capital/NBS_OP/data/raster/', 'coastal_risk_reduction', nam[x], '.tif'), overwrite=TRUE))
-#remeber that the layer as such, keeps the name in a slot and that we are using that. 
+paste0(here(outpath, 'coastal_risk_reduction_'), nam[x], '.tif')
+map(1:length(c_risk_red), function(x) writeRaster(c_risk_red[[x]], paste0(here(outpath, 'coastal_risk_reduction_'), nam[x], '.tif'), overwrite=TRUE)
+#remember that the layer as such, keeps the name in a slot and that we are using that. 
 ```
 
-## 2.2 Iterate over Restoration all rasters 
-
+## 2.2 Iterate over  all rasters 
 Restoration Data is being processed here I designed this process because i thought it would be better to oad and process each raster individually to avoid memory issues, but now i think i am an idiot because the rasters are not totally loaded anyway. 
 
 ```{r iterate cropMask}
-wd <- '/Volumes/Jero_HDD/POSDOC/Downloaded_data_ES'
-setwd(wd)
+wd <- here(inpath) # i know, this is stupid but not feel like thinking. 
 
 #This is for the restoration data I
-tiffes <- file.path(wd, list.files(wd, pattern= '2020-1992'))
-n <- 3
+tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '2020-1992'))
+
+
+n <- 3 #this is therestoration for pollination
 t <- rast(tiffes[[n]])
 clean_filename <- function(filename) {
   sub("_md5.*", "", filename)
 }
 
-output_path <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data/'
+outpath <- here(outpath) #'/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data/'
 
  cropped <- map(1:length(poly), function(x) crop(t, poly[[x]]))
  masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
