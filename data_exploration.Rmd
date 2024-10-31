@@ -275,20 +275,20 @@ wd <- here("cropped_raster_data")
 
 
 # Drop the second band. There must be an easier way. Now i have th background to put to the ecosystem service rasters. Somethin  
+# Create a background to fill the NAs from ESA's land cover maps
 bkg <- lapply(lc, function(r){
   r <- r[[1]]
   r <- subst(r, from = c(1:8), to =0)
 })
 
+bkg_wgs<- lapply(bkg, function(r){
+  r <- project(r, "EPSG:4326")
+})
+
 
 tiffes <- file.path(wd, list.files(wd, pattern="tif"))
 #tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
-tiffes <-  tiffes[c(1:5, 11:15, 21:25, 41:45)]
-tiffes <- tiffes[-c(1:5)] # removethe access becasue fucking distances. Deal with this when we´re done with the first one. We need to resample becasue of the pixel resolution. That´s annoying. just get the first ones done,then we deal with that one 
-# lab <- sapply(tiffes, function(x) {
-#   basename(tools::file_path_sans_ext(x))
-# })
-
+tiffes <-  tiffes[c(31:35, 41:45, 81:85)]#, 111:115)]
 
 # Step 1: Extract file names, product names, and country names
 file_names <- basename(tiffes)  # Extract file names from paths
@@ -313,44 +313,34 @@ file_info <- file_info %>%
 tiffes <- file_info$FilePath
 
 baseES <- lapply(tiffes, rast)
+# split again. We are going to use this a lot
+#baseES <- unlist(baseES, recursive=FALSE)
+# Reproject to equal_+earth_crs
+# baseES <- lapply(baseES, function(r){
+#   r <- project(r, equal_earth_crs, method='cubic')
+# })
+
 
 # Group the list of ES as nested list, one for eah country
 baseES <- split(baseES, rep(1:length(lc), each = 3))
 
 # Step 5: Add the backgrounds
 
+
+
 baseES <- map2(
   baseES,   # The list of raster sublists
-  bkg,     # The list of backgrounds
-  function(rasters, bkg) {
+  bkg_wgs,     # The list of backgrounds
+  function(rasters, bkg_wgs) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) merge(raster, bkg))
+    lapply(rasters, function(raster) merge(raster, bkg_wgs))
   }
 )
-
-# split again. We are going to use this a lot
-baseES <- unlist(baseES, recursive=FALSE)
-# Reproject to equal_+earth_crs
-baseES <- lapply(baseES, function(r){
-  r <- project(r, equal_earth_crs, method='cubic')
-})
-
-
-
-ap <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/pa_nbs.shp')
-filt <- c("Not Reported", "Not Assigned", "Not Applicable")
-ap <- ap %>% filter(!(IUCN_CAT %in% filt))
-ap <- st_transform(ap, equal_earth_crs)
-ap <- ap%>%split(.$COUNTR)
-
-# Step 1: Split the rasters list into a list of lists, where each sublist contains 4 SpatRasters maldita sea. Otra vez yo peleando con una puta lista 
-baseES <- split(baseES, rep(1:length(ap), each = 3))
-
 
 # Step 2: Apply mask for each group of rasters using the corresponding country vector
 baseES_ap <- map2(
   baseES,   # The list of raster sublists
-  ap,     # The list of country polygons
+  pa,     # The list of country polygons
   function(rasters, vector) {
     # Apply mask to each raster in the sublist using the corresponding country vector
     lapply(rasters, function(raster) mask(raster, vector))
@@ -359,7 +349,7 @@ baseES_ap <- map2(
 # "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
 baseES_api <- map2(
   baseES,   # The list of raster sublists
-  ap,     # The list of country polygons
+  pa,     # The list of country polygons
   function(rasters, vector) {
     # Apply mask to each raster in the sublist using the corresponding country vector
     lapply(rasters, function(raster) mask(raster, vector, inverse=TRUE))
@@ -387,9 +377,9 @@ msk_no_ap <- lapply(msk_api, function(r) {
 })
 
 
-bkg <- lapply(bkg, function(r){
-  r <- project(r, equal_earth_crs, method='near')
-})
+# bkg <- lapply(bkg, function(r){
+#   r <- project(r, equal_earth_crs, method='near')
+# })
 
 
 msk_ap <- map2(msk_ap, bkg, merge)
@@ -546,7 +536,7 @@ totSE_l <- totSE_l %>%
 ```
 
 ########################################################################## 
-
+# Pendingthis same thing with the beneficiaries and other data wit other crs/spatial resolution
 ########################################################################## 
 
 -   Coastal Risk Reduction
