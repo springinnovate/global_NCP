@@ -263,9 +263,20 @@ as a way to see if protected areas are abnormally represented. This is
 for cosnervation. Once i get this done, i need the same for griscom \##
 Get summaries per PA.
 
+Here, we take the rasters with th target data (provided ecosystem service on time t (baseline) , recover (restoration potential) or whatever else and we take the areas that we want to run comparions between inside/outside to checl the relative productivity of these areas. This is key for decision making/show donors/officials for example)
+
+It is possible to do this systematically, to save on work at the edn, gain on replicability and to be able to make adjustments easily (for example "we need all PA, even the non-UICN"). We load the polygons/rasters, cropMask to get what's inside and the inverse (*this I need to work on, it is poorly written and inneficient*)
+
+We need to create binary masks to use as  background/the/ homgonezie the total area of interest. This is necessary because we need to know the share of the total area that is under the target. A class/status (protected area, restoration priority, land cover whatever) as a share of the total. This is necessary because we want to comparethe relative share of the area with the share of the service/target data to check compare **productivities**  inside/outside. This is the whole purpose of this par.
+
+The whole process is run on the EPSG 8857 crs (Equal earth) to facilitate dealing with distances and areas. 
+Thjer is some complication because we wantthe data organzied by country/studyarea and then by service, so some manipulation was necessary before loading. The key is that the labeling is already done and next times, the same type of analysis should be way easier. 
+ 
+
 ```{r get summaries}
 #load protected areas
 pa = st_read(here("vector", "wdpa_nbs.gpkg"))
+pa <- st_transform(pa, crs = 8857)
 # DO NOT remove those without UICN category
 pa <- pa%>%split(.$COUNTR)
 
@@ -273,6 +284,13 @@ pa <- pa%>%split(.$COUNTR)
 # set inpath
 wd <- here("cropped_raster_data")
 
+path_lc <- here('ESA_LC') 
+# load reclassified land cover map
+tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
+lc <- lapply(tf,rast)
+lc <- lapply(lc, function(r){
+  r <- project(r, "EPSG 8857")
+})
 
 # Drop the second band. There must be an easier way. Now i have th background to put to the ecosystem service rasters. Somethin  
 # Create a background to fill the NAs from ESA's land cover maps
@@ -326,8 +344,6 @@ baseES <- split(baseES, rep(1:length(lc), each = 3))
 
 # Step 5: Add the backgrounds
 
-
-
 baseES <- map2(
   baseES,   # The list of raster sublists
   bkg_wgs,     # The list of backgrounds
@@ -336,6 +352,14 @@ baseES <- map2(
     lapply(rasters, function(raster) merge(raster, bkg_wgs))
   }
 )
+
+rm(lc)
+# set the projected reference ayatem here, so I on;y have to run this once!
+# equal_earth_crs <- "EPSG:8857"
+# baseEs <- lapply(baseES, function(r){
+#   r <- project(r, equal_earth_crs, method='bilinear')
+# })
+
 
 # Step 2: Apply mask for each group of rasters using the corresponding country vector
 baseES_ap <- map2(
@@ -360,40 +384,51 @@ baseES_api <- map2(
 baseES_ap <- unlist(baseES_ap, recursive = FALSE)
 baseES_api <- unlist(baseES_api, recursive = FALSE)
 ################################
-# I think this is not necessary anymore. 
 
+# This extracts the background/the total area of interst. This is necessary becaue we need to know the share of the total area that is under the target 
+# class/status (protected area, restoration, land cover wahtever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check xcompare between isnide/outside. This tis the whole purpose of this part 
 msk_ap <- baseES_ap[c(1,4,7,10,13)]
 msk_api <- baseES_api[c(1,4,7,10,13)]
-
 
 msk_ap <- lapply(msk_ap, function(r) {
   # Replace all non-NA values with 1 using ifel()
   ifel(!is.na(r), 1, NA)
 })
-
 msk_no_ap <- lapply(msk_api, function(r) {
   # Replace all non-NA values with 1 using ifel()
   r <- ifel(!is.na(r), 1, NA)
 })
 
+msk_ap <- map2(msk_ap, bkg_wgs, merge)
 
-# bkg <- lapply(bkg, function(r){
+freq_ap <- lapply(msk_ap, function(r){
+  f <- lsm_c_ai(r)
+})
+
+#####################################################
+freq_ap <- lapply(msk_ap, function(r){
+  f <- freq(r)
+})
+#####################################################
+# leave it here, but thos has the frequencies. from here gettign the shares is very easy. I always foget tho. 
+
+# Set the target CRS to Equal Earth (EPSG:8857) It is absolutely necessary because we are going to calculate shares using landcapemetrics fucntions, not by counting pixels
+
+# equal_earth_crs <- "EPSG:8857"
+# baseES_ap <- lapply(baseES_ap, function(r){
+#   r <- project(r, equal_earth_crs, method='bilinear')
+# })
+# baseES_api <- lapply(baseES_api, function(r){
+#   r <- project(r, equal_earth_crs, method='bilinear')
+# })
+# 
+# msk_ap <- lapply(msk_ap, function(r){
 #   r <- project(r, equal_earth_crs, method='near')
 # })
 
 
-msk_ap <- map2(msk_ap, bkg, merge)
 
-# Set the target CRS to Equal Earth (EPSG:8857)
-equal_earth_crs <- "EPSG:8857"
 
-baseES_ap <- lapply(baseES_ap, function(r){
-  r <- project(r, equal_earth_crs, method='bilinear')
-})
-
-baseES_api <- lapply(baseES_api, function(r){
-  r <- project(r, equal_earth_crs, method='bilinear')
-})
 
 msk_ap <- lapply(baseES_ap, function(r){
   r <- classify(r, cbind(0, Inf, 1), others = NA)
