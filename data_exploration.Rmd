@@ -1,13 +1,16 @@
 ---
 title: "DaTa Preparation NBS"    
 output: html_notebook
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
-I will use this project to pepare and extract insights from the raster data for the polygons in the 5 prioritized areas.
-
-
+I will use this project to pepare and extract insights from the raster
+data for the polygons in the 5 prioritized areas.
 
 # 1. Prepare Environemnt (Load necessary libraries)
+
 ```{r load libraries, include=FALSE}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
@@ -15,6 +18,7 @@ packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
 sapply(packs, require, character.only = TRUE, quietly=TRUE)
 rm(packs)
 ```
+
 ## 1.1 set class names and colors
 
 ```{r set symbols, include=FALSE}
@@ -29,8 +33,8 @@ lb <- data.frame(
 names(lb) <- c("Class", "color", "value")
 ```
 
-
 ## 2 Crop the Data for the target areas
+
 ```{r load target area polygons}
 poly <- st_read(here("vector", "areas_nbs.geojson")) 
 #Split the vector into a list of individual polygons
@@ -39,11 +43,15 @@ nam <- poly$COUNTR
 nam <- sort(nam)
 poly <- poly%>%split(.$COUNTR)
 ```
+
 ## 2.1 Test with one raster
-This is to process one single raster and ths that require reprojection (access related )
 
+Cropping and masking individual raster layers by the 5 study regions.
+Data processed here:
 
-Here i extracted ESAs land cover maps, and coastal riske reduction. No need to run again
+- ESA land cover maps
+- Pollination Restoration
+- Coastal Riske Reduction 
 
 ```{r crop rast, eval=FALSE, include=FALSE}
 #set path to downloaded data
@@ -56,6 +64,22 @@ esamod <- map(1:length(poly), function(x) crop(esamod, poly[[x]]))
 esamod <- map(1:length(esamod), function(x) mask(esamod[[x]], poly[[x]]))
 map(1:length(esamod), function(x) writeRaster(esamod[[x]], paste0(here("ESA_LC"), 'esaLC_', nam[x], '.tif'), overwrite=TRUE))
 
+n <- 3 #this is therestoration for pollination
+t <- rast(tiffes[[n]])
+clean_filename <- function(filename) {
+  sub("_md5.*", "", filename)
+}
+outpath <- here(outpath) 
+
+ cropped <- map(1:length(poly), function(x) crop(t, poly[[x]]))
+ masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
+  
+  # Extract the base filename before 'md5'
+  base_filename <- clean_filename(basename(tiffes[[n]]))
+  
+  # Write the cropped and masked rasters to files
+  map(1:length(masked), function(x) (writeRaster(masked[[x]], paste0(outpath, "/", base_filename, "_", nam[x], ".tif"), overwrite = TRUE)))
+
 #Coastal risk reduction This was addewd later. Check if there are some missing that i need to add.
 c_risk_red<- rast(here(inpath, "ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d.tif"))
 
@@ -64,39 +88,39 @@ c_risk_red <- map(1:length(c_risk_red), function(x) mask(c_risk_red[[x]], poly[[
 paste0(here(outpath, 'coastal_risk_reduction_'), nam[x], '.tif')
 map(1:length(c_risk_red), function(x) writeRaster(c_risk_red[[x]], paste0(here(outpath, 'coastal_risk_reduction_'), nam[x], '.tif'), overwrite=TRUE)
 #remember that the layer as such, keeps the name in a slot and that we are using that. 
+#rest naturebase
+t <-  list.files(here(inpath), pattern='nbs')
+t <- t[2]
+
+rest <- rast(here(inpath, t))
+
+t <- "~/Downloads/nbs_restoration_naturebase.tif.ovr"
+
+t <- rast(t)
+
+crs(t) <- "EPSG:54009"
+
+val <- unique(rest)
+
 ```
 
-## 2.2 Iterate over  all rasters 
-Restoration Data is being processed here I designed this process because i thought it would be better to oad and process each raster individually to avoid memory issues, but now i think i am an idiot because the rasters are not totally loaded anyway. 
+## 2.2 Iterate over all rasters
 
-```{r iterate cropMask}
+This runs thesame process in batch. Memory was optimzied to not load all the data atthesame time, but process and write each raster individually before going to the next one.  
+
+```{r iterate cropMask, eval=FALSE, include=FALSE}
 wd <- here(inpath) # i know, this is stupid but not feel like thinking. 
 
 #This is for the restoration data I
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '2020-1992'))
 
 
-n <- 3 #this is therestoration for pollination
-t <- rast(tiffes[[n]])
-clean_filename <- function(filename) {
-  sub("_md5.*", "", filename)
-}
 
-outpath <- here(outpath) #'/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data/'
-
- cropped <- map(1:length(poly), function(x) crop(t, poly[[x]]))
- masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
-  
-  # Extract the base filename before 'md5'
-  base_filename <- clean_filename(basename(paths[[n]]))
-  
-  # Write the cropped and masked rasters to files
-  map(1:length(masked), function(x) (writeRaster(masked[[x]], paste0(output_path, base_filename, "_", nam[x], ".tif"), overwrite = TRUE)))
 
 # Loop through each geotiff file
 for (i in seq_along(tiffes)) {
   # Get the current tiff file
-  tiff_file <- paths[i]
+  tiff_file <- tiffes[i]
   
   # Load the current geotiff (don't load all at once)
   access <- rast(tiff_file)
@@ -110,7 +134,7 @@ for (i in seq_along(tiffes)) {
   
   # Write the cropped and masked rasters to files
   map(1:length(masked), function(x) {
-    writeRaster(masked[[x]], paste0(output_path, base_filename, "_", nam[x], ".tif"), overwrite = TRUE)
+    writeRaster(masked[[x]], paste0(output_path, "/", base_filename, "_", nam[x], ".tif"), overwrite = TRUE)
   })
   # Optionally, clear the variable to free up memory
   rm(access, cropped, masked)
@@ -121,47 +145,60 @@ for (i in seq_along(tiffes)) {
 
 ## 2.3. Reproj and CropMask Accesibility Raster
 
-```{r reproj access}
+The accessibility data was handled separately because it is  in another crs because of course, it is a
+distance raster and an equal distance projection is required.
+
+```{r reproj access, eval=FALSE, include=FALSE}
 
 # Nature access: number of people within 1 hour travel
-acc <- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb.tif')
+acc <- rast(here(inpath, 'nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb.tif'))
 #Load template. Where did I get it from? 
-acc2 <- rast('/Volumes/Jero_HDD/WWF/global_outputs/temp/access_WGS84.tif')
+acc2 <- rast(here(inpath, 'access_WGS84.tif'))
 acc <- project(acc,acc2)
-writeRaster(acc, '/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif')
+writeRaster(acc, here(inpath, 'nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif'))
 
 
-# Nature Accessibility Data Becsuse i have to reproejcxt. check if there are some left to do. 
-# Hast to be reprojected, so that is a bit annoying but no big deal, alrady done. I think the issue is that one is still pending
-acc<- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif')
+# Nature Accessibility Data Because i have to reproejcxt. check if there are some left to do. 
+# Has to be reprojected, so that is a bit annoying but no big deal, alrady done. I think the issue is that one is still pending
+acc<- rast(here(inpath, 'global_outputs/nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb_WGS84.tif'))
 acc <- map(1:length(poly), function(x) crop(acc, poly[[x]]))
 acc <- map(1:length(acc), function(x) mask(acc[[x]], poly[[x]]))
-map(1:length(acc), function(x) writeRaster(acc[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'nature_access_ESA_2020', nam[x], '.tif'), overwrite=TRUE))
+map(1:length(acc), function(x) writeRaster(acc[[x]], paste0(here(outpath, "/", 'nature_access_ESA_2020', nam[x], '.tif'), overwrite=TRUE)))
 
 # Access restoration
-acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/nature_access_diff_Sc3v1_PNVnoag-esa2020.tif')
+acces_rest <- rast(here(inpath, 'nature_access_diff_Sc3v1_PNVnoag-esa2020.tif'))
 acces_rest <- project(acces_rest, acc2, method='bilinear')
 acces_rest <- map(1:length(poly), function(x) crop(acces_rest, poly[[x]]))
 acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
-map(1:length(access_nature), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/extracted/', 'nature_access_diff_Sc3v1_PNVnoag-esa2020_', nam[x], '.tif'), overwrite=TRUE))
+map(1:length(access_nature), function(x) writeRaster(acces_rest[[x]], paste0(here(outpath, "/", 'nature_access_diff_Sc3v1_PNVnoag-esa2020_'), nam[x], '.tif'), overwrite=TRUE))
 
-acces_rest <- rast('/Volumes/Jero_HDD/WWF/global_outputs/global_people_access_population_2019_60.0m_md5_d264d371bd0d0a750b002a673abbb383.tif')
+
+# Access 60m 2019
+acces_rest <- rast(here(inpath, 'global_people_access_population_2019_60.0m_md5_d264d371bd0d0a750b002a673abbb383.tif'))
+acces_rest <- project(acces_rest, acc2, method='bilinear')
+acces_rest <- map(1:length(poly), function(x) crop(acces_rest, poly[[x]]))
+acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
+
 
 map(1:length(access_rest), function(x) writeRaster(acces_rest[[x]], paste0('/Volumes/Jero_HDD/WWF/NBS_OPS/raster/', 'global_people_access_population_2019_60.0m_', nam[x], '.tif'), overwrite=TRUE))
 ```
 
-##  2.4. Coastal Risk Reduction 
-So far here i have loaded, reprojected when necessary and cropmasked the global ecosystem reasters for each one of the study areas. (NBS) and exported them back to map in Qgis. 
 
-# 3 Explore rasters
+# 3 Explore Datasets
 
-For summarizing geotiff raster files and comparing values across protected areas or different land covers for an initial assessment, especially for an audience without geospatial expertise, here are some accessible metrics you can use:
-1. Basic Statistical Summaries:
+For summarizing geotiff raster files and comparing values across
+protected areas or different land covers for an initial assessment,
+especially for an audience without geospatial expertise, here are some
+accessible metrics : 1. Basic Statistical Summaries:
 
-## 3.1 Summaries Land cover
-```{r basic summaries}
+## 3.1 Summaries Land covers
 
-path_lc <- '/Users/sputnik/Documents/Natural_capital/NBS_OP/data_import/ESA_LC'
+Extract the shares for the different land covers for the reclassified
+ESA land cover maps for the 5 study areas for 1992 and 2020.
+
+```{r basic summaries LC, eval=FALSE, include=FALSE}
+
+path_lc <- here('ESA_LC') 
 # load reclassified land cover map
 tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
 lc <- lapply(tf,rast)
@@ -188,7 +225,16 @@ lsmet <-  lsmet %>% group_by(AREA, layer) %>%
     layer == 1 ~ 1992,
     layer == 2 ~ 2020
   ))
-# Create the bar plot using ggplot2
+
+save(lsmet, file=here("output_data", 'shares_lc.RData'))
+```
+
+## 3.2. Chart the shares per land cover
+
+-   Land Cover ESA
+-   Area Proportion for both years (1992,2020)
+
+```{r land covers, echo=FALSE, fig.width=9, fig.height=7}
 t <- ggplot(lsmet, aes(x = Class, y = percentage, fill = color)) +
   geom_bar(stat = "identity") +  # Use identity since we are plotting pre-calculated values
   scale_fill_identity() +  # Use the exact colors provided in the `color` column
@@ -196,50 +242,36 @@ t <- ggplot(lsmet, aes(x = Class, y = percentage, fill = color)) +
   labs(title = "Class Distribution by Area and Year",
        x = "Class",
        y = "Percentage") +
-  #theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for readability
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8)) +  # Rotate x-axis labels for readability
+  geom_text(aes(label = scales::percent(percentage / 100, accuracy = 0.01)),  # Convert to percentage format
+            vjust = -0.5,  # Position labels slightly above the bars
+            size = 2.5)  # Adjust label size as needed
 
 print(t)
 ```
 
 
-This is the data that we have ready:
-
-- Land Cover ESA
-  - Area Proportion for both years
-- Coastal Risk Reduction
-- Restoration
-  - Nitrogen Export
-  - nature access restoration
-  - pollination restoration
-  - sediment export
-- Conservation?
-
-
-
-Beneficiaries and coastal protection pop< 10 downstreams
-
-
-
-then, go through these change raster (priority 4 and take a look at them and think what can be done here, and show differences for land covers), inside outside protected areas (UICN cat National park Ia , Ib, II, III, IV , V, VI)
-
 # Get summaries
 
-Barplots/distributions outisde inside protected areas/land cover classes as a way to see if protected areas are abnormally represented. This is for cosnervation. Once i get this done, i need the same for griscom
-## Get summaries per PA.
+Go through these change raster (priority 4 and take a look at them
+and think what can be done here, and show differences for land covers),
+inside outside protected areas. UICN cat National park Ia , Ib, II, III,
+IV , V, VI and those non UICN (especially important in Mexico)
+
+Barplots/distributions outside inside protected areas/land cover classes
+as a way to see if protected areas are abnormally represented. This is
+for cosnervation. Once i get this done, i need the same for griscom \##
+Get summaries per PA.
 
 ```{r get summaries}
 #load protected areas
-pa = st_read('/Volumes/Jero_HDD/POSDOC/NBS_OPS/vector/wdpa_nbs.gpkg')
-#remove those without UICN cathegory
-filt <- c("Not Reported", "Not Assigned", "Not Applicable")
-pa <- pa %>% filter(!(IUCN_CAT %in% filt))
+pa = st_read(here("vector", "wdpa_nbs.gpkg"))
+# DO NOT remove those without UICN category
 pa <- pa%>%split(.$COUNTR)
 
 #Get baseline values for ecosystem services. Will use the 2020baseline values
 # set inpath
-wd <- '/Volumes/Jero_HDD/POSDOC/NBS_OPS/cropped_raster_data'
-wd <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/cropped_rasters'
+wd <- here("cropped_raster_data")
 
 
 # Drop the second band. There must be an easier way. Now i have th background to put to the ecosystem service rasters. Somethin  
@@ -512,10 +544,21 @@ totSE_l <- totSE_l %>%
                                "Pollination" 
                                ))
 ```
-##########################################################################
-##########################################################################
 
-# Get the histograms
+########################################################################## 
+
+########################################################################## 
+
+-   Coastal Risk Reduction
+-   Restoration
+    -   Nitrogen Export
+    -   nature access restoration
+    -   pollination restoration
+    -   sediment export
+-   Conservation?
+
+Beneficiaries and coastal protection pop\< 10 downstreams \# Get the
+histograms
 
 ```{r histograms}
 baseES_api_v <- lapply(baseES_api, function(r){
@@ -637,6 +680,7 @@ t <- ggplot(df, aes(x = Value, fill = set)) +
   )
 t
 ```
+
 # Plot the shares
 
 ```{r ggplot, h=8, w=8}
@@ -961,6 +1005,7 @@ s5 <- lapply(s5, function(r){
 ```
 
 # Produce land cover change maps
+
 ```{r land cover change}
 
 #path to lc classifications
@@ -990,14 +1035,15 @@ map(1:length(chmaps), function(x) writeRaster(chmaps[[x]][[1]], paste0(path_lc, 
 
 ```
 
-
-#######################################################################
+####################################################################### 
 
 Second part with justin.
 
-# Explore Data. 
+# Explore Data.
 
-The ecorregiosn Raster is not suited, 830 different values. Could be done but does not make a lot of sense
+The ecorregiosn Raster is not suited, 830 different values. Could be
+done but does not make a lot of sense
+
 ```{r explore data}
 
 ecoregions <- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/Ecoregions2017_compressed_md5_316061.tif')
@@ -1005,9 +1051,9 @@ ecoregions <- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversit
 ec_uniqe <- unique(ecoregions)
 ```
 
-Use vector file, just the main biomes. 
+Use vector file, just the main biomes.
 
-# PA 
+# PA
 
 ```{r filter out PAs}
 
@@ -1088,13 +1134,14 @@ summary_df <- map2_dfr(seq_along(rs_msk), rs_msk, function(i, inner_list) {
 
 ```
 
-
 # Split by Countries/continents
+
 # mask by protected areas (all togeter, chategories I-VI)
-# Reclassify Land Cover maps. 
 
+# Reclassify Land Cover maps.
 
-#  Change Maps
+# Change Maps
+
 ```{r change_map_calc}
 esat <- c('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif','/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESACCI-LC-L4-LCCS-Map-300m-P1Y-1992-v2.0.7cds_compressed_md5_60cf30.tif')
 
@@ -1160,8 +1207,8 @@ diffs_p <-  diffTablej(mat, digits=3, analysis = "change")
 
 ```
 
-
 # Get Sankey Diagrams
+
 ```{r Sankey Diagram}
 classes <- c("Cultivated", "Forests", "Grasses/shrubs", "Sparse", "Mangroves", "Urban", "Bare", "Water")
 groupColor <- c("#dcf064","#00b809","#8ca000","#ffebaf",'#009678', "#c31400", "#fff5d7", "#0046c8")
@@ -1211,134 +1258,116 @@ sankeyNetwork(Links = linkInfo, Nodes = nodeInfo,
               colourScale = JS(colorScaleJS))
 ```
 
-
-
 # Next step
-1. Zonal Countries. one per service
 
-mask for the forest 
+1.  Zonal Countries. one per service
 
-not sum, average. 
+mask for the forest
 
-Historic services. 
+not sum, average.
+
+Historic services.
 
 name(test)
 
+Map 4 maps for each servie for the average change fior that time peiod
 
-Map 4 maps for each servie for the average change fior that time peiod 
+map(1:2, function(x) writeRaster(esas[[x]],
+paste0('\~/Documents/Natural_capital/NBS_OP/data/ESA_LC/',
+"ESA_LC_Rec\_", year[x], '.tif')))
 
-
-map(1:2, function(x) writeRaster(esas[[x]], paste0('~/Documents/Natural_capital/NBS_OP/data/ESA_LC/', "ESA_LC_Rec_", year[x], '.tif')))
-
-
-
-cls
-[[1]]
-   layer value      count
-1      1    10  105009519
-2      1    11  102087508
-3      1    12    2415511
-4      1    20   29796402
-5      1    30   48088904
-6      1    40   44613941
-7      1    50  137316150
-8      1    60   84649974
-9      1    61   11061590
-10     1    62   39391781
-11     1    70  113472860
-12     1    71   45563958
-13     1    72      19882
-14     1    80  109865531
-15     1    81      55745
-16     1    82         21
-17     1    90   37417117
-18     1   100   58048747
-19     1   110   15730987
-20     1   120  140408175
-21     1   121    3007375
-22     1   122   32663372
-23     1   130  177774130
-24     1   140   42447574
-25     1   150  155885143
-26     1   151         61
-27     1   152    1072086
-28     1   153    3664319
-29     1   160   11677666
-30     1   170    2394625
-31     1   180   34499895
-32     1   190   10933052
-33     1   200  247641877
-34     1   201    1572727
-35     1   202    1244423
-36     1   210 5675137546
-37     1   220  871449826
-
+cls [[1]] layer value count 1 1 10 105009519 2 1 11 102087508 3 1 12
+2415511 4 1 20 29796402 5 1 30 48088904 6 1 40 44613941 7 1 50 137316150
+8 1 60 84649974 9 1 61 11061590 10 1 62 39391781 11 1 70 113472860 12 1
+71 45563958 13 1 72 19882 14 1 80 109865531 15 1 81 55745 16 1 82 21 17
+1 90 37417117 18 1 100 58048747 19 1 110 15730987 20 1 120 140408175 21
+1 121 3007375 22 1 122 32663372 23 1 130 177774130 24 1 140 42447574 25
+1 150 155885143 26 1 151 61 27 1 152 1072086 28 1 153 3664319 29 1 160
+11677666 30 1 170 2394625 31 1 180 34499895 32 1 190 10933052 33 1 200
+247641877 34 1 201 1572727 35 1 202 1244423 36 1 210 5675137546 37 1 220
+871449826
 
 So, now what does this mean?
 
-
-
 Add column with the class names with multiple aggregation levels (ESA)
 
-    Mean: The average value within each zone (e.g., inside/outside protected areas or across land cover types). This provides a simple understanding of the central tendency.
-    Median: The middle value when data is ordered, useful when your data has outliers that could skew the mean.
-    Standard Deviation: Indicates the variation or dispersion from the average, helping show if values are clustered or spread out.
-    Min/Max: The range of values, showing the extremes within each zone.
+```         
+Mean: The average value within each zone (e.g., inside/outside protected areas or across land cover types). This provides a simple understanding of the central tendency.
+Median: The middle value when data is ordered, useful when your data has outliers that could skew the mean.
+Standard Deviation: Indicates the variation or dispersion from the average, helping show if values are clustered or spread out.
+Min/Max: The range of values, showing the extremes within each zone.
+```
 
-2. Zonal Statistics (Per Category):
+2.  Zonal Statistics (Per Category):
 
-    Sum: The total value across a zone, particularly useful for variables like ecosystem services (e.g., total nitrogen retention within protected areas).
-    Count of Pixels: The number of pixels in each zone, which could give an idea of the area covered by specific land covers.
-    Percentage Area Contribution: For each zone or land cover class, express the variable as a percentage of the total landscape (e.g., “30% of nitrogen retention occurs in protected areas”).
+    Sum: The total value across a zone, particularly useful for
+    variables like ecosystem services (e.g., total nitrogen retention
+    within protected areas). Count of Pixels: The number of pixels in
+    each zone, which could give an idea of the area covered by specific
+    land covers. Percentage Area Contribution: For each zone or land
+    cover class, express the variable as a percentage of the total
+    landscape (e.g., “30% of nitrogen retention occurs in protected
+    areas”).
 
-3. Comparisons by Category:
+3.  Comparisons by Category:
 
-    Inside vs. Outside Protected Areas:
-        You can calculate mean, sum, and standard deviation inside and outside protected areas to compare the effectiveness of protection measures in preserving ecosystem services.
-    Land Cover Comparison:
-        Use zonal means to compare how different land cover types contribute to ecosystem services like sediment retention or distance to beneficiaries.
-        Express results as percentages, e.g., “Forests account for 60% of nitrogen retention.”
+    Inside vs. Outside Protected Areas: You can calculate mean, sum, and
+    standard deviation inside and outside protected areas to compare the
+    effectiveness of protection measures in preserving ecosystem
+    services. Land Cover Comparison: Use zonal means to compare how
+    different land cover types contribute to ecosystem services like
+    sediment retention or distance to beneficiaries. Express results as
+    percentages, e.g., “Forests account for 60% of nitrogen retention.”
 
-4. Histogram or Distribution Analysis:
+4.  Histogram or Distribution Analysis:
 
-    A frequency distribution showing how the values of each variable are distributed across the entire study area or within protected vs. unprotected zones.
-    This can help show if most of the service is concentrated in a few high-value areas or spread out.
+    A frequency distribution showing how the values of each variable are
+    distributed across the entire study area or within protected vs.
+    unprotected zones. This can help show if most of the service is
+    concentrated in a few high-value areas or spread out.
 
-5. Change Detection (If Time Series Exists):
+5.  Change Detection (If Time Series Exists):
 
-    If your rasters cover different time periods, you could show net changes in ecosystem service values (e.g., changes in nitrogen retention) inside and outside protected areas or across different land covers.
+    If your rasters cover different time periods, you could show net
+    changes in ecosystem service values (e.g., changes in nitrogen
+    retention) inside and outside protected areas or across different
+    land covers.
 
-6. Normalized or Standardized Scores:
+6.  Normalized or Standardized Scores:
 
-    Convert variables into percentile ranks or Z-scores to facilitate comparisons across variables that might have different units (e.g., how “high” or “low” the ecosystem service is in relation to the mean).
+    Convert variables into percentile ranks or Z-scores to facilitate
+    comparisons across variables that might have different units (e.g.,
+    how “high” or “low” the ecosystem service is in relation to the
+    mean).
 
-7. Threshold Analysis:
+7.  Threshold Analysis:
 
-    For variables where a threshold is meaningful (e.g., distance to beneficiaries < 10 km), you can count the number of pixels above or below the threshold in each category (protected areas, land covers).
-    For example, "80% of the people dependent on agriculture live within 5 km of high-sediment retention areas."
+    For variables where a threshold is meaningful (e.g., distance to
+    beneficiaries \< 10 km), you can count the number of pixels above or
+    below the threshold in each category (protected areas, land covers).
+    For example, "80% of the people dependent on agriculture live within
+    5 km of high-sediment retention areas."
 
-8. Spatial Autocorrelation (Advanced):
+8.  Spatial Autocorrelation (Advanced):
 
-    If you're dealing with spatially explicit relationships, calculating spatial autocorrelation (Moran’s I) might help quantify clustering patterns of ecosystem services inside and outside protected areas.
+    If you're dealing with spatially explicit relationships, calculating
+    spatial autocorrelation (Moran’s I) might help quantify clustering
+    patterns of ecosystem services inside and outside protected areas.
 
-9. Cumulative Impact Maps:
+9.  Cumulative Impact Maps:
 
-    Create a composite map where multiple variables are aggregated to show high- vs. low-value areas for ecosystem services. This could simplify complex data into an easily interpretable map for non-specialists.
+    Create a composite map where multiple variables are aggregated to
+    show high- vs. low-value areas for ecosystem services. This could
+    simplify complex data into an easily interpretable map for
+    non-specialists.
 
-These summaries will provide enough detail to highlight key insights, while also being interpretable by those without technical expertise. Let me know if you'd like to dive deeper into any specific metric or approach!
-
+These summaries will provide enough detail to highlight key insights,
+while also being interpretable by those without technical expertise. Let
+me know if you'd like to dive deeper into any specific metric or
+approach!
 
 Produyces forest loss maps/gain permanences
-
 
 Country/continent
 
 Biomes. (Köppen)
-
-
-
-
-
-
-
-
