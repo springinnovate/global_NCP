@@ -85,7 +85,7 @@ c_risk_red<- rast(here(inpath, "ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323e
 
 c_risk_red <- map(1:length(poly), function(x) crop(c_risk_red, poly[[x]]))
 c_risk_red <- map(1:length(c_risk_red), function(x) mask(c_risk_red[[x]], poly[[x]]))
-map(1:length(c_risk_red), function(x) writeRaster(c_risk_red[[x]], paste0(here(outpath, 'coastal_risk_reduction_'), nam[x], '.tif'), overwrite=TRUE)
+map(1:length(c_risk_red), function(x) writeRaster(c_risk_red[[x]], paste0(here(outpath, 'coastal_risk_reduction_'), nam[x], '.tif'), overwrite=TRUE))
 #remember that the layer as such, keeps the name in a slot and that we are using that. 
 #rest naturebase
 
@@ -871,64 +871,14 @@ t <- ggplot(df, aes(x = Value, fill = set)) +
 print(t)
 ```
 
-# 5. Restorastion Areas G(Nature base) 
+# 5. Restorastion Areas (Nature base) 
 
 ```{r resto}
-
-
-rest <- lapply(rest, function(r){
-  r <- ifel(r >0, 1, r)
-  })
-
-
-freq_r <- lapply(rest, function(r){
-  f <- freq(r)
-  })
-
-
-freq_r <- lapply(seq_along(freq_r), function(i) {
-  freq_r[[i]]$Country <- nam[i]
-  freq_r[[i]]
-})
-
-freq_r <- as_tibble(do.call(rbind, freq_r))
-
-freq_r <- freq_r %>%
-  group_by(Country) %>%
-  mutate(share = (count / sum(count)) * 100) %>%
-  ungroup()
-
-################################
-baseES <- map2(
-  baseES,   # The list of raster sublists
-  bkg,     # The list of backgrounds
-  function(rasters, bkg) {
-    # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) merge(raster, bkg))
-  }
-)
-
-
-
-freq_r <- map2(freq_r, nam, function(df) {
-  df$country <- country_names[i]  # Add country column
-  freq_ap[[i]]  # Return the modified dataframe
-})
-
-# I need to add new background,s not derived from ESA becasue the spatial resolutioon is larger. this also means that i will have to resample this!
-#get the backgrounds
-msk_r <- lapply(rest, function(r){
-  r <- ifel(r >0, 0, r)
-  })
-
 
 path_lc <- here('ESA_LC') 
 # load reclassified land cover map
 tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
 lc <- lapply(tf,rast)
-# lc <- lapply(lc, function(r){
-#   r <- project(r, "EPSG 8857")
-# })
 
 # Drop the second band. There must be an easier way. Now i have th background to put to the ecosystem service rasters. Somethin  
 # Create a background to fill the NAs from ESA's land cover maps
@@ -937,10 +887,42 @@ bkg <- lapply(lc, function(r){
   r <- subst(r, from = c(1:8), to =0)
 })
 
+
+outpath <- here('restoration')
+
+tf <- file.path(outpath, list.files(outpath, pattern= "tif"))
+tf <- tf[-1]
+rest <- lapply(tf,rast)
+
+rest <- lapply(rest, function(r){
+  r <- ifel(r >0, 1, r)
+  })
+
+# Get frequencies inside/outside
+freq_r <- lapply(rest, function(r){
+  f <- freq(r)
+  })
+freq_r <- lapply(seq_along(freq_r), function(i) {
+  freq_r[[i]]$Country <- nam[i]
+  freq_r[[i]]
+})
+freq_r <- as_tibble(do.call(rbind, freq_r))
+freq_r <- freq_r %>%
+  group_by(Country) %>%
+  mutate(share = (count / sum(count)) * 100) %>%
+  ungroup()
+
+######################
+# I need to add new background,s not derived from ESA becasue the spatial resolution is larger. this also means that i will have to resample this!
+#get the background why did i do this?
+msk_r <- lapply(rest, function(r){
+  r <- ifel(r >0, 0, r)
+  })
+
 # Load the rasters with the target data.
-tiffes <- file.path(wd, list.files(wd, pattern="tif"))
+tiffes <- file.path(here("cropped_raster_data"), list.files(here("cropped_raster_data"), pattern="tif"))
 #tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
-tiffes <-  tiffes[c(31:35, 41:45, 81:85)]#, 111:115)]
+tiffes <-  tiffes[c(76:80, 86:90,111:115)]#, 111:115)]
 
 # Step 1: Extract file names, product names, and country names
 file_names <- basename(tiffes)  # Extract file names from paths
@@ -965,11 +947,13 @@ file_info <- file_info %>%
 tiffes <- file_info$FilePath
 
 baseES <- lapply(tiffes, rast)
+################################
 
 # Group the list of ES as nested list, one for eah country
 baseES <- split(baseES, rep(1:length(lc), each = 3))
 
 # Step 5: Add the backgrounds
+
 
 baseES <- map2(
   baseES,   # The list of raster sublists
@@ -980,24 +964,58 @@ baseES <- map2(
   }
 )
 
-rm(lc)
+msk_r <- lapply(rest, function(r){
+  r <- classify(r, cbind(0, Inf,0))
+})
 
-# Step 2: Apply mask for each group of rasters using the corresponding country vector
-baseES_ap <- map2(
+
+#Resample Restoration data to service resolution
+# 1 Extract first element of the ES list
+base1 <- lapply(baseES, function(sublist) sublist[[1]])
+# it is key to set the resampling  method to nearest neighbor here!!!
+rest <- map2(
+  rest,
+  base1,
+  function(rast1, rast2){
+    rast1 <- resample(rast1,rast2, method='near', threads= 10)
+    rast1 <- ifel(rast1 >0, 1, rast1)
+  }
+)
+
+
+# Step 2: Apply mask for each group of rasters using the corresponding country Mask
+baseES <- map2(
   baseES,   # The list of raster sublists
-  pa,     # The list of country polygons
-  function(rasters, vector) {
+  rest,     # The list of country polygons
+  function(rasters, msk) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, vector))
+    lapply(rasters, function(raster) crop(raster, ext(msk)))
+  })
+
+# becasue fuck you, pollinatoes  
+baseES[[1]][[2]] <- resample(baseES[[1]][[2]], baseES[[1]][[1]], method= 'cubic', threads=10)
+baseES[[2]][[2]] <- resample(baseES[[2]][[2]], baseES[[2]][[1]], method= 'cubic', threads=10)
+baseES[[3]][[2]] <- resample(baseES[[3]][[2]], baseES[[3]][[1]], method= 'cubic', threads=10)
+baseES[[4]][[2]] <- resample(baseES[[4]][[2]], baseES[[4]][[1]], method= 'cubic', threads=10)
+baseES[[5]][[2]] <- resample(baseES[[5]][[2]], baseES[[5]][[1]], method= 'cubic', threads=10)
+
+
+
+ baseES_ap <- map2(
+  baseES,   # The list of raster sublists
+  rest,     # The list of country polygons 
+  function(rasters, msk) {
+    # Apply mask to each raster in the sublist using the corresponding country vector
+    lapply(rasters, function(raster) mask(raster, msk, maskvalues=1))
   }
 )
 # "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
-baseES_api <- map2(
+ baseES_api <- map2(
   baseES,   # The list of raster sublists
-  pa,     # The list of country polygons
-  function(rasters, vector) {
+  rest,     # The list of country polygons 
+  function(rasters, msk) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, vector, inverse=TRUE))
+    lapply(rasters, function(raster) mask(raster, msk, maskvalues=0))
   }
 )
 
@@ -1008,7 +1026,7 @@ baseES_api <- unlist(baseES_api, recursive = FALSE)
 
 # This extracts the background/the total area of interest. This is necessary because we need to know the share of the total area that is under the target 
 # class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of this part. 
-msk_ap <- baseES_ap[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with different quantities, not only on a 3 step basis
+msk_ap <- baseES_ap[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with different quantities, not only on a 3 step basis. I know how!
 msk_api <- baseES_api[c(1,4,7,10,13)]
 
 msk_ap <- lapply(msk_ap, function(r) {
