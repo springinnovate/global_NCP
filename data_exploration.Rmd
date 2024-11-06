@@ -435,13 +435,8 @@ totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap)
 
 # dropoutside 
 freq_ap <- freq_ap %>% filter(layer == 1)  %>%  filter(value == 1)
-
-# freq_ap <- rbind(freq_ap,freq_ap,freq_ap)
-# freq_ap <- freq_ap %>% arrange(country)
 freq_ap <- freq_ap %>% select(!c(1,2))
-# freq_all <- rbind(freq_all,freq_all,freq_all)
-# freq_all <- freq_all %>% arrange(country)
-# freq_all <- freq_all %>% select(!c(1,2))
+
 
 names(freq_ap) <- c("pix_count_pa", "Country","share_area")
 #rearrange columns 
@@ -1006,7 +1001,7 @@ baseES[[5]][[2]] <- resample(baseES[[5]][[2]], baseES[[5]][[1]], method= 'cubic'
   rest,     # The list of country polygons 
   function(rasters, msk) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, msk, maskvalues=1))
+    lapply(rasters, function(raster) mask(raster, msk, maskvalues=0))
   }
 )
 # "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
@@ -1015,7 +1010,7 @@ baseES[[5]][[2]] <- resample(baseES[[5]][[2]], baseES[[5]][[1]], method= 'cubic'
   rest,     # The list of country polygons 
   function(rasters, msk) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, msk, maskvalues=0))
+    lapply(rasters, function(raster) mask(raster, msk, maskvalues=1))
   }
 )
 
@@ -1024,21 +1019,21 @@ baseES_ap <- unlist(baseES_ap, recursive = FALSE)
 baseES_api <- unlist(baseES_api, recursive = FALSE)
 ################################
 
-# This extracts the background/the total area of interest. This is necessary because we need to know the share of the total area that is under the target 
-# class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of this part. 
-msk_ap <- baseES_ap[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with different quantities, not only on a 3 step basis. I know how!
-msk_api <- baseES_api[c(1,4,7,10,13)]
-
-msk_ap <- lapply(msk_ap, function(r) {
-  # Replace all non-NA values with 1 using ifel()
-  ifel(!is.na(r), 1, NA)
-})
-msk_no_ap <- lapply(msk_api, function(r) {
-  # Replace all non-NA values with 1 using ifel()
-  r <- ifel(!is.na(r), 1, NA)
-})
-
-msk_ap <- map2(msk_ap, bkg, merge)
+# # This extracts the background/the total area of interest. This is necessary because we need to know the share of the total area that is under the target 
+# # class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of this part. 
+# msk_ap <- baseES_ap[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with different quantities, not only on a 3 step basis. I know how!
+# msk_api <- baseES_api[c(1,4,7,10,13)]
+# 
+# msk_ap <- lapply(msk_ap, function(r) {
+#   # Replace all non-NA values with 1 using ifel()
+#   ifel(!is.na(r), 1, NA)
+# })
+# msk_no_ap <- lapply(msk_api, function(r) {
+#   # Replace all non-NA values with 1 using ifel()
+#   r <- ifel(!is.na(r), 1, NA)
+# })
+# 
+# msk_ap <- map2(msk_ap, bkg, merge)
 
 # Extract the shares
 #####################################################
@@ -1046,25 +1041,10 @@ msk_ap <- map2(msk_ap, bkg, merge)
 # freq_ap <- lapply(msk_ap, function(r){
 #   f <- lsm_c_ca(r)
 # })
-freq_ap <- lapply(msk_ap, function(r){
-  f <- freq(r)
-})
+# dropoutside 
+freq_r <- freq_r %>% filter(layer == 1)  %>%  filter(value == 1)
 
-country_names <- unique(country_names)
-
-freq_ap <- lapply(seq_along(freq_ap), function(i) {
-  freq_ap[[i]]$country <- country_names[i]  # Add country column
-  freq_ap[[i]]  # Return the modified dataframe
-})
-freq_ap <- as_tibble(do.call(rbind, freq_ap))
-
-freq_ap <- freq_ap %>%
-  group_by(country) %>%
-  mutate(share = (count / sum(count)) * 100) %>%
-  ungroup()
-
-#####################################################
-# leave it here, but this has the frequencies. from here getting the shares is very easy. I always forget tho. 
+country_names <- nam
 
 # Create background masks ### I DON'T THINK THIS IS NECESSARYANYMORE. CAN BE REMOVED!
 msk_ap <- lapply(baseES_ap, function(r){
@@ -1096,28 +1076,21 @@ totSE_ap <- as_tibble(unlist(totSE_ap))
 totSE_api <- as_tibble(unlist(totSE_api))
 totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap)
 
-# dropoutside 
-freq_ap <- freq_ap %>% filter(layer == 1)  %>%  filter(value == 1)
-
-# freq_ap <- rbind(freq_ap,freq_ap,freq_ap)
-# freq_ap <- freq_ap %>% arrange(country)
-freq_ap <- freq_ap %>% select(!c(1,2))
-# freq_all <- rbind(freq_all,freq_all,freq_all)
-# freq_all <- freq_all %>% arrange(country)
-# freq_all <- freq_all %>% select(!c(1,2))
-
-names(freq_ap) <- c("pix_count_pa", "Country","share_area")
+freq_r <- freq_r %>% select(c(3:5))
+names(freq_r) <- c("pix_count_in", "Country","share_area")
 #rearrange columns 
-freq_ap <- freq_ap %>% select(c(3,1,2))
-names(totSE) <- c("Service", "Country","WholeArea", "PArea")
-totSE <- left_join(totSE,freq_ap)
+freq_r <- freq_r %>% select(c(3,1,2))
+names(totSE) <- c("Service", "Country","Outside", "Inside")
+totSE <- left_join(totSE,freq_r)
 
 
-totSE <- totSE %>% mutate(share_service= (PArea/WholeArea)*100)
+# I need to add and then get the total!!!!!!!! 
+totSE <- totSE %>% mutate(WholeArea= Outside+Inside)
+# The freaking error is here!!!!!
+totSE <- totSE %>% mutate(share_service= (Inside/WholeArea)*100)
 
-names(totSE) <- c("Service", "Country", "WholeArea", "PArea", "Share_Area", "pix_count_pa", "Share_Service")
 
-write.csv(totSE, file=here('output_data', "service_prov_PA.csv"))
+write.csv(totSE, file=here('output_data', "service_prov_rest.csv"))
 
 totSE_l <- totSE %>%
   # Create a new column with simplified service names
