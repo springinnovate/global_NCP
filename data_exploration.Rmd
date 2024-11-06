@@ -907,6 +907,10 @@ freq_r <- freq_r %>%
   mutate(share = (count / sum(count)) * 100) %>%
   ungroup()
 
+freq_r <- freq_r %>% filter(layer == 1)  %>%  filter(value == 1)
+freq_r <- freq_r %>% select(c(3:5))
+names(freq_r) <- c("pix_count_in", "Country","share_area")
+# dropoutside 
 ######################
 # I need to add new background,s not derived from ESA becasue the spatial resolution is larger. this also means that i will have to resample this!
 #get the background why did i do this?
@@ -977,7 +981,6 @@ rest <- map2(
   }
 )
 
-
 # Step 2: Apply mask for each group of rasters using the corresponding country Mask
 baseES <- map2(
   baseES,   # The list of raster sublists
@@ -988,20 +991,23 @@ baseES <- map2(
   })
 
 # becasue fuck you, pollinatoes  
-baseES[[1]][[2]] <- resample(baseES[[1]][[2]], baseES[[1]][[1]], method= 'cubic', threads=10)
-baseES[[2]][[2]] <- resample(baseES[[2]][[2]], baseES[[2]][[1]], method= 'cubic', threads=10)
-baseES[[3]][[2]] <- resample(baseES[[3]][[2]], baseES[[3]][[1]], method= 'cubic', threads=10)
-baseES[[4]][[2]] <- resample(baseES[[4]][[2]], baseES[[4]][[1]], method= 'cubic', threads=10)
-baseES[[5]][[2]] <- resample(baseES[[5]][[2]], baseES[[5]][[1]], method= 'cubic', threads=10)
+# Apply resample to the second SpatRaster object in each sublist
+baseES <- lapply(baseES, function(sublist) {
+  # Check if the sublist has at least two elements
+  if (length(sublist) >= 2) {
+    # Resample the second SpatRaster to match the first
+    sublist[[2]] <- resample(sublist[[2]], sublist[[1]], method = 'cubic', threads = 10)
+  }
+  return(sublist)  # Return the updated sublist
+})
 
-
-
+# Maks the rasters by the area of interest 
  baseES_ap <- map2(
   baseES,   # The list of raster sublists
   rest,     # The list of country polygons 
   function(rasters, msk) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, msk, maskvalues=0))
+    lapply(rasters, function(raster) mask(raster, msk, maskvalues=0)) #Inside
   }
 )
 # "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
@@ -1010,7 +1016,7 @@ baseES[[5]][[2]] <- resample(baseES[[5]][[2]], baseES[[5]][[1]], method= 'cubic'
   rest,     # The list of country polygons 
   function(rasters, msk) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, msk, maskvalues=1))
+    lapply(rasters, function(raster) mask(raster, msk, maskvalues=1)) #Outside
   }
 )
 
@@ -1041,8 +1047,6 @@ baseES_api <- unlist(baseES_api, recursive = FALSE)
 # freq_ap <- lapply(msk_ap, function(r){
 #   f <- lsm_c_ca(r)
 # })
-# dropoutside 
-freq_r <- freq_r %>% filter(layer == 1)  %>%  filter(value == 1)
 
 country_names <- nam
 
@@ -1074,12 +1078,9 @@ totSE_api <-  lapply(baseES_api, compute_sum)#, mc.cores = detectCores() - 4)
 
 totSE_ap <- as_tibble(unlist(totSE_ap))
 totSE_api <- as_tibble(unlist(totSE_api))
-totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap)
+totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap) # here, we merged the otside first!
 
-freq_r <- freq_r %>% select(c(3:5))
-names(freq_r) <- c("pix_count_in", "Country","share_area")
 #rearrange columns 
-freq_r <- freq_r %>% select(c(3,1,2))
 names(totSE) <- c("Service", "Country","Outside", "Inside")
 totSE <- left_join(totSE,freq_r)
 
@@ -1089,47 +1090,29 @@ totSE <- totSE %>% mutate(WholeArea= Outside+Inside)
 # The freaking error is here!!!!!
 totSE <- totSE %>% mutate(share_service= (Inside/WholeArea)*100)
 
-
+# clean the service name:
+totSE$Service <- sub("_.*", "", totSE$Service)
 write.csv(totSE, file=here('output_data', "service_prov_rest.csv"))
 
 totSE_l <- totSE %>%
-  # Create a new column with simplified service names
-  mutate(Service = case_when(
-    Service == "global_n_retention_esamod2_compressed" ~ "Nitrogen Retention",
-    Service == "global_sed_retention_esamod2_compressed" ~ "Sediment Retention",
-    Service == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
-    Service == "nature_access_ESA" ~ "Access",
-    Service == "access_ESA_2020" ~ "Access",
-    TRUE ~ Service  # Keep other names unchanged, if any
-  )) %>%
-  # Select relevant columns and reshape the data into long format
-  select(Service, Share_Service, Share_Area, Country) %>%
-  pivot_longer(cols = c(Share_Service, Share_Area),
+  select(Service, share_service, share_area, Country) %>%
+  pivot_longer(cols = c(share_service, share_area),
                names_to = "Metric",
                values_to = "Value")
-totSE_l <- totSE_l %>%
-  filter(!(Metric == "Share_Area" & duplicated(paste(Country, Metric))))
 
 
 totSE_l <- totSE_l %>%
-  mutate(Service = fct_relevel(Service, 
-                               "Share Area",
-                               "Nitrogen Retention", 
-                               "Sediment Retention", 
-                               "Pollination" 
-                               ))
+  filter(!(Metric == "share_area" & duplicated(paste(Country, Metric))))
 
+totSE_l <- totSE_l %>% mutate(Service=case_when(
+  Metric== "share_area" ~ "area",
+  TRUE ~ Service 
+))
 
-totSE_l <- totSE_l %>%
-  group_by(Country, Metric) %>%
-  filter(!(Metric == "Share_Area" & row_number() > 1)) %>%
-  ungroup()
+# i don't think i should save this anymore 
+save(totSE_l, file= here('output_data', 'serv_dist2.RData'))
 
-save(totSE_l, file= here('output_data', 'serv_dist1.RData'))
-
-
-
-
+### Whagt is going on here?
 # Step 3: Group SpatRasters by country and populate the nested list
 for (i in seq_along(baseES)) {
   country <- get_country(baseES[[i]])
@@ -1138,24 +1121,6 @@ for (i in seq_along(baseES)) {
 
 baseES <- country_list
 rm(country_list)
-
-baseES_rp <- lapply(seq_along(baseES), function(i) {
-  # Get the current sublist of SpatRasters from baseES
-  current_sublist <- baseES[[i]]
-  # Get the corresponding template SpatRaster for reprojection
-  template_raster <- rest[[i]]
-  # Use lapply to reproject each SpatRaster in the sublist using the template raster
-  reprojected_sublist <- lapply(current_sublist, function(r) {
-    # Reproject the SpatRaster to match the CRS and extent of the template raster
-    project(r, template_raster, method = "bilinear")
-  })
-  # Return the reprojected sublist
-  return(reprojected_sublist)
-})
-
-
-baseES <- baseES_rp
-rm(baseES_rp)
 
 baseES_0 <- lapply(seq_along(baseES), function(i) {
   # Get the current sublist of SpatRasters from baseES
