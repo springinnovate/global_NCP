@@ -591,7 +591,7 @@ histograms
 ## 4.2 Extract Values and organize the dataftames for charting
 The code here is used to extract the pixel values from the input datasets and organzie so i can get the density plots.
 
-I still need to generalzie this to wrok with diffenret data inputs/number of differnetservices. There are some poor coding practices that need to be fixed. 
+I still need to generalize this to wrok with different data inputs/number of different services. There are some poor coding practices that need to be fixed. 
 ```{r extract data, eval=FALSE, include=FALSE}
 baseES_api_v <- lapply(baseES_api, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
@@ -710,14 +710,13 @@ t <- ggplot(df, aes(x = Value, fill = set)) +
 print(t)
 ```
 
-
 ### 4.3.2 Madagascar
-```{r density plots 2, echo=FALSE, fig.height=6, fig.width=9}
+```{r density plots pa 2, echo=FALSE, fig.height=6, fig.width=9}
 
 C <- 2
 
 df <- baseES_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
-t <- ggplot(df, aes(x = value, fill = restoration)) +
+t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
   facet_wrap(~Service, scales = "free") +
   # Set both x and y axes to be free for each facet
@@ -745,38 +744,19 @@ print(t)
 
 C <- 3
 
-# Calculate the 98th percentile for each combination of Service and Country
-# percentile_98 <- baseES_vf %>%
-#   group_by(Service, Country) %>%
-#   summarize(threshold = quantile(Value, 0.98)) %>%
-#   ungroup()
-percentile_95 <- baseES_vf %>%
-  group_by(Service, Country) %>%
-  summarize(threshold = quantile(Value, 0.95)) %>%
-  ungroup()
-# # Join the threshold back to the original data and filter values up to the 98th percentile
-# baseES_vf_filtered <- baseES_vf %>%
-#   left_join(percentile_98, by = c("Service", "Country")) %>%
-#   filter(Value <= threshold)
-
-baseES_vf_filtered <- baseES_vf %>%
-  left_join(percentile_95, by = c("Service", "Country")) %>%
-  filter(Value <= threshold)
-
-df <- baseES_vf_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
-
-
+df <- baseES_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  #facet_wrap(~Service, scales = "free") +
   facet_wrap(~Service, scales = "free") +
   # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `set` variable
-  labs(title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
-       x = "Value",
-       y = "Density",
-       fill = "Set") +
-  #scale_y_continuous(trans = 'log10')# Label for the fill legend
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Restoration"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
   theme_minimal() +
   theme(
     strip.text = element_text(size = 12),  # Increase facet labels' font size
@@ -785,7 +765,6 @@ t <- ggplot(df, aes(x = Value, fill = set)) +
   )
 print(t)
 ```
-
 
 ### 4.3.4 Peru- Madre de Dios
 
@@ -794,39 +773,19 @@ print(t)
 
 C <- 4
 
-# Calculate the 98th percentile for each combination of Service and Country
-# percentile_98 <- baseES_vf %>%
-#   group_by(Service, Country) %>%
-#   summarize(threshold = quantile(Value, 0.98)) %>%
-#   ungroup()
-percentile_95 <- baseES_vf %>%
-  group_by(Service, Country) %>%
-  summarize(threshold = quantile(Value, 0.95)) %>%
-  ungroup()
-
-# Join the threshold back to the original data and filter values up to the 98th percentile
-# baseES_vf_filtered <- baseES_vf %>%
-#   left_join(percentile_98, by = c("Service", "Country")) %>%
-#   filter(Value <= threshold)
-
-baseES_vf_filtered <- baseES_vf %>%
-  left_join(percentile_95, by = c("Service", "Country")) %>%
-  filter(Value <= threshold)
-
-df <- baseES_vf_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
-
-
+df <- baseES_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  #facet_wrap(~Service, scales = "free") +
   facet_wrap(~Service, scales = "free") +
   # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `set` variable
-  labs(title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
-       x = "Value",
-       y = "Density",
-       fill = "Set") +
-  #scale_y_continuous(trans = 'log10')# Label for the fill legend
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Restoration"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
   theme_minimal() +
   theme(
     strip.text = element_text(size = 12),  # Increase facet labels' font size
@@ -836,46 +795,25 @@ t <- ggplot(df, aes(x = Value, fill = set)) +
 print(t)
 ```
 
-
 ### 4.3.2 Vietnam
 ```{r density plots 2, echo=FALSE, fig.height=6, fig.width=9}
 #baseES_vf <- read.csv(here('output_data', "distributionServ_pa.csv"))
 
 C <- 5
 
-# Calculate the 98th percentile for each combination of Service and Country
-# percentile_98 <- baseES_vf %>%
-#   group_by(Service, Country) %>%
-#   summarize(threshold = quantile(Value, 0.98)) %>%
-#   ungroup()
-percentile_95 <- baseES_vf %>%
-  group_by(Service, Country) %>%
-  summarize(threshold = quantile(Value, 0.95)) %>%
-  ungroup()
-
-# Join the threshold back to the original data and filter values up to the 98th percentile
-# baseES_vf_filtered <- baseES_vf %>%
-#   left_join(percentile_98, by = c("Service", "Country")) %>%
-#   filter(Value <= threshold)
-# 
-baseES_vf_filtered <- baseES_vf %>%
-  left_join(percentile_95, by = c("Service", "Country")) %>%
-  filter(Value <= threshold)
-
-df <- baseES_vf_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
-
-
+df <- baseES_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  #facet_wrap(~Service, scales = "free") +
   facet_wrap(~Service, scales = "free") +
   # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `set` variable
-  labs(title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
-       x = "Value",
-       y = "Density",
-       fill = "Set") +
-  #scale_y_continuous(trans = 'log10')# Label for the fill legend
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Restoration"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
   theme_minimal() +
   theme(
     strip.text = element_text(size = 12),  # Increase facet labels' font size
@@ -887,7 +825,7 @@ print(t)
 
 # 5. Restorastion Areas (Nature base) 
 
-```{r resto}
+```{r resto, eval=FALSE, include=FALSE}
 
 path_lc <- here('ESA_LC') 
 # load reclassified land cover map
@@ -1095,11 +1033,20 @@ totSE_l <- totSE_l %>% mutate(Service=case_when(
 ))
 
 # i don't think i should save this anymore 
+totSE_l <- totSE_l %>%
+  mutate(Service = fct_relevel(Service, 
+                               "area",
+                               "nitrogen", 
+                               "sediment", 
+                               "pollination" 
+                               ))
+
+
 save(totSE_l, file= here('output_data', 'serv_dist2.RData'))
 
 ```
 
-## 4.1  Plot the shares
+## 5.1  Plot the shares
 
 ```{r plot shares, fig.width=9, fig.height=7}
 
@@ -1107,7 +1054,7 @@ load(here('output_data', 'serv_dist2.RData'))
 # Step 2: Create the bar plot
 p <- ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.7)) + 
-  aes(width = ifelse(Metric == "Share_Area", 0.5, 0.9)) + 
+  aes(width = ifelse(Metric == "share_area", 0.5, 0.9)) + 
   scale_y_continuous(limits = c(0, 100)) +
   facet_wrap(~ Country, ncol = 5) +  # Create 5 columns (one for each country)
   scale_fill_manual(values = c(
@@ -1117,7 +1064,7 @@ p <- ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
     "pollination" = "#dd1c77"          # Shade of purple
   )) +
   labs(
-    title = "Share of the protected areas and of the total ES provided inside them",
+    title = "Share of the Restoration Potential areas and of the total ES provided inside them",
     x = "Metric",
     y = "%",
     fill = "Service"
@@ -1139,7 +1086,7 @@ print(p)
 
 ## 5.2  Get the histograms
 
-```{r hist}
+```{r extract density restoration hist, eval=FALSE, include=FALSE}
 
 baseES_v <- lapply(baseES_api, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
@@ -1200,19 +1147,22 @@ write.csv(baseES_v, here('output_data', "distributionServ_restoration.csv"))
 ## 5.2. Produdce the Histograms
 ### 5.2.1 Brazil
 ```{r plot hist, echo=FALSE}
-# Calculate the 98th percentile for each combination of Service and Country
-# percentile_98 <- baseES_v %>%
-#   group_by(Service, country) %>%
-#   summarize(threshold = quantile(value, 0.98)) %>%
-#   ungroup()
-# # percentile_95 <- baseES_v %>%
-# #   group_by(Service, Country) %>%
-# #   summarize(threshold = quantile(Value, 0.95)) %>%
-# #   ungroup()
+baseES_v <- as_tibble(read.csv(here('output_data', "distributionServ_restoration.csv")))
+
+baseES_v$Service <- factor(baseES_v$Service, levels = c(
+  "nitrogen", "sediment", "pollination"))
+
+
+#Calculate the 98th percentile for each combination of Service and Country
+percentile_98 <- baseES_v %>%
+  group_by(Service, country) %>%
+  summarize(threshold = quantile(value, 0.98)) %>%
+  ungroup()
+
 # # Join the threshold back to the original data and filter values up to the 98th percentile
-# baseES_filtered <- baseES_v %>%
-#   left_join(percentile_98, by = c("Service", "country")) %>%
-#   filter(value <= threshold)
+baseES_filtered <- baseES_v %>%
+  left_join(percentile_98, by = c("Service", "country")) %>%
+  filter(value <= threshold)
 
 C <- 1
 
