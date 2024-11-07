@@ -663,15 +663,11 @@ write.csv(baseES_vf, here('output_data', "distributionServ_pa.csv"))
 ```
 
 ## 4.3. Produce plots
-
-### 4.3.1 BRazil
-
-This is calcualted for the percentile 95 to remove extreme values
-```{r density plots pa 1, echo=FALSE, fig.height=6, fig.width=9}
-
- # baseES_vf <- as_tibble(read.csv(here('output_data', "distributionServ_pa.csv")))
- # baseES_vf$Service <- factor(baseES_vf$Service, levels = c(
- #   "Nitrogen Retention", "Sediment Retention", "Pollination"))
+### 4.3.05 Load density data PA
+```{r load_dens_rest}
+  baseES_vf <- as_tibble(read.csv(here('output_data', "distributionServ_pa.csv")))
+  baseES_vf$Service <- factor(baseES_vf$Service, levels = c(
+    "Nitrogen Retention", "Sediment Retention", "Pollination"))
 
 percentile_98 <- baseES_vf %>%
   group_by(Service, Country) %>%
@@ -681,10 +677,12 @@ percentile_98 <- baseES_vf %>%
 baseES_filtered <- baseES_vf %>%
   left_join(percentile_98, by = c("Service", "Country")) %>%
   filter(Value <= threshold)
+```
+### 4.3.1 BRazil
 
-# baseES_vf_filtered <- baseES_vf %>%
-#   left_join(percentile_95, by = c("Service", "Country")) %>%
-#   filter(Value <= threshold)
+This is calcualted for the percentile 95 to remove extreme values
+```{r density plots pa 1, echo=FALSE, fig.height=6, fig.width=9}
+
 
 C <- 1
 
@@ -698,7 +696,7 @@ t <- ggplot(df, aes(x = Value, fill = set)) +
     title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
     x = "Value (Log Scale)",
     y = "Density",
-    fill = "Restoration"
+    fill = "Protected Area"
   ) +
   scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
   theme_minimal() +
@@ -725,7 +723,7 @@ t <- ggplot(df, aes(x = Value, fill = set)) +
     title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
     x = "Value (Log Scale)",
     y = "Density",
-    fill = "Restoration"
+    fill = "Protected Area"
   ) +
   scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
   theme_minimal() +
@@ -754,7 +752,7 @@ t <- ggplot(df, aes(x = Value, fill = set)) +
     title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
     x = "Value (Log Scale)",
     y = "Density",
-    fill = "Restoration"
+    fill = "Protected Area"
   ) +
   scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
   theme_minimal() +
@@ -773,7 +771,7 @@ print(t)
 
 C <- 4
 
-df <- baseES_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
+df <- baseES_vf %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
   facet_wrap(~Service, scales = "free") +
@@ -783,7 +781,7 @@ t <- ggplot(df, aes(x = Value, fill = set)) +
     title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
     x = "Value (Log Scale)",
     y = "Density",
-    fill = "Restoration"
+    fill = "Protected Area"
   ) +
   scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
   theme_minimal() +
@@ -811,7 +809,7 @@ t <- ggplot(df, aes(x = Value, fill = set)) +
     title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
     x = "Value (Log Scale)",
     y = "Density",
-    fill = "Restoration"
+    fill = "Protected Area"
   ) +
   scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
   theme_minimal() +
@@ -1145,12 +1143,14 @@ write.csv(baseES_v, here('output_data', "distributionServ_restoration.csv"))
 
 
 ## 5.2. Produdce the Histograms
-### 5.2.1 Brazil
-```{r plot hist, echo=FALSE}
+
+### 5.2.05 Load and prepare the data 
+```{r laod data density rest}
 baseES_v <- as_tibble(read.csv(here('output_data', "distributionServ_restoration.csv")))
 
 baseES_v$Service <- factor(baseES_v$Service, levels = c(
   "nitrogen", "sediment", "pollination"))
+baseES_v$restoration <- factor(baseES_v$restoration, levels = c(0,1))
 
 
 #Calculate the 98th percentile for each combination of Service and Country
@@ -1158,12 +1158,14 @@ percentile_98 <- baseES_v %>%
   group_by(Service, country) %>%
   summarize(threshold = quantile(value, 0.98)) %>%
   ungroup()
-
 # # Join the threshold back to the original data and filter values up to the 98th percentile
 baseES_filtered <- baseES_v %>%
   left_join(percentile_98, by = c("Service", "country")) %>%
   filter(value <= threshold)
+```
 
+### 5.2.1 Brazil
+```{r plot hist resto bra, echo=FALSE, fig.height=6, fig.width=9}
 C <- 1
 
 df <- baseES_filtered %>% filter(country==nam[C]) %>% filter(Service!="Nature Access")
@@ -1190,7 +1192,7 @@ print(t)
 
 ### 5.2.2. Madagascar 
 
-```{r plot hist, echo=FALSE}
+```{r plot hist resto mdg, echo=FALSE, fig.height=6, fig.width=9}
 
 C <- 2
 
@@ -1218,20 +1220,8 @@ print(t)
 
 ### 5.2.3 Mexico - Yucatan
 
-```{r plot hist}
+```{r plot hist resto MX, echo=FALSE, fig.height=6, fig.width=9}
 # Calculate the 98th percentile for each combination of Service and Country
-percentile_98 <- baseES_v %>%
-  group_by(Service, country) %>%
-  summarize(threshold = quantile(value, 0.98)) %>%
-  ungroup()
-# percentile_95 <- baseES_v %>%
-#   group_by(Service, Country) %>%
-#   summarize(threshold = quantile(Value, 0.95)) %>%
-#   ungroup()
-# Join the threshold back to the original data and filter values up to the 98th percentile
-baseES_filtered <- baseES_v %>%
-  left_join(percentile_98, by = c("Service", "country")) %>%
-  filter(value <= threshold)
 
 C <- 3
 
@@ -1259,7 +1249,7 @@ print(t)
 
 ### 5.2.4. Peru Madre de Dios
 
-```{r plot hist}
+```{r plot r plot hist resto PE, echo=FALSE, fig.height=6, fig.width=9}
 
 C <- 4
 
@@ -1286,7 +1276,7 @@ print(t)
 ```
 ### 5.2.5. Vietnam 
 
-```{r plot hist}
+```{r plot r plot hist resto VT, echo=FALSE, fig.height=6, fig.width=9}
 # Calculate the 98th percentile for each combination of Service and Country
 C <- 5
 
@@ -1311,7 +1301,7 @@ t <- ggplot(df, aes(x = value, fill = restoration)) +
   )
 print(t)
 ```
-
+####################################################3
 
 
 ```{r land cover change}
