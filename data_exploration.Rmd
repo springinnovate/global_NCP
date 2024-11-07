@@ -426,17 +426,34 @@ compute_sum <- function(raster) {
   total_sum <- global(raster, fun = "sum", na.rm = TRUE)[,1]  # Use global() to get the sum
   return(total_sum)
 }
+
 totSE_ap <-  lapply(baseES_ap, compute_sum)#, mc.cores = detectCores() - 4)
 totSE_api <-  lapply(baseES_api, compute_sum)#, mc.cores = detectCores() - 4)
+
 
 totSE_ap <- as_tibble(unlist(totSE_ap))
 totSE_api <- as_tibble(unlist(totSE_api))
 totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap)
 
+#rearrange columns 
+names(totSE) <- c("Service", "Country","Outside", "Inside")
+totSE <- left_join(totSE,freq_ap)#!!!!!!!!!
+
+
 # dropoutside 
 freq_ap <- freq_ap %>% filter(layer == 1)  %>%  filter(value == 1)
 freq_ap <- freq_ap %>% select(!c(1,2))
 
+
+
+names(totSE) <- c("Service", "Country","Outside", "Inside")
+totSE <- left_join(totSE,freq_r)
+
+
+# I need to add and then get the total!!!!!!!! 
+totSE <- totSE %>% mutate(WholeArea= Outside+Inside)
+# The freaking error is here!!!!!
+totSE <- totSE %>% mutate(share_service= (Inside/WholeArea)*100)
 
 names(freq_ap) <- c("pix_count_pa", "Country","share_area")
 #rearrange columns 
@@ -448,6 +465,17 @@ totSE <- left_join(totSE,freq_ap)
 totSE <- totSE %>% mutate(share_service= (PArea/WholeArea)*100)
 
 names(totSE) <- c("Service", "Country", "WholeArea", "PArea", "Share_Area", "pix_count_pa", "Share_Service")
+#########################################################################
+#calculate ES output
+
+
+
+#rearrange columns 
+
+
+# clean the service name:
+totSE$Service <- sub("_.*", "", totSE$Service)
+
 
 write.csv(totSE, file=here('output_data', "service_prov_PA.csv"))
 
@@ -953,7 +981,6 @@ baseES <- split(baseES, rep(1:length(lc), each = 3))
 
 # Step 5: Add the backgrounds
 
-
 baseES <- map2(
   baseES,   # The list of raster sublists
   bkg,     # The list of backgrounds
@@ -966,7 +993,6 @@ baseES <- map2(
 msk_r <- lapply(rest, function(r){
   r <- classify(r, cbind(0, Inf,0))
 })
-
 
 #Resample Restoration data to service resolution
 # 1 Extract first element of the ES list
@@ -1025,41 +1051,9 @@ baseES_ap <- unlist(baseES_ap, recursive = FALSE)
 baseES_api <- unlist(baseES_api, recursive = FALSE)
 ################################
 
-# # This extracts the background/the total area of interest. This is necessary because we need to know the share of the total area that is under the target 
-# # class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of this part. 
-# msk_ap <- baseES_ap[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with different quantities, not only on a 3 step basis. I know how!
-# msk_api <- baseES_api[c(1,4,7,10,13)]
-# 
-# msk_ap <- lapply(msk_ap, function(r) {
-#   # Replace all non-NA values with 1 using ifel()
-#   ifel(!is.na(r), 1, NA)
-# })
-# msk_no_ap <- lapply(msk_api, function(r) {
-#   # Replace all non-NA values with 1 using ifel()
-#   r <- ifel(!is.na(r), 1, NA)
-# })
-# 
-# msk_ap <- map2(msk_ap, bkg, merge)
+n=3
+country_names <- rep(nam, each = n)
 
-# Extract the shares
-#####################################################
-# using lsm_c_ca requiues prjected coordoantes and ths can take too long to calcualte. Just count the pixels!
-# freq_ap <- lapply(msk_ap, function(r){
-#   f <- lsm_c_ca(r)
-# })
-
-country_names <- nam
-
-# Create background masks ### I DON'T THINK THIS IS NECESSARYANYMORE. CAN BE REMOVED!
-msk_ap <- lapply(baseES_ap, function(r){
-  r <- classify(r, cbind(0, Inf, 1), others = NA)
-})
-
-msk_api <- lapply(baseES_api, function(r){
-  r <- classify(r, cbind(0, Inf, 1), others = NA)
-})
-
-# split again to have nested lists
 msk_ap <- split(msk_ap, rep(1:length(bkg), each = 3))
 msk_api <- split(msk_api, rep(1:length(bkg), each = 3))
 
@@ -1112,223 +1106,235 @@ totSE_l <- totSE_l %>% mutate(Service=case_when(
 # i don't think i should save this anymore 
 save(totSE_l, file= here('output_data', 'serv_dist2.RData'))
 
-### Whagt is going on here?
-# Step 3: Group SpatRasters by country and populate the nested list
-for (i in seq_along(baseES)) {
-  country <- get_country(baseES[[i]])
-  country_list[[country]] <- c(country_list[[country]], list(baseES[[i]]))
-}
+```
 
-baseES <- country_list
-rm(country_list)
 
-baseES_0 <- lapply(seq_along(baseES), function(i) {
-  # Get the current sublist of SpatRasters from baseES
-  current_sublist <- baseES[[i]]
-  # Get the corresponding template SpatRaster for reprojection
-  template_raster <- rest[[i]]
-  # Use lapply to reproject each SpatRaster in the sublist using the template raster
-  masked_sublist <- lapply(current_sublist, function(r) {
-    # Reproject the SpatRaster to match the CRS and extent of the template raster
-    mask(r, template_raster, maskvalues=0)
-  })
-  # Return the reprojected sublist
-  return(masked_sublist)
-})
-# ok so far so good, but of course resolution with freaking access is always an issue
-baseES_1 <- lapply(seq_along(baseES), function(i) {
-  # Get the current sublist of SpatRasters from baseES
-  current_sublist <- baseES[[i]]
-  # Get the corresponding template SpatRaster for reprojection
-  template_raster <- rest[[i]]
-  # Use lapply to reproject each SpatRaster in the sublist using the template raster
-  masked_sublist <- lapply(current_sublist, function(r) {
-    # Reproject the SpatRaster to match the CRS and extent of the template raster
-    mask(r, template_raster, maskvalues=1)
-  })
-  # Return the reprojected sublist
-  return(masked_sublist)
-})
+## 5.2  Get the histograms
 
- # Step 1: Flatten the nested list into a single list of SpatRaster objects
-flattened_list <- unlist(baseES_1, recursive = FALSE)
+```{r hist}
 
-# Step 2: Extract information for the data frame
-
-# Create a dataframe to store the information
-raster_info <- data.frame(
-  Country = character(),   # Empty column for country names
-  Product = character(),   # Empty column for product names
-  stringsAsFactors = FALSE # Prevent automatic conversion to factors
-)
-
-# Step 3: Generate the correct country names for each raster
-# Calculate the number of rasters per country
-rasters_per_country <- length(flattened_list) / length(country_names)
-
-# Repeat each country name for the number of rasters per country
-repeated_country_names <- rep(country_names, each = rasters_per_country)
-
-# Step 4: Iterate over the flattened list and extract the relevant information
-for (i in seq_along(flattened_list)) {
-  # Get the corresponding country name from the repeated country names vector
-  country_name <- repeated_country_names[i]
-  
-  # Get the product name from the `name` slot of the SpatRaster
-  product_name <- names(flattened_list[[i]])
-  
-  # If the product name contains a "~" or "_md5", extract only the part before it
-  if (grepl("_md5", product_name)) {
-    product_name <- sub("_md5.*$", "", product_name)
-  }
-
-  # Step 5: Add the extracted information to the dataframe
-  raster_info <- rbind(raster_info, data.frame(Country = country_name, Product = product_name))
-}
-
-# Step 5: Optional - If you need to store the raster info back into a named list with country and product
-# Create a named list where each raster is named by country and product
-
-# baseES_0 <- setNames(flattened_list, paste(raster_info$Country, raster_info$Product, sep = "_"))
-baseES_1 <- setNames(flattened_list, paste(raster_info$Country, raster_info$Product, sep = "_"))
-
-# Get the histograms
-baseES_v <- lapply(baseES_0, function(r){
+baseES_v <- lapply(baseES_api, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
 })
 
-baseESap_v <- lapply(baseES_1, function(r){
+baseESap_v <- lapply(baseES_ap, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
 })
-
-
-# Adding corresponding rows from `df` to each tibble in `list_of_tibbles`
-baseES_v <- map2(baseES_v,                  # First input: List of tibbles
-  split(raster_info, seq(nrow(raster_info))),         # Second input: Split the dataframe into individual rows
-  ~ mutate(.x, Country = .y$Country, Product = .y$Product)  # Add `Country` and `Product` columns from df to each tibble
-)
-
-baseESap_v <- map2(baseESap_v,                  # First input: List of tibbles
-  split(raster_info, seq(nrow(raster_info))),         # Second input: Split the dataframe into individual rows
-  ~ mutate(.x, Country = .y$Country, Product = .y$Product)  # Add `Country` and `Product` columns from df to each tibble
-)
-
-
-new_col <- "Value"
-# Use lapply to rename the first column of each tibble
-baseES_v <- lapply(baseES_v, function(tbl) {
-  tbl %>%
-    rename(!!new_col := 1)  # Rename first column using column position
+baseES_v <- lapply(baseES_v, function(df) {
+  # Extract the service name (everything before the first "_")
+  service_name <- sub("_.*", "", names(df))
+  # Rename the first column to "value"
+  names(df) <- "value"
+  # Add a new column "Service" with the extracted service name
+  df <- df %>%
+    mutate(Service = service_name)
+  return(df)
 })
-
-baseESap_v <- lapply(baseESap_v, function(tbl) {
-  tbl %>%
-    rename(!!new_col := 1)  # Rename first column using column position
+baseESap_v <- lapply(baseESap_v, function(df) {
+  # Extract the service name (everything before the first "_")
+  service_name <- sub("_.*", "", names(df))
+  # Rename the first column to "value"
+  names(df) <- "value"
+  # Add a new column "Service" with the extracted service name
+  df <- df %>%
+    mutate(Service = service_name)
+  return(df)
 })
+country_names <- as_tibble(country_names)
+names(country_names) <-"Country"
 
+baseES_v <- Map(function(df, country_names) {
+  df$country <- country_names$Country 
+  df
+}, baseES_v, split(country_names, seq(nrow(country_names))))
 
+baseESap_v <- Map(function(df, country_names) {
+  df$country <- country_names$Country 
+  df
+}, baseESap_v, split(country_names, seq(nrow(country_names))))
+
+##################### do not run inside the Rmd!!!!!!!!
 baseES_v <- do.call(rbind, baseES_v)
 baseESap_v <- do.call(rbind, baseESap_v)
 ##################### do not run inside the Rmd!!!!!!!!
+
 baseES_v <- baseES_v%>% mutate(restoration = "0")
 baseESap_v <- baseESap_v%>% mutate(restoration = "1")
 
 baseES_v <- rbind(baseES_v, baseESap_v)
 
-baseES_v <- baseES_v %>%
-  # Create a new column with simplified service names
-  mutate(Service = case_when(
-    Product == "global_n_retention_esamod2_compressed" ~ "Nitrogen Retention",
-    Product == "global_sed_retention_esamod2_compressed" ~ "Sediment Retention",
-    Product == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
-    Product == "access_WGS84" ~ "Nature Access",
-    TRUE ~ Product  # Keep other names unchanged, if any
-  )) 
 
-write.csv(baseES_v, here('data', "distributionServ_restoration.csv"))
+# Write the output
+write.csv(baseES_v, here('output_data', "distributionServ_restoration.csv"))
+```
+
+
+## 5.2. Produdce the Histograms
+### 5.2.1 Brazil
+```{r plot hist, echo=FALSE}
 # Calculate the 98th percentile for each combination of Service and Country
-percentile_98 <- baseES_v %>%
-  group_by(Service, Country) %>%
-  summarize(threshold = quantile(Value, 0.98)) %>%
-  ungroup()
-percentile_95 <- baseES_v %>%
-  group_by(Service, Country) %>%
-  summarize(threshold = quantile(Value, 0.95)) %>%
-  ungroup()
+# percentile_98 <- baseES_v %>%
+#   group_by(Service, country) %>%
+#   summarize(threshold = quantile(value, 0.98)) %>%
+#   ungroup()
+# # percentile_95 <- baseES_v %>%
+# #   group_by(Service, Country) %>%
+# #   summarize(threshold = quantile(Value, 0.95)) %>%
+# #   ungroup()
+# # Join the threshold back to the original data and filter values up to the 98th percentile
+# baseES_filtered <- baseES_v %>%
+#   left_join(percentile_98, by = c("Service", "country")) %>%
+#   filter(value <= threshold)
 
+C <- 1
 
-# Join the threshold back to the original data and filter values up to the 98th percentile
-baseES_filtered <- baseES_v %>%
-  left_join(percentile_98, by = c("Service", "Country")) %>%
-  filter(Value <= threshold)
-
-baseES_filtered <- baseES_v %>%
-  left_join(percentile_95, by = c("Service", "Country")) %>%
-  filter(Value <= threshold)
-
-
-
-C <- 5
-
-df <- baseES_filtered %>% filter(Country==country_names[C]) %>% filter(Service!="Nature Access")
-
-rm(t)
-t <- ggplot(df, aes(x = Value, fill = restoration)) +
+df <- baseES_filtered %>% filter(country==nam[C]) %>% filter(Service!="Nature Access")
+t <- ggplot(df, aes(x = value, fill = restoration)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
   facet_wrap(~Service, scales = "free") +
-  #facet_wrap(~Country, scales = "free") +
   # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `set` variable
-  labs(title = paste("Density Plot of Services Inside and Outside Griscom restoration Areas -", country_names[C]),
-       x = "Value",
-       y = "Density",
-       fill = "Restoration") +
-  #scale_y_continuous(trans = 'log10')# Label for the fill legend
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Restoration Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Restoration"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
   theme_minimal() +
   theme(
     strip.text = element_text(size = 12),  # Increase facet labels' font size
     legend.position = "bottom",  # Place the legend at the bottom
     legend.box = "horizontal"  # Arrange legend items horizontally
   )
-t
+print(t)
 ```
 
-```{r get prportions restoration}
+### 5.2.2. Madagascar 
 
-rest <- lapply(rest, function(r){
-  r <- project(r, baseES[[1]])
-  })
+```{r plot hist, echo=FALSE}
 
+C <- 2
 
-s1 <- list(baseES[[1]],baseES[[6]],baseES[[11]], baseES[[16]])
-s2 <- list(baseES[[2]],baseES[[7]],baseES[[12]], baseES[[17]])
-s3 <- list(baseES[[3]],baseES[[8]],baseES[[13]], baseES[[18]])
-s4 <- list(baseES[[4]],baseES[[9]],baseES[[14]], baseES[[19]])
-s5 <- list(baseES[[5]],baseES[[10]],baseES[[15]], baseES[[20]])
-
-#baseEs_ap <- map(baseES, ap, mask)
-s11 <- lapply(s1, function(r){
-  r <- mask(r,rest[[1]],maskvalues=0)
-})
-s12 <- lapply(s1, function(r){
-  r <- mask(r,rest[[1]],maskvalues=1)
-})
-s2 <- lapply(s2, function(r){
-  r <- mask(r,ap[[2]])
-})
-s3 <- lapply(s3, function(r){
-  r <- mask(r,ap[[3]])
-})
-s4 <- lapply(s4, function(r){
-  r <- mask(r,ap[[4]])
-})
-s5 <- lapply(s5, function(r){
-  r <- mask(r,ap[[5]])
-})
-
+df <- baseES_filtered %>% filter(country==nam[C]) %>% filter(Service!="Nature Access")
+t <- ggplot(df, aes(x = value, fill = restoration)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_wrap(~Service, scales = "free") +
+  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Restoration Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Restoration"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+print(t)
 ```
 
-# Produce land cover change maps
+### 5.2.3 Mexico - Yucatan
+
+```{r plot hist}
+# Calculate the 98th percentile for each combination of Service and Country
+percentile_98 <- baseES_v %>%
+  group_by(Service, country) %>%
+  summarize(threshold = quantile(value, 0.98)) %>%
+  ungroup()
+# percentile_95 <- baseES_v %>%
+#   group_by(Service, Country) %>%
+#   summarize(threshold = quantile(Value, 0.95)) %>%
+#   ungroup()
+# Join the threshold back to the original data and filter values up to the 98th percentile
+baseES_filtered <- baseES_v %>%
+  left_join(percentile_98, by = c("Service", "country")) %>%
+  filter(value <= threshold)
+
+C <- 3
+
+df <- baseES_filtered %>% filter(country==nam[C]) %>% filter(Service!="Nature Access")
+t <- ggplot(df, aes(x = value, fill = restoration)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_wrap(~Service, scales = "free") +
+  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Restoration Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Restoration"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+print(t)
+```
+
+### 5.2.4. Peru Madre de Dios
+
+```{r plot hist}
+
+C <- 4
+
+df <- baseES_filtered %>% filter(country==nam[C]) %>% filter(Service!="Nature Access")
+t <- ggplot(df, aes(x = value, fill = restoration)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_wrap(~Service, scales = "free") +
+  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Restoration Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Restoration"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+print(t)
+```
+### 5.2.5. Vietnam 
+
+```{r plot hist}
+# Calculate the 98th percentile for each combination of Service and Country
+C <- 5
+
+df <- baseES_filtered %>% filter(country==nam[C]) %>% filter(Service!="Nature Access")
+t <- ggplot(df, aes(x = value, fill = restoration)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_wrap(~Service, scales = "free") +
+  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Restoration Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Restoration"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+print(t)
+```
+
+
 
 ```{r land cover change}
 
