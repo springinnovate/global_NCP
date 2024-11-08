@@ -545,14 +545,15 @@ load(here('output_data', 'serv_dist1.RData'))
 # Step 2: Create the bar plot
 p <- ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.7)) + 
-  aes(width = ifelse(Metric == "Share_Area", 0.5, 0.9)) + 
+  aes(width = ifelse(Metric == "share_area", 0.5, 0.9)) + 
   scale_y_continuous(limits = c(0, 100)) +
   facet_wrap(~ Country, ncol = 5) +  # Create 5 columns (one for each country)
   scale_fill_manual(values = c(
     "Share Area" = "gray50",         # Medium gray for "Share Area"
     "Nitrogen Retention" = "#2c944c",  # Shade of green
     "Sediment Retention" = "#08306b",  # Shade of blue
-    "Pollination" = "#dd1c77"          # Shade of purple
+    "Pollination" = "#dd1c77",     # Shade of purple
+    "access" = "#A57C00"
   )) +
   labs(
     title = "Share of the protected areas and of the total ES provided inside them",
@@ -829,6 +830,17 @@ print(t)
 
 ```{r resto, eval=FALSE, include=FALSE}
 
+```{r get summaries, eval=FALSE, include=FALSE}
+#load protected areas
+pa = st_read(here("vector", "wdpa_nbs.gpkg"))
+#pa <- st_transform(pa, crs = 8857)
+# DO NOT remove those without UICN category
+pa <- pa%>%split(.$COUNTR)
+
+#Get baseline values for ecosystem services. Will use the 2020baseline values
+# set inpath
+wd <- here("cropped_raster_data")
+
 path_lc <- here('ESA_LC') 
 # load reclassified land cover map
 tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
@@ -841,47 +853,12 @@ bkg <- lapply(lc, function(r){
   r <- subst(r, from = c(1:8), to =0)
 })
 
-
-outpath <- here('restoration')
-
-tf <- file.path(outpath, list.files(outpath, pattern= "tif"))
-tf <- tf[-1]
-rest <- lapply(tf,rast)
-
-rest <- lapply(rest, function(r){
-  r <- ifel(r >0, 1, r)
-  })
-
-# Get frequencies inside/outside
-freq_r <- lapply(rest, function(r){
-  f <- freq(r)
-  })
-freq_r <- lapply(seq_along(freq_r), function(i) {
-  freq_r[[i]]$Country <- nam[i]
-  freq_r[[i]]
-})
-freq_r <- as_tibble(do.call(rbind, freq_r))
-freq_r <- freq_r %>%
-  group_by(Country) %>%
-  mutate(share = (count / sum(count)) * 100) %>%
-  ungroup()
-
-freq_r <- freq_r %>% filter(layer == 1)  %>%  filter(value == 1)
-freq_r <- freq_r %>% select(c(3:5))
-names(freq_r) <- c("pix_count_in", "Country","share_area")
-# dropoutside 
-######################
-# I need to add new background,s not derived from ESA becasue the spatial resolution is larger. this also means that i will have to resample this!
-#get the background why did i do this?
-msk_r <- lapply(rest, function(r){
-  r <- ifel(r >0, 0, r)
-  })
-
 # Load the rasters with the target data.
-tiffes <- file.path(here("cropped_raster_data"), list.files(here("cropped_raster_data"), pattern="tif"))
+tiffes <- file.path(wd, list.files(wd, pattern="tif"))
 #tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
-tiffes <-  tiffes[c(76:80, 86:90,111:115)]#, 111:115)]
-
+#tiffes <-  tiffes[c(31:35, 41:45, 81:85)]
+tiffes <-  tiffes[c(1:5)]#, 26:30)]
+#tiffes <-  tiffes[c(11:15, 1:45, 81:85)]
 # Step 1: Extract file names, product names, and country names
 file_names <- basename(tiffes)  # Extract file names from paths
 
@@ -905,12 +882,19 @@ file_info <- file_info %>%
 tiffes <- file_info$FilePath
 
 baseES <- lapply(tiffes, rast)
-################################
 
+num <- length(unique(product_names))
 # Group the list of ES as nested list, one for eah country
-baseES <- split(baseES, rep(1:length(lc), each = 3))
+baseES <- split(baseES, rep(1:length(lc), each = num))
 
 # Step 5: Add the backgrounds
+
+bkg <- map2(
+  bkg, 
+  baseES,
+  function(r1,r2){
+    r1 <- resample(r1,r2, method = "near", , threads= 10)
+  })
 
 baseES <- map2(
   baseES,   # The list of raster sublists
@@ -921,59 +905,24 @@ baseES <- map2(
   }
 )
 
-msk_r <- lapply(rest, function(r){
-  r <- classify(r, cbind(0, Inf,0))
-})
+rm(lc)
 
-#Resample Restoration data to service resolution
-# 1 Extract first element of the ES list
-base1 <- lapply(baseES, function(sublist) sublist[[1]])
-# it is key to set the resampling  method to nearest neighbor here!!!
-rest <- map2(
-  rest,
-  base1,
-  function(rast1, rast2){
-    rast1 <- resample(rast1,rast2, method='near', threads= 10)
-    rast1 <- ifel(rast1 >0, 1, rast1)
-  }
-)
-
-# Step 2: Apply mask for each group of rasters using the corresponding country Mask
-baseES <- map2(
+# Step 2: Apply mask for each group of rasters using the corresponding country vector
+baseES_ap <- map2(
   baseES,   # The list of raster sublists
-  rest,     # The list of country polygons
-  function(rasters, msk) {
+  pa,     # The list of country polygons
+  function(rasters, vector) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) crop(raster, ext(msk)))
-  })
-
-# becasue fuck you, pollinatoes  
-# Apply resample to the second SpatRaster object in each sublist
-baseES <- lapply(baseES, function(sublist) {
-  # Check if the sublist has at least two elements
-  if (length(sublist) >= 2) {
-    # Resample the second SpatRaster to match the first
-    sublist[[2]] <- resample(sublist[[2]], sublist[[1]], method = 'cubic', threads = 10)
-  }
-  return(sublist)  # Return the updated sublist
-})
-
-# Maks the rasters by the area of interest 
- baseES_ap <- map2(
-  baseES,   # The list of raster sublists
-  rest,     # The list of country polygons 
-  function(rasters, msk) {
-    # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, msk, maskvalues=0)) #Inside
+    lapply(rasters, function(raster) mask(raster, vector))
   }
 )
 # "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
- baseES_api <- map2(
+baseES_api <- map2(
   baseES,   # The list of raster sublists
-  rest,     # The list of country polygons 
-  function(rasters, msk) {
+  pa,     # The list of country polygons
+  function(rasters, vector) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, msk, maskvalues=1)) #Outside
+    lapply(rasters, function(raster) mask(raster, vector, inverse=TRUE))
   }
 )
 
@@ -982,11 +931,54 @@ baseES_ap <- unlist(baseES_ap, recursive = FALSE)
 baseES_api <- unlist(baseES_api, recursive = FALSE)
 ################################
 
-n=3
-country_names <- rep(nam, each = n)
+# This extracts the background/the total area of interest. This is necessary because we need to know the share of the total area that is under the target 
+# class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of this part. 
+msk_ap <- baseES_ap#[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with different quantities, not only on a 3 step basis
+msk_api <- baseES_api#[c(1,4,7,10,13)]
 
-msk_ap <- split(msk_ap, rep(1:length(bkg), each = 3))
-msk_api <- split(msk_api, rep(1:length(bkg), each = 3))
+msk_ap <- lapply(msk_ap, function(r) {
+  # Replace all non-NA values with 1 using ifel()
+  ifel(!is.na(r), 1, NA)
+})
+msk_no_ap <- lapply(msk_api, function(r) {
+  # Replace all non-NA values with 1 using ifel()
+  r <- ifel(!is.na(r), 1, NA)
+})
+
+msk_ap <- map2(msk_ap, bkg, merge)
+
+freq_ap <- lapply(msk_ap, function(r){
+  f <- freq(r)
+})
+
+country_names <- unique(country_names)
+
+freq_ap <- lapply(seq_along(freq_ap), function(i) {
+  freq_ap[[i]]$country <- country_names[i]  # Add country column
+  freq_ap[[i]]  # Return the modified dataframe
+})
+freq_ap <- as_tibble(do.call(rbind, freq_ap))
+
+freq_ap <- freq_ap %>%
+  group_by(country) %>%
+  mutate(share = (count / sum(count)) * 100) %>%
+  ungroup()
+
+#####################################################
+# leave it here, but this has the frequencies. from here getting the shares is very easy. I always forget tho. 
+
+# Create background masks ### I DON'T THINK THIS IS NECESSARYANYMORE. CAN BE REMOVED!
+msk_ap <- lapply(baseES_ap, function(r){
+  r <- classify(r, cbind(0, Inf, 1), others = NA)
+})
+
+msk_api <- lapply(baseES_api, function(r){
+  r <- classify(r, cbind(0, Inf, 1), others = NA)
+})
+
+# split again to have nested lists
+msk_ap <- split(msk_ap, rep(1:length(bkg), each = num))
+msk_api <- split(msk_api, rep(1:length(bkg), each = num))
 
 
 ##################################################################
@@ -998,17 +990,42 @@ compute_sum <- function(raster) {
   total_sum <- global(raster, fun = "sum", na.rm = TRUE)[,1]  # Use global() to get the sum
   return(total_sum)
 }
+
 totSE_ap <-  lapply(baseES_ap, compute_sum)#, mc.cores = detectCores() - 4)
 totSE_api <-  lapply(baseES_api, compute_sum)#, mc.cores = detectCores() - 4)
 
+
 totSE_ap <- as_tibble(unlist(totSE_ap))
 totSE_api <- as_tibble(unlist(totSE_api))
-totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap) # here, we merged the otside first!
+totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap)
+
+freq_ap <- freq_ap %>% filter(layer == 1)  %>%  filter(value == 1)
+freq_ap <- freq_ap %>% select(!c(1,2))
+#rearrange columns 
+names(totSE) <- c("Service", "Country","Outside", "Inside")
+totSE <- left_join(totSE,freq_ap)#!!!!!!!!!
+
+
+# I need to add and then get the total!!!!!!!! 
+totSE <- totSE %>% mutate(WholeArea= Outside+Inside)
+# The freaking error is here!!!!!
+totSE <- totSE %>% mutate(share_service= (Inside/WholeArea)*100)
+
+names(freq_ap) <- c("pix_count_pa", "Country","share_area")
+#rearrange columns 
+freq_ap <- freq_ap %>% select(c(3,1,2))
+totSE <- left_join(totSE,freq_ap)
+
+
+totSE <- totSE %>% mutate(share_service= (PArea/WholeArea)*100)
+
+names(totSE) <- c("Service", "Country", "WholeArea", "PArea", "Share_Area", "pix_count_pa", "Share_Service")
+#########################################################################
+#calculate ES output
 
 #rearrange columns 
 names(totSE) <- c("Service", "Country","Outside", "Inside")
 totSE <- left_join(totSE,freq_r)
-
 
 # I need to add and then get the total!!!!!!!! 
 totSE <- totSE %>% mutate(WholeArea= Outside+Inside)
@@ -1017,7 +1034,8 @@ totSE <- totSE %>% mutate(share_service= (Inside/WholeArea)*100)
 
 # clean the service name:
 totSE$Service <- sub("_.*", "", totSE$Service)
-write.csv(totSE, file=here('output_data', "service_prov_rest.csv"))
+write.csv(totSE, file=here('output_data', "service_prov_PA.csv"))
+
 
 totSE_l <- totSE %>%
   select(Service, share_service, share_area, Country) %>%
@@ -1035,15 +1053,23 @@ totSE_l <- totSE_l %>% mutate(Service=case_when(
 ))
 
 # i don't think i should save this anymore 
+save(totSE_l, file= here('output_data', 'serv_dist1.RData'))
+
+
 totSE_l <- totSE_l %>%
   mutate(Service = fct_relevel(Service, 
                                "area",
-                               "nitrogen", 
-                               "sediment", 
-                               "pollination" 
+                               "Nitrogen Retention", 
+                               "Sediment Retention", 
+                               "Pollination",
+                               "access"
                                ))
 
 
+totSE_l <- totSE_l %>%
+  group_by(Country, Metric) %>%
+  filter(!(Metric == "share_area" & row_number() > 1)) %>%
+  ungroup()
 save(totSE_l, file= here('output_data', 'serv_dist2.RData'))
 
 ```
@@ -1314,247 +1340,7 @@ Now, i need to do the same thing  for the layers in different cr, nature access,
 
 ```{r get summaries, eval=FALSE, include=FALSE}
 #load protected areas
-pa = st_read(here("vector", "wdpa_nbs.gpkg"))
-#pa <- st_transform(pa, crs = 8857)
-# DO NOT remove those without UICN category
-pa <- pa%>%split(.$COUNTR)
 
-#Get baseline values for ecosystem services. Will use the 2020baseline values
-# set inpath
-wd <- here("cropped_raster_data")
-
-path_lc <- here('ESA_LC') 
-# load reclassified land cover map
-tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
-lc <- lapply(tf,rast)
-
-# Drop the second band. There must be an easier way. Now i have th background to put to the ecosystem service rasters. Somethin  
-# Create a background to fill the NAs from ESA's land cover maps
-bkg <- lapply(lc, function(r){
-  r <- r[[1]]
-  r <- subst(r, from = c(1:8), to =0)
-})
-
-# Load the rasters with the target data.
-tiffes <- file.path(wd, list.files(wd, pattern="tif"))
-#tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
-#tiffes <-  tiffes[c(31:35, 41:45, 81:85)]
-tiffes <-  tiffes[c(1:5)]#, 26:30)]
-#tiffes <-  tiffes[c(11:15, 1:45, 81:85)]
-# Step 1: Extract file names, product names, and country names
-file_names <- basename(tiffes)  # Extract file names from paths
-
-# Extract product names and country names
-product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
-country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
-
-# Step 2: Create a dataframe to organize the information
-file_info <- data.frame(
-  FilePath = tiffes,
-  Product = product_names,
-  Country = country_names,
-  stringsAsFactors = FALSE
-)
-
-# Step 3: Sort the dataframe by Country first, then by Product
-file_info <- file_info %>%
-  arrange(Country, Product)
-
-# Step 4: Extract the sorted file paths
-tiffes <- file_info$FilePath
-
-baseES <- lapply(tiffes, rast)
-
-num <- length(unique(product_names))
-# Group the list of ES as nested list, one for eah country
-baseES <- split(baseES, rep(1:length(lc), each = num))
-
-# Step 5: Add the backgrounds
-
-bkg <- map2(
-  bkg, 
-  baseES,
-  function(r1,r2){
-    r1 <- resample(r1,r2, method = "near", , threads= 10)
-  })
-
-baseES <- map2(
-  baseES,   # The list of raster sublists
-  bkg,     # The list of backgrounds
-  function(rasters, bkg) {
-    # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) merge(raster, bkg))
-  }
-)
-
-rm(lc)
-
-# Step 2: Apply mask for each group of rasters using the corresponding country vector
-baseES_ap <- map2(
-  baseES,   # The list of raster sublists
-  pa,     # The list of country polygons
-  function(rasters, vector) {
-    # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, vector))
-  }
-)
-# "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
-baseES_api <- map2(
-  baseES,   # The list of raster sublists
-  pa,     # The list of country polygons
-  function(rasters, vector) {
-    # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, vector, inverse=TRUE))
-  }
-)
-
-# Step 3: Flatten back the list to get a single list of masked rasters
-baseES_ap <- unlist(baseES_ap, recursive = FALSE)
-baseES_api <- unlist(baseES_api, recursive = FALSE)
-################################
-
-# This extracts the background/the total area of interest. This is necessary because we need to know the share of the total area that is under the target 
-# class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of this part. 
-msk_ap <- baseES_ap#[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with different quantities, not only on a 3 step basis
-msk_api <- baseES_api#[c(1,4,7,10,13)]
-
-msk_ap <- lapply(msk_ap, function(r) {
-  # Replace all non-NA values with 1 using ifel()
-  ifel(!is.na(r), 1, NA)
-})
-msk_no_ap <- lapply(msk_api, function(r) {
-  # Replace all non-NA values with 1 using ifel()
-  r <- ifel(!is.na(r), 1, NA)
-})
-
-msk_ap <- map2(msk_ap, bkg, merge)
-
-freq_ap <- lapply(msk_ap, function(r){
-  f <- freq(r)
-})
-
-country_names <- unique(country_names)
-
-freq_ap <- lapply(seq_along(freq_ap), function(i) {
-  freq_ap[[i]]$country <- country_names[i]  # Add country column
-  freq_ap[[i]]  # Return the modified dataframe
-})
-freq_ap <- as_tibble(do.call(rbind, freq_ap))
-
-freq_ap <- freq_ap %>%
-  group_by(country) %>%
-  mutate(share = (count / sum(count)) * 100) %>%
-  ungroup()
-
-#####################################################
-# leave it here, but this has the frequencies. from here getting the shares is very easy. I always forget tho. 
-
-# Create background masks ### I DON'T THINK THIS IS NECESSARYANYMORE. CAN BE REMOVED!
-msk_ap <- lapply(baseES_ap, function(r){
-  r <- classify(r, cbind(0, Inf, 1), others = NA)
-})
-
-msk_api <- lapply(baseES_api, function(r){
-  r <- classify(r, cbind(0, Inf, 1), others = NA)
-})
-
-# split again to have nested lists
-msk_ap <- split(msk_ap, rep(1:length(bkg), each = num))
-msk_api <- split(msk_api, rep(1:length(bkg), each = num))
-
-
-##################################################################
-##################################################################
-
-#calculate ES output
-# Define a function to compute the total sum for each SpatRaster
-compute_sum <- function(raster) {
-  total_sum <- global(raster, fun = "sum", na.rm = TRUE)[,1]  # Use global() to get the sum
-  return(total_sum)
-}
-
-totSE_ap <-  lapply(baseES_ap, compute_sum)#, mc.cores = detectCores() - 4)
-totSE_api <-  lapply(baseES_api, compute_sum)#, mc.cores = detectCores() - 4)
-
-
-totSE_ap <- as_tibble(unlist(totSE_ap))
-totSE_api <- as_tibble(unlist(totSE_api))
-totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap)
-
-freq_ap <- freq_ap %>% filter(layer == 1)  %>%  filter(value == 1)
-freq_ap <- freq_ap %>% select(!c(1,2))
-#rearrange columns 
-names(totSE) <- c("Service", "Country","Outside", "Inside")
-totSE <- left_join(totSE,freq_ap)#!!!!!!!!!
-
-
-# I need to add and then get the total!!!!!!!! 
-totSE <- totSE %>% mutate(WholeArea= Outside+Inside)
-# The freaking error is here!!!!!
-totSE <- totSE %>% mutate(share_service= (Inside/WholeArea)*100)
-
-names(freq_ap) <- c("pix_count_pa", "Country","share_area")
-#rearrange columns 
-freq_ap <- freq_ap %>% select(c(3,1,2))
-totSE <- left_join(totSE,freq_ap)
-
-
-totSE <- totSE %>% mutate(share_service= (PArea/WholeArea)*100)
-
-names(totSE) <- c("Service", "Country", "WholeArea", "PArea", "Share_Area", "pix_count_pa", "Share_Service")
-#########################################################################
-#calculate ES output
-
-#rearrange columns 
-names(totSE) <- c("Service", "Country","Outside", "Inside")
-totSE <- left_join(totSE,freq_r)
-
-# I need to add and then get the total!!!!!!!! 
-totSE <- totSE %>% mutate(WholeArea= Outside+Inside)
-# The freaking error is here!!!!!
-totSE <- totSE %>% mutate(share_service= (Inside/WholeArea)*100)
-
-# clean the service name:
-totSE$Service <- sub("_.*", "", totSE$Service)
-write.csv(totSE, file=here('output_data', "service_prov_PA.csv"))
-
-
-totSE_l <- totSE %>%
-  select(Service, share_service, share_area, Country) %>%
-  pivot_longer(cols = c(share_service, share_area),
-               names_to = "Metric",
-               values_to = "Value")
-
-
-totSE_l <- totSE_l %>%
-  filter(!(Metric == "share_area" & duplicated(paste(Country, Metric))))
-
-totSE_l <- totSE_l %>% mutate(Service=case_when(
-  Metric== "share_area" ~ "area",
-  TRUE ~ Service 
-))
-
-# i don't think i should save this anymore 
-save(totSE_l, file= here('output_data', 'serv_dist1.RData'))
-
-
-totSE_l <- totSE_l %>%
-  mutate(Service = fct_relevel(Service, 
-                               "area",
-                               "Nitrogen Retention", 
-                               "Sediment Retention", 
-                               "Pollination",
-                               "access"
-                               ))
-
-
-totSE_l <- totSE_l %>%
-  group_by(Country, Metric) %>%
-  filter(!(Metric == "share_area" & row_number() > 1)) %>%
-  ungroup()
-
-
-save(totSE_l, file= here('output_data', 'serv_dist1.RData'))
 ```
 
 
