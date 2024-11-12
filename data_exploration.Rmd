@@ -263,10 +263,11 @@ It is possible to do this systematically, to save on work at the edn, gain on re
 We need to create binary masks to use as  background/the/ homgonezie the total area of interest. This is necessary because we need to know the share of the total area that is under the target. A class/status (protected area, restoration priority, land cover whatever) as a share of the total. This is necessary because we want to comparethe relative share of the area with the share of the service/target data to check compare **productivities**  inside/outside. This is the whole purpose of this par.
 
 The whole process is run on the EPSG 8857 crs (Equal earth) to facilitate dealing with distances and areas. 
-Thjer is some complication because we wantthe data organzied by country/studyarea and then by service, so some manipulation was necessary before loading. The key is that the labeling is already done and next times, the same type of analysis should be way easier. 
+Thjer is some complication because we wantthe data organzied by country/studyarea and then by service, so some manipulation was necessary before loading. The key is that the labeling is already done and next times, the same type of analysis should be way easier.
  
+## 4.1 Extract and apply Masks (inside/outside AOI) 
 
-```{r get summaries, eval=FALSE, include=FALSE}
+```{r apply mask, eval=TRUE, include=FALSE}
 #load protected areas
 pa = st_read(here("vector", "wdpa_nbs.gpkg"))
 #pa <- st_transform(pa, crs = 8857)
@@ -293,10 +294,13 @@ bkg <- lapply(lc, function(r){
 })
 
 # Load the rasters with the target data.
+
+###### This is not a great way to do this, it is annoying to know where each thing is and go name by name, when they are these very long strings. I have to think how to deal with this better. 
 tiffes <- file.path(wd, list.files(wd, pattern="tif"))
 #tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
 tiffes <-  tiffes[c(31:35, 41:45, 81:85)]#, 111:115)]
 
+# Step 1: Extract file names, product names, and country names
 # Step 1: Extract file names, product names, and country names
 file_names <- basename(tiffes)  # Extract file names from paths
 
@@ -325,10 +329,15 @@ num <- length(unique(product_names))
 # Group the list of ES as nested list, one for eah country
 baseES <- split(baseES, rep(1:length(lc), each = num))
 
-# Group the list of ES as nested list, one for eah country
-baseES <- split(baseES, rep(1:length(lc), each = num))
-
 # Step 5: Add the backgrounds
+
+bkg <- map2(
+  bkg, 
+  baseES.,
+  function(r1,r2){
+    r1 <- resample(r1,r2, method = "near", , threads= 10)
+  })
+
 
 baseES <- map2(
   baseES,   # The list of raster sublists
@@ -364,7 +373,11 @@ baseES_api <- map2(
 baseES_ap <- unlist(baseES_ap, recursive = FALSE)
 baseES_api <- unlist(baseES_api, recursive = FALSE)
 ################################
+```
+################################
+## 4.2 Extract values for the density plots
 
+```{r extract values}
 # This extracts the background/the total area of interest. This is necessary because we need to know the share of the total area that is under the target 
 # class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of this part. 
 msk_ap <- baseES_ap[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with different quantities, not only on a 3 step basis
@@ -379,14 +392,14 @@ msk_no_ap <- lapply(msk_api, function(r) {
   r <- ifel(!is.na(r), 1, NA)
 })
 
+# add background to create binary mask 
 msk_ap <- map2(msk_ap, bkg, merge)
 
-# Extract the shares
+```
+
+##4.3  Extract the shares
 #####################################################
-# using lsm_c_ca requiues prjected coordoantes and ths can take too long to calcualte. Just count the pixels!
-# freq_ap <- lapply(msk_ap, function(r){
-#   f <- lsm_c_ca(r)
-# })
+```{r extract shares AOI/service prov}
 freq_ap <- lapply(msk_ap, function(r){
   f <- freq(r)
 })
@@ -403,23 +416,6 @@ freq_ap <- freq_ap %>%
   group_by(country) %>%
   mutate(share = (count / sum(count)) * 100) %>%
   ungroup()
-
-#####################################################
-# leave it here, but this has the frequencies. from here getting the shares is very easy. I always forget tho. 
-
-# Create background masks ### I DON'T THINK THIS IS NECESSARYANYMORE. CAN BE REMOVED!
-msk_ap <- lapply(baseES_ap, function(r){
-  r <- classify(r, cbind(0, Inf, 1), others = NA)
-})
-
-msk_api <- lapply(baseES_api, function(r){
-  r <- classify(r, cbind(0, Inf, 1), others = NA)
-})
-
-# split again to have nested lists
-msk_ap <- split(msk_ap, rep(1:length(bkg), each = 3))
-msk_api <- split(msk_api, rep(1:length(bkg), each = 3))
-
 
 ##################################################################
 ##################################################################
@@ -531,13 +527,10 @@ totSE_l <- totSE_l %>%
   group_by(Country, Metric) %>%
   filter(!(Metric == "Share_Area" & row_number() > 1)) %>%
   ungroup()
-
-
-
 ```
 
 
-## 4.1  Plot the shares
+## 4.4  Plot the shares
 
 ```{r plot shares, fig.width=9, fig.height=7}
 
@@ -576,8 +569,6 @@ print(p)
 ```
 
 
-
-
 ########################################################################## 
 Pendingthis same thing with the beneficiaries and other data wit other crs/spatial resolution
 ########################################################################## 
@@ -588,12 +579,12 @@ Pendingthis same thing with the beneficiaries and other data wit other crs/spati
     -   nature access restoration
     -   pollination restoration
     -   sediment export
--   Conservation?
+
 
 Beneficiaries and coastal protection pop\< 10 downstreams Get the
 histograms
 
-## 4.2 Extract Values and organize the dataftames for charting
+## 4.5 Extract Values and organize the dataftames for charting
 The code here is used to extract the pixel values from the input datasets and organzie so i can get the density plots.
 
 I still need to generalize this to wrok with different data inputs/number of different services. There are some poor coding practices that need to be fixed. 
@@ -663,7 +654,7 @@ baseES_vf <- baseES_vf %>%
   )) 
 
 baseES_vf$Service <- factor(baseES_vf$Service, levels = c(
-  "Nitrogen Retention", "Sediment Retention", "Pollination"))
+  "Nitrogen Retention", "Sediment Retention", "Pollination", "Nature Access"))
 write.csv(baseES_vf, here('output_data', "distributionServ_pa.csv"))
 ```
 
@@ -672,7 +663,7 @@ write.csv(baseES_vf, here('output_data', "distributionServ_pa.csv"))
 ```{r load_dens_rest}
   baseES_vf <- as_tibble(read.csv(here('output_data', "distributionServ_pa.csv")))
   baseES_vf$Service <- factor(baseES_vf$Service, levels = c(
-    "Nitrogen Retention", "Sediment Retention", "Pollination"))
+    "Nitrogen Retention", "Sediment Retention", "Pollination", "Nature Access"))
 
 percentile_98 <- baseES_vf %>%
   group_by(Service, Country) %>%
@@ -691,7 +682,7 @@ This is calcualted for the percentile 95 to remove extreme values
 
 C <- 1
 
-df <- baseES_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
+df <- baseES_filtered %>% filter(Country==nam[C])# %>% filter(Service!="Nature Access")
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
   facet_wrap(~Service, scales = "free") +
@@ -1340,6 +1331,9 @@ Now, i need to do the same thing  for the layers in different cr, nature access,
 
 ```{r get summaries, eval=FALSE, include=FALSE}
 #load protected areas
+
+
+
 
 ```
 
