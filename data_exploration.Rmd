@@ -665,14 +665,21 @@ write.csv(baseES_vf, here('output_data', "distributionServ_pa.csv"))
   baseES_vf$Service <- factor(baseES_vf$Service, levels = c(
     "Nitrogen Retention", "Sediment Retention", "Pollination", "Nature Access"))
 
-percentile_98 <- baseES_vf %>%
+# Calculate both the 2nd and 98th percentiles
+percentiles <- baseES_vf %>%
   group_by(Service, Country) %>%
-  summarize(threshold = quantile(Value, 0.98)) %>%
+  summarize(
+    lower_threshold = quantile(Value, 0.02),
+    upper_threshold = quantile(Value, 0.98)
+  ) %>%
   ungroup()
-# # Join the threshold back to the original data and filter values up to the 98th percentile
+
+# Join the thresholds back to the original data and filter values within the 2nd and 98th percentiles
 baseES_filtered <- baseES_vf %>%
-  left_join(percentile_98, by = c("Service", "Country")) %>%
-  filter(Value <= threshold)
+  left_join(percentiles, by = c("Service", "Country")) %>%
+  filter(Value >= lower_threshold & Value <= upper_threshold)
+
+
 ```
 ### 4.3.1 BRazil
 
@@ -682,7 +689,7 @@ This is calcualted for the percentile 95 to remove extreme values
 
 C <- 1
 
-df <- baseES_filtered %>% filter(Country==nam[C])# %>% filter(Service!="Nature Access")
+df <- baseES_filtered %>% filter(Country==nam[C])
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
   facet_wrap(~Service, scales = "free") +
@@ -709,7 +716,7 @@ print(t)
 
 C <- 2
 
-df <- baseES_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
+df <- baseES_filtered %>% filter(Country==nam[C]) 
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
   facet_wrap(~Service, scales = "free") +
@@ -738,7 +745,7 @@ print(t)
 
 C <- 3
 
-df <- baseES_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
+df <- baseES_filtered %>% filter(Country==nam[C]) 
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
   facet_wrap(~Service, scales = "free") +
@@ -767,7 +774,7 @@ print(t)
 
 C <- 4
 
-df <- baseES_vf %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
+df <- baseES_vf %>% filter(Country==nam[C]) 
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
   facet_wrap(~Service, scales = "free") +
@@ -795,7 +802,7 @@ print(t)
 
 C <- 5
 
-df <- baseES_filtered %>% filter(Country==nam[C]) %>% filter(Service!="Nature Access")
+df <- baseES_filtered %>% filter(Country==nam[C]) 
 t <- ggplot(df, aes(x = Value, fill = set)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
   facet_wrap(~Service, scales = "free") +
