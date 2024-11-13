@@ -845,21 +845,28 @@ pa <- lapply(pa, function(r){
   r <- classify(r, rcl)
 })
 ###########################################
-#Get baseline values for ecosystem services. Will use the 2020baseline values
-# set inpath
-wd <- here("cropped_raster_data")
-path_lc <- here('ESA_LC') 
-# load reclassified land cover map
-tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
-lc <- lapply(tf,rast)
-
-# Drop the second band. There must be an easier way. Now i have th background to put to the ecosystem service rasters. Somethin  
-# Create a background to fill the NAs from ESA's land cover maps
-bkg <- lapply(lc, function(r){
-  r <- r[[1]]
-  r <- subst(r, from = c(1:8), to =0)
+#Calcualte share inside outside AOI (when it is a raster)
+freq_ap <- lapply(pa, function(r){
+  f <- freq(r)
 })
 
+country_names <- unique(country_names)
+
+freq_ap <- lapply(seq_along(freq_ap), function(i) {
+  freq_ap[[i]]$Country <- country_names[i]  # Add country column
+  freq_ap[[i]]  # Return the modified dataframe
+})
+freq_ap <- as_tibble(do.call(rbind, freq_ap))
+
+freq_ap <- freq_ap %>%
+  group_by(Country) %>%
+  mutate(share = (count / sum(count)) * 100) %>%
+  ungroup()
+freq_ap <- freq_ap %>% filter(layer == 1)  %>%  filter(value == 1)
+freq_ap <- freq_ap %>% select(!c(1,2))
+
+#############################################
+#############################################
 # Load the rasters with the target data.
 tiffes <- file.path(wd, list.files(wd, pattern="tif"))
 #tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
@@ -892,15 +899,15 @@ tiffes <- file_info$FilePath
 baseES <- lapply(tiffes, rast)
 
 num <- length(unique(product_names))
-# Group the list of ES as nested list, one for eah country
-baseES <- split(baseES, rep(1:length(lc), each = num))
+# Group the list of ES as nested list, one for each country
+baseES <- split(baseES, rep(1:length(baseES), each = num))
 
-#unnest the list. This only works if there is only 1 service, else we nee to do this y hand 
-msk <- unlist(baseES)
+# #unnest the list. This only works if there is only 1 service, else we nee to do this y hand 
+# msk <- unlist(baseES)
+# msk <- 
+
 # Step cropmask: Add the backgrounds
-
-
-
+#resample to bring to the same resolution and apply the mask 
 pa <- map2(
   pa, 
   msk,
@@ -912,7 +919,7 @@ pa <- map2(
 # Step 2: Apply mask for each group of rasters using the corresponding country vector
 baseES_ap <- map2(
   baseES,   # The list of raster sublists
-  pa,     # The list of country polygons
+  pa,     # The list of AOIs
   function(rasters, vector) {
     # Apply mask to each raster in the sublist using the corresponding country vector
     lapply(rasters, function(raster) mask(raster, vector, maskvalue=0))
@@ -934,62 +941,17 @@ baseES_api <- unlist(baseES_api, recursive = FALSE)
 ################################
 
 # This extracts the background/the total area of interest. This is necessary because we need to know the share of the total area that is under the target 
-# class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of this part. 
-msk_ap <- baseES_ap#[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with different quantities, not only on a 3 step basis
-msk_api <- baseES_api#[c(1,4,7,10,13)]
+# class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of
+# produce backgeiund if zeros
 
-
-bkg <- lapply(bkg, function(r){
-  r <- r[[1]]
-  r <- subst(r, from = c(1), to =0)
-})
-
-
-
-
-#merge to get 
-
-
-
-msk_ap <- lapply(msk_ap, function(r) {
-  # Replace all non-NA values with 1 using ifel()
-  ifel(!is.na(r), 1, NA)
-})
-msk_no_ap <- lapply(msk_api, function(r) {
-  # Replace all non-NA values with 1 using ifel()
-  r <- ifel(!is.na(r), 1, NA)
-})
-
-msk_ap <- map2(msk_ap, bkg, merge)
-
-freq_ap <- lapply(msk_ap, function(r){
-  f <- freq(r)
-})
-
-country_names <- unique(country_names)
-
-freq_ap <- lapply(seq_along(freq_ap), function(i) {
-  freq_ap[[i]]$country <- country_names[i]  # Add country column
-  freq_ap[[i]]  # Return the modified dataframe
-})
-freq_ap <- as_tibble(do.call(rbind, freq_ap))
-
-freq_ap <- freq_ap %>%
-  group_by(country) %>%
-  mutate(share = (count / sum(count)) * 100) %>%
-  ungroup()
+# bkg <- lapply(pa, function(r){
+#   r <- subst(r, from = c(1), to =0)
+# })
+# 
+# 
 
 #####################################################
 # leave it here, but this has the frequencies. from here getting the shares is very easy. I always forget tho. 
-
-# Create background masks ### I DON'T THINK THIS IS NECESSARYANYMORE. CAN BE REMOVED!
-msk_ap <- lapply(baseES_ap, function(r){
-  r <- classify(r, cbind(0, Inf, 1), others = NA)
-})
-
-msk_api <- lapply(baseES_api, function(r){
-  r <- classify(r, cbind(0, Inf, 1), others = NA)
-})
 
 # split again to have nested lists
 msk_ap <- split(msk_ap, rep(1:length(bkg), each = num))
@@ -1014,42 +976,28 @@ totSE_ap <- as_tibble(unlist(totSE_ap))
 totSE_api <- as_tibble(unlist(totSE_api))
 totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap)
 
-freq_ap <- freq_ap %>% filter(layer == 1)  %>%  filter(value == 1)
-freq_ap <- freq_ap %>% select(!c(1,2))
 #rearrange columns 
 names(totSE) <- c("Service", "Country","Outside", "Inside")
 totSE <- left_join(totSE,freq_ap)#!!!!!!!!!
 
-
+###############################################
+###############################################
 # I need to add and then get the total!!!!!!!! 
 totSE <- totSE %>% mutate(WholeArea= Outside+Inside)
 # The freaking error is here!!!!!
 totSE <- totSE %>% mutate(share_service= (Inside/WholeArea)*100)
 
-names(freq_ap) <- c("pix_count_pa", "Country","share_area")
-#rearrange columns 
-freq_ap <- freq_ap %>% select(c(3,1,2))
-totSE <- left_join(totSE,freq_ap)
 
 
-totSE <- totSE %>% mutate(share_service= (PArea/WholeArea)*100)
-
-names(totSE) <- c("Service", "Country", "WholeArea", "PArea", "Share_Area", "pix_count_pa", "Share_Service")
-#########################################################################
+names(totSE)[5] <- "pix_count_in"
+names(totSE)[6] <- "share_area"
 #calculate ES output
 
-#rearrange columns 
-names(totSE) <- c("Service", "Country","Outside", "Inside")
-totSE <- left_join(totSE,freq_r)
 
-# I need to add and then get the total!!!!!!!! 
-totSE <- totSE %>% mutate(WholeArea= Outside+Inside)
-# The freaking error is here!!!!!
-totSE <- totSE %>% mutate(share_service= (Inside/WholeArea)*100)
-
-# clean the service name:
+# clean the service name: v#doesn ot work well with the freaking name of theacces data, nbut anyway, i really cleaned this code, which was the key aspect.
 totSE$Service <- sub("_.*", "", totSE$Service)
-write.csv(totSE, file=here('output_data', "service_prov_PA.csv"))
+write.csv(totSE, file=here('output_data', "service_prov_rest.csv"))
+
 
 
 totSE_l <- totSE %>%
@@ -1063,37 +1011,32 @@ totSE_l <- totSE_l %>%
   filter(!(Metric == "share_area" & duplicated(paste(Country, Metric))))
 
 totSE_l <- totSE_l %>% mutate(Service=case_when(
-  Metric== "share_area" ~ "area",
+  Service== "nature" ~ "access",
   TRUE ~ Service 
 ))
 
-# i don't think i should save this anymore 
-save(totSE_l, file= here('output_data', 'serv_dist1.RData'))
-
-
-totSE_l <- totSE_l %>%
-  mutate(Service = fct_relevel(Service, 
-                               "area",
-                               "Nitrogen Retention", 
-                               "Sediment Retention", 
-                               "Pollination",
-                               "access"
-                               ))
-
-
+#3remove repeate share_area columns
 totSE_l <- totSE_l %>%
   group_by(Country, Metric) %>%
   filter(!(Metric == "share_area" & row_number() > 1)) %>%
   ungroup()
-save(totSE_l, file= here('output_data', 'serv_dist2.RData'))
 
+
+# change the name to area where it comes
+
+
+totSE_l <- totSE_l %>% mutate(Service=case_when(
+  Metric== "share_area" ~ "area",
+  TRUE ~ Service 
+))
+########### Listoooooooo!!!!!!!
 ```
 
 ## 5.1  Plot the shares
 
 ```{r plot shares, fig.width=9, fig.height=7}
 
-load(here('output_data', 'serv_dist2.RData'))
+#load(here('output_data', 'serv_dist2.RData'))
 # Step 2: Create the bar plot
 p <- ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.7)) + 
@@ -1104,7 +1047,8 @@ p <- ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
     "area" = "gray50",         # Medium gray for "Share Area"
     "nitrogen" = "#2c944c",  # Shade of green
     "sediment" = "#08306b",  # Shade of blue
-    "pollination" = "#dd1c77"          # Shade of purple
+    "pollination" = "#dd1c77",          # Shade of purple
+    "access" = "#A57C00"
   )) +
   labs(
     title = "Share of the Restoration Potential areas and of the total ES provided inside them",
