@@ -828,17 +828,26 @@ print(t)
 
 ```{r resto, eval=FALSE, include=FALSE}
 
-```{r get summaries, eval=FALSE, include=FALSE}
 #load protected areas
-pa = st_read(here("vector", "wdpa_nbs.gpkg"))
-#pa <- st_transform(pa, crs = 8857)
-# DO NOT remove those without UICN category
-pa <- pa%>%split(.$COUNTR)
+rest_tf  <- file.path(here('restoration'), list.files(here('restoration'), pattern="tif"))
 
+pa = lapply(rest_tf, rast)
+pa <- pa[-1]
+
+# create rcl matrix
+rcl <- matrix(c(
+  0, 0, NA,   # Zero becomes NA
+  0, Inf, 1   # Any value greater than 0 becomes 1
+), ncol = 3, byrow = TRUE)
+
+# this produces a binbary mask. 1 inside restoration areas, 0 outside. this also works as background to fill later
+pa <- lapply(pa, function(r){
+  r <- classify(r, rcl)
+})
+###########################################
 #Get baseline values for ecosystem services. Will use the 2020baseline values
 # set inpath
 wd <- here("cropped_raster_data")
-
 path_lc <- here('ESA_LC') 
 # load reclassified land cover map
 tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
@@ -855,7 +864,8 @@ bkg <- lapply(lc, function(r){
 tiffes <- file.path(wd, list.files(wd, pattern="tif"))
 #tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
 #tiffes <-  tiffes[c(31:35, 41:45, 81:85)]
-tiffes <-  tiffes[c(1:5)]#, 26:30)]
+#tiffes <-  tiffes[c(1:5)]#, 26:30)] #access
+tiffes <-  tiffes[c(56:60)]#, 26:30)] #access restoration
 #tiffes <-  tiffes[c(11:15, 1:45, 81:85)]
 # Step 1: Extract file names, product names, and country names
 file_names <- basename(tiffes)  # Extract file names from paths
@@ -885,25 +895,19 @@ num <- length(unique(product_names))
 # Group the list of ES as nested list, one for eah country
 baseES <- split(baseES, rep(1:length(lc), each = num))
 
-# Step 5: Add the backgrounds
+#unnest the list. This only works if there is only 1 service, else we nee to do this y hand 
+msk <- unlist(baseES)
+# Step cropmask: Add the backgrounds
 
-bkg <- map2(
-  bkg, 
-  baseES,
+
+
+pa <- map2(
+  pa, 
+  msk,
   function(r1,r2){
     r1 <- resample(r1,r2, method = "near", , threads= 10)
   })
 
-baseES <- map2(
-  baseES,   # The list of raster sublists
-  bkg,     # The list of backgrounds
-  function(rasters, bkg) {
-    # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) merge(raster, bkg))
-  }
-)
-
-rm(lc)
 
 # Step 2: Apply mask for each group of rasters using the corresponding country vector
 baseES_ap <- map2(
@@ -911,7 +915,7 @@ baseES_ap <- map2(
   pa,     # The list of country polygons
   function(rasters, vector) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, vector))
+    lapply(rasters, function(raster) mask(raster, vector, maskvalue=0))
   }
 )
 # "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
@@ -920,7 +924,7 @@ baseES_api <- map2(
   pa,     # The list of country polygons
   function(rasters, vector) {
     # Apply mask to each raster in the sublist using the corresponding country vector
-    lapply(rasters, function(raster) mask(raster, vector, inverse=TRUE))
+    lapply(rasters, function(raster) mask(raster, vector, maskvalue=0, inverse=TRUE))
   }
 )
 
@@ -933,6 +937,19 @@ baseES_api <- unlist(baseES_api, recursive = FALSE)
 # class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of this part. 
 msk_ap <- baseES_ap#[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with different quantities, not only on a 3 step basis
 msk_api <- baseES_api#[c(1,4,7,10,13)]
+
+
+bkg <- lapply(bkg, function(r){
+  r <- r[[1]]
+  r <- subst(r, from = c(1), to =0)
+})
+
+
+
+
+#merge to get 
+
+
 
 msk_ap <- lapply(msk_ap, function(r) {
   # Replace all non-NA values with 1 using ifel()
