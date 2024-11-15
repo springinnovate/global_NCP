@@ -36,7 +36,7 @@ names(lb) <- c("Class", "color", "value")
 ## 2 Crop the Data for the target areas
 
 ```{r load target area polygons}
-poly <- st_read(here("vector", "areas_nbs.geojson")) 
+poly <- st_read(here("vector", "areas_nbs2.geojson")) 
 #Split the vector into a list of individual polygons
 #create vector with names
 nam <- poly$COUNTR
@@ -64,7 +64,9 @@ esamod <- map(1:length(poly), function(x) crop(esamod, poly[[x]]))
 esamod <- map(1:length(esamod), function(x) mask(esamod[[x]], poly[[x]]))
 map(1:length(esamod), function(x) writeRaster(esamod[[x]], paste0(here("ESA_LC"), 'esaLC_', nam[x], '.tif'), overwrite=TRUE))
 
-n <- 3 #this is therestoration for pollination
+tiffes <- file.path(here(inpath), list.files(here(inpath), pattern='tif'))
+
+n <- 3 #this is therestoration for pollination DO NOT ever do this again
 t <- rast(tiffes[[n]])
 clean_filename <- function(filename) {
   sub("_md5.*", "", filename)
@@ -105,9 +107,10 @@ This runs thesame process in batch. Memory was optimzied to not load all the dat
 ```{r iterate cropMask, eval=FALSE, include=FALSE}
 wd <- here(inpath) # i know, this is stupid but not feel like thinking. 
 
-#This is for the restoration data I
+#This is for the restoration data. 
+# keep the conservation also 
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '2020-1992'))
-
+tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'esamod'))
 
 
 
