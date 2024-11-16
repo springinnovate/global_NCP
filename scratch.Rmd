@@ -56,4 +56,89 @@ and many more lines. summary yields this: > summary(rest[[1]])
  0   : 9833  
  1   : 8812  
  NA's:81741
+<<<<<<< HEAD
  I am confused on why this is happening. I suspect it has to be with the datatype and the way terra in R and qgis handle the data, but can you help me understand this? 
+=======
+ I am confused on why this is happening. I suspect it has to be with the datatype and the way terra in R and qgis handle the data, but can you help me understand this? 
+ 
+ 
+ ### Whagt is going on here?
+# Step 3: Group SpatRasters by country and populate the nested list
+for (i in seq_along(baseES)) {
+  country <- get_country(baseES[[i]])
+  country_list[[country]] <- c(country_list[[country]], list(baseES[[i]]))
+}
+
+baseES <- country_list
+rm(country_list)
+
+baseES_0 <- lapply(seq_along(baseES), function(i) {
+  # Get the current sublist of SpatRasters from baseES
+  current_sublist <- baseES[[i]]
+  # Get the corresponding template SpatRaster for reprojection
+  template_raster <- rest[[i]]
+  # Use lapply to reproject each SpatRaster in the sublist using the template raster
+  masked_sublist <- lapply(current_sublist, function(r) {
+    # Reproject the SpatRaster to match the CRS and extent of the template raster
+    mask(r, template_raster, maskvalues=0)
+  })
+  # Return the reprojected sublist
+  return(masked_sublist)
+})
+# ok so far so good, but of course resolution with freaking access is always an issue
+baseES_1 <- lapply(seq_along(baseES), function(i) {
+  # Get the current sublist of SpatRasters from baseES
+  current_sublist <- baseES[[i]]
+  # Get the corresponding template SpatRaster for reprojection
+  template_raster <- rest[[i]]
+  # Use lapply to reproject each SpatRaster in the sublist using the template raster
+  masked_sublist <- lapply(current_sublist, function(r) {
+    # Reproject the SpatRaster to match the CRS and extent of the template raster
+    mask(r, template_raster, maskvalues=1)
+  })
+  # Return the reprojected sublist
+  return(masked_sublist)
+})
+
+ # Step 1: Flatten the nested list into a single list of SpatRaster objects
+flattened_list <- unlist(baseES_1, recursive = FALSE)
+
+# Step 2: Extract information for the data frame
+
+# Create a dataframe to store the information
+raster_info <- data.frame(
+  Country = character(),   # Empty column for country names
+  Product = character(),   # Empty column for product names
+  stringsAsFactors = FALSE # Prevent automatic conversion to factors
+)
+
+# Step 3: Generate the correct country names for each raster
+# Calculate the number of rasters per country
+rasters_per_country <- length(flattened_list) / length(country_names)
+
+# Repeat each country name for the number of rasters per country
+repeated_country_names <- rep(country_names, each = rasters_per_country)
+
+# Step 4: Iterate over the flattened list and extract the relevant information
+for (i in seq_along(flattened_list)) {
+  # Get the corresponding country name from the repeated country names vector
+  country_name <- repeated_country_names[i]
+  
+  # Get the product name from the `name` slot of the SpatRaster
+  product_name <- names(flattened_list[[i]])
+  
+  # If the product name contains a "~" or "_md5", extract only the part before it
+  if (grepl("_md5", product_name)) {
+    product_name <- sub("_md5.*$", "", product_name)
+  }
+
+  # Step 5: Add the extracted information to the dataframe
+  raster_info <- rbind(raster_info, data.frame(Country = country_name, Product = product_name))
+}
+
+# Step 5: Optional - If you need to store the raster info back into a named list with country and product
+# Create a named list where each raster is named by country and product
+
+# baseES_0 <- setNames(flattened_list, paste(raster_info$Country, raster_info$Product, sep = "_"))
+baseES_1 <- setNames(flattened_list, paste(raster_info$Country, raster_info$Product, sep = "_"))
+>>>>>>> main
