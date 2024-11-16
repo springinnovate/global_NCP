@@ -223,7 +223,7 @@ lsmet <-  lsmet %>% group_by(AREA, layer) %>%
     layer == 2 ~ 2020
   ))
 
-save(lsmet, file=here("output_data", 'shares_lc.RData'))
+save(lsmet, file=here("output_data", 'shares_lc2.RData'))
 ```
 
 ## 3.2. Chart the shares per land cover
@@ -270,9 +270,10 @@ Thjer is some complication because we wantthe data organzied by country/studyare
  
 ## 4.1 Extract and apply Masks (inside/outside AOI) 
 
+Update the protected areas!!! 
 ```{r apply mask, eval=TRUE, include=FALSE}
 #load protected areas
-pa = st_read(here("vector", "wdpa_nbs.gpkg"))
+pa = st_read(here("vector", "areas_nbs2.geojson"))
 #pa <- st_transform(pa, crs = 8857)
 # DO NOT remove those without UICN category
 pa <- pa%>%split(.$COUNTR)
@@ -296,14 +297,24 @@ bkg <- lapply(lc, function(r){
   r <- subst(r, from = c(1:8), to =0)
 })
 
-# Load the rasters with the target data.
+
+
+# create rcl matrix
+rcl <- matrix(c(
+  0, 0, NA,   # Zero becomes NA
+  0, Inf, 1   # Any value greater than 0 becomes 1
+), ncol = 3, byrow = TRUE)
+
+# this produces a binbary mask. 1 inside restoration areas, 0 outside. this also works as background to fill later
+pa <- lapply(lc, function(r){
+  r <- classify(r, rcl)
+})# Load the rasters with the target data.
 
 ###### This is not a great way to do this, it is annoying to know where each thing is and go name by name, when they are these very long strings. I have to think how to deal with this better. 
 tiffes <- file.path(wd, list.files(wd, pattern="tif"))
 #tiffes <-  tiffes[c(36:40, 46:50, 66:70, 86:90)]
-tiffes <-  tiffes[c(31:35, 41:45, 81:85)]#, 111:115)]
+tiffes <-  tiffes[c(31:35, 41:45, 81:85)]#, 111:115)]# Conservation. do not incldue Access yet it's thesame crs, but differnetresolution, would have to resample and a lot of other things and that's annoying, it' s easier to do appartand then add the rows. 
 
-# Step 1: Extract file names, product names, and country names
 # Step 1: Extract file names, product names, and country names
 file_names <- basename(tiffes)  # Extract file names from paths
 
@@ -336,7 +347,7 @@ baseES <- split(baseES, rep(1:length(lc), each = num))
 
 bkg <- map2(
   bkg, 
-  baseES.,
+  baseES,
   function(r1,r2){
     r1 <- resample(r1,r2, method = "near", , threads= 10)
   })
