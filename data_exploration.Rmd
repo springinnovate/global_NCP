@@ -150,45 +150,9 @@ map(1:length(acces_rest), function(x) writeRaster(acces_rest[[x]], paste0(here('
 
 ```
 
-```{r select pending data to process, eval=FALSE, include=FALSE}
-#Remove points, risk reduction baseline
-tiffes <- tiffes[-c(2,3,4)]
-tiffes2 <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'pollination.*\\.tif$'))
-tiffes2 <- tiffes2[c(2,3)]
-tiffes <- c(tiffes,tiffes2)
-This is pending to fix, i am just groupingthje differnet layers, butactually i could hve processed all those on the same crs together (cosnervation/restoration)
-#######################
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
-
-tiffes2 <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '2020-1992'))
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'esamod'))
-
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
-
-tiffes <- tiffes
-wd <- here(inpath) # i know, this is stupid but not feel like thinking. 
-
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '2020-1992'))
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'esamod'))
 
 
-
-
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '2020-1992'))
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'esamod'))
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'ESAmod'))
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
-
-tiffes <- tiffes
-
-x
-
-```
-
-
-
-This runs the same process in batch. Memory was optimzied to not load all the data atthesame time, but process and write each raster individually before going to the next one.  
+This runs the same process in batch. Memory was optimzied to not load all the data at thesame time, but process and write each raster individually before going to the next one.  
 
 
 ```{r iterate cropMask, eval=FALSE, include=FALSE}
@@ -452,7 +416,7 @@ baseES_api <- unlist(baseES_api, recursive = FALSE)
 ## 4.2 Claculate Shares (1)
 
 
-```{r extract total  ES provision}
+```{r extract total  ES provision, eval=FALSE, include=FALSE}
 
 #calculate ES output
 # Define a function to compute the total sum for each SpatRaster
@@ -514,7 +478,6 @@ totSE_l <- totSE_l %>% mutate(Service=case_when(
 
 ## 4.3 Calcualte Shares (2) 
 ```{r calculate Access Conservation}
-#Restoration:
 tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= '.tif$'))
 #Remove points, risk reduction baseline
 tiffes <- tiffes[c(56:60)]
@@ -698,6 +661,37 @@ Pendingthis same thing with the beneficiaries and other data wit other crs/spati
 
 # Get the histograms
 
+
+```{r set list of names}
+
+# Step 1: Extract file names, product names, and country names
+file_names <- basename(tiffes)  # Extract file names from paths
+
+# Extract product names and country names
+product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
+country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
+
+# Step 2: Create a dataframe to organize the information
+file_info <- data.frame(
+  Product = product_names,
+  Country = country_names,
+  stringsAsFactors = FALSE
+)
+
+# Step 3: Sort the dataframe by Country first, then by Product
+file_info <- file_info %>%
+  arrange(Country, Product)
+
+
+prod_nam <- unique(product_names)
+
+num <- length(unique(product_names))
+serv <- c("Coastal_Protection", "Nitrogen_Retention", "Sediment_Retention", "Pollination") #Access 
+
+new_nam <- cbind(prod_nam, serv)
+```
+
+
 ```{r extract density restoration hist, eval=FALSE, include=FALSE}
 
 baseES_v <- lapply(baseES_api, function(r){
@@ -708,67 +702,55 @@ baseESap_v <- lapply(baseES_ap, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
 })
 
-  
-baseES_v <- split(baseES_v, rep(1:length(nam), each = num))
-baseESap_v <- split(baseESap_v, rep(1:length(nam), each = num))
+# Add two new columns to each data frame in the list
+baseES_v  <- Map(function(df, row) {
+  names(df)[1] <- "Value"
+  df$Service <- row[[1]]  
+  df$Country <- row[[2]]  
+  return(df)
+}, baseES_v , split(file_info, seq(nrow(file_info))))
 
-serv <- c("Coastal_Protection", "Nitrogen_Retention", "Sediment_Retention", "Pollination") #Access            
-baseES_v <- lapply(seq_along(baseES_v), function(i) {
-  baseES_v[[i]]$Service <- serv[i]
-  return(baseES_v[[i]])
-})
+baseESap_v  <- Map(function(df, row) {
+  names(df)[1] <- "Value"
+  df$Service <- row[[1]]  
+  df$Country <- row[[2]]  
+  return(df)
+}, baseESap_v , split(file_info, seq(nrow(file_info))))
 
-  # Add a new column "Service" with the extracted service name
-  df <- df %>%
-    mutate(Service = serv)
+
+
+baseES_v <- lapply(baseES_v, function(df) {
+  # Extract the column name
+  col_name <- names(df)[1]
+  # Create a new column "Service" with the first 10 characters of the colu
+  df$Service <- substr(col_name, 1, 10)
   return(df)
 })
-baseESap_v <- lapply(baseESap_v, function(df) {
-  # Extract the service name (everything before the first "_")
-  service_name <- sub("_.*", "", names(df))
-  # Rename the first column to "value"
-  names(df) <- "value"
-  # Add a new column "Service" with the extracted service name
-  df <- df %>%
-    mutate(Service = service_name)
-  return(df)
-})
-country_names <- as_tibble(country_names)
-names(country_names) <-"Country"
 
-baseES_v <- Map(function(df, country_names) {
-  df$country <- country_names$Country 
-  df
-}, baseES_v, split(country_names, seq(nrow(country_names))))
 
-baseESap_v <- Map(function(df, country_names) {
-  df$country <- country_names$Country 
-  df
-}, baseESap_v, split(country_names, seq(nrow(country_names))))
-
+           
 ##################### do not run inside the Rmd!!!!!!!!
 baseES_v <- do.call(rbind, baseES_v)
 baseESap_v <- do.call(rbind, baseESap_v)
 ##################### do not run inside the Rmd!!!!!!!!
-
->>>>>>> main
 baseES_v <- baseES_v%>% mutate(restoration = "0")
 baseESap_v <- baseESap_v%>% mutate(restoration = "1")
 
 baseES_v <- rbind(baseES_v, baseESap_v)
+rm(baseESap_v)
 
-<<<<<<< HEAD
+
 baseES_v <- baseES_v %>%
   # Create a new column with simplified service names
   mutate(Service = case_when(
-    Product == "global_n_retention_esamod2_compressed" ~ "Nitrogen Retention",
-    Product == "global_sed_retention_esamod2_compressed" ~ "Sediment Retention",
-    Product == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
-    Product == "access_WGS84" ~ "Nature Access",
-    TRUE ~ Product  # Keep other names unchanged, if any
+    Service == new_nam[1,][1] ~ new_nam[1,][2],
+    Service == new_nam[2,][1] ~ new_nam[2,][2],
+    Service == new_nam[3,][1] ~ new_nam[3,][2],
+    Service == new_nam[4,][1] ~ new_nam[4,][2],
+    TRUE ~ Service  # Keep other names unchanged, if any
   )) 
 
-write.csv(baseES_v, here('data', "distributionServ_restoration.csv"))
+write.csv(baseES_v, here('output_data', "distributionServ_pa1.csv"))
 # Calculate the 98th percentile for each combination of Service and Country
 ```{r extract data, eval=FALSE, include=FALSE}
 
@@ -1729,8 +1711,7 @@ s5 <- lapply(s5, function(r){
 ```
 
 # Produce land cover change maps
-=======
-print(t)
+
 ```
 
 ### 5.2.2. Madagascar 
@@ -1859,7 +1840,6 @@ Now, i need to do the same thing  for the layers in different cr, nature access,
 
 ```
 
->>>>>>> main
 
 ```{r land cover change}
 
