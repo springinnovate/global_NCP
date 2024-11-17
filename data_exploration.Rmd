@@ -445,30 +445,18 @@ bkg <- map2(
   })
 
 ################################
-```
 ################################
 ## 4.2 Extract values for the density plots
 
 ```{r extract values}
-# This extracts the background/the total area of interest. This is necessary because we need to know the share of the total area that is under the target 
-# class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of this part. 
-msk_ap <- baseES_ap[c(1,4,7,10,13)]   # there must be a smarter way to do this. It needs to work with 
 
-msk_ap <- lapply(msk_ap, function(r) {
-  # Replace all non-NA values with 1 using ifel()
-  ifel(!is.na(r), 1, NA)
+bkg_1 <- map2(bkg, pa, mask)
+bkg_1 <- lapply(bkg_1, function(r){
+  r <- subst(r, from = 0, to =1)
 })
-msk_no_ap <- lapply(msk_api, function(r) {
-  # Replace all non-NA values with 1 using ifel()
-  r <- ifel(!is.na(r), 1, NA)
-})
+msk_ap <- map2(bkg_1,bkg, merge)
 
-msk_ap <- map2(msk_ap, bkg, merge)
-
-# Extract the shares
- 
-msk_ap <- map2(msk_ap, bkg, merge)
-
+plot(msk_ap[[1]])
 ```
 
 ##4.3  Extract the shares
@@ -478,7 +466,6 @@ msk_ap <- map2(msk_ap, bkg, merge)
 freq_ap <- lapply(msk_ap, function(r){
   f <- freq(r)
 })
-
 country_names <- unique(country_names)
 
 freq_ap <- lapply(seq_along(freq_ap), function(i) {
@@ -492,23 +479,6 @@ freq_ap <- freq_ap %>%
   mutate(share = (count / sum(count)) * 100) %>%
   ungroup()
 
-<<<<<<< HEAD
-#####################################################
-# leave it here, but this has the frequencies. from here getting the shares is very easy. I always forget tho. 
-
-# Set the target CRS to Equal Earth (EPSG:8857) It is necessary because we are going to calculate shares using landscapemetrics functions, not by counting pixels
-
-# equal_earth_crs <- "EPSG:8857"
-# baseES_ap <- lapply(baseES_ap, function(r){
-#   r <- project(r, equal_earth_crs, method='bilinear')
-# })
-# baseES_api <- lapply(baseES_api, function(r){
-#   r <- project(r, equal_earth_crs, method='bilinear')
-# })
-# 
-# msk_ap <- lapply(msk_ap, function(r){
-#   r <- project(r, equal_earth_crs, method='near')
-# })
 
 # Create background masks ### I DON'T THINK THIS IS NECESSARYANYMORE. CAN BE REMOVED!
 msk_ap <- lapply(baseES_ap, function(r){
@@ -524,9 +494,6 @@ msk_ap <- split(msk_ap, rep(1:length(bkg), each = 3))
 msk_api <- split(msk_api, rep(1:length(bkg), each = 3))
 
 
-=======
->>>>>>> main
-##################################################################
 ##################################################################
 
 #calculate ES output
