@@ -698,7 +698,78 @@ Pendingthis same thing with the beneficiaries and other data wit other crs/spati
 
 # Get the histograms
 
+```{r extract density restoration hist, eval=FALSE, include=FALSE}
 
+baseES_v <- lapply(baseES_api, function(r){
+  t <- as_tibble(values(r, na.rm=TRUE))
+})
+
+baseESap_v <- lapply(baseES_ap, function(r){
+  t <- as_tibble(values(r, na.rm=TRUE))
+})
+
+  
+baseES_v <- split(baseES_v, rep(1:length(nam), each = num))
+baseESap_v <- split(baseESap_v, rep(1:length(nam), each = num))
+
+serv <- c("Coastal_Protection", "Nitrogen_Retention", "Sediment_Retention", "Pollination") #Access            
+baseES_v <- lapply(seq_along(baseES_v), function(i) {
+  baseES_v[[i]]$Service <- serv[i]
+  return(baseES_v[[i]])
+})
+
+  # Add a new column "Service" with the extracted service name
+  df <- df %>%
+    mutate(Service = serv)
+  return(df)
+})
+baseESap_v <- lapply(baseESap_v, function(df) {
+  # Extract the service name (everything before the first "_")
+  service_name <- sub("_.*", "", names(df))
+  # Rename the first column to "value"
+  names(df) <- "value"
+  # Add a new column "Service" with the extracted service name
+  df <- df %>%
+    mutate(Service = service_name)
+  return(df)
+})
+country_names <- as_tibble(country_names)
+names(country_names) <-"Country"
+
+baseES_v <- Map(function(df, country_names) {
+  df$country <- country_names$Country 
+  df
+}, baseES_v, split(country_names, seq(nrow(country_names))))
+
+baseESap_v <- Map(function(df, country_names) {
+  df$country <- country_names$Country 
+  df
+}, baseESap_v, split(country_names, seq(nrow(country_names))))
+
+##################### do not run inside the Rmd!!!!!!!!
+baseES_v <- do.call(rbind, baseES_v)
+baseESap_v <- do.call(rbind, baseESap_v)
+##################### do not run inside the Rmd!!!!!!!!
+
+>>>>>>> main
+baseES_v <- baseES_v%>% mutate(restoration = "0")
+baseESap_v <- baseESap_v%>% mutate(restoration = "1")
+
+baseES_v <- rbind(baseES_v, baseESap_v)
+
+<<<<<<< HEAD
+baseES_v <- baseES_v %>%
+  # Create a new column with simplified service names
+  mutate(Service = case_when(
+    Product == "global_n_retention_esamod2_compressed" ~ "Nitrogen Retention",
+    Product == "global_sed_retention_esamod2_compressed" ~ "Sediment Retention",
+    Product == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
+    Product == "access_WGS84" ~ "Nature Access",
+    TRUE ~ Product  # Keep other names unchanged, if any
+  )) 
+
+write.csv(baseES_v, here('data', "distributionServ_restoration.csv"))
+# Calculate the 98th percentile for each combination of Service and Country
 ```{r extract data, eval=FALSE, include=FALSE}
 
 baseES_api_v <- lapply(baseES_api, function(r){
@@ -709,7 +780,6 @@ baseES_ap_v <- lapply(baseES_ap, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
 })
 
-# waht the fuck does this freaking line do???/ It adds the id for the service
 # this lineIt adds the id for the service
 
 # There is a better way to do it, check the next part 
