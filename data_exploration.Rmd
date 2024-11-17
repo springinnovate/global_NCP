@@ -387,8 +387,8 @@ tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("croppe
 tiffes <- tiffes[c(21:30,36:40,71:75)]
 ```
 
-
-```{r apply mask, eval=TRUE, include=FALSE}
+### 4.1.2 Mask the Service Rasters by the AOI (1)
+```{r apply mask AOI AP, eval=TRUE, include=FALSE}
 
 # Step 1: Extract file names, product names, and country names
 file_names <- basename(tiffes)  # Extract file names from paths
@@ -449,7 +449,7 @@ baseES_api <- unlist(baseES_api, recursive = FALSE)
 
 
 ################################
-## 4.2 Extract values for the density plots
+## 4.2 Claculate Shares (1)
 
 
 ```{r extract total  ES provision}
@@ -512,26 +512,151 @@ totSE_l <- totSE_l %>% mutate(Service=case_when(
 ```
 
 
+## 4.3 Calcualte Shares (2) 
+```{r calculate Access Conservation}
+#Restoration:
+tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= '.tif$'))
+#Remove points, risk reduction baseline
+tiffes <- tiffes[c(56:60)]
+```
+
+### 4.4 Mask the Service Rasters by the AOI (2)
+```{r apply mask AOI AP2, eval=TRUE, include=FALSE}
+
+# Step 1: Extract file names, product names, and country names
+file_names <- basename(tiffes)  # Extract file names from paths
+
+# Extract product names and country names
+product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
+country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
+
+# Step 2: Create a dataframe to organize the information
+file_info <- data.frame(
+  FilePath = tiffes,
+  Product = product_names,
+  Country = country_names,
+  stringsAsFactors = FALSE
+)
+
+# Step 3: Sort the dataframe by Country first, then by Product
+file_info <- file_info %>%
+  arrange(Country, Product)
+
+# Step 4: Extract the sorted file paths
+tiffes <- file_info$FilePath
+
+baseES <- lapply(tiffes, rast)
+# set the number of different products to split the list 
+num <- length(unique(product_names))
+# Group the list of ES as nested list, one for eah country
+# split again to have nested lists
+baseES <- split(baseES, rep(1:length(nam), each = num))
 
 
+# Step 2: Apply mask for each group of rasters using the corresponding country vector
+baseES_ap <- map2(
+  baseES,   # The list of raster sublists
+  pa,     # The list of country polygons
+  function(rasters, vector) {
+    # Apply mask to each raster in the sublist using the corresponding country vector
+    lapply(rasters, function(raster) mask(raster, vector))
+  }
+)
+# "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
+baseES_api <- map2(
+  baseES,   # The list of raster sublists
+  pa,     # The list of country polygons
+  function(rasters, vector) {
+    # Apply mask to each raster in the sublist using the corresponding country vector
+    lapply(rasters, function(raster) mask(raster, vector, inverse=TRUE))
+  }
+)
 
+
+# Step 3: Flatten back the list to get a single list of masked rasters
+baseES_ap <- unlist(baseES_ap, recursive = FALSE)
+baseES_api <- unlist(baseES_api, recursive = FALSE)
+
+```
+
+
+### 4.4 Calculate Shares (2)
+
+
+```{r extract total  ES provision}
+
+#calculate ES output
+# Define a function to compute the total sum for each SpatRaster
+compute_sum <- function(raster) {
+  total_sum <- global(raster, fun = "sum", na.rm = TRUE)[,1]  # Use global() to get the sum
+  return(total_sum)
+}
+totSE_ap <-  lapply(baseES_ap, compute_sum)
+totSE_api <-  lapply(baseES_api, compute_sum)
+
+totSE_ap <- as_tibble(unlist(totSE_ap))
+totSE_api <- as_tibble(unlist(totSE_api))
+totSE <- cbind(file_info[c(2,3)], totSE_api, totSE_ap)
+
+
+# dropoutside 
+
+#rearrange columns 
+names(totSE) <- c("Service", "country","Outside", "Inside")
+totSE <- left_join(totSE,freq_ap)
+
+# I need to add and then get the total!!!!!!!! 
+totSE <- totSE %>% mutate(WholeArea= Outside+Inside)
+# The freaking error is here!!!!!
+totSE <- totSE %>% mutate(share_service= (Inside/WholeArea)*100)
+
+
+names(totSE) <- c("Service", "Country","Outside", "Inside", "Share_AOI", "WholeArea", "Share_service")
+
+#
+totSE <- totSE %>%
+  # Create a new column with simplified service names
+  mutate(Service = case_when(
+    Service == "nature_access_lspop2019_esa2020modVCFhab" ~ "Access",
+    TRUE ~ Service  # Keep other names unchanged, if any
+  )) %>%
+  # Select relevant columns and reshape the data into long format
+  select(Service, Share_service, Share_AOI, Country) %>%
+  pivot_longer(cols = c(Share_service, Share_AOI),
+               names_to = "Metric",
+               values_to = "Value")
+
+
+totSE_l2 <- totSE %>%
+  filter(!(Metric == "Share_AOI" & duplicated(paste(Country, Metric))))
+totSE_l <- rbind(totSE_l, totSE_l2)
+
+totSE_l <- totSE_l %>% mutate(Service=case_when(
+  Metric== "Share_AOI" ~ "Area",
+  TRUE ~ Service 
+))
+write.csv(totSE_l, file=here('output_data', "service_prov_PA.csv"))
+```
 ## 4.4  Plot the shares
 
-```{r plot shares AP, fig.width=9, fig.height=7}
+```{r plot shares AP, fig.width=9, fig.height=6.5}
 
-load(here('output_data', 'serv_dist1.RData'))
+totSE_l <- as_tibble(read.csv(here('output_data', 'service_prov_PA.csv')))
+totSE_l$Service <- factor(totSE_l$Service, levels = c('Area', 'Nitrogen Retention', 'Sediment Retention', "Pollination", "Access", "Coastal Protection"))
+
 # Step 2: Create the bar plot
 p <- ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.7)) + 
-  aes(width = ifelse(Metric == "share_area", 0.5, 0.9)) + 
+  aes(width = ifelse(Metric == "Share_AOI", 0.5, 0.9)) + 
   scale_y_continuous(limits = c(0, 100)) +
   facet_wrap(~ Country, ncol = 5) +  # Create 5 columns (one for each country)
   scale_fill_manual(values = c(
-    "Share Area" = "gray50",         # Medium gray for "Share Area"
+    "Area" = "gray50",         # Medium gray for "Share Area"
     "Nitrogen Retention" = "#2c944c",  # Shade of green
     "Sediment Retention" = "#08306b",  # Shade of blue
     "Pollination" = "#dd1c77",          # Shade of purple
-    "Coastal Protection" = "#A57C00"
+    "Access" = "#A57C00",
+    "Coastal Protection" = "#7a0177"
   )) +
   labs(
     title = "Share of the protected areas and of the total ES provided inside them",
