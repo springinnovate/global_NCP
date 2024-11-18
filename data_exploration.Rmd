@@ -741,11 +741,11 @@ baseES_v <- baseES_v %>%
   ))
 # 
  write.csv(baseES_v, here('output_data', "distributionServ_pa.csv"))
-# Calculate the 98th percentile for each combination of Service and Country
+
 ```
 
 
-```{r calculate percentiles 2 and 98}
+```{r calculate percentiles 2 and 98, eval=FALSE, include=FALSE}
 
 #baseES_vf <- read.csv(here('data', "distributionServ_pa.csv"))
 baseES_v <- as_tibble(baseES_v)
@@ -899,168 +899,75 @@ t <- ggplot(df, aes(x = Value, fill = AOI)) +
 print(t)
 ```
 
-```{r densit plot oa 1, fig.height=6, fig.width=9}
-Count <- unique(country_names) 
+# 5 Restoration Griscom
 
-C <- 1
-
-df <- baseES_vf_filtered %>% filter(Country==Count[C]) %>% filter(Service!="Nature Access")
-
-
-t <- ggplot(df, aes(x = Value, fill = set)) +
-  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  #facet_wrap(~Service, scales = "free") +
-  facet_wrap(~Service, scales = "free") +
-  # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `set` variable
-  labs(title = paste("Density Plot of Services Inside and Outside Protected Areas -", Count[C]),
-       x = "Value",
-       y = "Density",
-       fill = "Set") +
-  #scale_y_continuous(trans = 'log10')# Label for the fill legend
-baseES_vf$Service <- factor(baseES_vf$Service, levels = c(
-  "Nitrogen Retention", "Sediment Retention", "Pollination", "Nature Access"))
-write.csv(baseES_vf, here('output_data', "distributionServ_pa.csv"))
+### 5.1 List the Restoration data 
+```{r select conservation data}
+#Restoration:
+tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= '.tif$'))
+#Remove points, risk reduction baselin    
+tiffes <- tiffes[c(21:30,36:40,56:60,71:75)]
 ```
 
-## 4.3. Produce plots
-### 4.3.05 Load density data PA
-```{r load_dens_rest}
-  baseES_vf <- as_tibble(read.csv(here('output_data', "distributionServ_pa.csv")))
-  baseES_vf$Service <- factor(baseES_vf$Service, levels = c(
-    "Nitrogen Retention", "Sediment Retention", "Pollination", "Nature Access"))
+### 4.1.2 Mask the Service Rasters by the AOI (1)
+```{r apply mask AOI AP, eval=TRUE, include=FALSE}
 
-# Calculate both the 2nd and 98th percentiles
-percentiles <- baseES_vf %>%
-  group_by(Service, Country) %>%
-  summarize(
-    lower_threshold = quantile(Value, 0.02),
-    upper_threshold = quantile(Value, 0.98)
-  ) %>%
-  ungroup()
+# Step 1: Extract file names, product names, and country names
+file_names <- basename(tiffes)  # Extract file names from paths
 
-# Join the thresholds back to the original data and filter values within the 2nd and 98th percentiles
-baseES_filtered <- baseES_vf %>%
-  left_join(percentiles, by = c("Service", "Country")) %>%
-  filter(Value >= lower_threshold & Value <= upper_threshold)
+# Extract product names and country names
+product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
+country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
 
+# Step 2: Create a dataframe to organize the information
+file_info <- data.frame(
+  FilePath = tiffes,
+  Product = product_names,
+  Country = country_names,
+  stringsAsFactors = FALSE
+)
+
+# Step 3: Sort the dataframe by Country first, then by Product
+file_info <- file_info %>%
+  arrange(Country, Product)
+
+# Step 4: Extract the sorted file paths
+tiffes <- file_info$FilePath
+
+baseES <- lapply(tiffes, rast)
+# set the number of different products to split the list 
+num <- length(unique(product_names))
+# Group the list of ES as nested list, one for eah country
+# split again to have nested lists
+baseES <- split(baseES, rep(1:length(nam), each = num))
+
+
+# Step 2: Apply mask for each group of rasters using the corresponding country vector
+baseES_ap <- map2(
+  baseES,   # The list of raster sublists
+  pa,     # The list of country polygons
+  function(rasters, vector) {
+    # Apply mask to each raster in the sublist using the corresponding country vector
+    lapply(rasters, function(raster) mask(raster, vector))
+  }
+)
+# "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
+baseES_api <- map2(
+  baseES,   # The list of raster sublists
+  pa,     # The list of country polygons
+  function(rasters, vector) {
+    # Apply mask to each raster in the sublist using the corresponding country vector
+    lapply(rasters, function(raster) mask(raster, vector, inverse=TRUE))
+  }
+)
+
+
+# Step 3: Flatten back the list to get a single list of masked rasters
+baseES_ap <- unlist(baseES_ap, recursive = FALSE)
+baseES_api <- unlist(baseES_api, recursive = FALSE)
 
 ```
 
-
-
-### 4.3.2 Madagascar
-```{r density plots pa 2, echo=FALSE, fig.height=6, fig.width=9}
-
-C <- 2
-
-df <- baseES_filtered %>% filter(Country==nam[C]) 
-t <- ggplot(df, aes(x = Value, fill = AOI)) +
-  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  facet_grid(~Service, scales = "free") +
-  # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
-  labs(
-    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
-    x = "Value (Log Scale)",
-    y = "Density",
-    fill = "Protected Area"
-  ) +
-  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
-  theme_minimal() +
-  theme(
-    strip.text = element_text(size = 12),  # Increase facet labels' font size
-    legend.position = "bottom",  # Place the legend at the bottom
-    legend.box = "horizontal"  # Arrange legend items horizontally
-  )
-print(t)
-```
-
-### 4.3.3 Mexico-Yucatan
-
-```{r density plots 2, echo=FALSE, fig.height=6, fig.width=9}
-#baseES_vf <- read.csv(here('output_data', "distributionServ_pa.csv"))
-
-C <- 3
-
-df <- baseES_filtered %>% filter(Country==nam[C]) 
-t <- ggplot(df, aes(x = Value, fill = set)) +
-  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  facet_wrap(~Service, scales = "free") +
-  # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
-  labs(
-    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
-    x = "Value (Log Scale)",
-    y = "Density",
-    fill = "Protected Area"
-  ) +
-  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
-  theme_minimal() +
-  theme(
-    strip.text = element_text(size = 12),  # Increase facet labels' font size
-    legend.position = "bottom",  # Place the legend at the bottom
-    legend.box = "horizontal"  # Arrange legend items horizontally
-  )
-print(t)
-```
-
-### 4.3.4 Peru- Madre de Dios
-
-```{r density plots 2, echo=FALSE, fig.height=6, fig.width=9}
-#baseES_vf <- read.csv(here('output_data', "distributionServ_pa.csv"))
-
-C <- 4
-
-df <- baseES_vf %>% filter(Country==nam[C]) 
-t <- ggplot(df, aes(x = Value, fill = set)) +
-  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  facet_wrap(~Service, scales = "free") +
-  # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
-  labs(
-    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
-    x = "Value (Log Scale)",
-    y = "Density",
-    fill = "Protected Area"
-  ) +
-  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
-  theme_minimal() +
-  theme(
-    strip.text = element_text(size = 12),  # Increase facet labels' font size
-    legend.position = "bottom",  # Place the legend at the bottom
-    legend.box = "horizontal"  # Arrange legend items horizontally
-  )
-print(t)
-```
-
-### 4.3.2 Vietnam
-```{r density plots 2, echo=FALSE, fig.height=6, fig.width=9}
-#baseES_vf <- read.csv(here('output_data', "distributionServ_pa.csv"))
-
-C <- 5
-
-df <- baseES_filtered %>% filter(Country==nam[C]) 
-t <- ggplot(df, aes(x = Value, fill = set)) +
-  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  facet_wrap(~Service, scales = "free") +
-  # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
-  labs(
-    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
-    x = "Value (Log Scale)",
-    y = "Density",
-    fill = "Protected Area"
-  ) +
-  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
-  theme_minimal() +
-  theme(
-    strip.text = element_text(size = 12),  # Increase facet labels' font size
-    legend.position = "bottom",  # Place the legend at the bottom
-    legend.box = "horizontal"  # Arrange legend items horizontally
-  )
-print(t)
-```
 
 # 5. Restorastion Areas (Nature base) 
 
@@ -1177,6 +1084,10 @@ baseES_api <- map2(
 baseES_ap <- unlist(baseES_ap, recursive = FALSE)
 baseES_api <- unlist(baseES_api, recursive = FALSE)
 ################################
+```  
+
+
+
 
 # This extracts the background/the total area of interest. This is necessary because we need to know the share of the total area that is under the target 
 # class/status (protected area, restoration, land cover whatever) as a share of the total. This is necessary because we want to compare this share with the share of the service/target data to check compare between inside/outside. This is the whole purpose of
