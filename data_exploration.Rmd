@@ -641,11 +641,6 @@ p <- ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
 print(p)
 ```
 
-
-
-
-########################################################################## 
-# Pendingthis same thing with the beneficiaries and other data wit other crs/spatial resolution
 ########################################################################## 
 Pendingthis same thing with the beneficiaries and other data wit other crs/spatial resolution
 
@@ -752,81 +747,99 @@ baseES_v <- baseES_v %>%
 
 write.csv(baseES_v, here('output_data', "distributionServ_pa1.csv"))
 # Calculate the 98th percentile for each combination of Service and Country
-```{r extract data, eval=FALSE, include=FALSE}
+```
 
-baseES_api_v <- lapply(baseES_api, function(r){
+```{r set list of names}
+
+# Step 1: Extract file names, product names, and country names
+file_names <- basename(tiffes)  # Extract file names from paths
+
+# Extract product names and country names
+product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
+country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
+
+# Step 2: Create a dataframe to organize the information
+file_info <- data.frame(
+  Product = product_names,
+  Country = country_names,
+  stringsAsFactors = FALSE
+)
+
+# Step 3: Sort the dataframe by Country first, then by Product
+file_info <- file_info %>%
+  arrange(Country, Product)
+
+
+prod_nam <- unique(product_names)
+
+num <- length(unique(product_names))
+serv <- c("Coastal_Protection", "Nitrogen_Retention", "Sediment_Retention", "Pollination") #Access 
+
+new_nam <- cbind(prod_nam, serv)
+```
+
+
+```{r extract density restoration hist, eval=FALSE, include=FALSE}
+
+baseES_v <- lapply(baseES_api, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
 })
 
-baseES_ap_v <- lapply(baseES_ap, function(r){
+baseESap_v <- lapply(baseES_ap, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
 })
 
-# this lineIt adds the id for the service
+# Add two new columns to each data frame in the list
+baseES_v  <- Map(function(df, row) {
+  names(df)[1] <- "Value"
+  df$Service <- row[[1]]  
+  df$Country <- row[[2]]  
+  return(df)
+}, baseES_v , split(file_info, seq(nrow(file_info))))
 
-# There is a better way to do it, check the next part 
-file_info[1] <- NULL
-baseES_api_v <- lapply(seq_along(baseES_api_v), function(i) {
-  cbind(baseES_api_v[[i]], file_info[i,])
+baseESap_v  <- Map(function(df, row) {
+  names(df)[1] <- "Value"
+  df$Service <- row[[1]]  
+  df$Country <- row[[2]]  
+  return(df)
+}, baseESap_v , split(file_info, seq(nrow(file_info))))
+
+t
+
+baseES_v <- lapply(baseES_v, function(df) {
+  # Extract the column name
+  col_name <- names(df)[1]
+  # Create a new column "Service" with the first 10 characters of the colu
+  df$Service <- substr(col_name, 1, 10)
+  return(df)
 })
 
-baseES_api_v <- lapply(baseES_api_v, function(r){
-  r <- as_tibble(r)
-})
 
-baseES_ap_v <- lapply(seq_along(baseES_ap_v), function(i) {
-  cbind(baseES_ap_v[[i]], file_info[i,])
-})
-
-baseES_ap_v <- lapply(baseES_ap_v, function(r){
-  r <- as_tibble(r)
-})
-new_col <- "Value"
-# Use lapply to rename the first column of each tibble
-baseES_api_v <- lapply(baseES_api_v, function(tbl) {
-  tbl %>%
-    rename(!!new_col := 1)  # Rename first column using column position
-})
-
-baseES_ap_v <- lapply(baseES_ap_v, function(tbl) {
-  tbl %>%
-    rename(!!new_col := 1)  # Rename first column using column position
-})
-
+           
 ##################### do not run inside the Rmd!!!!!!!!
-baseES_api_v <- do.call(rbind, baseES_api_v)
-baseES_ap_v <- do.call(rbind, baseES_ap_v)
+baseES_v <- do.call(rbind, baseES_v)
+baseESap_v <- do.call(rbind, baseESap_v)
 ##################### do not run inside the Rmd!!!!!!!!
-###########################################################
-###########################################################
+baseES_v <- baseES_v%>% mutate(restoration = "0")
+baseESap_v <- baseESap_v%>% mutate(restoration = "1")
+
+baseES_v <- rbind(baseES_v, baseESap_v)
+rm(baseESap_v)
 
 
-baseES_v <- baseES_api_v%>% mutate(set = "outside")
-
-baseESap_v <- baseES_ap_v%>% mutate(set = "inside")
-baseES_vf <- rbind(baseES_v, baseESap_v)
-
-baseES_vf <- baseES_vf %>% rename(Service = Product)
-
-
-baseESap_v <- baseES_ap_v%>% mutate(set = "inside")
-baseES_vf <- rbind(baseES_v, baseESap_v)
-baseES_vf <- baseES_vf %>% rename(Service = Product)
-
-# Change the name of the services 
-baseES_vf <- baseES_vf %>%
+baseES_v <- baseES_v %>%
   # Create a new column with simplified service names
   mutate(Service = case_when(
-    Service == "global_n_retention_esamod2_compressed" ~ "Nitrogen Retention",
-    Service == "global_sed_retention_esamod2_compressed" ~ "Sediment Retention",
-    Service == "pollination_ppl_fed_on_ag_10s_esa2020" ~ "Pollination",
-    Service == "nature_access_ESA" ~ "Nature Access",
-    Service == "nature_access_ESA_2020" ~ "Nature Access",
-    Service == "access_ESA_2020" ~ "Nature Access",
+    Service == new_nam[1,][1] ~ new_nam[1,][2],
+    Service == new_nam[2,][1] ~ new_nam[2,][2],
+    Service == new_nam[3,][1] ~ new_nam[3,][2],
+    Service == new_nam[4,][1] ~ new_nam[4,][2],
     TRUE ~ Service  # Keep other names unchanged, if any
   )) 
 
-write.csv(baseES_vf, here('data', "distributionServ.csv"))
+write.csv(baseES_v, here('output_data', "distributionServ_pa1.csv"))
+# Calculate the 98th percentile for each combination of Service and Country
+```
 ```
 
 baseES_vf <- read.csv(here('data', "distributionServ.csv"))
