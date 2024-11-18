@@ -36,7 +36,7 @@ names(lb) <- c("Class", "color", "value")
 ## 2 Crop the Data for the target areas
 
 ```{r load target area polygons}
-poly <- st_read(here("vector", "areas_nbs.gpkg")) 
+poly <- st_read(here("vector", "areas_nbs2.geojson")) 
 #Split the vector into a list of individual polygons
 #create vector with names
 poly <- poly%>%split(.$COUNTR)
@@ -292,16 +292,20 @@ Thjer is some complication because we wantthe data organzied by country/studyare
 ## 4.1.  Extract the shares PA/total
 
 
-```{r load overall areas}
+```{r load protected  areas}
 #load protected areas
 pa = st_read(here("vector", "wdpa_nbs.shp"))
 pa <- pa%>%split(.$COUNTR)
+
+```
+
+## Extract shares
+```{r extract sahres}
 # add backgrounds/templates to align 
 path_lc <- here('ESA_LC') 
 # load reclassified land cover map
 tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
 lc <- lapply(tf,rast)
-
 # Drop the second band. There must be an easier way. Now i have th background to put to the ecosystem service rasters. Somethin  
 # Create a background to fill the NAs from ESA's land cover maps
 
@@ -347,8 +351,8 @@ freq_ap <- freq_ap %>% select(!c(1,2,3))
 ```{r select conservation data}
 #Restoration:
 tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= '.tif$'))
-#Remove points, risk reduction baseline
-tiffes <- tiffes[c(21:30,36:40,71:75)]
+#Remove points, risk reduction baselin    
+tiffes <- tiffes[c(21:30,36:40,56:60,71:75)]
 ```
 
 ### 4.1.2 Mask the Service Rasters by the AOI (1)
@@ -413,7 +417,7 @@ baseES_api <- unlist(baseES_api, recursive = FALSE)
 
 
 ################################
-## 4.2 Claculate Shares (1)
+## 4.2 Calculate Shares (1)
 
 
 ```{r extract total  ES provision, eval=FALSE, include=FALSE}
@@ -681,7 +685,8 @@ file_info <- file_info %>%
 prod_nam <- unique(product_names)
 
 num <- length(unique(product_names))
-serv <- c("Coastal_Protection", "Nitrogen_Retention", "Sediment_Retention", "Pollination") #Access 
+#serv <- c("Coastal_Protection", "Nitrogen_Retention", "Sediment_Retention", "Pollination", "Acces") 
+#serv <- c("Access") 
 
 new_nam <- cbind(prod_nam, serv)
 ```
@@ -712,17 +717,6 @@ baseESap_v  <- Map(function(df, row) {
   return(df)
 }, baseESap_v , split(file_info, seq(nrow(file_info))))
 
-t
-
-baseES_v <- lapply(baseES_v, function(df) {
-  # Extract the column name
-  col_name <- names(df)[1]
-  # Create a new column "Service" with the first 10 characters of the colu
-  df$Service <- substr(col_name, 1, 10)
-  return(df)
-})
-
-
            
 ##################### do not run inside the Rmd!!!!!!!!
 baseES_v <- do.call(rbind, baseES_v)
@@ -739,13 +733,13 @@ baseES_v <- baseES_v %>%
   # Create a new column with simplified service names
   mutate(Service = case_when(
     Service == new_nam[1,][1] ~ new_nam[1,][2],
-    Service == new_nam[2,][1] ~ new_nam[2,][2],
-    Service == new_nam[3,][1] ~ new_nam[3,][2],
-    Service == new_nam[4,][1] ~ new_nam[4,][2],
+    # Service == new_nam[2,][1] ~ new_nam[2,][2],
+    # Service == new_nam[3,][1] ~ new_nam[3,][2],
+    # Service == new_nam[4,][1] ~ new_nam[4,][2],
     TRUE ~ Service  # Keep other names unchanged, if any
   )) 
 
-write.csv(baseES_v, here('output_data', "distributionServ_pa1.csv"))
+write.csv(baseES_v, here('output_data', "distributionServ_pa2.csv"))
 # Calculate the 98th percentile for each combination of Service and Country
 ```
 
@@ -804,16 +798,6 @@ baseESap_v  <- Map(function(df, row) {
   return(df)
 }, baseESap_v , split(file_info, seq(nrow(file_info))))
 
-t
-
-baseES_v <- lapply(baseES_v, function(df) {
-  # Extract the column name
-  col_name <- names(df)[1]
-  # Create a new column "Service" with the first 10 characters of the colu
-  df$Service <- substr(col_name, 1, 10)
-  return(df)
-})
-
 
            
 ##################### do not run inside the Rmd!!!!!!!!
@@ -837,9 +821,17 @@ baseES_v <- baseES_v %>%
     TRUE ~ Service  # Keep other names unchanged, if any
   )) 
 
-write.csv(baseES_v, here('output_data', "distributionServ_pa1.csv"))
+write.csv(baseES_v, here('output_data', "distributionServ_pa2.csv"))
+
+base_esold <- read.csv(here('output_data', "distributionServ_pa1.csv"))
+base_esold <- base_esold[-1]
+baseES_v <- rbind(base_esold, baseES_v)
+write.csv(baseES_v, here('output_data', "distributionServ_pa.csv"))
+
+
 # Calculate the 98th percentile for each combination of Service and Country
 ```
+
 ```
 
 baseES_vf <- read.csv(here('data', "distributionServ.csv"))
@@ -864,7 +856,7 @@ baseES_vf_filtered <- baseES_vf %>%
   left_join(percentile_95, by = c("Service", "Country")) %>%
   filter(Value <= threshold)
 
-
+```
 
 Count <- unique(country_names) 
 
