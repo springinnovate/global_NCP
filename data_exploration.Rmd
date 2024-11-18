@@ -470,7 +470,7 @@ totSE <- totSE %>%
 totSE_l <- totSE %>%
   filter(!(Metric == "Share_AOI" & duplicated(paste(Country, Metric))))
 
-write.csv(totSE, file=here('output_data', "service_prov_PA.csv"))
+#write.csv(totSE, file=here('output_data', "service_prov_PA.csv"))
 
 totSE_l <- totSE_l %>% mutate(Service=case_when(
   Metric== "Share_AOI" ~ "Area",
@@ -658,10 +658,10 @@ Pendingthis same thing with the beneficiaries and other data wit other crs/spati
     -   sediment export
     -   Conservation?
 
-# Get the histograms
+# 5 Produce Density Plots (Protected Areas) 
 
 
-```{r set list of names}
+```{r set list of names, include=FALSE}
 
 # Step 1: Extract file names, product names, and country names
 file_names <- basename(tiffes)  # Extract file names from paths
@@ -685,14 +685,14 @@ file_info <- file_info %>%
 prod_nam <- unique(product_names)
 
 num <- length(unique(product_names))
-#serv <- c("Coastal_Protection", "Nitrogen_Retention", "Sediment_Retention", "Pollination", "Acces") 
+serv <- c("Coastal_Protection", "Nitrogen_Retention", "Sediment_Retention", "Pollination", "Access") 
 #serv <- c("Access") 
 
 new_nam <- cbind(prod_nam, serv)
 ```
 
 
-```{r extract density restoration hist, eval=FALSE, include=FALSE}
+```{r extract values conservation, eval=FALSE, include=FALSE}
 
 baseES_v <- lapply(baseES_api, function(r){
   t <- as_tibble(values(r, na.rm=TRUE))
@@ -722,95 +722,13 @@ baseESap_v  <- Map(function(df, row) {
 baseES_v <- do.call(rbind, baseES_v)
 baseESap_v <- do.call(rbind, baseESap_v)
 ##################### do not run inside the Rmd!!!!!!!!
-baseES_v <- baseES_v%>% mutate(restoration = "0")
-baseESap_v <- baseESap_v%>% mutate(restoration = "1")
+baseES_v <- baseES_v%>% mutate(AOI = "0")
+baseESap_v <- baseESap_v%>% mutate(AOI = "1")
 
 baseES_v <- rbind(baseES_v, baseESap_v)
 rm(baseESap_v)
 
-
-baseES_v <- baseES_v %>%
-  # Create a new column with simplified service names
-  mutate(Service = case_when(
-    Service == new_nam[1,][1] ~ new_nam[1,][2],
-    # Service == new_nam[2,][1] ~ new_nam[2,][2],
-    # Service == new_nam[3,][1] ~ new_nam[3,][2],
-    # Service == new_nam[4,][1] ~ new_nam[4,][2],
-    TRUE ~ Service  # Keep other names unchanged, if any
-  )) 
-
-write.csv(baseES_v, here('output_data', "distributionServ_pa2.csv"))
-# Calculate the 98th percentile for each combination of Service and Country
-```
-
-```{r set list of names}
-
-# Step 1: Extract file names, product names, and country names
-file_names <- basename(tiffes)  # Extract file names from paths
-
-# Extract product names and country names
-product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
-country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
-
-# Step 2: Create a dataframe to organize the information
-file_info <- data.frame(
-  Product = product_names,
-  Country = country_names,
-  stringsAsFactors = FALSE
-)
-
-# Step 3: Sort the dataframe by Country first, then by Product
-file_info <- file_info %>%
-  arrange(Country, Product)
-
-
-prod_nam <- unique(product_names)
-
-num <- length(unique(product_names))
-serv <- c("Coastal_Protection", "Nitrogen_Retention", "Sediment_Retention", "Pollination") #Access 
-
-new_nam <- cbind(prod_nam, serv)
-```
-
-
-```{r extract density restoration hist, eval=FALSE, include=FALSE}
-
-baseES_v <- lapply(baseES_api, function(r){
-  t <- as_tibble(values(r, na.rm=TRUE))
-})
-
-baseESap_v <- lapply(baseES_ap, function(r){
-  t <- as_tibble(values(r, na.rm=TRUE))
-})
-
-# Add two new columns to each data frame in the list
-baseES_v  <- Map(function(df, row) {
-  names(df)[1] <- "Value"
-  df$Service <- row[[1]]  
-  df$Country <- row[[2]]  
-  return(df)
-}, baseES_v , split(file_info, seq(nrow(file_info))))
-
-baseESap_v  <- Map(function(df, row) {
-  names(df)[1] <- "Value"
-  df$Service <- row[[1]]  
-  df$Country <- row[[2]]  
-  return(df)
-}, baseESap_v , split(file_info, seq(nrow(file_info))))
-
-
-           
-##################### do not run inside the Rmd!!!!!!!!
-baseES_v <- do.call(rbind, baseES_v)
-baseESap_v <- do.call(rbind, baseESap_v)
-##################### do not run inside the Rmd!!!!!!!!
-baseES_v <- baseES_v%>% mutate(restoration = "0")
-baseESap_v <- baseESap_v%>% mutate(restoration = "1")
-
-baseES_v <- rbind(baseES_v, baseESap_v)
-rm(baseESap_v)
-
-
+baseES_v <- as_tibble(baseES_v)
 baseES_v <- baseES_v %>%
   # Create a new column with simplified service names
   mutate(Service = case_when(
@@ -818,49 +736,173 @@ baseES_v <- baseES_v %>%
     Service == new_nam[2,][1] ~ new_nam[2,][2],
     Service == new_nam[3,][1] ~ new_nam[3,][2],
     Service == new_nam[4,][1] ~ new_nam[4,][2],
+    Service == new_nam[5,][1] ~ new_nam[5,][2],
     TRUE ~ Service  # Keep other names unchanged, if any
-  )) 
-
-write.csv(baseES_v, here('output_data', "distributionServ_pa2.csv"))
-
-base_esold <- read.csv(here('output_data', "distributionServ_pa1.csv"))
-base_esold <- base_esold[-1]
-baseES_v <- rbind(base_esold, baseES_v)
-write.csv(baseES_v, here('output_data', "distributionServ_pa.csv"))
-
-
+  ))
+# 
+ write.csv(baseES_v, here('output_data', "distributionServ_pa.csv"))
 # Calculate the 98th percentile for each combination of Service and Country
 ```
 
-```
 
-baseES_vf <- read.csv(here('data', "distributionServ.csv"))
+```{r calculate percentiles 2 and 98}
 
+#baseES_vf <- read.csv(here('data', "distributionServ_pa.csv"))
+baseES_v <- as_tibble(baseES_v)
 # Calculate the 98th percentile for each combination of Service and Country
-percentile_98 <- baseES_vf %>%
+  baseES_v$Service <- factor(baseES_v$Service, levels = c(
+    "Nitrogen_Retention", "Sediment_Retention", "Pollination", "Access","Coastal_Protection"))
+
+# Calculate both the 2nd and 98th percentiles
+percentiles <- baseES_v %>%
   group_by(Service, Country) %>%
-  summarize(threshold = quantile(Value, 0.98)) %>%
+  summarize(
+    lower_threshold = quantile(Value, 0.02),
+    upper_threshold = quantile(Value, 0.98)
+  ) %>%
   ungroup()
-percentile_95 <- baseES_vf %>%
-  group_by(Service, Country) %>%
-  summarize(threshold = quantile(Value, 0.95)) %>%
-  ungroup()
 
-
-# Join the threshold back to the original data and filter values up to the 98th percentile
-baseES_vf_filtered <- baseES_vf %>%
-  left_join(percentile_98, by = c("Service", "Country")) %>%
-  filter(Value <= threshold)
-
-baseES_vf_filtered <- baseES_vf %>%
-  left_join(percentile_95, by = c("Service", "Country")) %>%
-  filter(Value <= threshold)
-
+# Join the thresholds back to the original data and filter values within the 2nd and 98th percentiles
+baseES_filtered <- baseES_v %>%
+  left_join(percentiles, by = c("Service", "Country")) %>%
+  filter(Value >= lower_threshold & Value <= upper_threshold)
 ```
 
-Count <- unique(country_names) 
+# Density Plots
+
+
+### 4.3.1 BRazil
+
+This is calcualted for the percentile 95 to remove extreme values
+```{r density plots pa 1, echo=FALSE, fig.height=6, fig.width=9}
+
+C <- 1
+
+df <- baseES_filtered %>% filter(Country==nam[C])
+t <- ggplot(df, aes(x = Value, fill = AOI)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_wrap(~Service, scales = "free") +
+  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Protected Area"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+print(t)
+```
+
+### 4.3.2 Madagascar
+```{r density plots pa 2, echo=FALSE, fig.height=6, fig.width=9}
+
+C <- 2
+
+df <- baseES_filtered %>% filter(Country==nam[C])
+t <- ggplot(df, aes(x = Value, fill = AOI)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_wrap(~Service, scales = "free") +
+  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Protected Area"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+print(t)
+```
+### 4.3.2 Mexico
+```{r density plots pa 3, echo=FALSE, fig.height=6, fig.width=9}
+
+C <- 3
+
+df <- baseES_filtered %>% filter(Country==nam[C])
+t <- ggplot(df, aes(x = Value, fill = AOI)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_wrap(~Service, scales = "free") +
+  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Protected Area"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+print(t)
+```
+### 4.3.4 Peru
+```{r density plots pa 4, echo=FALSE, fig.height=6, fig.width=9}
+
+C <- 4
+df <- baseES_filtered %>% filter(Country==nam[C])
+t <- ggplot(df, aes(x = Value, fill = AOI)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_wrap(~Service, scales = "free") +
+  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Protected Area"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+print(t)
+```
+### 4.3.5 Vietnam
+```{r density plots pa 1, echo=FALSE, fig.height=6, fig.width=9}
 
 C <- 5
+
+df <- baseES_filtered %>% filter(Country==nam[C])
+t <- ggplot(df, aes(x = Value, fill = AOI)) +
+  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
+  facet_wrap(~Service, scales = "free") +
+  # Set both x and y axes to be free for each facet
+  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
+  labs(
+    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
+    x = "Value (Log Scale)",
+    y = "Density",
+    fill = "Protected Area"
+  ) +
+  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
+  theme(
+    strip.text = element_text(size = 12),  # Increase facet labels' font size
+    legend.position = "bottom",  # Place the legend at the bottom
+    legend.box = "horizontal"  # Arrange legend items horizontally
+  )
+print(t)
+```
+
+```{r densit plot oa 1, fig.height=6, fig.width=9}
+Count <- unique(country_names) 
+
+C <- 1
 
 df <- baseES_vf_filtered %>% filter(Country==Count[C]) %>% filter(Service!="Nature Access")
 
@@ -904,57 +946,8 @@ baseES_filtered <- baseES_vf %>%
 
 
 ```
-### 4.3.1 BRazil
-
-This is calcualted for the percentile 95 to remove extreme values
-```{r density plots pa 1, echo=FALSE, fig.height=6, fig.width=9}
 
 
-C <- 1
-
-df <- baseES_filtered %>% filter(Country==nam[C])
-t <- ggplot(df, aes(x = Value, fill = set)) +
-  geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  facet_wrap(~Service, scales = "free") +
-  # Set both x and y axes to be free for each facet
-  scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
-  labs(
-    title = paste("Density Plot of Services Inside and Outside Protected Areas -", nam[C]),
-    x = "Value (Log Scale)",
-    y = "Density",
-    fill = "Protected Area"
-  ) +
-  scale_x_continuous(trans = 'log10') +  # Apply log10 transformation to x-axis
->>>>>>> main
-  theme_minimal() +
-  theme(
-    strip.text = element_text(size = 12),  # Increase facet labels' font size
-    legend.position = "bottom",  # Place the legend at the bottom
-    legend.box = "horizontal"  # Arrange legend items horizontally
-  )
-<<<<<<< HEAD
-t
-```
-
-# Plot the shares
-
-```{r ggplot, h=8, w=8}
-
-# Step 2: Create the bar plot
-p <- ggplot(totSE_l, aes(x = Metric, y = Value, fill = Service)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.7)) + 
-  #scale_y_continuous(limits = c(0, 100))+
-  facet_wrap(~ Country, ncol = 5) +  # Create 5 columns (one for each country)
-  scale_fill_brewer(palette = "Set3") +  # Use a color palette for services
-  labs(title = "Share of the protected areas and of the total ES provided inside them",
-       x = "Metric",
-       y = "%",
-       fill = "Service") +
-  #theme_minimal() +
-   theme(
-=======
-print(t)
-```
 
 ### 4.3.2 Madagascar
 ```{r density plots pa 2, echo=FALSE, fig.height=6, fig.width=9}
@@ -962,9 +955,9 @@ print(t)
 C <- 2
 
 df <- baseES_filtered %>% filter(Country==nam[C]) 
-t <- ggplot(df, aes(x = Value, fill = set)) +
+t <- ggplot(df, aes(x = Value, fill = AOI)) +
   geom_density(alpha = 0.4) +  # Use transparency with alpha to see overlapping densities
-  facet_wrap(~Service, scales = "free") +
+  facet_grid(~Service, scales = "free") +
   # Set both x and y axes to be free for each facet
   scale_fill_manual(values = c("blue", "orange")) +  # Set colors for the `restoration` variable
   labs(
