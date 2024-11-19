@@ -37,6 +37,8 @@ names(lb) <- c("Class", "color", "value")
 
 ```{r load target area polygons}
 poly <- st_read(here("vector", "areas_nbs2.geojson")) 
+#temp: reproject if needed
+#poly <- st_transform(poly, crs = crs(tmp))
 #Split the vector into a list of individual polygons
 #create vector with names
 poly <- poly%>%split(.$COUNTR)
@@ -62,13 +64,16 @@ Select the different datasets for batch processing. This is the critical aspect 
 #### 2.2.1.2 Restoration data
 ```{r select restroration data to process}
 
+inpath <- here(("Downloaded_data_ES"))
+
+#This is one of the most basic but also annoying parts of this workflow; select the rasters to process. I have not been able to come with an autoamted manner, in some cases the strings in the product names have no common patterns that i can use, the easiest way is just to sue excel to sort and filter. Just by hand is difficult and tiresome. 
 #Restoration:
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'ESAmod.*\\.tif$'))
+# do not include data with a differnet crs here, we will deal with that on the next chunk.
+
+tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
 #Remove points, risk reduction baseline
-tiffes <- tiffes[-c(2,3,4)]
-tiffes2 <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'pollination.*\\.tif$'))
-tiffes2 <- tiffes2[c(2,3)]
-tiffes <- c(tiffes,tiffes2)
+tiffes <- tiffes[c(3,23,25,26,30)]
+
 ```
 
 
@@ -92,7 +97,7 @@ acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[
 map(1:length(acces_rest), function(x) writeRaster(acces_rest[[x]], paste0(here('cropped_raster_data'),"/",filename, '_', nam[x], '.tif'), overwrite=TRUE))
 
 
-# pemnding access restoration. No need to export repporjected, just get everything done here. 
+# pending access restoration. No need to export retrospected, just get everything done here. 
 
 ```
 
@@ -101,23 +106,22 @@ map(1:length(acces_rest), function(x) writeRaster(acces_rest[[x]], paste0(here('
 
 #Restoration:
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'nature_access.*\\.tif$'))
-tiffes <- tiffes[1]
+tiffes <- tiffes[c(4)]
 # Access restoration
-acces_rest2 <- rast(tiffes)
 basename <- basename(tiffes)
 clean_filename <- function(filename){
-  sub("_md5.*", "", filename)
+  sub("_md5*", "", filename)
   sub(".tif.*", "", filename)
 }
 filename <- clean_filename(basename)
 
-
-acces_rest2 <- mapply(function(raster1, raster2) {
+acces_rest <- rast(tiffes) 
+acces_rest <- mapply(function(raster1, raster2) {
   project(raster1, raster2, method = "bilinear")  # Adjust method if needed
-}, acces_rest2, acces_rest, SIMPLIFY = FALSE)
-acces_rest2 <- map(1:length(poly), function(x) crop(acces_rest2[[x]], poly[[x]]))
-acces_rest2 <- map(1:length(acces_rest2), function(x) mask(acces_rest2[[x]], poly[[x]]))
-map(1:length(acces_rest2), function(x) writeRaster(acces_rest2[[x]], paste0(here('cropped_raster_data'),"/",filename, '_', nam[x], '.tif'), overwrite=TRUE))
+}, acces_rest, tmp, SIMPLIFY = FALSE)
+acces_rest <- map(1:length(poly), function(x) crop(acces_rest[[1]], poly[[x]]))
+acces_rest  <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
+map(1:length(acces_rest), function(x) writeRaster(acces_rest[[x]], paste0(here('cropped_raster_data'),"/",filename, '_', nam[x], '.tif'), overwrite=TRUE))
 
 
 # pending access restoration. No need to export repporjected, just get everything done here. 
@@ -152,11 +156,14 @@ map(1:length(acces_rest), function(x) writeRaster(acces_rest[[x]], paste0(here('
 
 
 
-This runs the same process in batch. Memory was optimzied to not load all the data at thesame time, but process and write each raster individually before going to the next one.  
+This runs the same process in batch. Memory was optimized to not load all the data at thesame time, but process and write each raster individually before going to the next one.  
 
 
 ```{r iterate cropMask, eval=FALSE, include=FALSE}
-
+clean_filename <- function(filename){
+  sub("_md5.*", "", filename)
+  sub(".tif.*", "", filename)
+}
 # Loop through each geotiff file
 for (i in seq_along(tiffes)) {
   # Get the current tiff file
@@ -658,7 +665,7 @@ Pendingthis same thing with the beneficiaries and other data wit other crs/spati
     -   sediment export
     -   Conservation?
 
-# 5 Produce Density Plots (Protected Areas) 
+## 4.5 Produce Density Plots (Protected Areas) 
 
 
 ```{r set list of names, include=FALSE}
