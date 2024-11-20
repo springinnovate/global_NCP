@@ -14,7 +14,7 @@ data for the polygons in the 5 prioritized areas.
 ```{r load libraries, include=FALSE}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
-           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats')
+           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign')
 sapply(packs, require, character.only = TRUE, quietly=TRUE)
 rm(packs)
 ```
@@ -32,6 +32,33 @@ lb <- data.frame(
   value=c(1:8))
 names(lb) <- c("Class", "color", "value")
 ```
+
+## 1.3 Define align function
+Because of course
+```{r align list of rasters }
+
+
+library(terra)
+
+align_rasters <- function(raster_list, template, resample_method = "near") {
+  lapply(raster_list, function(r) {
+    if (!compareGeom(r, template, stopOnError = FALSE)) {
+      message("Aligning raster: ", names(r))
+      # Resample to align with the template
+      resample(r, template, method = resample_method)
+    } else {
+      # Return raster as is if already aligned
+      message("Raster already aligned: ", names(r))
+      r
+    }
+  })
+}
+
+
+```
+
+aligned_rasters <- align_rasters(raster_list, template)
+
 
 ## 2 Crop the Data for the target areas
 
@@ -908,12 +935,15 @@ print(t)
 
 # 5 Restoration Griscom
 
+
+
+
 ### 5.1 List the Restoration data 
 ```{r select conservation data}
 #Restoration:
 tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= '.tif$'))
 #Remove points, risk reduction baselin    
-tiffes <- tiffes[c(21:30,36:40,56:60,71:75)]
+tiffes <- tiffes[c(1:5,51:55,71:75,81:90, 106:110)]
 ```
 
 ### 4.1.2 Mask the Service Rasters by the AOI (1)
@@ -949,10 +979,96 @@ num <- length(unique(product_names))
 baseES <- split(baseES, rep(1:length(nam), each = num))
 
 
+# Load Griscome Rest data
+tiffes <- file.path(here("Restoration_Griscom"), list.files(paste0(here("Restoration_Griscom")),pattern= '.tif$'))
+tiffes <- tiffes[-5]
+
+pa <- lapply(tiffes,rast)
+#Read the metadata because of course me
+meta <- lapply(pa, cats)
+
+rcl_matrices <- lapply(meta, function(x) x[[1]]) 
+
+# rEclassify the rasters. 
+pa_rc <- mapply(function(raster, rcl) {
+  classify(raster, as.matrix(rcl[, c("Value", "Restore")]))
+}, pa, rcl_matrices, SIMPLIFY = FALSE)
+
+
+freq_ap <- lapply(pa_rc, function(r){
+  f <- freq(r)
+})
+country_names <- unique(country_names)
+
+freq_ap <- lapply(seq_along(freq_ap), function(i) {
+  freq_ap[[i]]$country <- country_names[i]  # Add country column
+  freq_ap[[i]]  # Return the modified dataframe
+})
+freq_ap <- as_tibble(do.call(rbind, freq_ap))
+
+freq_ap <- freq_ap %>%
+  group_by(country) %>%
+  mutate(share = (count / sum(count)) * 100) %>%
+  ungroup()
+
+freq_ap <- freq_ap %>% filter(layer == 1)  %>%  filter(value == 1)
+freq_ap <- freq_ap %>% select(!c(1,2,3))
+
+#grt templates
+tmp <- lapply(baseES, function(sublist) sublist[[1]])
+
+
+# Function to align a nested list of rasters with corresponding templates
+align_list <- function(raster_list, template, resample_method = "near") {
+  lapply(raster_list, function(r) {
+    if (!compareGeom(r, template, stopOnError = FALSE)) {
+      message("Aligning raster: ", names(r))
+      # Resample to align with the template
+      resample(r, template, method = resample_method)
+    } else {
+      # Return raster as is if already aligned
+      message("Raster already aligned: ", names(r))
+      r
+    }
+  })
+}
+
+
+baseES <- lapply(seq_along(baseES), function(i) {
+  align_list(
+    raster_list = baseES[[i]],
+    template = pa_rc[[i]],
+    resample_method = "bilinear" 
+  )
+})
+
+
+
+# Align CRS and resolution
+pa_rc <- mapply(function(raster, target) {
+  # Reproject to match the CRS of the target raster
+  reprojected <- project(raster, target, method = "near")
+  
+  # Resample to match the resolution of the target raster
+  resampled <- resample(reprojected, target, method = "near")
+  
+  return(resampled)
+}, pa_rc, tmp, SIMPLIFY = FALSE)
+rm(tmp)
+# put the accesibility data in a different list because crs
+baseES_acces <- lapply(baseES, function(sublist) sublist[[2]])
+#remove access data from the list
+baseES <- lapply(baseES, function(sublist) sublist[-2])
+
+
+# align rasters
+aligned_rasters <- align_rasters(raster_list, template)
+
+
 # Step 2: Apply mask for each group of rasters using the corresponding country vector
 baseES_ap <- map2(
   baseES,   # The list of raster sublists
-  pa,     # The list of country polygons
+  pa_rc,     # The list of country polygons
   function(rasters, vector) {
     # Apply mask to each raster in the sublist using the corresponding country vector
     lapply(rasters, function(raster) mask(raster, vector))
@@ -961,7 +1077,7 @@ baseES_ap <- map2(
 # "api" stands for "outside". I don´t know why I gave tho name, it makes no sense 
 baseES_api <- map2(
   baseES,   # The list of raster sublists
-  pa,     # The list of country polygons
+  pa_rc,     # The list of country polygons
   function(rasters, vector) {
     # Apply mask to each raster in the sublist using the corresponding country vector
     lapply(rasters, function(raster) mask(raster, vector, inverse=TRUE))
@@ -974,6 +1090,16 @@ baseES_ap <- unlist(baseES_ap, recursive = FALSE)
 baseES_api <- unlist(baseES_api, recursive = FALSE)
 
 ```
+
+
+
+
+
+
+
+
+
+
 
 
 # 5. Restorastion Areas (Nature base) 
