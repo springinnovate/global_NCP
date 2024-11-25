@@ -1,0 +1,227 @@
+---
+title: "Globaler ES Extraction"
+output: html_notebook
+---
+
+####################################################################### 
+
+Second part with justin.
+
+# Explore Data.
+
+The ecorregiosn Raster is not suited, 830 different values. Could be
+done but does not make a lot of sense
+
+```{r explore data}
+
+ecoregions <- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/Ecoregions2017_compressed_md5_316061.tif')
+
+ec_uniqe <- unique(ecoregions)
+```
+
+Use vector file, just the main biomes.
+
+# PA
+
+```{r filter out PAs}
+
+pa <- st_read('/Users/sputnik/Documents/Natural_capital/NBS_OP/data/vector/global-2024-05-08.gpkg')
+
+att <- unique(pa$IUCN_CAT)
+
+filt <- c("Not Reported", "Not Assigned", "Not Applicable")
+pa <- pa %>% filter(!(IUCN_CAT %in% filt))
+
+st_write(pa, '/Users/sputnik/Documents/Natural_capital/NBS_OP/data/vector/PA_filt.gpkg')
+
+
+
+countries <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/cartographic_ee_ee_r264_correspondence.gpkg')
+
+pa <- st_transform(pa, crs=st_crs(countries))
+
+```
+
+split the rasters by biomes
+
+```{r split countries}
+wd. <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products'
+
+tf <- list.files(wd., pattern='1992')
+tf <- clean_filename(tf)
+
+tf <- tf[-c(2,3,5)]
+
+
+tiffes <- file.path(wd., list.files(wd., pattern='1992'))
+rs <- lapply(tiffes, rast) 
+
+rs <- rs[-3]
+
+biomes <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/global_products/biomes_WWF.gpkg')
+
+
+nam <- sort(biomes$BIOME)
+
+biomes <- biomes %>% split(.$BIOME)
+
+# Apply cropping and masking recursively using lapply and map
+rs_msk <- lapply(rs, function(raster) {
+  map(biomes, function(polygon) {
+    # Crop the raster to the extent of the polygon
+    cropped_raster <- crop(raster, polygon)
+    masked_raster <- mask(cropped_raster, polygon)
+    return(masked_raster)
+  })
+})
+
+outpath <- '~/Documents/Natural_capital/Global_mapping/rest_masked_biomes'
+# Use lapply to iterate over each list in nested_list
+lapply(seq_along(rs_msk), function(i) {
+  # For each outer list, iterate through the inner list (rasters)
+  lapply(seq_along(rs_msk[[i]]), function(j) {
+    
+    # Construct the filename using vector_1 and vector_2
+    file_name <- paste0(outpath, tf[[i]], '_', nam[[j]], '.tif')
+    
+    # Write the raster to the file
+    writeRaster(rs_msk[[i]][[j]], file_name, overwrite = TRUE)
+  })
+})
+
+summary_df <- map2_dfr(seq_along(rs_msk), rs_msk, function(i, inner_list) {
+  
+  # i corresponds to the index of the outer list (e.g., 1, 2, 3...)
+  outer_label <- paste0("Outer_", i)  # Label for the outer list
+  
+  # Loop through each SpatRaster in the inner list
+  map_dfr(inner_list, function(raster) {
+    extract_raster_summary(raster, outer_label)
+  })
+})
+
+```
+
+# Split by Countries/continents
+
+# mask by protected areas (all togeter, chategories I-VI)
+
+# Reclassify Land Cover maps.
+
+# Change Maps
+
+```{r change_map_calc}
+esat <- c('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif','/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESACCI-LC-L4-LCCS-Map-300m-P1Y-1992-v2.0.7cds_compressed_md5_60cf30.tif')
+
+
+esas <- lapply(esat,rast)
+
+
+nam <- c(2020,1992)
+
+map(1:2, function(x) writeRaster(esas[[x]], paste0('ESA_LC_', nam[x],'.tif')))
+cls <- lapply(esas,freq)
+
+
+wd <- '~/Documents/Natural_capital/NBS_OP/data/ESA_LC'
+
+tf <- file.path(wd, list.files(wd, pattern='tif'))
+
+tf <- tf[c(2,3)]
+
+esas <- lapply(tf,rast)
+
+
+
+countries <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/cartographic_ee_ee_r264_correspondence.gpkg')
+
+cont <- countries %>% filter(subregion=='Central America')
+
+# Define the reclassification rules in one operation
+reclass_table <- data.frame(
+  from = c(10, 11, 12, 20, 30, 40, 50, 60, 61, 62, 70, 71, 72, 80, 81, 82, 90, 100,
+           110, 120, 121, 122, 130, 140, 150, 151, 152, 153, 160, 170, 180,
+           190, 200, 201, 202, 210, 220),
+  to = c(1, 1, 1, 1, 1, 1,   # Cultivated
+         2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,  # Forests
+         3, 3, 3, 3, 3,   # Grasses and Shrubs
+         4, 4, 4, 4, 4,   # Sparse Vegetation
+         5, 5, 5,   # Mangroves
+         6,   # Urban
+         7, 7, 7,   # Bare
+         8,   # Water
+         9)   # Ice
+)
+
+esas <- lapply(esas, function(r) {
+  subst(r, from = reclass_table$from, to = reclass_table$to)
+})
+
+
+map(1:2, function(x) writeRaster(esas[[x]], paste0('~/Documents/Natural_capital/NBS_OP/data/ESA_LC/', "Forests_esa", year[x], '.tif')))
+
+# Extract forests
+esas <- lapply(esas, function(r) {
+  subst(r, from = 2, to =1, others=NA)
+})
+
+
+chg <- ch_mapR(esas[[1]],esas[[2]])
+freq(chg)
+
+mat_1 <- crosstabm(esas[[1]],esas[[2]])
+
+diffs_p <-  diffTablej(mat, digits=3, analysis = "change")
+
+```
+
+# Get Sankey Diagrams
+
+```{r Sankey Diagram}
+classes <- c("Cultivated", "Forests", "Grasses/shrubs", "Sparse", "Mangroves", "Urban", "Bare", "Water")
+groupColor <- c("#dcf064","#00b809","#8ca000","#ffebaf",'#009678', "#c31400", "#fff5d7", "#0046c8")
+
+years <- c(1992,2020)
+
+
+nodeInfo <- nodeInfoR(years, classes, groupColor)
+
+NodeCols<- sort(unique(nodeInfo$nodeCol))
+
+#create paths to the rasters/bands
+num_bands <- length(NodeCols)
+tf <- list.files(wd, pattern= "Rec")
+tf <- file.path(wd,tf)
+fileInfo <- tibble(
+  nodeCol = seq_along(tf),
+  rast = tf,
+  rasterBand = 1
+)
+
+# join path strings to nodeInfo
+nodeInfo <- dplyr::left_join(nodeInfo, fileInfo, by='nodeCol') 
+linkInfo <- linkInfoR(NodeCols, nodeInfo)
+
+
+fontSize <- 0.5
+nodeWidth <-30
+fontFamily <- "sans-serif"
+colorScaleJS <- sprintf("d3.scaleOrdinal().domain(%s).range(%s)",
+                        jsonlite::toJSON(unique(nodeInfo$nodeGroup)),
+                        jsonlite::toJSON(unique(nodeInfo$groupColor)))
+
+
+sankeyNetwork(Links = linkInfo, Nodes = nodeInfo,
+              Source = "source",
+              Target = "target",
+              Value = "value",
+              NodeID = "nodeName",
+              NodeGroup = "nodeGroup",
+              LinkGroup = "LinkGroup",
+              fontSize = fontSize,
+              fontFamily = fontFamily,
+              nodePadding = 10,
+              margin=1,
+              nodeWidth = nodeWidth,
+              colourScale = JS(colorScaleJS))
+```
