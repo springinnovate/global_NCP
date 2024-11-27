@@ -292,7 +292,22 @@ writeRaster(rest_mex, here("Interventions", "PER_intervention", "per_griscom.tif
 
 ```{r define vars}
 
-bra <- rest_sp
+rast1 <- rast(here("Interventions", "Brazil_intervention", "SS_griscom.tif"))
+rast2 <- rast(here("Interventions", "Mex_intervention", "Mex_griscom.tif"))
+rast3 <- rast(here("Interventions", "Peru_intervention", "MDDmask_final.tif"))
+rast1 <- project(rast1, crs(poly))
+rast2 <- project(rast2, crs(poly))
+
+
+msg <- list(rast1,rast2,rast3)
+
+ar_m <- lapply(msg, lsm_c_ca)
+
+ct <- c("Espirito Santo", "Made de Dios", "Yucatan")
+ar_m[[3]] <- ar_m[[3]] %>% mutate(Intervention = ct[3])
+#######
+
+
 mdg <- pa_rc[[2]]
 mex <- rest_mex
 per1 <- rest_per # Griscom Peru]
