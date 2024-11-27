@@ -1,42 +1,43 @@
 ---
-title: "Globaler ES Extraction"
+title: "Globale ES Extraction"
 output: html_notebook
 ---
 
 ####################################################################### 
 
-Second part with justin.
+Second part with Justin.
 
 # Explore Data.
 
-The ecorregiosn Raster is not suited, 830 different values. Could be
+The ecorregions Raster is not suited, 830 different values. Could be
 done but does not make a lot of sense
 
-```{r explore data}
 
-ecoregions <- rast('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/Ecoregions2017_compressed_md5_316061.tif')
+Key aspect:
 
+Global NCP change maps: country breakdowns -> income groups; geographic regions (IPBES? Or just continents); individual countries that have changed the most
+How much land cover change did you get, how much biophysical change did you get, how much service change?
+Which specific transitions are service change attributable to? (e.g., forest to cropland vs. forest to grassland)
+
+
+```{r explore ecoregions, eval=FALSE, include=FALSE}
+
+ecoregions <- rast(here("Downloaded_data_ES", "Ecoregions2017_compressed_md5_316061.tif"))
 ec_uniqe <- unique(ecoregions)
 ```
 
 Use vector file, just the main biomes.
 
-# PA
+# Load Data
 
+Protected Areas, Countries
 ```{r filter out PAs}
 
-pa <- st_read('/Users/sputnik/Documents/Natural_capital/NBS_OP/data/vector/global-2024-05-08.gpkg')
-
-att <- unique(pa$IUCN_CAT)
-
-filt <- c("Not Reported", "Not Assigned", "Not Applicable")
-pa <- pa %>% filter(!(IUCN_CAT %in% filt))
-
-st_write(pa, '/Users/sputnik/Documents/Natural_capital/NBS_OP/data/vector/PA_filt.gpkg')
+pa <- st_read(here('natcap_data', 'global-2024-05-08.gpkg'))
+st_write(pa, here('natcap_data', 'PA_filt.gpkg'))
 
 
-
-countries <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/cartographic_ee_ee_r264_correspondence.gpkg')
+countries <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
 
 pa <- st_transform(pa, crs=st_crs(countries))
 
@@ -45,8 +46,7 @@ pa <- st_transform(pa, crs=st_crs(countries))
 split the rasters by biomes
 
 ```{r split countries}
-wd. <- '/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products'
-
+wd. <- here('Downloaded_data_ES') 
 tf <- list.files(wd., pattern='1992')
 tf <- clean_filename(tf)
 
@@ -54,6 +54,7 @@ tf <- tf[-c(2,3,5)]
 
 
 tiffes <- file.path(wd., list.files(wd., pattern='1992'))
+tiffes <- tiffes[-3]
 rs <- lapply(tiffes, rast) 
 
 rs <- rs[-3]
