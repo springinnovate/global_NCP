@@ -9,6 +9,57 @@ editor_options:
 I will use this project to pepare and extract insights from the raster
 data for the polygons in the 5 prioritized areas.
 
+
+# Question
+Potential value of ecosystemtservices provided if the target surface is distributed randomly across the intervention area?
+
+Why did I add tyhe pixels? To identify the areas with the highest combined restoration value.
+Once we have these pixels extracted, we can select the top X% to target the intervention.
+This is preliminary, as it departs from2 assumptions:
+
+have 
+
+# 1. Summary
+
+A framework to assess the potential ecosystem service gains from restoration across five landscapes.
+
+# 2 Goals:
+
+- Identify High-Value Pixels: Focus restoration on areas where ecosystem service gains are maximized.
+- Estimate Total Gains: If restoration is distributed randomly over a target area, what is the expected ecosystem service value?
+
+# 3 Assumptions:
+
+- All ecosystem services are equally valued.
+- Value is a constant function of service quantity.
+- Sampling provides a robust method for estimating random distribution effects.
+
+# 4 Approach:
+
+- Normalize ecosystem service rasters to a 0-1 scale, sum them, and identify high-value areas.
+- Randomly sample pixels to estimate service values under random distribution scenarios, iterating multiple times for robust confidence intervals.
+-Address spatial distribution issues (e.g., clustering) later using additional weighting factors (e.g., downstream beneficiaries).
+
+# 5 Methodological Soundness and Feasibility
+
+## 5.1 Normalization and Summation:
+easonable first step when dealing with multiple rasters of different units.
+**Limitations:**
+- Implicitly assumes equal importance of ecosystem services.
+- May overemphasize areas with one dominant service.
+- Fails to account for geographically weighted factors, plan to address.
+
+## 5.2 Random Sampling:
+Sound methodology when no location-based prioritization is assumed.
+Repeating the sampling process  assuming  Central Limit Theorem
+Summarize results with mean and confidence intervals.
+
+The described workflow is computationally intensive but manageable with modern spatial libraries like terra in R or GDAL in Python.
+Repeated sampling is straightforward to automate.
+
+
+
+
 # 1. Prepare Environemnt (Load necessary libraries)
 
 ```{r load libraries, include=FALSE}
@@ -58,7 +109,7 @@ align_rasters <- function(raster_list, template, resample_method = "near") {
 ```
 
 
-## 1.3 Define Data Preparation Function
+## 1.3 Define Data Combination Function
 ```{r ES combination}
 process_rasters <- function(nested_list, templates, resample_method = "bilinear") {
   lapply(seq_along(nested_list), function(i) {
@@ -84,6 +135,7 @@ process_rasters <- function(nested_list, templates, resample_method = "bilinear"
   })
 }
 ```
+
 ## 1.4 Prepare Templates
 ```{r create tmp}
 # add backgrounds/templates to align 
@@ -123,7 +175,7 @@ process_intervention_area <- function(raster_list) {
 }
 ```
 
-
+**Note**. Need to think if the normalization is best before or after masking, but i think after will provide slightly more detailed data, but i dont think it changes a lot
 
 # 2 Extract the data
 
@@ -139,7 +191,7 @@ tiffes <- tiffes[c(1:5,51:55,71:75,81:90, 106:110)]
 
 ## 2.2 Load and Sort the layers
 
-Also run the normalizatio nand add them together
+Also run the normalization nand add them together
 ```{r apply mask AOI AP, eval=TRUE, include=FALSE}
 
 # Step 1: Extract file names, product names, and country names
@@ -183,7 +235,7 @@ map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here("restorat
 ## 2.3 Load Griscom Data and apply mask
 
 
-```{r load Grsicoms data}
+```{r load Griscoms data}
 # Load Griscom Data
 tiffes <- file.path(here("Restoration_Griscom"), list.files(paste0(here("Restoration_Griscom")),pattern= 'rec'))
 
@@ -290,7 +342,33 @@ writeRaster(rest_mex, here("Interventions", "PER_intervention", "per_griscom.tif
 
 ```
 
+## 3.4 Sampling and Extracyting values
+
 ```{r define vars}
+#ok, i  need a template background raster ot sample across it (we could add a restriction that says that it has to be at least x distance from the external border, that sampled points need to be at least x distance between or that the sampling uint is more than one pixel, like clumps of pixels equaling to a target area. that would be fum)
+sample <- sample_pixels(base_raster, 30000)
+set.seed(123) 
+num_iterations <- 30
+target_area_ha <- 1000 # Target area in hectares
+
+# Perform sampling and summarize results
+sampling_results <- replicate(num_iterations, {
+  sampled_raster <- sample_pixels(normalized_raster, target_area_ha)
+  # Extract mean value for each service
+  colMeans(as.data.frame(sampled_raster))
+}, simplify = "matrix")
+
+# Summarize results
+sampling_summary <- data.frame(
+  Service = names(sampling_results),
+  Mean = rowMeans(sampling_results),
+  SD = apply(sampling_results, 1, sd),
+  CI_lower = rowMeans(sampling_results) - 1.96 * apply(sampling_results, 1, sd) / sqrt(num_iterations),
+  CI_upper = rowMeans(sampling_results) + 1.96 * apply(sampling_results, 1, sd) / sqrt(num_iterations)
+)
+
+```
+
 
 rast1 <- rast(here("Interventions", "Brazil_intervention", "SS_griscom.tif"))
 rast2 <- rast(here("Interventions", "Mex_intervention", "Mex_griscom.tif"))
@@ -318,8 +396,17 @@ VN
 
 
 
-I did not do Peru or Vietnam Because 1, in peru i will have to use the whole area or maybe add ganaderia. ?The resdt is included 
-## 3.4 Peru
+
+
+I did not do Peru or Vietnam Because 1, in peru i will have to use the whole area or maybe add ganaderia. ?The resdt is included . I did include ganaderia 
+
+
+
+
+
+
+
+
 
 ```{r Pero intervention}
 # create rcl matrix
