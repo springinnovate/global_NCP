@@ -25,6 +25,9 @@ A framework to assess the potential ecosystem service gains from restoration acr
 
 # 2 Goals:
 
+Estimating the total ecosystem service provision based on restored areas.
+Representing uncertainty through confidence intervals and spatial distributions of selected pixels.
+
 - Identify High-Value Pixels: Focus restoration on areas where ecosystem service gains are maximized.
 - Estimate Total Gains: If restoration is distributed randomly over a target area, what is the expected ecosystem service value?
 
@@ -32,6 +35,8 @@ A framework to assess the potential ecosystem service gains from restoration acr
 
 - All ecosystem services are equally valued.
 - Value is a constant function of service quantity.
+- Uniform likelihood of restoration across the intervention area unless constrained by inputs (e.g., masks, distance).
+- Independence of pixel values (no spatial autocorrelation considered in sampling)
 - Sampling provides a robust method for estimating random distribution effects.
 
 # 4 Approach:
@@ -302,10 +307,11 @@ writeRaster(rest_mex, here("Interventions", "Mex_intervention", "Mex_griscom.tif
 ```
 
 ## 3.3  Peru
-```{r yucatan intervention}
+```{r Madre De Dios intervention}
 pol <- st_read(here("Interventions","Peru","Intervenciones", "commondata","ganaderia","GANADERIA.shp"))
 pol <- st_make_valid(pol)
 st_write(pol, here("Interventions", "ganaderia.shp"))
+
 #get msk non zero values from the EC mask
 msk_p <- classify(baseES[[4]],rcl)
 pol_wgs <- st_transform(pol, crs=crs(baseES_m[[4]]))
@@ -326,26 +332,20 @@ mask_all_wgs <- project(mask_all, baseES[[4]])
 
 mks_peru <- mask(baseES[[4]],mask_all_wgs, maskvalue=0)
 
-
 areas <- lapply(maks,lsm_c_ca)
 save(areas, file=here("Interventions", "Peru_intervention","Proportions.RData"))
-
 writeRaster(mask_all, here("Interventions", "Peru_intervention","MDDmask_final.tif"), overwrite=TRUE)
 writeRaster(mks_peru, here("Interventions", "Peru_intervention","MDDEES_final.tif"), overwrite=TRUE)
 
-
-r <- project(rest_per, serv_per)
-
-serv_per <- project(serv_per, crs(pol), method='cubic')
-writeRaster(serv_mex, here("Interventions", "PER_intervention", "per_int_rest.tif"))
-writeRaster(rest_mex, here("Interventions", "PER_intervention", "per_griscom.tif"), overwrite=TRUE)
+```
+_griscom.tif"), overwrite=TRUE)
 
 ```
 
-## 3.4 Sampling and Extracyting values
+## 3.4 Sampling and Extrayting values
 
 ```{r define vars}
-#ok, i  need a template background raster ot sample across it (we could add a restriction that says that it has to be at least x distance from the external border, that sampled points need to be at least x distance between or that the sampling uint is more than one pixel, like clumps of pixels equaling to a target area. that would be fum)
+
 sample <- sample_pixels(base_raster, 30000)
 set.seed(123) 
 num_iterations <- 30

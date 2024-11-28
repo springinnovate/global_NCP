@@ -19,6 +19,14 @@ Global NCP change maps: country breakdowns -> income groups; geographic regions 
 How much land cover change did you get, how much biophysical change did you get, how much service change?
 Which specific transitions are service change attributable to? (e.g., forest to cropland vs. forest to grassland)
 
+# Goal
+Global NCP change maps: country breakdowns -> income groups; geographic regions (IPBES? Or just continents); individual countries that have changed the most
+How much land cover change did you get, how much biophysical change did you get, how much service change?
+Which specific transitions are service change attributable to? (e.g., forest to cropland vs. forest to grassland)
+
+
+
+
 
 ```{r explore ecoregions, eval=FALSE, include=FALSE}
 
@@ -36,14 +44,12 @@ Protected Areas, Countries
 pa <- st_read(here('natcap_data', 'global-2024-05-08.gpkg'))
 st_write(pa, here('natcap_data', 'PA_filt.gpkg'))
 
-
 countries <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
 
 pa <- st_transform(pa, crs=st_crs(countries))
-
 ```
 
-split the rasters by biomes
+Split the rasters by biomes
 
 ```{r split countries}
 wd. <- here('Downloaded_data_ES') 
