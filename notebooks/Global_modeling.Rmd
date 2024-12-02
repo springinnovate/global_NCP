@@ -11,7 +11,15 @@ Second part with Justin.
 
 The ecorregions Raster is not suited, 830 different values. Could be
 done but does not make a lot of sense
+# 1. Prepare Environemnt (Load necessary libraries)
 
+```{r load libraries, include=FALSE}
+packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
+           'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
+           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign')
+sapply(packs, require, character.only = TRUE, quietly=TRUE)
+rm(packs)
+```
 
 Key aspect:
 
@@ -38,43 +46,67 @@ Use vector file, just the main biomes.
 
 # Load Data
 
-Protected Areas, Countries
+Countries
 ```{r filter out PAs}
-
-pa <- st_read(here('natcap_data', 'global-2024-05-08.gpkg'))
-st_write(pa, here('natcap_data', 'PA_filt.gpkg'))
-
-countries <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
-
-pa <- st_transform(pa, crs=st_crs(countries))
+poly <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
+nam <- sort(unique(poly$income_grp))
+poly <- poly%>%split(.$income_grp)
 ```
 
-Split the rasters by biomes
+```{r select data to process}
 
-```{r split countries}
-wd. <- here('Downloaded_data_ES') 
-tf <- list.files(wd., pattern='1992')
-tf <- clean_filename(tf)
+inpath <- "~/Documents/MN_Applied_Economics/Global_ES_mapping/Downloaded_data" 
+outpath <- "~/Documents/MN_Applied_Economics/Global_ES_mapping/income_level"
+# do not include data with a differnet crs here, we will deal with that on the next chunk.
 
-tf <- tf[-c(2,3,5)]
+tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
+#Remove points, risk reduction baseline
+tiffes <- tiffes[-c(2,4)]
+
+```
+
+This runs the same process in batch. Memory was optimized to not load all the data at thesame time, but process and write each raster individually before going to the next one.  
 
 
-tiffes <- file.path(wd., list.files(wd., pattern='1992'))
-tiffes <- tiffes[-3]
+
+```{r iterate cropMask, eval=FALSE, include=FALSE}
+clean_filename <- function(filename){
+  sub("_md5.*", "", filename)
+  sub(".tif.*", "", filename)
+}
+# Loop through each geotiff file
+for (i in seq_along(tiffes)) {
+  # Get the current tiff file
+  tiff_file <- tiffes[i]
+  
+  # Load the current geotiff (don't load all at once)
+  access <- rast(tiff_file)
+  
+  # Apply crop and mask operations to each polygon
+  cropped <- map(1:length(poly), function(x) crop(access, poly[[x]]))
+  masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
+  
+  # Extract the base filename before 'md5'
+  base_filename <- clean_filename(basename(tiff_file))
+  
+  # Write the cropped and masked rasters to files
+  map(1:length(masked), function(x) {
+    writeRaster(masked[[x]], paste0(outpath,"/", base_filename, "_", nam[x], ".tif"), overwrite = TRUE)
+  })
+  # Optionally, clear the variable to free up memory
+  rm(access, cropped, masked)
+  gc()  # Garbage collection to clear memory
+}
+```
+
+
+# By Income level
+```{r cropmask}
 rs <- lapply(tiffes, rast) 
-
-rs <- rs[-3]
-
-biomes <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/global_products/biomes_WWF.gpkg')
-
-
-nam <- sort(biomes$BIOME)
-
-biomes <- biomes %>% split(.$BIOME)
-
+# Pending to add: run this in parallel!
 # Apply cropping and masking recursively using lapply and map
 rs_msk <- lapply(rs, function(raster) {
-  map(biomes, function(polygon) {
+  map(poly, function(polygon) {
     # Crop the raster to the extent of the polygon
     cropped_raster <- crop(raster, polygon)
     masked_raster <- mask(cropped_raster, polygon)
@@ -82,7 +114,7 @@ rs_msk <- lapply(rs, function(raster) {
   })
 })
 
-outpath <- '~/Documents/Natural_capital/Global_mapping/rest_masked_biomes'
+outpath
 # Use lapply to iterate over each list in nested_list
 lapply(seq_along(rs_msk), function(i) {
   # For each outer list, iterate through the inner list (rasters)
@@ -110,6 +142,7 @@ summary_df <- map2_dfr(seq_along(rs_msk), rs_msk, function(i, inner_list) {
 ```
 
 # Split by Countries/continents
+
 
 # mask by protected areas (all togeter, chategories I-VI)
 
