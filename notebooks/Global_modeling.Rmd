@@ -49,8 +49,8 @@ Use vector file, just the main biomes.
 Countries
 ```{r filter out PAs}
 poly <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
-nam <- sort(unique(poly$income_grp))
-poly <- poly%>%split(.$income_grp)
+nam <- sort(unique(poly$region_wb))
+poly <- poly%>%split(.$region_wb)
 nam <- gsub("[[:punct:]]", "", nam) # Remove punctuation
 nam <- gsub(" ", "_", nam) # Replace spaces with underscores
 ```
@@ -58,7 +58,7 @@ nam <- gsub(" ", "_", nam) # Replace spaces with underscores
 ```{r select data to process}
 
 inpath <- "~/Documents/MN_Applied_Economics/Global_ES_mapping/Downloaded_data" 
-outpath <- "~/Documents/MN_Applied_Economics/Global_ES_mapping/Income_level"
+outpath <- "~/Documents/MN_Applied_Economics/Global_ES_mapping/region_wb"
 # do not include data with a differnet crs here, we will deal with that on the next chunk.
 
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
@@ -108,20 +108,24 @@ for (i in seq_along(tiffes)) {
 
 
 # By Income level
+# Region Wb
 ```{r cropmask}
 rs <- lapply(tiffes, rast) 
 # Pending to add: run this in parallel!
 # Apply cropping and masking recursively using lapply and map
-rs_msk <- lapply(rs, function(raster) {
-  map(poly, function(polygon) {
-    # Crop the raster to the extent of the polygon
+
+num_cores <- 6
+# Parallelize the outer loop using mclapply
+rs_msk <- mclapply(rs, function(raster) {
+  # Use lapply for the inner loop
+  lapply(poly, function(polygon) {
+    # Crop and mask the raster
     cropped_raster <- crop(raster, polygon)
     masked_raster <- mask(cropped_raster, polygon)
     return(masked_raster)
   })
-})
+}, mc.cores = num_cores) 
 
-outpath
 # Use lapply to iterate over each list in nested_list
 lapply(seq_along(rs_msk), function(i) {
   # For each outer list, iterate through the inner list (rasters)
@@ -134,7 +138,10 @@ lapply(seq_along(rs_msk), function(i) {
     writeRaster(rs_msk[[i]][[j]], file_name, overwrite = TRUE)
   })
 })
+```
 
+
+```{r}
 summary_df <- map2_dfr(seq_along(rs_msk), rs_msk, function(i, inner_list) {
   
   # i corresponds to the index of the outer list (e.g., 1, 2, 3...)
@@ -237,12 +244,13 @@ mat_1 <- crosstabm(esas[[1]],esas[[2]])
 
 diffs_p <-  diffTablej(mat, digits=3, analysis = "change")
 
+
 ```
-
-
+git remote set-url origin git@github.com:springinnovate/nbs_op.git
 # Get Change Maps 
 
-```{r calculate change maps}
+```{r calculate 
+change maps}
 
 inpath <- '~/Documents/MN_Applied_Economics/Global_ES_mapping/ESA_LC'
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
