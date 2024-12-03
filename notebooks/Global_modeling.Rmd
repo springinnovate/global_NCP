@@ -50,9 +50,11 @@ Countries
 ```{r filter out PAs}
 poly <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
 nam <- sort(unique(poly$region_wb))
-poly <- poly%>%split(.$region_wb)
+poly <- poly %>% filter(region_wb!="Antarctica")
 nam <- gsub("[[:punct:]]", "", nam) # Remove punctuation
 nam <- gsub(" ", "_", nam) # Replace spaces with underscores
+nam <- sort(unique(poly$region_wb))
+poly <- poly%>%split(.$region_wb)
 ```
 
 ```{r select data to process}
@@ -95,6 +97,8 @@ for (i in seq_along(tiffes)) {
   
   # Extract the base filename before 'md5'
   base_filename <- clean_filename(basename(tiff_file))
+  base_filename <- gsub("[[:punct:]]", "", base_filename) # Remove punctuation
+base_filename <- gsub(" ", "_", base_filename) # Replace spaces with underscores
   
   # Write the cropped and masked rasters to files
   map(1:length(masked), function(x) {
