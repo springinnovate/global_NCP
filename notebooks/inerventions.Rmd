@@ -368,9 +368,43 @@ This second part has implicit a couple of assumptions:
 3. Somehow it is important to weigh the whole thing by total downstream beneficiaries/population  (by the way, is this data related to all services or only some of them)
 4. Additional issue:coastal risk protection onpy occurs at the coast, obviously, any random sampling performed will haveto consider this. Deal with this later. 
 
+
+
+This approach utilizes a stratified random sampling technique to estimate the mean values of different bands in a multi-band raster dataset. Stratified random sampling is a probability sampling method where the population is divided into homogeneous subgroups called strata, and random samples are taken from each stratum. In this case, the strata are defined by the spatial extent of the raster dataset, and the pixels within the raster represent the individual sampling units.
+
+Methodology
+
+Define the Area of Interest: The first step is to define the area of interest (AOI) within the raster dataset. This AOI represents the spatial extent from which the samples will be drawn. In this specific case, the AOI is defined as 30,000 hectares.
+
+Calculate the Sample Size: Based on the resolution of the raster and the desired AOI, the required number of pixels to be sampled is calculated. This ensures that the total area covered by the sampled pixels corresponds to the defined AOI.
+
+Perform Stratified Random Sampling: The spatSample() function from the terra package in R is used to perform stratified random sampling. This function allows for random sampling of pixels within the defined AOI, while also excluding pixels with "NA" values in all bands, ensuring that only valid data points are included in the analysis.
+
+Repeat Sampling: To reduce potential sampling bias and improve the accuracy of the estimates, the random sampling process is repeated multiple times (in this case, 30 times). This is analogous to the concept of bootstrapping, where repeated sampling with replacement is used to estimate the sampling distribution of a statistic.
+
+Calculate Summary Statistics: For each repetition, the mean, standard deviation, and 95% confidence intervals are calculated for each band in the raster dataset. This provides a measure of the central tendency and variability of the sampled data.
+
+Synthesize Results: The results from all repetitions are combined to calculate an overall mean and confidence interval for each band. This provides a more robust estimate of the expected values, effectively correcting for potential outliers and reducing the influence of individual sample variations.
+
+Theoretical Justification
+
+The use of stratified random sampling is justified as it ensures that the sample is representative of the entire population (i.e., all pixels within the AOI). By dividing the population into strata and sampling from each stratum, this method reduces the variability of the estimates compared to simple random sampling. This is particularly important when dealing with spatial data, where there may be inherent spatial autocorrelation or heterogeneity.
+
+The repeated sampling approach further enhances the robustness of the estimates by providing a distribution of possible values. This allows for the calculation of confidence intervals, which provide a measure of the uncertainty associated with the estimates. By synthesizing the results from multiple repetitions, the overall estimates are less susceptible to the influence of individual sample variations and provide a more accurate representation of the true population values.
+
+References
+
+Cochran, W. G. (1977). Sampling techniques (3rd ed.). John Wiley & Sons.
+Lohr, S. L. (2010). Sampling: Design and analysis (2nd ed.). Brooks/Cole. 1    
+1.
+www.researchgate.net
+www.researchgate.net
+Bivand, R. S., Pebesma, E. J., & Gómez-Rubio, V. (2013). Applied spatial data analysis with R (2nd ed.). Springer.
+
+
 ## 4.1 Espirito Santo
 
-## 4.1 Prepare Data Esp Santo.
+### 4.1.1 Prepare Data Esp Santo.
 
 ```{r filter data 1}
 serv <- rast(here("Interventions", "Brazil_intervention", "esp_santo_bkg.tif"))
@@ -402,9 +436,72 @@ serv_1 <- lapply(serv_1, function(r){
 map(1:length(serv_1), function(x) writeRaster(serv_1[[x]], paste0(here("Interventions", "Brazil_intervention"), '/', tf[x]), overwrite=TRUE))
 ```
 
-```{r define vars}
 
-sample <- sample_pixels(base_raster, 30000)
+### 4.1.2
+
+Here, we are finally sampling the data for obtain a rogh estiamte of the expected restoration gains asuming randomly selected pixels extracted form the potetnial restoration areas. Again, some asusmptions will have to be reviewed, but this is an initial assessment.
+
+
+```{r sampling targe area}
+
+serv_1 <- c(serv_1)
+rest_m <- rast(here('Interventions', 'Brazil_intervention', 'SS_griscom.tif'))
+rest_m <-project(rest_m, tt)
+tt <- mask(tt,rest_m)
+
+# Calculate the number of pixels needed for 30,000 hectares
+pixel_area <- 30 * 30  # Area of a single pixel in square meters (30m resolution)
+hectare_area <- 10000  # Area of one hectare in square meters
+pixels_needed <- round((30000 * hectare_area) / pixel_area)
+
+# Number of repetitions
+n_repetitions <- 30
+# Function to perform the sampling and calculations
+sample_and_calculate <- function(i, raster, pixels_needed) {
+  # Sample pixels and directly extract values
+  sample_values <- spatSample(raster, size = pixels_needed, 
+                              method = "random", 
+                              na.rm = TRUE, 
+                              as.points = FALSE,  # No need for points
+                              xy = FALSE,       # No need for coordinates
+                              values = TRUE)    # Get cell values directly
+
+  # Calculate summary statistics (directly on sample_values)
+  band_stats <- apply(sample_values, 2, function(x) { 
+    mean_val <- mean(x)
+    sd_val <- sd(x)
+    n_val <- length(x)
+    se_val <- sd_val / sqrt(n_val)
+    margin_error <- qt(0.975, df = n_val - 1) * se_val
+    lower_ci <- mean_val - margin_error
+    upper_ci <- mean_val + margin_error
+    return(c(mean = mean_val, lower_ci = lower_ci, upper_ci = upper_ci))
+  })
+
+  band_stats_df <- as.data.frame(t(band_stats))
+  band_stats_df$repetition <- i
+  return(band_stats_df)
+}
+
+# Using mclapply (parallel processing)
+num_cores <- 12
+results_list <- mclapply(1:n_repetitions, sample_and_calculate, 
+                         raster = tt, 
+                         pixels_needed = pixels_needed,
+                         mc.cores = num_cores) 
+
+# Combine all results into a single data frame
+all_results <- do.call(rbind, results_list)
+
+# Print the final data frame
+print(all_results)
+
+```
+
+
+```{r run samplingand estimate potential values}
+
+ttsample <- sample_pixels(base_raster, 30000)
 set.seed(123) 
 num_iterations <- 30
 target_area_ha <- 1000 # Target area in hectares
