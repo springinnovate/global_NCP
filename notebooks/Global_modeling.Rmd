@@ -5,8 +5,6 @@ output: html_notebook
 
 ####################################################################### 
 
-Second part with Justin.
-
 # Explore Data.
 
 The ecorregions Raster is not suited, 830 different values. Could be
@@ -46,7 +44,7 @@ Use vector file, just the main biomes.
 
 # Load Data
 
-Countries
+By World Bank Region
 ```{r filter out PAs}
 poly <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
 nam <- sort(unique(poly$region_wb))
@@ -57,10 +55,25 @@ nam <- sort(unique(poly$region_wb))
 poly <- poly%>%split(.$region_wb)
 ```
 
+
+By Country
+```{r filter out PAs}
+poly <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
+poly <- poly %>% group_by(iso3) %>% summarize(geom =st_union(geom)) %>% ungroup()
+#Exclude countries/territories too far North/South
+exclude_iso3 <- c("ATA", "FRO", "ISL", "FIN", "GRL", "NOR")
+# Filter the sf object
+poly <- poly %>% filter(!iso3 %in% exclude_iso3)
+nam <- sort(unique(poly$iso3))
+poly <- poly%>%split(.$iso3)
+```
+
+
+
 ```{r select data to process}
 
 inpath <- "~/Documents/MN_Applied_Economics/Global_ES_mapping/Downloaded_data" 
-outpath <- "~/Documents/MN_Applied_Economics/Global_ES_mapping/region_wb"
+outpath <- "~/Documents/MN_Applied_Economics/Global_ES_mapping/country"
 # do not include data with a differnet crs here, we will deal with that on the next chunk.
 
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
@@ -80,7 +93,7 @@ This runs the same process in batch. Memory was optimized to not load all the da
 
 ```{r iterate cropMask, eval=FALSE, include=FALSE}
 clean_filename <- function(filename){
-  sub("_md5.*", "", filename)
+  #sub("_md5.*", "", filename)
   sub(".tif.*", "", filename)
 }
 # Loop through each geotiff file
@@ -97,8 +110,8 @@ for (i in seq_along(tiffes)) {
   
   # Extract the base filename before 'md5'
   base_filename <- clean_filename(basename(tiff_file))
-  base_filename <- gsub("[[:punct:]]", "", base_filename) # Remove punctuation
-base_filename <- gsub(" ", "_", base_filename) # Replace spaces with underscores
+  #base_filename <- gsub("[[:punct:]]", "", base_filename) # Remove punctuation
+#base_filename <- gsub(" ", "_", base_filename) # Replace spaces with underscores
   
   # Write the cropped and masked rasters to files
   map(1:length(masked), function(x) {
