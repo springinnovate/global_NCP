@@ -58,8 +58,6 @@ easonable first step when dealing with multiple rasters of different units.
 Sound methodology when no location-based prioritization is assumed.
 Repeating the sampling process  assuming  Central Limit Theorem
 Summarize results with mean and confidence intervals.
-
-The described workflow is computationally intensive but manageable with modern spatial libraries like terra in R or GDAL in Python.
 Repeated sampling is straightforward to automate.
 
 
@@ -96,7 +94,7 @@ Because of course
 
 library(terra)
 
-align_rasters <- function(raster_list, template, resample_method = "near") {
+align_rasters <- function(raster_list, template, resample_method = "bilinear") {
   lapply(raster_list, function(r) {
     if (!compareGeom(r, template, stopOnError = FALSE)) {
       message("Aligning raster: ", names(r))
@@ -129,7 +127,7 @@ process_rasters <- function(nested_list, templates, resample_method = "bilinear"
     # Stack all aligned rasters into a single multiband SpatRaster
     stacked <- do.call(c, aligned)
     
-    # Merge the stacked raster with the corresponding template raster
+   tmp # Merge the stacked raster with the corresponding template raster
     merged <- merge(stacked, templates[[i]])
     
     # Sum the layers of the merged raster
@@ -186,7 +184,7 @@ process_intervention_area <- function(raster_list) {
 #Restoration:
 tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= '.tif$'))
 #Remove points, risk reduction baselin    
-tiffes <- tiffes[c(1:5,51:55,71:75,81:90, 106:110)]
+tiffes <- tiffes[c(1:5,51:55,71:75,81:90,106:110)]
 #tiffes <- tiffes[-c(6:10)]
 #tiffes <- tiffes[c(6:10)]
 ```
@@ -237,14 +235,13 @@ map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here("restorat
 
 ## 2.3 Load Adjusted Griscom Restoration Data and apply mask
 
-Use the adjusted Griscom restoration data (deals with pixel values encoding issues in the original data, had to get the metadadata for that). 
+Use the adjusted Griscom restoration data (deals with pixel values encoding issues in the original data, had to get the metadadata for that). The data is tored in the same restoration_combined directory
 
 ```{r load Griscoms data, eval=FALSE, include=FALSE}
 # Load Griscom Data
 tiffes <- file.path(here("Restoration_Griscom"), list.files(paste0(here("Restoration_Griscom")),pattern= 'rec'))
 
 pa_rc <- lapply(tiffes,rast)
-
 
 baseES_m <- map2(
   baseES, 
@@ -255,18 +252,17 @@ baseES_m <- map2(
   }
 )
 
-
 map(1:length(baseES), function(x) writeRaster(baseES_m[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], '_ES_msk.tif'), overwrite=T))
-
 ```
 
 
 # 3 Interventions
 
-## 3.1 Load Intervention Data back
+
+Load Intervention Data back
 
 ```{r load intevention data}
-tiffes <- file.path(here("restoration_combined"), list.files(paste0(here("restoration_combined")),pattern= 'ES'))
+tiffes <- file.path(here("restoration_combined"), list.files(paste0(here("restoration_combined")),pattern= 'ES_msk'))
 
 
 baseES_m <- lapply(tiffes, rast)
@@ -275,7 +271,7 @@ baseES_m <- lapply(tiffes, rast)
 
 ## 3.1 Brazil Espiritu Santo
 ```{r brazil intervention}
-poly <- st_read(here("Interventions", "Brazil", "Espirito_Santo_Albers.shp"))
+poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
 pol_wgs <- st_transform(poly, crs=crs(baseES_m[[1]]))
 serv_bra <- baseES_m[[1]] %>% crop(pol_wgs) %>% mask(pol_wgs)
 serv_bra <- project(serv_bra, crs(poly), method='cubic')
@@ -286,8 +282,19 @@ writeRaster(rest_sp, here("Interventions", "Brazil_intervention", "SS_griscom.ti
 
 ```
 
-## 3.2 Madagascar (Not Necessary To Mask for te Interrventions)
-```{r yucatan intervention}
+### 3.1.1 Prepare Template Brazil Espiritu Santo
+This just create a background of Zeroes to use as template for reprojecting (this is necessary because the access layer whic is on a different crs. Not ideal, but need to move forward)
+```{r brazil intervention}
+poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
+pol_wgs <- st_transform(poly, crs=crs(tmp[[1]]))
+serv_bra <- tmp[[1]] %>% crop(pol_wgs) %>% mask(pol_wgs)
+serv_bra <- project(serv_bra, crs(poly), res=30)
+writeRaster(serv_bra, here("Interventions", "Brazil_intervention", "esp_santo_bkg.tif"),overwrite=TRUE)
+
+```
+
+## 3.2 Madagascar (Not Necessary To Mask for te Interventions)
+```{r yucatan intervention, eval=FALSE, include=TRUE}
 poly <- st_read(here("Interventions", "Mex_intervention","mex_intervention2.geojson"))
 
 pol_wgs <- st_transform(poly, crs=crs(baseES_m[[3]]))
@@ -300,9 +307,8 @@ writeRaster(rest_sp, here("Interventions", "Mdg_intervention", "mdg_griscom.tif"
 
 ```
 
-
 ## 3.3  Yucatan
-```{r yucatan intervention}
+```{r yucatan intervention, eval=FALSE, include=FALSE}
 poly <- st_read(here("Interventions", "Mex_intervention","mex_intervention2.geojson"))
 
 pol_wgs <- st_transform(poly, crs=crs(baseES_m[[3]]))
@@ -316,7 +322,7 @@ writeRaster(rest_mex, here("Interventions", "Mex_intervention", "Mex_griscom.tif
 ```
 
 ## 3.3  Peru
-```{r Madre De Dios intervention}
+```{r Madre De Dios intervention, eval=FALSE, include=FALSE}
 pol <- st_read(here("Interventions","Peru","Intervenciones", "commondata","ganaderia","GANADERIA.shp"))
 pol <- st_make_valid(pol)
 st_write(pol, here("Interventions", "ganaderia.shp"))
@@ -347,11 +353,54 @@ writeRaster(mask_all, here("Interventions", "Peru_intervention","MDDmask_final.t
 writeRaster(mks_peru, here("Interventions", "Peru_intervention","MDDEES_final.tif"), overwrite=TRUE)
 
 ```
-_griscom.tif"), overwrite=TRUE)
 
+## 3.4 Vietnam
+
+Pending...
+
+# 4 Sampling and Extracting values
+This will be dealt on a two part basis:
+1.Identify the hectares that yield the maximum aggregated restoration values withing the Griscom restoration potential pixels. Contingent on the entry assumptions
+2. Model the estimated values of ES gains for the services based on a random sampling.
+This second part has implicit a couple of assumptions: 
+1.  We are not considering any spatial configuration (landscape metrics) aspects affecting the total value
+2. We should add additional parameters (e.g minimum distance to boundaries, distance between points, topography or inhabited areas (maybe that is implicit in the input data/masks)
+3. Somehow it is important to weigh the whole thing by total downstream beneficiaries/population  (by the way, is this data related to all services or only some of them)
+4. Additional issue:coastal risk protection onpy occurs at the coast, obviously, any random sampling performed will haveto consider this. Deal with this later. 
+
+## 4.1 Espirito Santo
+
+## 4.1 Prepare Data Esp Santo.
+
+```{r filter data 1}
+serv <- rast(here("Interventions", "Brazil_intervention", "esp_santo_bkg.tif"))
+a_files <- tiffes[grep("BRAZIL", tiffes)]
+#a_files <- a_files[2]
+serv_1 <- lapply(a_files, rast)
+tf <- basename(a_files)
+temp <- trim(project(serv, serv_1[[1]]))
+serv_1 <- lapply(serv_1, function(r){
+  r <- crop(r,temp, snap= "in", extend=TRUE)
+  if (!compareGeom(r, temp, stopOnError = FALSE)) {
+      message("Aligning raster: ", names(r))
+      # Resample to align with the template
+      resample(r, temp, method = "bilinear")
+    } else {
+      # Return raster as is if already aligned
+      message("Raster already aligned: ", names(r))
+      r
+    }
+  r <- trim(r)
+  #r <- mask(r,temp)
+r <- project(r, serv, method = 'bilinear')
+})
+
+serv_1 <- lapply(serv_1, function(r){
+  r <- mask(r,serv)
+})
+
+map(1:length(serv_1), function(x) writeRaster(serv_1[[x]], paste0(here("Interventions", "Brazil_intervention"), '/', tf[x]), overwrite=TRUE))
 ```
-
-## 3.4 Sampling and Extrayting values
 
 ```{r define vars}
 
