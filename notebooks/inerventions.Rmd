@@ -109,8 +109,6 @@ align_rasters <- function(raster_list, template, resample_method = "near") {
     }
   })
 }
-
-
 ```
 
 
@@ -128,7 +126,6 @@ process_rasters <- function(nested_list, templates, resample_method = "bilinear"
         r
       }
     })
-    
     # Stack all aligned rasters into a single multiband SpatRaster
     stacked <- do.call(c, aligned)
     
@@ -160,7 +157,7 @@ tmp <- lapply(lc, function(r){
 
 rm(lc)
 ```
-tfs <- 
+
 
 ## 1.4 Function to Normalize Rasters
 ```{r normalize}
@@ -180,7 +177,7 @@ process_intervention_area <- function(raster_list) {
 }
 ```
 
-**Note**. Need to think if the normalization is best before or after masking, but i think after will provide slightly more detailed data, but i dont think it changes a lot
+**Note**. Need to think if the normalization is best before or after masking, but i think after will provide slightly more detailed data, but i don't think it changes a lot.
 
 # 2 Extract the data
 
@@ -196,7 +193,8 @@ tiffes <- tiffes[c(1:5,51:55,71:75,81:90, 106:110)]
 
 ## 2.2 Load and Sort the layers
 
-Also run the normalization nand add them together
+Also run the normalization and add them together
+This represents a proxy for the total ES provided(with some assumptions that need to be eventually reviewed and refined) 
 ```{r apply mask AOI AP, eval=TRUE, include=FALSE}
 
 # Step 1: Extract file names, product names, and country names
@@ -233,14 +231,15 @@ baseES <- split(baseES, rep(1:length(nam), each = num))
 
 # align, add background and sum all the values
 baseES <- process_rasters(baseES,tmp, resample_method = "bilinear")
-map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here("restoration"),'/', unique(country_names)[[x]], '_ES_sum.tif')))
+map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], '_ES_sum.tif')))
 
 ```
 
-## 2.3 Load Griscom Data and apply mask
+## 2.3 Load Adjusted Griscom Restoration Data and apply mask
 
+Use the adjusted Griscom restoration data (deals with pixel values encoding issues in the original data, had to get the metadadata for that). 
 
-```{r load Griscoms data}
+```{r load Griscoms data, eval=FALSE, include=FALSE}
 # Load Griscom Data
 tiffes <- file.path(here("Restoration_Griscom"), list.files(paste0(here("Restoration_Griscom")),pattern= 'rec'))
 
@@ -257,12 +256,22 @@ baseES_m <- map2(
 )
 
 
-map(1:length(baseES), function(x) writeRaster(baseES_m[[x]], paste0(here("restoration"),'/', unique(country_names)[[x]], '_ES_msk.tif'), overwrite=T))
+map(1:length(baseES), function(x) writeRaster(baseES_m[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], '_ES_msk.tif'), overwrite=T))
 
 ```
 
 
 # 3 Interventions
+
+## 3.1 Load Intervention Data back
+
+```{r load intevention data}
+tiffes <- file.path(here("restoration_combined"), list.files(paste0(here("restoration_combined")),pattern= 'ES'))
+
+
+baseES_m <- lapply(tiffes, rast)
+
+```
 
 ## 3.1 Brazil Espiritu Santo
 ```{r brazil intervention}
