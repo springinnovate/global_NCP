@@ -395,10 +395,8 @@ The repeated sampling approach further enhances the robustness of the estimates 
 References
 
 Cochran, W. G. (1977). Sampling techniques (3rd ed.). John Wiley & Sons.
-Lohr, S. L. (2010). Sampling: Design and analysis (2nd ed.). Brooks/Cole. 1    
+Lohr, S. L. (2010). Sampling: Design and analysis (2nd ed.). Brooks/Cole. 1  
 1.
-www.researchgate.net
-www.researchgate.net
 Bivand, R. S., Pebesma, E. J., & Gómez-Rubio, V. (2013). Applied spatial data analysis with R (2nd ed.). Springer.
 
 
@@ -442,12 +440,33 @@ map(1:length(serv_1), function(x) writeRaster(serv_1[[x]], paste0(here("Interven
 Here, we are finally sampling the data for obtain a rogh estiamte of the expected restoration gains asuming randomly selected pixels extracted form the potetnial restoration areas. Again, some asusmptions will have to be reviewed, but this is an initial assessment.
 
 
-```{r sampling targe area}
+#### 4.1.2.1
+Load the rasters
 
-serv_1 <- c(serv_1)
+
+
+```{r load intevention data}
+tiffes <- file.path(here("Interventions", "Brazil_intervention"), list.files(paste0(here("Interventions", "Brazil_intervention")),pattern= 'BRAZIL'))
+
+serv_1 <- lapply(tiffes, rast)
+serv_1 <- (do.call(c,serv_1))
+serv_1 <- trim(merge(serv_1,serv)) #add background of Zeros
+writeRaster(serv_1, paste0(here("Interventions", "Brazil_intervention"),'/', 'serv_BRAZIL.tif'), overwrite=TRUE)
+
+```
+
+```{r sampling targe area}
+serv_1 <- rast(here("Interventions", "Brazil_intervention",'/', 'serv_BRAZIL.tif'))
 rest_m <- rast(here('Interventions', 'Brazil_intervention', 'SS_griscom.tif'))
-rest_m <-project(rest_m, tt)
-tt <- mask(tt,rest_m)
+rcl <- matrix(c(
+  -Inf, 0, 0,  # Any value from -Infinity to 0 remains 0
+  0, Inf, 1   # Any value from 0 to Infinity becomes 1
+), ncol = 3, byrow = TRUE)
+rest_m <- classify(rest_m, rcl)
+
+rest_m <-project(rest_m, serv_1)
+rest_m <- terra::resample(rest_m, serv_1)
+serv_1 <- mask(serv_1,rest_m, maskvalues=0)
 
 # Calculate the number of pixels needed for 30,000 hectares
 pixel_area <- 30 * 30  # Area of a single pixel in square meters (30m resolution)
@@ -458,15 +477,28 @@ pixels_needed <- round((30000 * hectare_area) / pixel_area)
 n_repetitions <- 30
 # Function to perform the sampling and calculations
 sample_and_calculate <- function(i, raster, pixels_needed) {
-  # Sample pixels and directly extract values
+  # Sample pixels and directly extract values (without na.rm)
   sample_values <- spatSample(raster, size = pixels_needed, 
                               method = "random", 
-                              na.rm = TRUE, 
-                              as.points = FALSE,  # No need for points
-                              xy = FALSE,       # No need for coordinates
-                              values = TRUE)    # Get cell values directly
+                              na.rm = FALSE,  
+                              as.points = FALSE, 
+                              xy = FALSE,
+                              values = TRUE) 
 
-  # Calculate summary statistics (directly on sample_values)
+  # Remove rows where ALL values are NA
+  sample_values <- sample_values[rowSums(is.na(sample_values)) != ncol(sample_values), ]
+
+  # If not enough samples after removing NAs, resample
+  if (nrow(sample_values) < pixels_needed) {
+    sample_values <- rbind(
+      sample_values,
+      spatSample(raster, size = pixels_needed - nrow(sample_values),
+                 method = "random", na.rm = TRUE, 
+                 as.points = FALSE, xy = FALSE, values = TRUE)
+    )
+  }
+
+  # Calculate summary statistics
   band_stats <- apply(sample_values, 2, function(x) { 
     mean_val <- mean(x)
     sd_val <- sd(x)
@@ -480,21 +512,68 @@ sample_and_calculate <- function(i, raster, pixels_needed) {
 
   band_stats_df <- as.data.frame(t(band_stats))
   band_stats_df$repetition <- i
+
+  # Calculate sum of pixel values for each band
+  band_sums <- colSums(sample_values) 
+  band_stats_df$sum <- band_sums
+
   return(band_stats_df)
 }
 
 # Using mclapply (parallel processing)
-num_cores <- 12
+num_cores <- 15 
 results_list <- mclapply(1:n_repetitions, sample_and_calculate, 
-                         raster = tt, 
+                         raster = serv_1, 
                          pixels_needed = pixels_needed,
                          mc.cores = num_cores) 
 
+results_list <- lapply(results_list, function(df){
+  df <- df %>% mutate(band=rownames(df))
+})
+# Combine all results into a single data frame
+all_results <- as_tibble(do.call(rbind, results_list))
+
+# Extract band names from column names and repeat for each repetition
+band_names <- sub(".*_", "", names(all_results)[-ncol(all_results)])
+all_results$band <- rep(band_names, n_repetitions)
+
+df <-all_results %>%  filter(band!="nature_access_diff_Sc3v1_PNVnoag-esa2020")
+p <- ggplot(all_results, aes(x = band, y = sum)) +
+  geom_boxplot() +
+  labs(title = "Total estimated Service Gain in units for the target intevention area",
+       x = "Band",  # Keep the x-axis label for the overall plot
+       y = "Total Sum Value") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_blank(),  # Remove x-axis labels within facets
+    axis.ticks.x = element_blank(),  # Remove x-axis ticks within facets
+    strip.background = element_blank(),  # Remove facet label background
+    strip.text = element_text(face = "bold")  # Make facet labels bold
+  ) +
+  facet_wrap(~ band, scales = "free_y")  # Create facets with free y-axis scales
+# Summarize the results across repetitions for each band
+summarized_results <- all_results %>%
+  group_by(band) %>%  # Group by band 
+  summarize(
+    overall_mean = mean(mean),
+    mean_lower_ci = mean(lower_ci),
+    mean_upper_ci = mean(upper_ci),
+    total_sum = sum(sum) 
+  )
+
+
 # Combine all results into a single data frame
 all_results <- do.call(rbind, results_list)
-
-# Print the final data frame
-print(all_results)
+all_results <- as_tibble(all_results%>%mutate(band=rownames(all_results))) 
+# Summarize the results across repetitions for each band
+summarized_results <- all_results %>%
+  group_by(band, repetition) %>%  # Group by band only
+  summarize(
+    overall_mean = mean(mean),
+    mean_lower_ci = mean(lower_ci),
+    mean_upper_ci = mean(upper_ci),
+    total_sum = sum(sum) 
+  )
 
 ```
 
