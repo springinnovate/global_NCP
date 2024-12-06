@@ -467,11 +467,10 @@ rest_m <- classify(rest_m, rcl)
 rest_m <-project(rest_m, serv_1)
 rest_m <- terra::resample(rest_m, serv_1)
 serv_1 <- mask(serv_1,rest_m, maskvalues=0)
-
-# Calculate the number of pixels needed for 30,000 hectares
+pize# Calculate the number of pixels needed for 30,000 hectares
 pixel_area <- 30 * 30  # Area of a single pixel in square meters (30m resolution)
 hectare_area <- 10000  # Area of one hectare in square meters
-pixels_needed <- round((30000 * hectare_area) / pixel_area)
+pixels_needed <- round((30200 * hectare_area) / pixel_area)
 
 # Number of repetitions
 n_repetitions <- 30
@@ -533,100 +532,137 @@ results_list <- lapply(results_list, function(df){
 # Combine all results into a single data frame
 all_results <- as_tibble(do.call(rbind, results_list))
 
-# Extract band names from column names and repeat for each repetition
-band_names <- sub(".*_", "", names(all_results)[-ncol(all_results)])
-all_results$band <- rep(band_names, n_repetitions)
 
-df <-all_results %>%  filter(band!="nature_access_diff_Sc3v1_PNVnoag-esa2020")
-p <- ggplot(all_results, aes(x = band, y = sum)) +
+# Add new columns with the service names and units.
+all_results <- all_results %>%
+  mutate(Service = case_when(
+    band == "cv_habitat_value_Sc3v1-ESAmod2_v2_md5_64082b" ~ "Coastal Protection",
+    band == "nature_access_diff_Sc3v1_PNVnoag-esa2020" ~ "Nature Access",
+    band == "nitrogen_ESAmod2-Sc3v1_md5_024a36" ~ "Nitrogen Export",
+    band == "pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag-esa2020_md5_405c88" ~ "Pollination",
+    band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "Pollination (people fed on Hab)",
+    band == "sediment_ESAmod2-Sc3v1_md5_149078" ~ "Sediment Export",
+    # ... add more cases for other bands ...
+    TRUE ~ band  # Keep the original band name if no match
+  ))
+
+all_results <- all_results %>%
+  mutate(units = case_when(
+    band == "cv_habitat_value_Sc3v1-ESAmod2_v2_md5_64082b" ~ "Risk Reduction Index",
+    band == "nature_access_diff_Sc3v1_PNVnoag-esa2020" ~ "People within 1 hour",
+    band == "nitrogen_ESAmod2-Sc3v1_md5_024a36" ~ "Nitrogen Export (kg/ha/year)",
+    band == "pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag-esa2020_md5_405c88" ~ "Pollination (equivalent people fed)",
+    band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "Pollination (people fed on hab)",
+    band == "sediment_ESAmod2-Sc3v1_md5_149078" ~ "Sediment Export (ton/kg/year)",
+    # ... add more cases for other bands ...
+    TRUE ~ band  # Keep the original band name if no match
+  ))
+
+all_results <- all_results %>%
+  mutate(color = case_when(
+    band == "cv_habitat_value_Sc3v1-ESAmod2_v2_md5_64082b" ~ "#7a0177",
+    band == "nature_access_diff_Sc3v1_PNVnoag-esa2020" ~ "#A57C00",
+    band == "nitrogen_ESAmod2-Sc3v1_md5_024a36" ~ "#2c944c",
+    band == "pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag-esa2020_md5_405c88" ~ "#dd1c77",
+    band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "#dd1b56",
+    band == "sediment_ESAmod2-Sc3v1_md5_149078" ~ "#08306b",
+    # ... add more cases for other bands ...
+    TRUE ~ band  # Keep the original band name if no match
+  ))
+
+ 
+df <-all_results %>%  filter(band!="nature_access_diff_Sc3v1_PNVnoag-esa2020") %>% filter(band!= "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790")
+# Assuming your 'all_results' data frame has the columns 'Service', 'units', and 'color'
+# Assuming your 'all_results' data frame has the columns 'Service', 'units', and 'color'
+
+# Generate the ggplot object
+plot <- ggplot(df, aes(y = sum, fill = color)) +
   geom_boxplot() +
-  labs(title = "Total estimated Service Gain in units for the target intevention area",
-       x = "Band",  # Keep the x-axis label for the overall plot
+  labs(title = str_wrap("Total estimated service change in units for the target intervention area - Espirito Santo", width = 50), 
        y = "Total Sum Value") +
   theme_bw() +
   theme(
-    axis.text.x = element_blank(),  # Remove x-axis labels within facets
-    axis.ticks.x = element_blank(),  # Remove x-axis ticks within facets
-    strip.background = element_blank(),  # Remove facet label background
-    strip.text = element_text(face = "bold")  # Make facet labels bold
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank(),
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"  # Remove legend since color is already mapped
   ) +
-  facet_wrap(~ band, scales = "free_y")  # Create facets with free y-axis scales
-# Summarize the results across repetitions for each band
-summarized_results <- all_results %>%
-  group_by(band) %>%  # Group by band 
-  summarize(
-    overall_mean = mean(mean),
-    mean_lower_ci = mean(lower_ci),
-    mean_upper_ci = mean(upper_ci),
-    total_sum = sum(sum) 
-  )
+  scale_fill_identity() + 
+  facet_wrap(~ Service, scales = "free_y", labeller = labeller(Service = label_wrap_gen(width = 10))) +  
+  scale_y_continuous(labels = function(x) {
+    if (max(x, na.rm = TRUE) > 100000) {
+      paste0(format(x / 1000, big.mark = ".", decimal.mark = ","), "k")
+    } else {
+      format(x, big.mark = ".", decimal.mark = ",")
+    }
+  }) 
 
 
-# Combine all results into a single data frame
-all_results <- do.call(rbind, results_list)
-all_results <- as_tibble(all_results%>%mutate(band=rownames(all_results))) 
-# Summarize the results across repetitions for each band
-summarized_results <- all_results %>%
-  group_by(band, repetition) %>%  # Group by band only
-  summarize(
-    overall_mean = mean(mean),
-    mean_lower_ci = mean(lower_ci),
-    mean_upper_ci = mean(upper_ci),
-    total_sum = sum(sum) 
-  )
 
+# Create a table grob for the units with smaller font size
+unit_table <- tableGrob(unique(all_results[, c("Service", "units")]), 
+                        theme = ttheme_minimal(base_size = 8))  # Adjust base_size as needed
+
+# Draw the plot and the unit table using grid
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 1, ncol = 2, widths = c(3, 1))))  # Adjust widths as needed
+
+# Draw the plot in the first column
+pushViewport(viewport(layout.pos.col = 1))
+grid.draw(plot)
+popViewport()
+
+# Draw the unit table in the second column with adjusted position
+pushViewport(viewport(layout.pos.col = 2, x = unit(0.8, "npc")))  # Adjust x as needed
+grid.draw(unit_table)
+popViewport()
+
+
+
+
+
+# Create a table grob for the units
+unit_table <- tableGrob(unique(all_results[, c("Service", "units")]), 
+                        theme = ttheme_minimal())
+
+# Arrange the plot and the unit table using gridExtra
+grid.arrange(plot, unit_table, ncol = 2, widths = c(3, 1))  # Adjust widths as needed
+
+
+
+
+
+
+
+
+
+
+# Draw the modified gtable
+grid.newpage()
+grid.draw(gt)
+
+
+## Draw the plot and add unit labels using grid
+grid.newpage()
+grid.draw(plot)
+
+# Get the viewport for each facet
+vp <- viewport(layout = grid.layout(nrow = 3, ncol = 2))  # Adjust nrow/ncol as needed
+pushViewport(vp)
+
+# Loop through facets and add unit labels (Corrected)
+for (i in seq_along(unit_grobs)) {
+  pushViewport(viewport(layout.pos.row = ceiling(i / 2), layout.pos.col = i %% 2 + 1))
+  # Add a new viewport for the unit label to the left of the y-axis
+  pushViewport(viewport(x = unit(0.0, "npc"), y = unit(0.5, "npc"), width = unit(0.1, "npc"), height = unit(1, "npc"), just = "left"))
+  grid.draw(unit_grobs[[i]])
+  popViewport()  # Pop the unit label viewport
+  popViewport()  # Pop the facet viewport
+}
 ```
 
-
-```{r run samplingand estimate potential values}
-
-ttsample <- sample_pixels(base_raster, 30000)
-set.seed(123) 
-num_iterations <- 30
-target_area_ha <- 1000 # Target area in hectares
-
-# Perform sampling and summarize results
-sampling_results <- replicate(num_iterations, {
-  sampled_raster <- sample_pixels(normalized_raster, target_area_ha)
-  # Extract mean value for each service
-  colMeans(as.data.frame(sampled_raster))
-}, simplify = "matrix")
-
-# Summarize results
-sampling_summary <- data.frame(
-  Service = names(sampling_results),
-  Mean = rowMeans(sampling_results),
-  SD = apply(sampling_results, 1, sd),
-  CI_lower = rowMeans(sampling_results) - 1.96 * apply(sampling_results, 1, sd) / sqrt(num_iterations),
-  CI_upper = rowMeans(sampling_results) + 1.96 * apply(sampling_results, 1, sd) / sqrt(num_iterations)
-)
-
-```
-
-
-rast1 <- rast(here("Interventions", "Brazil_intervention", "SS_griscom.tif"))
-rast2 <- rast(here("Interventions", "Mex_intervention", "Mex_griscom.tif"))
-rast3 <- rast(here("Interventions", "Peru_intervention", "MDDmask_final.tif"))
-rast1 <- project(rast1, crs(poly))
-rast2 <- project(rast2, crs(poly))
-
-
-msg <- list(rast1,rast2,rast3)
-
-ar_m <- lapply(msg, lsm_c_ca)
-
-ct <- c("Espirito Santo", "Made de Dios", "Yucatan")
-ar_m[[3]] <- ar_m[[3]] %>% mutate(Intervention = ct[3])
-#######
-
-
-mdg <- pa_rc[[2]]
-mex <- rest_mex
-per1 <- rest_per # Griscom Peru]
-per2 <- msk_p #all modeled rest non zero values maybe merge
-per3 <- max(per1,per2)
-VN
-```
 
 
 
