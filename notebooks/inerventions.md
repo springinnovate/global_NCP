@@ -2,81 +2,128 @@
 title: "Preliminary Intervention Assesment NBS"
 subtitle: "Espirito Santo & Yucatan Peninsula"
 output:
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 editor_options:
   markdown:
     wrap: 72
 ---
 
+# 1. Introduction
+
+This document provides a preliminary assessment of the  potential ecosystem service gains from
+restoration activities across five study areas. The current focus is on
+**Espírito Santo (Brazil)** and **Yucatán Peninsula (Mexico)**, with
+Peru (Madre de Dios), Madagascar (Diana Northen), and Vietnam (Northern
+Amannites) following.
+
+## 1.1 Purpose
+
+Estimate the potential ecosystem service value gains if restoration is
+distributed across target areas.
+
+## 1.2 Objectives
+
+1.  Identify high-value pixels for restoration.
+2.  Estimate total ecosystem service provision (ES) gains under random
+    distribution.
+3.  Represent uncertainty with confidence intervals and spatial
+    distributions.
+
+## 1.3 Theoretical Assumptions
+
+-   All ecosystem services are equally valued.
+-   Restoration likelihood is uniform across intervention areas.
+-   Pixel values are independent; no spatial autocorrelation considered.
+-   Confidence intervals provide robust estimates under random
+    distribution scenarios.
+
+------------------------------------------------------------------------
+
+# 2. Study Areas
+
+## 2.1 Brazil - Espírito Santo
+
+Espírito Santo represents a priority intervention area for restoration
+activities. The target area spans **30,200 hectares**.
+
+## 2.2 Mexico - Yucatán Peninsula
+
+The Yucatán Peninsula analysis includes two main intervention areas: the
+Jaguar Corridor and adjacent restoration polygons. The target
+intervention area spans **15,000 hectares**.
+
+## 2.3 Additional Intervention Areas.
+
+-   Peru - Madre de Dios
+-   Madagascar
+-   Vietnam
+
+------------------------------------------------------------------------
+
+# 3. Methods
+
+## 3.1 Data Sources
+
+-   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping
+    the planet’s critical natural
+    assets](https://www.nature.com/articles/s41559-022-01934-5).
+-   **Restoration Potential:** Adjusted Griscom restoration data.
+-   **Raster Processing Tools:** `terra`, `dplyr`, and `sf` packages in
+    R.
+
+## 3.2 Evaluated Services
+
+The data asseses here is expressedin terms of the potential gain in units of the provided services if the targeted areas is restored to a natural/seminatural state.
+
+1.  Coastal Protection. Unit less measure, refers to a vulnerability
+    index. [**InVEST Coastal Vulnerability
+    Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
+
+2.  Nitrogen Export. Derived from the Nitrogen retention modeled using
+    the [**InVEST Nutrient Delivery
+    Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
+    Expressed in kg/pixel/year
+
+3.  Sediment Retention. Derived using [**InVEST SDR: Sediment Delivery
+    Ration**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html).
+    Values in ton/pixel/year
+
+4.  Pollination. Derived from [**InVEST SDR: Pollinator Abundance
+    Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html).
+    Units expressed on *equivalent people feed*. More information in
+    [**Chaplin-Kramer, et al.
+    2022**](https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-022-01934-5/MediaObjects/41559_2022_1934_MOESM1_ESM.pdf)
+
+5.  Nature Access represented as *the number of people within 1 hour
+    travel of natural and semi-natural lands* (Chaplin-Kramer et al,
+    2022).
+
+## 3.3 Data Preparation
+
+### 3.3.1 Normalization of Ecosystem Service Rasters
+
+This formula was used to normalize the raster values:
+
+$$
+\text{Normalized Value} = \frac{\text{Raster Value} - \text{Min Value}}{\text{Max Value} - \text{Min Value}}
+$$
+
+Where: - $\text{Raster Value}$ is the value of a given pixel. -
+$\text{Min Value}$ and $\text{Max Value}$ represent the minimum and
+maximum observed values across the raster dataset.
+
+This step ensures that services with different units (e.g., tons,
+kilograms, or people) can be aggregated without bias toward any single
+service.
+
+Once normalized, the ecosystem service rasters were summed to create a composite raster that represents the aggregated value of all services. This approach assumes equal importance of all ecosystem services, meaning no weighting was applied at this stage. **Note**. Next iteration will include population-based weights. 
 
 
-A framework to assess the potential ecosystem service gains from restoration across five landscapes.
+### 3.3.2 Prepare Environemnt
 
-# Purpose
-
-Estimate the potential value of ecosystem services provision gain  if the target surface is distributed randomly across the intervention areas.
-
-
-The ecosystem data included here is derived from Chaplin-Kramer et. al (2022) [**Mapping the planet’s critical natural assets**](https://www.nature.com/articles/s41559-022-01934-5)
-
-
-1. Coastal Protection. Unitless measure, refers to a vulnerability index. [**InVEST Coastal Vulnerability Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
-
-2. Nitrogen Export. Derived from the Nitrogen retention modeled using the [**InVEST Nutrient Delivery Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html). Expressed in kg/pixel/year
-
-3. Sediment Retention. Derived using [**InVEST SDR: Sediment Delivery Ration**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html). Values in ton/pixel/year
-
-4. Pollination. Derived from [**InVEST SDR: Pollinator Abundance Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html). Units expressed on *equivalent people feed*.
- More information in [**Chaplin-Kramer, et al. 2022**](https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-022-01934-5/MediaObjects/41559_2022_1934_MOESM1_ESM.pdf)
-
-5. Nature Access represented as *the number of people within 1 hour travel of natural and semi-natural lands* (Chaplin-Kramer et al, 2022).
-: 
-# Main Objectives:
-
-- Identify High-Value Pixels: Focus restoration on areas where ecosystem service gains are maximized.
-- Estimate Total Gains: If restoration is distributed randomly over a target area, what is the expected ecosystem service value?
-
-- Represent uncertainty through confidence intervals and spatial distributions of selected pixels.
-
-# Methods:
-
-## Assumptions
-
-- All ecosystem services are equally valued.
-- Value is a constant function of service quantity.
-- Uniform likelihood of restoration across the intervention area unless constrained by inputs (e.g., masks, distance).
-- Independence of pixel values (no spatial autocorrelation considered in sampling)
-- Sampling provides a robust method for estimating random distribution effects.
-
-# Approach:
-
-- Normalize ecosystem service rasters to a 0-1 scale, add them, and identify high-value areas.
-- Randomly sample pixels to estimate service values under random distribution scenarios, iterating multiple times for robust confidence intervals.
--Address spatial distribution issues (e.g., clustering) later using additional weighting factors (e.g., downstream beneficiaries).
-
-
-## Combined ES raster production:
-
-Preliminar first step to deal with raster data sets representing different variables.
-
-**Limitations:**
-- Implicitly assumes equal importance of ecosystem services.
-- May overemphasize areas with one dominant service, especially pollination, which is contingent to agricultural production.
-- Fails to account for geographically weighted factors, plan to address.
-
-## Random Sampling:
-
-Suited methodology when no location-based prioritization is assumed.
-Repeated  sampling process  assuming  Central Limit Theorem.
-Summarize results with total estimated ES gains and confidence intervals.
-
-
-
-# 1. Prepare Environemnt 
-
-Load libraries, functions and prepare template data 
+Load libraries, functions and prepare template data
 
 ```{r align list of rasters, eval=TRUE, include=FALSE}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
@@ -135,9 +182,10 @@ process_intervention_area <- function(raster_list) {
 }
 ```
 
-## 1.2 Load Templates
+### 3.2.3 Load Templates
 
 This loads and prepares template data used to align
+
 ```{r create tmp}
 library(here)
 # add backgrounds/templates to align 
@@ -154,23 +202,24 @@ rcl <- matrix(c(
 tmp <- lapply(lc, function(r){
   r <- classify(r[[1]], rcl)
 })
-
 rm(lc)
 ```
 
+------------------------------------------------------------------------
+# 4 Run Data Extraction
 
-# 2 Extract the data
+## 4.1 List the Restoration Layers
 
-## 2.1 List the Restoration Layers 
-```{r select conservation data}
+```{r select restporation change data}
 #Restoration:
 tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= '.tif$'))
 tiffes <- tiffes[c(1:5,51:55,71:75,81:90,106:110)]
 ```
 
-## 2.2 Normalize and combine data layers
+## 4.2 Normalize and combine data layers
 
-The combined raster is a proxy for the total ES provided(with some assumptions that need to be eventually reviewed and refined).
+The combined raster is a proxy for the total ES provided(with some
+assumptions that need to be eventually reviewed and refined).
 
 ```{r apply mask AOI AP, eval=FALSE, include=FALSE}
 
@@ -211,13 +260,11 @@ baseES <- process_rasters(baseES,tmp, resample_method = "bilinear")
 map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], '_ES_sum.tif')))
 ```
 
+## 4.3 Load Adjusted Griscom Restoration Data and apply mask
 
-## 2.3 Load Adjusted Griscom Restoration Data and apply mask
-
-Use the adjusted Griscom restoration data (deals with pixel values encoding issues in the original data, had to get the metadadata for that). We apply this mask to isolate only the pixels that have been identified as Restoration Potential in Griscom's  Dataset on [Global priority areas for ecosystem
+Use the adjusted Griscom restoration data to extract the pixels includes as  Restoration Potential in Griscom's Dataset on [Global
+priority areas for ecosystem
 restoration](https://www.ksfire.org/woody_encroachment/documents/Global%20priority%20areas%20of%20ecosytem%20restoration.pdf).
-
-
 
 ```{r load Griscoms data, eval=FALSE, include=FALSE}
 # Load Griscom Data
@@ -236,11 +283,12 @@ baseES_m <- map2(
 map(1:length(baseES), function(x) writeRaster(baseES_m[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], '_ES_msk.tif'), overwrite=T))
 ```
 
-![Intervention Areas & Combiend Restoration Potential](/home/jeronimo/OneDrive/WWF_nbs_op/output_maps/maps_interventions.png)
+![Intervention Areas & Combiend Restoration
+Potential](/home/jeronimo/OneDrive/WWF_nbs_op/output_maps/maps_interventions.png)
 
+------------------------------------------------------------------------
 
-# 3 Calculate Restoration Potential output.
-
+# 5 Calculate Restoration Potential output.
 
 ```{r load intevention data}
 tiffes <- file.path(here("restoration_combined"), list.files(paste0(here("restoration_combined")),pattern= 'ES_msk'))
@@ -248,7 +296,8 @@ baseES_m <- lapply(tiffes, rast)
 tiffes
 ```
 
-## 3.1 Brazil Espiritu Santo
+## 5.1 Brazil Espiritu Santo
+
 ```{r brazil intervention , eval=FALSE, include=FALSE}
 poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
 pol_wgs <- st_transform(poly, crs=crs(baseES_m[[1]]))
@@ -261,8 +310,12 @@ writeRaster(rest_sp, here("Interventions", "Brazil_intervention", "SS_griscom.ti
 
 ```
 
-### 3.1.1 Prepare Template Brazil Espiritu Santo
-This just create a background of Zeroes to use as template for reprojecting (this is necessary because the access layer whic is on a different crs. Not ideal, but need to move forward)
+### 5.1.1 Prepare Template Brazil Espiritu Santo
+
+This just create a background of Zeroes to use as template for
+reprojecting (this is necessary because the access layer whic is on a
+different crs. Not ideal, but need to move forward)
+
 ```{r brazil intervention 1, eval=FALSE, include=FALSE}
 poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
 pol_wgs <- st_transform(poly, crs=crs(tmp[[1]]))
@@ -272,21 +325,8 @@ writeRaster(serv_bra, here("Interventions", "Brazil_intervention", "esp_santo_bk
 
 ```
 
-## 3.2 Madagascar (Not Necessary To Mask for te Interventions)
-```{r Madagascar intervention 1, eval=FALSE, include=FALSE}
-poly <- st_read(here("Interventions", "Mex_intervention","mex_intervention2.geojson"))
+## 5.2. Mexico Yucatan
 
-pol_wgs <- st_transform(poly, crs=crs(baseES_m[[3]]))
-serv_mdg <- baseES_m[[3]] 
-serv_mdg <- project(serv_mdg, crs(pol_wgs), method='cubic')
-rest_mdg <- crop(pa_rc[[3]], pol_wgs)
-rest_sp <- mask(rest_sp,pol_wgs)
-writeRaster(serv_mdg, here("Interventions", "Mdg_intervention", "mdg_int_rest.tif"))
-writeRaster(rest_sp, here("Interventions", "Mdg_intervention", "mdg_griscom.tif"))
-
-```
-
-## 3.3  Yucatan
 ```{r yucatan intervention 1, eval=FALSE, include=FALSE}
 poly <- st_read(here("Interventions", "Mex_intervention","mex_intervention2.geojson"))
 
@@ -300,8 +340,12 @@ writeRaster(rest_mex, here("Interventions", "Mex_intervention", "Mex_griscom.tif
 
 ```
 
-### 3.3.1 Prepare Template Yucatan
-This just create a background of Zeroes to use as template for reprojecting (this is necessary because the access layer whic is on a different crs. Not ideal, but need to move forward)
+### 5.2.1 Prepare Template Yucatan
+
+This just create a background of Zeroes to use as template for
+reprojecting (this is necessary because the access layer whic is on a
+different crs. Not ideal, but need to move forward)
+
 ```{r brazil intervention, eval=FALSE, include=FALSE}
 poly <- st_read(here("Interventions", "Mex_intervention","mex_intervention2.geojson"))
 pol_wgs <- st_transform(poly, crs=crs(tmp[[3]]))
@@ -310,7 +354,11 @@ serv_bra <- project(serv_bra, crs(poly), res=30)
 writeRaster(serv_bra, here("Interventions", "Mex_intervention", "yucatan_bkg.tif"),overwrite=TRUE)
 
 ```
-## 3.3  Peru
+
+## 5.3 Peru Madre De Dios
+
+Here, make sure that the intevention area is correct. Need to confirm with the new data provided
+
 ```{r Madre De Dios intervention, eval=FALSE, include=FALSE}
 pol <- st_read(here("Interventions","Peru","Intervenciones", "commondata","ganaderia","GANADERIA.shp"))
 pol <- st_make_valid(pol)
@@ -343,55 +391,99 @@ writeRaster(mks_peru, here("Interventions", "Peru_intervention","MDDEES_final.ti
 
 ```
 
-## 3.4 Vietnam
+## 5.4 Vietnam & Madagascar 
 
 Pending...
 
-# 4 Sampling and Extracting values
+------------------------------------------------------------------------
 
-This will be dealt on a two part basis:
-1.Identify the hectares that yield the maximum aggregated restoration values withing the Griscom restoration potential pixels. Contingent on the entry assumptions
-2. Model the estimated values of ES gains for the services based on a random sampling.
-This second part has implicit a couple of assumptions: 
+# 6 Sampling and Extracting values
 
-- We are not considering any spatial configuration (landscape metrics) aspects affecting the total value
-- Eventually, the model can be refined by incorporating additional parameters (e.g minimum distance to boundaries, distance between points, topography or inhabited areas (some of it is implicit in the input data, but needs to be confirmed).
-- Coastal risk protection only occurs at the coast, any random sampling performed will haveto consider this. This can be adjusted using weights.
+Model the estimated values of ES gains for the services based on a
+random sampling. This second part has implicit a couple of assumptions:
 
+-   We are not considering any spatial configuration (landscape metrics)
+    aspects affecting the total value
+-   Eventually, the model can be refined by incorporating additional
+    parameters (e.g minimum distance to boundaries, distance between
+    points, topography or inhabited areas (some of it is implicit in the
+    input data, but needs to be confirmed).
+-   Coastal risk protection only occurs at the coast, any random
+    sampling performed will haveto consider this. This can be adjusted
+    using weights.
 
-This approach utilizes a stratified random sampling technique to estimate the mean values of different bands in a multi-band raster dataset. Stratified random sampling is a probability sampling method where the population is divided into homogeneous subgroups called strata, and random samples are taken from each stratum. In this case, the strata are defined by the spatial extent of the raster dataset, and the pixels within the raster represent the individual sampling units.
+This approach utilizes a stratified random sampling technique to
+estimate the mean values of different bands in a multi-band raster
+dataset. Stratified random sampling is a probability sampling method
+where the population is divided into homogeneous subgroups called
+strata, and random samples are taken from each stratum. In this case,
+the strata are defined by the spatial extent of the raster dataset, and
+the pixels within the raster represent the individual sampling units.
 
 Methodology
 
-Define the Area of Interest: The first step is to define the area of interest (AOI) within the raster dataset. This AOI represents the spatial extent from which the samples will be drawn. In this specific case, the AOI is defined as 30,000 hectares.
+Define the Area of Interest: The first step is to define the area of
+interest (AOI) within the raster dataset. This AOI represents the
+spatial extent from which the samples will be drawn. In this specific
+case, the AOI is defined as 30,000 hectares for Espirito Santo and 15.000 for Yucatán.
 
-Calculate the Sample Size: Based on the resolution of the raster and the desired AOI, the required number of pixels to be sampled is calculated. This ensures that the total area covered by the sampled pixels corresponds to the defined AOI.
+Calculate the Sample Size: Based on the resolution of the raster and the
+desired AOI, the required number of pixels to be sampled is calculated.
+This ensures that the total area covered by the sampled pixels
+corresponds to the defined AOI.
 
-Perform Stratified Random Sampling: The spatSample() function from the terra package in R is used to perform stratified random sampling. This function allows for random sampling of pixels within the defined AOI, while also excluding pixels with "NA" values in all bands, ensuring that only valid data points are included in the analysis.
+Perform Stratified Random Sampling: The spatSample() function from the
+terra package in R is used to perform stratified random sampling. This
+function allows for random sampling of pixels within the defined AOI,
+while also excluding pixels with "NA" values in all bands, ensuring that
+only valid data points are included in the analysis.
 
-Repeat Sampling: To reduce potential sampling bias and improve the accuracy of the estimates, the random sampling process is repeated multiple times (in this case, 30 times). This is analogous to the concept of bootstrapping, where repeated sampling with replacement is used to estimate the sampling distribution of a statistic.
+Repeat Sampling: To reduce potential sampling bias and improve the
+accuracy of the estimates, the random sampling process is repeated
+multiple times (in this case, 30 times). This is analogous to the
+concept of bootstrapping, where repeated sampling with replacement is
+used to estimate the sampling distribution of a statistic.
 
-Calculate Summary Statistics: For each repetition, the mean, standard deviation, and 95% confidence intervals are calculated for each band in the raster dataset. This provides a measure of the central tendency and variability of the sampled data.
+Calculate Summary Statistics: For each repetition, the mean, standard
+deviation, and 95% confidence intervals are calculated for each band in
+the raster dataset. This provides a measure of the central tendency and
+variability of the sampled data.
 
-Synthesize Results: The results from all repetitions are combined to calculate an overall mean and confidence interval for each band. This provides a more robust estimate of the expected values, effectively correcting for potential outliers and reducing the influence of individual sample variations.
+Synthesize Results: The results from all repetitions are combined to
+calculate an overall mean and confidence interval for each band. This
+provides a more robust estimate of the expected values, effectively
+correcting for potential outliers and reducing the influence of
+individual sample variations.
 
 Theoretical Justification
 
-The use of stratified random sampling is justified as it ensures that the sample is representative of the entire population (i.e., all pixels within the AOI). By dividing the population into strata and sampling from each stratum, this method reduces the variability of the estimates compared to simple random sampling. This is particularly important when dealing with spatial data, where there may be inherent spatial autocorrelation or heterogeneity.
+The use of stratified random sampling is justified as it ensures that
+the sample is representative of the entire population (i.e., all pixels
+within the AOI). By dividing the population into strata and sampling
+from each stratum, this method reduces the variability of the estimates
+compared to simple random sampling. This is particularly important when
+dealing with spatial data, where there may be inherent spatial
+autocorrelation or heterogeneity.
 
-The repeated sampling approach further enhances the robustness of the estimates by providing a distribution of possible values. This allows for the calculation of confidence intervals, which provide a measure of the uncertainty associated with the estimates. By synthesizing the results from multiple repetitions, the overall estimates are less susceptible to the influence of individual sample variations and provide a more accurate representation of the true population values.
+The repeated sampling approach further enhances the robustness of the
+estimates by providing a distribution of possible values. This allows
+for the calculation of confidence intervals, which provide a measure of
+the uncertainty associated with the estimates. By synthesizing the
+results from multiple repetitions, the overall estimates are less
+susceptible to the influence of individual sample variations and provide
+a more accurate representation of the true population values.
 
 References
 
 Cochran, W. G. (1977). Sampling techniques (3rd ed.). John Wiley & Sons.
-Lohr, S. L. (2010). Sampling: Design and analysis (2nd ed.). Brooks/Cole. 1  
-1.
-Bivand, R. S., Pebesma, E. J., & Gómez-Rubio, V. (2013). Applied spatial data analysis with R (2nd ed.). Springer.
+Lohr, S. L. (2010). Sampling: Design and analysis (2nd ed.).
+Brooks/Cole. 1\
+1. Bivand, R. S., Pebesma, E. J., & Gómez-Rubio, V. (2013). Applied
+spatial data analysis with R (2nd ed.). Springer.
 
+## 6.1 Espirito Santo
 
-## 4.1 Espirito Santo
-
-### 4.1.1 Prepare Data Esp Santo.
+### 6.1.1 Prepare Data Esp Santo.
 
 Align and resampe all the raster datasets to the same crs and origin.
 
@@ -429,11 +521,13 @@ serv_1 <- trim(merge(serv_1,serv)) #add background of Zeros
 writeRaster(serv_1, paste0(here("Interventions", "Brazil_intervention"),'/', 'serv_BRAZIL.tif'), overwrite=TRUE)
 ```
 
+### 6.1.2 Run Sampling and Syntetize results - Espirito Santo
 
-### 4.1.2 Run Sampling and Syntetize results - Espirito Santo
-
-Here, we are sampling the data for obtain estimate of the expected restoration gains assuming randomly selected pixels extracted form the potential restoration areas. Again, some assumptions will have to be reviewed, but this is an initial assessment.
-The targeted intervention area is 30.200 ha.
+Here, we are sampling the data for obtain estimate of the expected
+restoration gains assuming randomly selected pixels extracted form the
+potential restoration areas. Again, some assumptions will have to be
+reviewed, but this is an initial assessment. The targeted intervention
+area is 30.200 ha.
 
 ```{r sampling target areas brazil, eval=FALSE, include=FALSE}
 serv_1 <- rast(here("Interventions", "Brazil_intervention",'/', 'serv_BRAZIL.tif'))
@@ -551,9 +645,8 @@ all_results <- all_results %>%
   ))
 save(all_results, file= here("Interventions", "Brazil_intervention", "all_res_bra.RData"))
 ```
- 
- 
-### 4.1.3 Plot Results Espirito Santo
+
+### 6.1.3 Plot Results Espirito Santo
 
 ```{r plot brazil outpus, echo=FALSE}
 load(here("Interventions", "Brazil_intervention", "all_res_bra.RData"))
@@ -587,12 +680,12 @@ plot <- ggplot(df, aes(y = sum, fill = color)) +
 plot
 ```
 
-## 4.2 Yucatan
+## 6.2 Yucatan
 
-The approach is the same as in Brazil.
-Two main intervention areas were used tro build the final polygon: the jaguar corridor and 
-### 4.2.1 Prepare Data Yucatan.
-Align and resample all the raster bands to the ame crs and origin.
+The approach is the same as in Brazil. Two main intervention areas were
+used tro build the final polygon: the jaguar corridor and \### 4.2.1
+Prepare Data Yucatan. Align and resample all the raster bands to the ame
+crs and origin.
 
 ```{r filter data 2, eval=FALSE, include=FALSE}
 serv <- rast(here("Interventions", "Mex_intervention", "yucatan_bkg.tif"))
@@ -628,7 +721,7 @@ serv_1 <- trim(merge(serv_1,serv)) #add background of Zeros
 writeRaster(serv_1, paste0(here("Interventions", "Mex_intervention"),'/', 'serv_MEXICO.tif'), overwrite=TRUE)
 ```
 
-### 4.1.2 Run Sampling and Synthetize results - Yucatan
+### 6.1.2 Run Sampling and Synthetize results - Yucatan
 
 ```{r sampling targe area MX, eval=FALSE, include=FALSE}
 #serv_1 <- rast(here("Interventions", "Mex_intervention",'/', 'serv_MEXICO.tif'))
@@ -748,7 +841,7 @@ all_results <- all_results %>%
 save(all_results, file=here("Interventions", "Mex_intervention", "all_results_mx.RData")) 
 ```
 
-### 4.1.3 . Plot Results Yucatan 
+### 6.1.3 . Plot Results Yucatan
 
 ```{r plot yucatan, echo=FALSE}
 load(file=here("Interventions", "Mex_intervention", "all_results_mx.RData"))
@@ -782,8 +875,24 @@ plot <- ggplot(df, aes(y = sum, fill = color)) +
 print(plot)
 ```
 
+# 7. Next Steps:
 
-# Next Steps:
+Run the Analysis for Madre de Dios, incorpporate
+beneficiaries/population related data, as the target metric is not the
+sum of the values.
 
-Run the Analysis for Madre de Dios, incorpporate beneficiaries/population related data, as the target metric is not the sum of the values.
+## 3.2 Madagascar (Not Necessary To Mask for te Interventions)
+
+```{r Madagascar intervention 1, eval=FALSE, include=FALSE}
+poly <- st_read(here("Interventions", "Mex_intervention","mex_intervention2.geojson"))
+
+pol_wgs <- st_transform(poly, crs=crs(baseES_m[[3]]))
+serv_mdg <- baseES_m[[3]] 
+serv_mdg <- project(serv_mdg, crs(pol_wgs), method='cubic')
+rest_mdg <- crop(pa_rc[[3]], pol_wgs)
+rest_sp <- mask(rest_sp,pol_wgs)
+writeRaster(serv_mdg, here("Interventions", "Mdg_intervention", "mdg_int_rest.tif"))
+writeRaster(rest_sp, here("Interventions", "Mdg_intervention", "mdg_griscom.tif"))
+
+```
 
