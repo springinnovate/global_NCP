@@ -66,12 +66,9 @@ intervention area spans **15,000 hectares**.
 
 ## 3.1 Data Sources
 
--   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping
-    the planet’s critical natural
-    assets](https://www.nature.com/articles/s41559-022-01934-5).
--   **Restoration Potential:** Adjusted Griscom restoration data.
--   **Raster Processing Tools:** `terra`, `dplyr`, and `sf` packages in
-    R.
+-   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5).
+-   **Restoration Potential:** [Adjusted Griscom restoration data](https://zenodo.org/records/883444). 
+-   **Raster Processing Tools:** `terra`, `dplyr`, and `sf` packages in R.
 
 ## 3.2 Evaluated Services
 
@@ -186,7 +183,7 @@ process_intervention_area <- function(raster_list) {
 
 This loads and prepares template data used to align
 
-```{r create tmp}
+```{r create tmp, include=FALSE}
 library(here)
 # add backgrounds/templates to align 
 path_lc <- here('ESA_LC') 
@@ -206,6 +203,7 @@ rm(lc)
 ```
 
 ------------------------------------------------------------------------
+
 # 4 Run Data Extraction
 
 ## 4.1 List the Restoration Layers
@@ -290,7 +288,7 @@ Potential](/home/jeronimo/OneDrive/WWF_nbs_op/output_maps/maps_interventions.png
 
 # 5 Calculate Restoration Potential output.
 
-```{r load intevention data}
+```{r load intevention data, include=FALSE}
 tiffes <- file.path(here("restoration_combined"), list.files(paste0(here("restoration_combined")),pattern= 'ES_msk'))
 baseES_m <- lapply(tiffes, rast)
 tiffes
@@ -310,11 +308,6 @@ writeRaster(rest_sp, here("Interventions", "Brazil_intervention", "SS_griscom.ti
 
 ```
 
-### 5.1.1 Prepare Template Brazil Espiritu Santo
-
-This just create a background of Zeroes to use as template for
-reprojecting (this is necessary because the access layer whic is on a
-different crs. Not ideal, but need to move forward)
 
 ```{r brazil intervention 1, eval=FALSE, include=FALSE}
 poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
@@ -340,11 +333,6 @@ writeRaster(rest_mex, here("Interventions", "Mex_intervention", "Mex_griscom.tif
 
 ```
 
-### 5.2.1 Prepare Template Yucatan
-
-This just create a background of Zeroes to use as template for
-reprojecting (this is necessary because the access layer whic is on a
-different crs. Not ideal, but need to move forward)
 
 ```{r brazil intervention, eval=FALSE, include=FALSE}
 poly <- st_read(here("Interventions", "Mex_intervention","mex_intervention2.geojson"))
@@ -412,15 +400,11 @@ random sampling. This second part has implicit a couple of assumptions:
     sampling performed will haveto consider this. This can be adjusted
     using weights.
 
-This approach utilizes a stratified random sampling technique to
-estimate the mean values of different bands in a multi-band raster
-dataset. Stratified random sampling is a probability sampling method
-where the population is divided into homogeneous subgroups called
-strata, and random samples are taken from each stratum. In this case,
-the strata are defined by the spatial extent of the raster dataset, and
-the pixels within the raster represent the individual sampling units.
+We run a stratified random sampling to estimate the mean values of different bands in a multi-band raster dataset. Stratified random sampling is a probability sampling method
+where the population is divided into homogeneous
+strata, and random samples are taken from each one.
 
-Methodology
+## Methodology
 
 Define the Area of Interest: The first step is to define the area of
 interest (AOI) within the raster dataset. This AOI represents the
