@@ -47,9 +47,7 @@ Use vector file, just the main biomes.
 By World Bank Region
 ```{r filter out PAs}
 poly <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
-#poly <- st_transform(poly, crs = crs(tmp))
-rm(tmp)
-poly <- poly %>% filter(region_wb!="Antarctica")
+poly <- poly %>% filter(region_wb!="Antarctica") %>% filter(region_wb!="East Asia & Pacific")
 nam <- sort(unique(poly$region_wb))
 nam <- gsub("[[:punct:]]", "", nam) # Remove punctuation
 nam <- gsub(" ", "_", nam) # Replace spaces with underscores
@@ -109,102 +107,70 @@ This runs the same process in batch. Memory was optimized to not load all the da
 This is way faster than the second approach (below). 
 
 ```{r iterate cropMask, eval=FALSE, include=FALSE}
-inpath <- here("ESA_LC") 
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
-tiffes <- tiffes[4]
+# Define input and output paths
+inpath <- here("ESA_LC")
+tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)), pattern = '.tif$'))
+tiffes <- tiffes[4]  # Adjust this to include all or specific files
 outpath <- here("ESA_LC", "wb_region")
+dir.create(outpath, showWarnings = FALSE)  # Ensure the output directory exists
 
-clean_filename <- function(filename){
-  #sub("_md5.*", "", filename)
+# Define a function to clean filenames
+clean_filename <- function(filename) {
   sub(".tif.*", "", filename)
 }
 
-# Loop through each geotiff file
-for (i in seq_along(tiffes)) {
-  # Get the current tiff file
-  tiff_file <- tiffes[i]
+# Function to process a single raster with the list of polygons
+process_raster <- function(tiff_file, poly, nam, outpath) {
+  # Debugging: Print the raster file being processed
+  message("Processing raster: ", tiff_file)
   
-  # Load the current geotiff (don't load all at once)
-  access <- rast(tiff_file)
-  # Apply crop and mask operations to each polygon
-  cropped <- map(1:length(poly), function(x) crop(access, poly[[x]]))
-  #cropped <- lapply(cropped,trim)
-  masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
-  
-  # Extract the base filename before 'md5'
-  base_filename <- clean_filename(basename(tiff_file))
-  #base_filename <- gsub("[[:punct:]]", "", base_filename) # Remove punctuation
-#base_filename <- gsub(" ", "_", base_filename) # Replace spaces with underscores
-  
-  # Write the cropped and masked rasters to files
-  map(1:length(masked), function(x) {
-    writeRaster(masked[[x]], paste0(outpath,"/", "ESA_LC_1992_2020_", nam[x], ".tif"), overwrite = TRUE)
-  })
-  # Optionally, clear the variable to free up memory
-  rm(access, cropped, masked)
-  gc()  # Garbage collection to clear memory
-}
-```
-
-# Region Wb
-
-I should stop using this apprach. The code looks well, but it is very inefficient.
-Check agains the other method. Also start thinking about covnerting all this into python.
-```{r cropmask}
-rs <-  rast(here("ESA_LC", "ESA_LC_1992_2020.tif")) 
-
-num_cores <- 6
-# Parallelize the outer loop using mclapply
-rs_msk <- mclapply(poly, function(polygon) {
-    # Crop and mask the raster
-    r<- crop(rs, polygon)
-    r <- mask(r, polygon)
-    return(masked_raster)
-  }, mc.cores = num_cores) 
-
-# Use lapply to iterate over each list in nested_list
-  map2(rs_msk, nam, writeRaster(x., paste0(here("ESA_LC", "wb_region"),"/",  "ESA_LC_1992_2020_", y., '.tif')))
-  
-  
-  .y,function(r) {
-    # Construct the filename using vector_1 and vector_2
-    file_name <- paste0(here("ESA_LC", "wb_region"),"/",  "ESA_LC_1992_2020_", nam[i], '.tif')
-    
-    # Write the raster to the file
-    writeRaster(rs_msk[[i]][[j]], file_name, overwrite = TRUE)
-  })
-})
-```
-
-
-```{r}
-summary_df <- map2_dfr(seq_along(rs_msk), rs_msk, function(i, inner_list) {
-  
-  # i corresponds to the index of the outer list (e.g., 1, 2, 3...)
-  outer_label <- paste0("Outer_", i)  # Label for the outer list
-  
-  # Loop through each SpatRaster in the inner list
-  map_dfr(inner_list, function(raster) {
-    extract_raster_summary(raster, outer_label)
-  })
-})
-
-
-for (i in seq_along(rs_msk)) {
-  sublist <- rs_msk[[i]]  # Access each sublist
-  
-  for (j in seq_along(sublist)) {
-    raster <- sublist[[j]]  # Access each SpatRaster
-    raster_name <- names(raster)  # Get the name slot of the SpatRaster
-    
-    # Build the output filename
-    output_filename <- paste0(outpath, '/', raster_name, "_", nam[j], ".tif")
-    
-    # Save the raster to a .tif file
-    writeRaster(raster, filename = output_filename, overwrite = TRUE)
+  # Function to process each polygon in the list
+  process_polygon <- function(idx, tiff_file, poly, nam, outpath) {
+    tryCatch({
+      message("Processing polygon group: ", nam[idx])
+      
+      # Load the raster inside the function
+      access <- rast(tiff_file)
+      if (!inherits(access, "SpatRaster")) stop("Failed to load raster: ", tiff_file)
+      
+      # Convert the polygon group from `sf` to `SpatVector`
+      poly_group <- vect(poly[[idx]])  # Convert sf to SpatVector
+      if (!inherits(poly_group, "SpatVector")) stop("Failed to convert polygon: ", nam[idx])
+      
+      # Perform crop and mask
+      cropped_masked <- mask(crop(access, poly_group), poly_group)
+      
+      # Define the output filename
+      filename <- paste0(outpath, "/", "ESA_LC_", nam[idx], ".tif")
+      
+      # Write the raster
+      writeRaster(cropped_masked, filename, overwrite = TRUE)
+      message("Successfully processed: ", nam[idx])
+      return(filename)
+    }, error = function(e) {
+      message("Error processing: ", nam[idx], " - ", e$message)
+      return(NULL)
+    })
   }
+  
+  # Use parallel processing for the list of polygon groups
+  cl <- makeCluster(detectCores() - 1)  # Use all but one core
+  clusterExport(cl, c("tiff_file", "poly", "nam", "outpath", "mask", "crop", "writeRaster", "vect", "rast"))
+  clusterEvalQ(cl, library(terra))  # Load terra in workers
+  
+  # Process all polygons in parallel
+  results <- parLapply(cl, seq_along(poly), function(idx) {
+    process_polygon(idx, tiff_file, poly, nam, outpath)
+  })
+  
+  # Clean up cluster
+  stopCluster(cl)
+  return(results)
 }
 
+
+
+results <- process_raster(tiffes, poly, nam, outpath)
 
 ```
 
