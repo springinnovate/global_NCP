@@ -181,6 +181,7 @@ for (i in seq_along(tiffes)) {
   
   # Apply crop and mask operations to each polygon
   cropped <- map(1:length(poly), function(x) crop(access, poly[[x]]))
+  cropped <- lapply(cropped,trim)
   masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
   
   # Extract the base filename before 'md5'
