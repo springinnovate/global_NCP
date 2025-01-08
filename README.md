@@ -7,16 +7,17 @@ README
 
 **RestorationES** is an R package designed to estimate the potential
 gains in ecosystem services (ES) from restoration interventions. This
-package integrates spatial datasets, ecosystem service models, and
-restoration priority data to provide actionable insights for landscape
+package integrates modeled griddle ecosystem service estimations, with
+restoration priority pixels to provide actionable insights for landscape
 restoration planning. The primary objective is to estimate the benefits
 of restoration actions in a replicable, transparent, and scientifically
 robust manner.
 
 ## Features
 
-- **Multi-Service Integration**: Combines ecosystem services, including
-  sediment retention, pollination, and coastal protection.
+- **Multi-Service Integration**: Integrates different modelded grided
+  spatial ecosystem services,: preliminary, and nitrogen sediment
+  retention, pollination, and coastal protection.
 - **Spatial Data Processing**: Tools for aligning, normalizing, and
   aggregating raster data.
 - **Intervention Analysis**: Evaluates potential ecosystem service gains
@@ -29,9 +30,10 @@ robust manner.
 
 The package relies on publicly available datasets and state-of-the-art
 models: - **Ecosystem Service Data**: Chaplin-Kramer et al. (2022),
-*Mapping the Planet’s Critical Natural Assets*. - **Restoration
-Potential**: Adjusted Griscom restoration data, focusing on priority
-intervention areas.
+*Mapping the Planet’s Critical Natural Assets*. - **InVEST** Integrated
+Valuation of Ecosystem Services and Tradeoffs: Natural Capital Project
+(2024) - **Restoration Potential**: Adjusted Griscom restoration data,
+focusing on priority intervention areas.
 
 ## Installation
 
