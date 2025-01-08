@@ -1,5 +1,5 @@
 ---
-title: "Preliminary Intervention Assessment NBS for Espirito Santo, Brazil"
+title: "Preliminary Intervention Assessment NBS for the state of Espírito Santo, Brazil"
 output:
   html_document:
     df_print: paged
@@ -32,17 +32,17 @@ distributed across target areas.
 -   Pixel values are independent; no spatial autocorrelation considered.
 -   Confidence intervals provide robust estimates under random
     distribution scenarios.
+
 ## 1.4 Next Steps
 - Incorporate Beneficiaries
-- Carbon?
 - Other Services
 - By Land Cover/PA
 
 ------------------------------------------------------------------------
 
-# 2. Study Areas
+# 2. Study Area
 
-## 2.1 Espírito Santo State, Brazil 
+Espírito Santo State, Brazilian Atlantic coast.  
 
 Espírito Santo represents a priority intervention area for restoration
 activities. The target area spans **30,200 hectares**.
@@ -52,37 +52,34 @@ activities. The target area spans **30,200 hectares**.
 
 # 3. Materials and Methods
 
-## 3.1 Data Sources
+## 3.1 Input Data
 
--   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5).
--   **Restoration Potential:** [Adjusted Griscom restoration data](https://zenodo.org/records/883444). 
--   **Raster Processing Tools:** `terra`, `dplyr`, and `sf` packages in R.
+-   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5), derived using InVEST. InVEST produces spatially explicit models to map and quantify nature’s contributions to people. Developed by the Natural Capital Project—a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund. Key InVEST is rooted in the principle that ecosystem services (such as clean water, carbon storage, and pollination) provide significant benefits that can be incorporated into decisions about land and marine resource management, including ecological restoration.
 
-## 3.2 Evaluated Services
+-   **Restoration Potential:** [Adjusted Griscom restoration grided data](https://zenodo.org/records/883444). 
 
-The data assesed here is expressed in terms of the potential gain in units of selected ecosystem services if the targeted surface is restored to a natural/seminatural state.
 
-1.  Coastal Protection. Unit less measure, refers to a vulnerability
-    index. [**InVEST Coastal Vulnerability
-    Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
+## 3.1 
+-   **Spatial Raster Processing Tools:** `terra`, `dplyr`, and `sf` packages in R, visualization using `ggplot2`.
 
-2.  Nitrogen Export. Derived from the Nitrogen retention modeled using
-    the [**InVEST Nutrient Delivery
-    Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
+## 3.2 Evaluated Ecosystem Services
+
+The input data used here is derived from global ecosystem service models, where the pixel value represent the estimated gain in units of the selected ecosystem services if the targeted surface is restored to a natural/seminatural state.
+
+1.  Coastal Protection. Unitless measure, refers to a derived vulnerability index. [**InVEST Coastal Vulnerability Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
+
+2.  Nitrogen Export. Derived from the Nitrogen retention modeled using the [**InVEST Nutrient Delivery Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
     Expressed in kg/pixel/year
 
-3.  Sediment Retention. Derived using [**InVEST SDR: Sediment Delivery
-    Ration**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html).
+3.  Sediment Retention. Derived using [**InVEST SDR: Sediment Delivery Ration**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html).
     Values in ton/pixel/year
 
-4.  Pollination. Derived from [**InVEST SDR: Pollinator Abundance
-    Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html).
+4.  Pollination. Derived from [**InVEST SDR: Pollinator Abundance Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html).
     Units expressed on *equivalent people feed*. More information in
     [**Chaplin-Kramer, et al.
     2022**](https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-022-01934-5/MediaObjects/41559_2022_1934_MOESM1_ESM.pdf)
 
-5.  Nature Access represented as *the number of people within 1 hour
-    travel of natural and semi-natural lands* (Chaplin-Kramer et al,
+5.  Nature Access represented as [**the number of people within 1 hour travel of natural and semi-natural lands**](https://github.com/springinnovate/distance-to-hab-with-friction) (Chaplin-Kramer et al,
     2022).
 
 ## 3.3 Data Preparation
@@ -96,17 +93,15 @@ $$
 $$
 
 Where: - $\text{Raster Value}$ is the value of a given pixel. -
-$\text{Min Value}$ and $\text{Max Value}$ represent the minimum and
-maximum observed values across the raster dataset.
+$\text{Min Value}$ and $\text{Max Value}$ represent the minimum and maximum observed values across the raster dataset.
 
-This step ensures that services with different units (e.g., tons,
-kilograms, or people) can be aggregated without bias toward any single
+This step allows to aggregate services with different units (e.g., tons, kilograms, number of people, unitless) can be aggregated limiting bias toward any single
 service.
 
-Once normalized, the ecosystem service rasters were summed to create a composite raster that represents the aggregated value of all services. This approach assumes equal importance of all ecosystem services, meaning no weighting was applied at this stage. **Note**. Next iteration will include population-based weights. 
+Once normalized, the ecosystem service raster datasets are added to create a synthesis raster that represents the aggregated value of all services. This approach assumes equal importance of all ecosystem services, meaning no weighting was applied at this stage. **Note**. The next iteration will include population-based weights. 
 
 
-### 3.3.2 Prepare Environemnt
+### 3.3.2 Prepare Computing Environment
 
 Load libraries, functions and prepare template data
 
@@ -167,9 +162,9 @@ process_intervention_area <- function(raster_list) {
 }
 ```
 
-### 3.2.3 Load Templates
+### 3.2.3 Prepare Templates to Align the Data
 
-This loads and prepares template data used to align
+To perform the analysis, all the raster datasets need to be brought to the same spatial resolution, crs and aligned  to the same origin.
 
 ```{r create tmp, include=FALSE}
 library(here)
@@ -192,14 +187,23 @@ rm(lc)
 
 ------------------------------------------------------------------------
 
-# 4 Run Data Extraction
+# 4 Perform Data Extraction
 
 ## 4.1 List the Restoration Layers
 
 ```{r select restporation change data}
 #Restoration:
-tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= '.tif$'))
-tiffes <- tiffes[c(1:5,51:55,71:75,81:90,106:110)]
+
+tiffes <- file.path(
+  here("cropped_raster_data"),
+  list.files(
+    here("cropped_raster_data"),
+    pattern = "BRAZIL.*\\.tif$"
+  )
+)
+
+tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= "BRAZIL*\\.tif$"))
+#tiffes <- tiffes[c(1:5,51:55,71:75,81:90,106:110)]
 ```
 
 ## 4.2 Normalize and combine data layers
