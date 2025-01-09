@@ -11,38 +11,33 @@ editor_options:
 
 # 1. Introduction
 
-This document provides a preliminary assessment of the  potential ecosystem service gains derived from 
-restoration in the state of **Espírito Santo (Brazil)** 
-## 1.1 Purpose
-
-Estimate the potential ecosystem service value gains if restoration is
-distributed across target areas.
+We present a preliminary assessment approach to estimate potential ecosystem service gains derived from 
+restoration in the state of **Espírito Santo (Brazil)** with a spatial resolution of 30 meters.
 
 ## 1.2 Objectives
 
-1.  Identify high-value pixels for restoration.
-2.  Estimate potential ecosystem service (ES) provision gains if a targeted surface is restored in the region .
-3.  Represent uncertainty with confidence intervals and spatial
-    distributions.
+1.  Identify high-value pixels for restoration purposes.
+2.  Estimate potential ecosystem service (ES) provision gains if a given/target surface (preliminarily 30.200 ha) are restored to natural vegetation within the State of Espirito Santo.
 
 ## 1.3 Theoretical Assumptions
 
--   All ecosystem services are equally valued.
+-   All ecosystem services are equally valuable.
 -   Restoration likelihood is uniform across intervention areas.
--   Pixel values are independent; no spatial autocorrelation considered.
 -   Confidence intervals provide robust estimates under random
-    distribution scenarios.
+    distribution scenarios. -we need a better way to say this  but i have not been able to find the suited words, but basically it means thatat this point we only know that the are to restore is 30.200 ha, but we still don't know exactly where they are going to be located, as it depends on land availability (which depends on factoe like willingess to take take part on the project by owners and land managers, and the capability ot secure control over land during the duration of the project) help me adjust this here please.
 
 ## 1.4 Next Steps
-- Incorporate Beneficiaries
-- Other Services
-- By Land Cover/PA
+- Incorporate  benefited population (Beneficiaries: Number of people downstream of every pixel) 
+- Incorporate more ES into the analysis starting with: 
+  - Carbon sequestration
+  - Hydrologic regulation 
+
 
 ------------------------------------------------------------------------
 
 # 2. Study Area
 
-Espírito Santo State, Brazilian Atlantic coast.  
+This analysis encompasses the totality of the State of Espírito Santo State, on the Brazilian Atlantic coast.  
 
 Espírito Santo represents a priority intervention area for restoration
 activities. The target area spans **30,200 hectares**.
@@ -54,7 +49,7 @@ activities. The target area spans **30,200 hectares**.
 
 ## 3.1 Input Data
 
--   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5), derived using InVEST. InVEST produces spatially explicit models to map and quantify nature’s contributions to people. Developed by the Natural Capital Project—a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund. Key InVEST is rooted in the principle that ecosystem services (such as clean water, carbon storage, and pollination) provide significant benefits that can be incorporated into decisions about land and marine resource management, including ecological restoration.
+-   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5), derived using InVEST. InVEST produces spatially explicit models to map and quantify nature’s contributions to people. Developed by the Natural Capital Project—a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund. 
 
 -   **Restoration Potential:** [Adjusted Griscom restoration grided data](https://zenodo.org/records/883444). 
 
@@ -64,7 +59,7 @@ activities. The target area spans **30,200 hectares**.
 
 ## 3.2 Evaluated Ecosystem Services
 
-The input data used here is derived from global ecosystem service models, where the pixel value represent the estimated gain in units of the selected ecosystem services if the targeted surface is restored to a natural/seminatural state.
+In this analysis, the input data consists of spatial grids (raster data in GeoTIFF format), where each pixel’s value reflects the estimated gain—measured in units of the specified ecosystem service—if that area were restored to a natural or seminatural state.
 
 1.  Coastal Protection. Unitless measure, refers to a derived vulnerability index. [**InVEST Coastal Vulnerability Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
 
@@ -128,10 +123,10 @@ align_rasters <- function(raster_list, template, resample_method = "bilinear") {
 process_rasters <- function(nested_list, templates, resample_method = "bilinear") {
   lapply(seq_along(nested_list), function(i) {
     # Align all rasters in the sublist to the template
-    aligned <- lapply(nested_list[[i]], function(r) {
-      if (!compareGeom(r, templates[[i]], stopOnError = FALSE)) {
+    aligned <- lapply(ras_list, function(r) {
+      if (!compareGeom(r, templates, stopOnError = FALSE)) {
         message("Aligning raster: ", names(r))
-        resample(r, templates[[i]], method = resample_method)
+        resample(r, templates, method = resample_method)
       } else {
         message("Raster already aligned: ", names(r))
         r
@@ -171,9 +166,9 @@ library(here)
 # add backgrounds/templates to align 
 path_lc <- here('ESA_LC') 
 # load reclassified land cover map
-tf <- file.path(path_lc, list.files(path_lc, pattern= "rec"))
+tf <- file.path(path_lc, list.files(path_lc, pattern= "Rec"))
 lc <- lapply(tf,rast)
-# create rcl matrix
+lc <- lc[[1]]# create rcl matrix
 rcl <- matrix(c(
   0, Inf, 0   # Any value greater than 0 becomes 1
 ), ncol = 3, byrow = TRUE)
@@ -182,6 +177,7 @@ rcl <- matrix(c(
 tmp <- lapply(lc, function(r){
   r <- classify(r[[1]], rcl)
 })
+tmp <- tmp[[1]]
 rm(lc)
 ```
 
@@ -191,7 +187,7 @@ rm(lc)
 
 ## 4.1 List the Restoration Layers
 
-```{r select restporation change data}
+```{r select ES diff  data}
 #Restoration:
 
 tiffes <- file.path(
@@ -201,15 +197,14 @@ tiffes <- file.path(
     pattern = "BRAZIL.*\\.tif$"
   )
 )
-
-tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= "BRAZIL*\\.tif$"))
-#tiffes <- tiffes[c(1:5,51:55,71:75,81:90,106:110)]
+tiffes <- tiffes[c(1,11,15,18,22)] #just keep pollination - HAB,
 ```
 
-## 4.2 Normalize and combine data layers
+## 4.2 Normalize and combine ES provision gains
 
-The combined raster is a proxy for the total ES provided(with some
-assumptions that need to be eventually reviewed and refined).
+
+The combined raster is a proxy for the total ES provided, assuming that all services are equally valuable and that location has already be considering during the modeling.
+It does not include Nature Access, as the pixel values repesent the amount of people that gain access to each individual pixel, which would result in counting the same people multiple times 
 
 ```{r apply mask AOI AP, eval=FALSE, include=FALSE}
 
@@ -240,19 +235,37 @@ baseES <- lapply(baseES, function(r){
   r <- normalize_raster(r)
 })
 
-# set the number of different products to split the list 
-num <- length(unique(product_names))
-# split again to have nested lists
-baseES <- split(baseES, rep(1:length(nam), each = num))
+
+  aligned <- lapply(baseES, function(r) {
+      if (!compareGeom(r, tmp, stopOnError = FALSE)) {
+        message("Aligning raster: ", names(r))
+        resample(r, tmp, method = "bilinear")
+      } else {
+        message("Raster already aligned: ", names(r))
+        r
+      }
+    })
+    # Stack all aligned rasters into a single multiband SpatRaster
+    stacked <- do.call(c, aligned)
+    
+    merged <- merge(stacked, tmp)
+    
+    # Sum the layers of the merged raster
+    baseES <- app(merged, sum)
+normalize_raster <- function(r) {
+  min_val <- min(values(r), na.rm = TRUE)
+  max_val <- max(values(r), na.rm = TRUE)
+  (r - min_val) / (max_val - min_val)
+
 
 # align, add background and sum all the values
-baseES <- process_rasters(baseES,tmp, resample_method = "bilinear")
-map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], '_ES_sum.tif')))
+#baseES <- process_rasters(baseES,tmp, resample_method = "bilinear")
+map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], 'BRA_ES_sum.tif')))
 ```
 
-## 4.3 Load Adjusted Griscom Restoration Data and apply mask
+## 4.3 Extract target pixels using Global Restoration Priority Areas
 
-Use the adjusted Griscom restoration data to extract the pixels includes as  Restoration Potential in Griscom's Dataset on [Global
+The analysis was limited to tyhe to the pixels with  Restoration Potential as per Griscom et al (2017) [Global
 priority areas for ecosystem
 restoration](https://www.ksfire.org/woody_encroachment/documents/Global%20priority%20areas%20of%20ecosytem%20restoration.pdf).
 
@@ -273,8 +286,7 @@ baseES_m <- map2(
 map(1:length(baseES), function(x) writeRaster(baseES_m[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], '_ES_msk.tif'), overwrite=T))
 ```
 
-![Intervention Areas & Combiend Restoration
-Potential](/home/jeronimo/OneDrive/WWF_nbs_op/output_maps/maps_interventions.png)
+![Intervention Areas & Combiend Restoration Potential](/home/jeronimo/OneDrive/WWF_nbs_op/output_maps/maps_interventions.png)
 
 ------------------------------------------------------------------------
 
@@ -309,21 +321,6 @@ writeRaster(serv_bra, here("Interventions", "Brazil_intervention", "esp_santo_bk
 
 ```
 
-## 5.2. Mexico Yucatan
-
-```{r yucatan intervention 1, eval=FALSE, include=FALSE}
-poly <- st_read(here("Interventions", "Mex_intervention","mex_intervention2.geojson"))
-
-pol_wgs <- st_transform(poly, crs=crs(baseES_m[[3]]))
-serv_mex <- baseES_m[[3]] %>% crop(pol_wgs) %>% mask(pol_wgs)
-serv_mex <- project(serv_mex, crs(poly_wgs), method='cubic')
-rest_mex <- crop(pa_rc[[3]], pol_wgs)
-rest_mex <- mask(rest_mex,pol_wgs)
-writeRaster(serv_mex, here("Interventions", "Mex_intervention", "yucatan_int_rest.tif"))
-writeRaster(rest_mex, here("Interventions", "Mex_intervention", "Mex_griscom.tif"), overwrite=TRUE)
-
-```
-
 
 ```{r brazil intervention, eval=FALSE, include=FALSE}
 poly <- st_read(here("Interventions", "Mex_intervention","mex_intervention2.geojson"))
@@ -334,59 +331,17 @@ writeRaster(serv_bra, here("Interventions", "Mex_intervention", "yucatan_bkg.tif
 
 ```
 
-## 5.3 Peru Madre De Dios
-
-Here, make sure that the intevention area is correct. Need to confirm with the new data provided
-
-```{r Madre De Dios intervention, eval=FALSE, include=FALSE}
-pol <- st_read(here("Interventions","Peru","Intervenciones", "commondata","ganaderia","GANADERIA.shp"))
-pol <- st_make_valid(pol)
-st_write(pol, here("Interventions", "ganaderia.shp"))
-
-#get msk non zero values from the EC mask
-msk_p <- classify(baseES[[4]],rcl)
-pol_wgs <- st_transform(pol, crs=crs(baseES_m[[4]]))
-serv_per_gan <- baseES[[4]] %>% crop(pol_wgs) %>% mask(pol_wgs)
-
-rest_per <- project(pa_rc[[4]], serv_per)
-rest_per <- classify(rest_per,rcl)
-serv_per_gan <- project(serv_per_gan, serv_per, method='bilinear')
-msk_g <- classify(serv_per_gan,rcl) 
-msk_g <- subst(msk_g, from=0, to =1)
-per1 <- project(per1,serv_per)
-
-mask_all <- merge(msk_g,rest_per)
-mask_all <- classify(mask_all,rcl)
-maks <- list(rest_per, msk_g, mask_all)
-
-mask_all_wgs <- project(mask_all, baseES[[4]])
-
-mks_peru <- mask(baseES[[4]],mask_all_wgs, maskvalue=0)
-
-areas <- lapply(maks,lsm_c_ca)
-save(areas, file=here("Interventions", "Peru_intervention","Proportions.RData"))
-writeRaster(mask_all, here("Interventions", "Peru_intervention","MDDmask_final.tif"), overwrite=TRUE)
-writeRaster(mks_peru, here("Interventions", "Peru_intervention","MDDEES_final.tif"), overwrite=TRUE)
-
-```
-
-## 5.4 Vietnam & Madagascar 
-
-Pending...
-
 ------------------------------------------------------------------------
 
 # 6 Sampling and Extracting values
 
 Model the estimated values of ES gains for the services based on a
-random sampling. This second part has implicit a couple of assumptions:
+random sampling. This second part has implicit following assumptions:
 
--   We are not considering any spatial configuration (landscape metrics)
-    aspects affecting the total value
--   Eventually, the model can be refined by incorporating additional
-    parameters (e.g minimum distance to boundaries, distance between
-    points, topography or inhabited areas (some of it is implicit in the
-    input data, but needs to be confirmed).
+-   Spatial configuration effecs are already considerd when modeling theecosystem servie data 
+-   The model can be refined by incorporating additional
+    parameters (e.g minimum distance to boundaries,distance between 
+    points, topography or inhabited areas, i .
 -   Coastal risk protection only occurs at the coast, any random
     sampling performed will haveto consider this. This can be adjusted
     using weights.
