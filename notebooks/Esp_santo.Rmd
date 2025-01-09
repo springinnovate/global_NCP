@@ -1,5 +1,6 @@
 ---
 title: "Preliminary Intervention Assessment NBS for the state of Espírito Santo, Brazil"
+author: "Jerónimo Rodríguez-Escobar"
 output:
   html_document:
     df_print: paged
@@ -11,128 +12,7 @@ editor_options:
 
 # 1. Introduction
 
-We present a preliminary approach to estimate potential ecosystem service gains derived from 
-restoration in the state of **Espírito Santo (Brazil)** with a spatial resolution of 30 meters.
-
-## 1.2 Objectives
-
-1.  Identify high-value pixels for restoration purposes.
-2.  Estimate potential ecosystem service (ES) provision gains if a given/target surface (preliminarily 30.200 ha) are restored to natural vegetation within the State of Espirito Santo.
-
-## 1.3 Theoretical Assumptions
-
--   All ecosystem services are equally valuable.
--   Restoration likelihood is distributed uniformly across the intervention areas.
--   Confidence intervals provide robust estimates under random
-    distribution scenarios. -we need a better way to say this  but i have not been able to find the suited words, but basically it means thatat this point we only know that the are to restore is 30.200 ha, but we still don't know exactly where they are going to be located, as it depends on land availability (which depends on factoe like willingess to take take part on the project by owners and land managers, and the capability ot secure control over land during the duration of the project) help me adjust this here please.
-
-------------------------------------------------------------------------
-
-# 2. Materials and Methods
-
-## 2.1 Study Area
-
-This analysis encompasses the totality of the State of Espírito Santo State, on the Brazilian Atlantic coast.  
-**Note** I still need to learn more about  the State of Espirito Santo ,  and can't say much about it, but a more detailed detailed contextualziation of the region, including geographic, environmental, demographic and economic aspects and how it integrates into the broader Symbiosis prokects can be included here.
-
-For this exercise, the total area to restore is 30.200 ha
-
-------------------------------------------------------------------------
-
-## 2.2 Input Data
-
--   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5), derived using InVEST. InVEST produces spatially explicit models to map and quantify nature’s contributions to people. Developed by the Natural Capital Project—a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund. 
-
--   **Restoration Potential:** [Adjusted Griscom restoration grided data](98. 
-
-
-We used  spatial grids (raster data in GeoTIFF format) for which the pixel values reflects the estimated gain—measured in units of the specified ecosystem service—represent the amount of the ecosystem service provision gain if it is restored to its potential natural vegetation except for urban/built-up for following  variables:
-
-
-1.  Coastal Protection. Unitless measure, refers to a derived vulnerability index. [**InVEST Coastal Vulnerability Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
-
-2.  Nitrogen Export. Derived from the Nitrogen retention modeled using the [**InVEST Nutrient Delivery Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
-    Expressed in kg/pixel/year
-
-3.  Sediment Retention. Derived using [**InVEST SDR: Sediment Delivery Ration**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html).
-    Values in ton/pixel/year
-
-4.  Pollination. Derived from [**InVEST SDR: Pollinator Abundance Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html).
-    Units represent Polllination Change in people fed on HABitat. More information in
-    [**Chaplin-Kramer, et al.
-    2022**](https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-022-01934-5/MediaObjects/41559_2022_1934_MOESM1_ESM.pdf)
-
-5.  Nature Access represented as [**the number of people within 1 hour travel of natural and semi-natural lands**](https://github.com/springinnovate/distance-to-hab-with-friction) (Chaplin-Kramer et al,
-    2022).
-
-
-## 2.3 Processing Environment 
-
--   **Spatial Raster Processing Tools:** `terra`, `dplyr`, and `sf` packages in R, visualization using `ggplot2`.
-
-
-### 2.4 Normalization of Ecosystem Service Restoration Data 
-
-The raster bands where nornmalized following using theis formula to bring them to a common standard:
-$$
-\text{Normalized Value} = \frac{\text{Raster Value} - \text{Min Value}}{\text{Max Value} - \text{Min Value}}
-$$
-
-Where: - $\text{Raster Value}$ is the value of a given pixel. -
-$\text{Min Value}$ and $\text{Max Value}$ represent the minimum and maximum observed values across the raster dataset.
-
-This step allows to aggregate services with different units (e.g., tons, kilograms, number of people, unitless) can be aggregated limiting bias toward any single
-service.
-
-Once normalized, the ecosystem service raster datasets are added to create a synthesis raster that represents the aggregated value of all services. This approach assumes equal importance of all ecosystem services, meaning no weighting was applied at this stage. **Note**. The next iteration will include population-based weights. 
-
-
-# 2.5 Potential  ES gain estimation   
-
-WWe run a stratified random sampling to estimate the the total amount in ES service provision gains given a total intervention area, in this case 30.200 ha. 
-Following aspects are considered :
-
--   Spatial configuration effects ware incorporasted during the modeling of the ecosystem service gainlayers. 
--   The model can be refined by incorporating additional
-    parameters (e.g minimum distance to boundaries,distance between 
-    points, topography or inhabited areas)
--   Coastal risk protection only occurs at the coast, any random
-    sampling performed will haveto consider this. This can be adjusted
-    setting weights for the services or using population density data.
-
-To reduce potential sampling bias and improve the
-accuracy of the estimates, the random sampling process is repeated  at least 30  times . This  bootstrapping, approach, where repeated sampling with replacement is
-used to estimate the sampling distribution of a statistic, in this case total ES gain for following ES.
-
-Calculate Summary Statistics: For each repetition, the mean, standard
-deviation, and 95% confidence intervals are calculated for each band in
-the raster dataset. This provides a measure of the central tendency and
-variability of the sampled data.
-
-Synthesize Results: The results from all repetitions are combined to
-calculate an overall mean and confidence interval for each band. This
-provides a more robust estimate of the expected values, effectively
-correcting for potential outliers and reducing the influence of
-individual sample variations.
-
-Theoretical Justification
-
-The use of stratified random sampling ensures that
-the sample is representative of the entire population (i.e., all pixels
-within the AOI). By dividing the population into strata and sampling
-from each stratum, this method reduces the variability of the estimates
-compared to simple random sampling. This is particularly important when
-dealing with spatial data, where there may be inherent spatial
-autocorrelation or heterogeneity.
-
-The repeated sampling approach further enhances the robustness of the
-estimates by providing a distribution of possible values. This allows
-for the calculation of confidence intervals, which provide a measure of
-the uncertainty associated with the estimates. By synthesizing the
-results from multiple repetitions, the overall estimates are less
-susceptible to the influence of individual sample variations and provide
-a more accurate representation of the true population values.
-
+This report presents a preliminary approach to estimate potential ecosystem service gains derived from restoration in the state of Espírito Santo, Brazil. The analysis is conducted at a spatial resolution of 30 meters.
 
 
 ```{r prep environment, eval=TRUE, include=FALSE}
@@ -170,6 +50,82 @@ process_intervention_area <- function(raster_list) {
 }
 ```
 
+## 1.2 Objectives
+
+This analysis has two objectives:
+- Identify high-value pixels for restoration purposes.
+- Estimate potential gains in ecosystem service (ES) provision if a target area (preliminarily 30,200 ha) is restored to natural vegetation within the State of Espírito Santo.
+
+## 1.3 Theoretical Assumptions
+
+This analysis is based on the following assumptions:
+
+- All ecosystem services are equally valuable.
+- Restoration likelihood is distributed uniformly across the intervention areas.
+- The restoration target area is 30,200 ha. The exact location of restoration efforts within the state is not yet determined, as it depends on factors such as:
+  - The willingness of landowners and managers to participate in the project.
+  - The ability to secure control over land during the project duration.
+  - The spatial configuration effects incorporated during the modeling of ecosystem service gains.
+- Confidence intervals provide robust estimates under random distribution scenarios.
+------------------------------------------------------------------------
+
+# 2. Materials and Methods
+
+## 2.1 Study Area
+
+This analysis encompasses the totality of Espírito Santo State, located on the Brazilian Atlantic coast. A more detailed contextualization of the region, including its geographic, environmental, demographic, and economic aspects, and how it integrates into the broader Symbiosis project can be included here. For this exercise, the total area to restore is 30,200 ha.
+
+------------------------------------------------------------------------
+
+## 2.2 Input Data
+
+-   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5). Data were derived using InVEST, a suite of spatially explicit models that map and quantify nature's contributions to people. InVEST was developed by the Natural Capital Project, a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund
+
+-   **Restoration Potential:** [Adjusted Griscom restoration grided data](https://zenodo.org/records/883444)
+
+Spatial grids (raster data in GeoTIFF format) were used, where pixel values reflect estimated gains, measured in units specific to each ecosystem service. These gains represent the potential increase in ecosystem service provision if an area is restored to its potential natural vegetation, except for urban/built-up areas. The following ecosystem services were considered:
+
+1.  Coastal Protection. Unitless measure, refers to a derived vulnerability index. [**InVEST Coastal Vulnerability Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
+
+2.  Nitrogen Export. Derived from the Nitrogen retention modeled using the [**InVEST Nutrient Delivery Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
+    Expressed in kg/pixel/year
+
+3.  Sediment Retention. Derived using [**InVEST SDR: Sediment Delivery Ration**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html).
+    Values in ton/pixel/year
+
+4.  Pollination. Derived from [**InVEST SDR: Pollinator Abundance Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html).
+    Units represent Polllination Change in people fed on HABitat. More information in
+    [**Chaplin-Kramer, et al.
+    2022**](https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-022-01934-5/MediaObjects/41559_2022_1934_MOESM1_ESM.pdf)
+
+5.  Nature Access represented as [**the number of people within 1 hour travel of natural and semi-natural lands**](https://github.com/springinnovate/distance-to-hab-with-friction) (Chaplin-Kramer et al,
+    2022).
+
+
+## 2.3 Processing Environment 
+
+Spatial Raster Processing Tools: The `terra`, `dplyr`, and `sf` packages in **R** were used for analysis. Data visualization was performed using `ggplot2`.
+
+### 2.4 Normalization of Ecosystem Service Restoration Data 
+
+Raster data were normalized using the following formula to bring values to a common standard:
+$$
+\text{Normalized Value} = \frac{\text{Raster Value} - \text{Min Value}}{\text{Max Value} - \text{Min Value}}
+$$
+
+Where: 
+- $\text{Raster Value}$ is the value of a given pixel. 
+- $\text{Min Value}$ and $\text{Max Value}$ represent the minimum and maximum observed values across the raster dataset.
+
+# 2.5 Stratified Random Sampling to Estimate Total Ecosystem Service Gains
+
+A stratified random sampling approach was employed to estimate total gains in ES service provision given a total intervention area of 30,200 ha. The model can be refined by incorporating additional parameters, such as minimum distance to boundaries, distance between points, topography, or inhabited areas. By definition, coastal risk protection only occurs at the coast; and this has to be kept in mind for example by setting sampling weights for the different  services or derived from population density data. This approach provides a distribution of possible values and allows for the calculation of confidence intervals. By synthesizing the results from multiple repetitions, the estimates are less susceptible to individual sample variations.
+
+# 2.6 Data Alignment
+
+All raster datasets were aligned to the same spatial resolution, coordinate reference system (CRS), and origin. The global ESA Land Cover Classification Raster for 2020 (CRS: WGS-84) was used as a template. The final results were then reprojected to the South America Albers Equal Area Conic CRS
+
+
 ### 3.2.3 Prepare Templates to Align the Data
 
 To perform the analysis, all the raster datasets need to be brought to the same spatial resolution, crs and aligned  to the same origin. We used the global ESA Land Cover Classification Raster for 2020 (CRS: WGS-84)
@@ -199,8 +155,8 @@ rm(lc)
 
 # 4 Processing
 
-## 4.1 List the target layers
-
+## 4.1 Target Layers
+The target layers used for this analysis were: Coastal Protection, Nitrogen Export, Sediment Retention, and Pollination.
 ```{r select ES diff  data}
 #Restoration:
 
@@ -215,12 +171,9 @@ tiffes <- tiffes[c(1,11,15,18,22)] #just keep pollination - HAB,
 tiffes <- tiffes[-2]
 ```
 
-## 4.2 Normalize and combine the ES provision gains into a single raster 
+## 4.2 Normalization and Combination of Ecosystem Service Provision Gains 
 
-
-The combined raster is a proxy for the total ES provided, assuming that all services are equally valuable, to identify the distribution of ecosystem sercie gains. 
-On asecond run, we extracted pixels for 30.200 ha that have the highestaggregated value, running an optimization. 
-It does not include Nature Access, as the pixel values repesent the amount of people that gain access to each individual pixel, which would result in counting the same people multiple times. I am dealing with that now. 
+The target layers were normalized and combined into a single raster. This raster serves as a proxy for total ES provision, assuming all services are equally valuable. This approach allows for the identification of the spatial distribution of potential ecosystem service gains. Nature Access was excluded from this combined layer because its pixel values represent the number of people who gain access to each pixel, which could result in counting the same people multiple times if multiple pixels are restored near each other.
 
 ```{r apply mask AOI AP, eval=FALSE, include=FALSE}
 
@@ -284,14 +237,12 @@ writeRaster(serv_bra, paste0(here("restoration_combined"),'/', 'BRA_ES_sum2.tif'
 ```
 
 
+## 4.3 Optimization to Identify Priority Areas
 
-## 4.3 Run Sampling and Syntetize results - Espirito Santo
+Pixels representing the highest aggregated ES gains were extracted from the combined raster, totaling 30,200 ha, to identify priority areas for restoration. This optimization process represents a second run of the analysis and considers the combined value of Coastal Protection, Nitrogen Export, Sediment Retention, and Pollination.
 
-Finally, we are sampled  the data for obtain estimate of the expected
-restoration gains assuming randomly selected pixels extracted form the
-potential restoration areas. Again, some assumptions will have to be
-reviewed, but this is an initial assessment. The targeted intervention
-area is 30.200 ha.
+## 4.4 Sampling and Synthesis of Results
+Stratified random sampling was performed on the optimized raster to estimate the expected restoration gains, assuming randomly selected pixels are extracted from the potential restoration areas. This initial assessment provides insight into potential ES gains associated with the restoration efforts.
 
 ```{r sampling target areas brazil, eval=FALSE, include=FALSE}
 serv_1 <- rast(here("Interventions", "Brazil_intervention",'/', 'serv_BRAZIL.tif'))
@@ -410,7 +361,7 @@ all_results <- all_results %>%
 save(all_results, file= here("Interventions", "Brazil_intervention", "all_res_bra.RData"))
 ```
 
-### 6.1.3 Plot Results Espirito Santo
+### 4.% Result Visualization
 
 ```{r plot brazil outpus, echo=FALSE}
 load(here("Interventions", "Brazil_intervention", "all_res_bra.RData"))
