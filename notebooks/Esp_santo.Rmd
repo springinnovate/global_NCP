@@ -218,8 +218,9 @@ tiffes <- tiffes[-2]
 ## 4.2 Normalize and combine the ES provision gains into a single raster 
 
 
-The combined raster is a proxy for the total ES provided, assuming that all services are equally valuable and that the location has already been consider during the modeling.
-It does not include Nature Access, as the pixel values repesent the amount of people that gain access to each individual pixel, which would result in counting the same people multiple times 
+The combined raster is a proxy for the total ES provided, assuming that all services are equally valuable, to identify the distribution of ecosystem sercie gains. 
+On asecond run, we extracted pixels for 30.200 ha that have the highestaggregated value, running an optimization. 
+It does not include Nature Access, as the pixel values repesent the amount of people that gain access to each individual pixel, which would result in counting the same people multiple times. I am dealing with that now. 
 
 ```{r apply mask AOI AP, eval=FALSE, include=FALSE}
 
@@ -282,92 +283,11 @@ serv_bra  <- merge(serv_bra , tmp)
 writeRaster(serv_bra, paste0(here("restoration_combined"),'/', 'BRA_ES_sum2.tif'))
 ```
 
-## 4.3 Extract target pixels using Global Restoration Priority Areas
 
-The analysis was limited to tyhe to the pixels with the Global Reforestation Potential Map by Griscom et al (2017).
 
-```{r load Griscoms data, eval=FALSE, include=FALSE}
-# Load Griscom Data
-tiffes <- file.path(here("Restoration_Griscom"), list.files(paste0(here("Restoration_Griscom")),pattern= 'rec'))
-tiffes <- tiffes[1]
-pa_rc <- rast(tiffes)
-pa_rc <- crop(pa_rc, tmp)
- 
-serv_bra <- mask(serv_bra, tmp)
-  
- writeRaster(serv_bra, paste0(here("restoration_combined"),'/', "BRA_ES_msk.tif"), overwrite=T)
- sf_crs <- st_crs(poly)$proj4string 
- serv_bra <- project(serv_bra, sf_crs, method= 'bilinear', res=30, threads=24)
- 
- 
-  griscom <- rast(here("Interventions", "Brazil_intervention", "SS_griscom.tif"))
- griscom <- project(griscom, serv_bra, threads=24)
-  
-  serv_bra <- mask(serv_bra, griscom, maskvalue=0)
- 
- target_area <- 30200  # Target area in hectares
+## 4.3 Run Sampling and Syntetize results - Espirito Santo
 
-# Step 1: Calculate pixel area in hectares
-pixel_area <- res(serv_bra)[1] * res(serv_bra)[2] / 10000  # 
- r_vals <- values(serv_bra, na.rm = TRUE)  # Extract non-NA pixel values
-sorted_values <- sort(r_vals, decreasing = TRUE)  # Sort in descending order
-
-# Step 3: Accumulate pixel areas until the target area is reached
-cum_area <- cumsum(rep(pixel_area, length(sorted_values)))  # Cumulative area
-cutoff_index <- which(cum_area >= target_area)[1]  # Find the index for the cutoff
-value_cutoff <- sorted_values[cutoff_index]  # Get the value at the cutoff index
-
-# Step 4: Create a mask for pixels meeting the condition
-msk <- serv_bra >= value_cutoff  # Retain only pixels >= cutoff value
-selected_pixels <- msk * serv_bra  # Apply the mask to keep the original values
- writeRaster(selected_pixels, paste0(here("restoration_combined"),'/', "max_ES.tif"), overwrite=T)
- 
-```
-
-![Intervention Areas & Combiend Restoration Potential](/home/jeronimo/OneDrive/WWF_nbs_op/output_maps/maps_interventions.png)
-## 6.1 Espirito Santo
-
-### 6.1.1 Prepare Data Esp Santo.
-
-Align and resampe all the raster datasets to the same crs and origin.
-
-```{r filter data 1, eval=FALSE, include=FALSE}
-serv <- rast(here("Interventions", "Brazil_intervention", "esp_santo_bkg.tif"))
-a_files <- tiffes[grep("BRAZIL", tiffes)]
-#a_files <- a_files[2]
-serv_1 <- lapply(a_files, rast)
-tf <- basename(a_files)
-temp <- trim(project(serv, serv_1[[1]]))
-serv_1 <- lapply(serv_1, function(r){
-  r <- crop(r,temp, snap= "in", extend=TRUE)
-  if (!compareGeom(r, temp, stopOnError = FALSE)) {
-      message("Aligning raster: ", names(r))
-      # Resample to align with the template
-      resample(r, temp, method = "bilinear")
-    } else {
-      # Return raster as is if already aligned
-      message("Raster already aligned: ", names(r))
-      r
-    }
-  r <- trim(r)
-  #r <- mask(r,temp)
-r <- project(r, serv, method = 'bilinear')
-})
-
-serv_1 <- lapply(serv_1, function(r){
-  r <- mask(r,serv)
-})
-
-map(1:length(serv_1), function(x) writeRaster(serv_1[[x]], paste0(here("Interventions", "Brazil_intervention"), '/', tf[x]), overwrite=TRUE))
-serv_1 <- lapply(tiffes, rast)
-serv_1 <- (do.call(c,serv_1))
-serv_1 <- trim(merge(serv_1,serv)) #add background of Zeros
-writeRaster(serv_1, paste0(here("Interventions", "Brazil_intervention"),'/', 'serv_BRAZIL.tif'), overwrite=TRUE)
-```
-
-### 6.1.2 Run Sampling and Syntetize results - Espirito Santo
-
-Here, we are sampling the data for obtain estimate of the expected
+Finally, we are sampled  the data for obtain estimate of the expected
 restoration gains assuming randomly selected pixels extracted form the
 potential restoration areas. Again, some assumptions will have to be
 reviewed, but this is an initial assessment. The targeted intervention
