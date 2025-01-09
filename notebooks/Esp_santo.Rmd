@@ -2,9 +2,10 @@
 title: "Preliminary Intervention Assessment NBS for the state of Espírito Santo, Brazil"
 author: "Jerónimo Rodríguez-Escobar"
 output:
+  word_document: default
+  pdf_document: default
   html_document:
     df_print: paged
-  pdf_document: default
 editor_options:
   markdown:
     wrap: 72
@@ -66,8 +67,8 @@ This analysis is based on the following assumptions:
   - The willingness of landowners and managers to participate in the project.
   - The ability to secure control over land during the project duration.
   - The spatial configuration effects incorporated during the modeling of ecosystem service gains.
-- Confidence intervals provide robust estimates under random distribution scenarios.
-------------------------------------------------------------------------
+  - Confidence intervals provide robust estimates under random distribution scenarios.
+---------------------------------------------------------------------
 
 # 2. Materials and Methods
 
@@ -157,18 +158,20 @@ rm(lc)
 
 ## 4.1 Target Layers
 The target layers used for this analysis were: Coastal Protection, Nitrogen Export, Sediment Retention, and Pollination.
-```{r select ES diff  data}
+```{r select ES diff  data, include=FALSE}
 #Restoration:
+area <-c("BRAZIL", "MEXICO") 
+
 
 tiffes <- file.path(
   here("cropped_raster_data"),
   list.files(
     here("cropped_raster_data"),
-    pattern = "BRAZIL.*\\.tif$"
+    pattern = "MEXICO,*\\.tif$"
   )
 )
 tiffes <- tiffes[c(1,11,15,18,22)] #just keep pollination - HAB,
-tiffes <- tiffes[-2]
+#tiffes <- tiffes[-2]
 ```
 
 ## 4.2 Normalization and Combination of Ecosystem Service Provision Gains 
@@ -201,7 +204,6 @@ tiffes <- file_info$FilePath
 
 baseES <- lapply(tiffes, rast)
 
-
 tmp <- crop(tmp, baseES[[1]])
  
 
@@ -214,13 +216,16 @@ baseES <- lapply(baseES, function(r) {
       r
       }
     })
-
-poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
-pol_wgs <- st_transform(poly, crs=crs(baseES[[1]]))
-serv_bra <- lapply(baseES, function(r){
-  r <- crop(r,pol_wgs)
-  r <- mask(r, pol_wgs)
-  }) 
+#### This is only necessary if we are working with a subset of the area, need to extract by a smaller polygon. Right now we only need that for Espirito Santo
+# poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
+# pol_wgs <- st_transform(poly, crs=crs(baseES[[1]]))
+# serv_bra <- lapply(baseES, function(r){
+#   r <- crop(r,pol_wgs)
+#   r <- mask(r, pol_wgs)
+#   }) 
+# 
+# # ust assign this vrariable name, sowe don't need to edit the whole thing 
+serv_bra <- baseES
 
 serv_bra <- lapply(serv_bra,normalize_raster)
 serv_bra <- do.call(c, serv_bra)
@@ -361,11 +366,11 @@ all_results <- all_results %>%
 save(all_results, file= here("Interventions", "Brazil_intervention", "all_res_bra.RData"))
 ```
 
-### 4.% Result Visualization
+### 4.5 Result Visualization
 
 ```{r plot brazil outpus, echo=FALSE}
 load(here("Interventions", "Brazil_intervention", "all_res_bra.RData"))
-df <-all_results %>%  filter(band!="nature_access_diff_Sc3v1_PNVnoag-esa2020") %>% filter(band!= "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790")
+df <-all_results %>%  filter(band!="nature_access_diff_Sc3v1_PNVnoag-esa2020") %>% filter(band!= "pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag-esa2020_md5_405c88")
 # Assuming your 'all_results' data frame has the columns 'Service', 'units', and 'color'
 # Assuming your 'all_results' data frame has the columns 'Service', 'units', and 'color'
 
@@ -395,14 +400,80 @@ plot <- ggplot(df, aes(y = sum, fill = color)) +
 plot
 ```
 
+
+# 5 Yucatan
+
+```{r synthesis data Surendra}
+
+
+baseES <- lapply(tiffes, rast)
+
+tmp <- crop(tmp, baseES[[1]])
+ 
+
+baseES <- lapply(baseES, function(r) {
+  if (!compareGeom(r, tmp, stopOnError = FALSE)) {
+    message("Aligning raster: ", names(r))
+    resample(r, tmp, method = "bilinear")
+    } else {
+      message("Raster already aligned: ", names(r))
+      r
+      }
+    })
+
+# convert into binary masks (i will need to add a background of zeroes, can be done after stacking.)
+# create rcl matrix
+baseES <- lapply(baseES, function(x) ifel(x > 0, 1, 0))
+
+#create background pixels, subsitute all by 0
+tmp <- subst(baseES[[2]], from= 1, to=0)
+baseES <- do.call(c, baseES)
+#trim to creae extent (because access is always an issue  because of projection)
+ext <- trim(baseES[[3]])
+baseES <- crop(baseES, ext)
+baseES <- crop(baseES,tmp)
+baseES <- mask(baseES,tmp)
+tmp <- crop(tmp, baseES)
+
+tt <- baseES[[-2]]
+
+
+rcl <- matrix(c(
+  0, Inf, 0   # Any value greater than 0 becomes 1
+), ncol = 3, byrow = TRUE)
+
+#create background pixels, subsitute all by 0
+tt <- lapply(tt, function(r){
+  r <- classify(r, rcl)
+})
+tt <- do.call(merge,tt)
+baseES <- mask(baseES,tt) 
+
+baseES <- merge(baseES,tt)
+
+    # Sum the layers of the merged raster
+serv_bra  <- app(baseES, sum)
+serv_bra <- project(serv_bra, "EPSG:32616", res=30, threads=30) 
+serv_bra <- round(serv_bra, digits=0) 
+writeRaster(serv_bra, paste0(here("Interventions", "Mexico_int_areas",'/', 'ES_occurrence.tif')))
+
+serv_norm <- normalize_raster(serv_bra)
+
+writeRaster(serv_norm, paste0(here("Interventions", "Mexico_int_areas",'/', 'ES_occ_norm_30m.tif')),overwrite=TRUE)
+
+r100_tmp <- rast(serv_norm)
+res(r100_tmp) <- 100
+r100<- resample(serv_norm,r100_tmp,method='near')
+writeRaster(r100, paste0(here("Interventions", "Mexico_int_areas",'/', 'ES_occ_norm_100m.tif')))
+```
+
 ------------------------------------------------------------------------
 
 
 References
-
+Bivand, R. S., Pebesma, E. J., & Gómez-Rubio, V. (2013). Applied
+spatial data analysis with R (2nd ed.). Springer.
 Cochran, W. G. (1977). Sampling techniques (3rd ed.). John Wiley & Sons.
 Lohr, S. L. (2010). Sampling: Design and analysis (2nd ed.).
 Brooks/Cole. 1\
-1. Bivand, R. S., Pebesma, E. J., & Gómez-Rubio, V. (2013). Applied
-spatial data analysis with R (2nd ed.). Springer.
-
+Natural Capital Project (2024). InVEST 0.0. Stanford University, University of Minnesota, Chinese Academy of Sciences, The Nature Conservancy, World Wildlife Fund, Stockholm Resilience Centre and the Royal Swedish Academy of Sciences. *https://naturalcapitalproject.stanford.edu/software/invest*
