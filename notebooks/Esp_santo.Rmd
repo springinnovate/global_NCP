@@ -404,67 +404,151 @@ plot
 # 5 Yucatan
 
 ```{r synthesis data Surendra}
+###############################################################################
+# Script:    process_ES_rasters.R
+# Author:    Jeronimo Rodriguez E.
+# Date:      2025-01-08
+# Purpose:   Read and align multiple SpatRasters, convert them to binary masks,
+#            merge and sum layers, then project and normalize the result.
+#            Finally, write outputs at 30 m and 100 m resolutions (EPSG:32616).
+###############################################################################
 
+# Load required packages
+library(terra)
+library(here)
+
+# -----------------------------------------------------------------------------
+# 1. Load and Inspect Data
+# -----------------------------------------------------------------------------
+# 'tiffes' is a character vector of file paths (all .tif files).
+# Each file is read into a SpatRaster and stored in a list.
 
 baseES <- lapply(tiffes, rast)
+# 'tmp' is  another SpatRaster used as the template for alignment.
+# Make sure 'tmp' is loaded or defined beforehand.
 
+# Crop 'tmp' to align it with the first raster in 'baseES'
+# (This ensures the extents match as closely as possible.)
 tmp <- crop(tmp, baseES[[1]])
- 
 
+# -----------------------------------------------------------------------------
+# 2. Align All Rasters to the Reference 'tmp'
+# -----------------------------------------------------------------------------
+# Compare geometry with 'tmp': if different, resample; otherwise keep as-is.
 baseES <- lapply(baseES, function(r) {
   if (!compareGeom(r, tmp, stopOnError = FALSE)) {
     message("Aligning raster: ", names(r))
     resample(r, tmp, method = "bilinear")
-    } else {
-      message("Raster already aligned: ", names(r))
-      r
-      }
-    })
+  } else {
+    message("Raster already aligned: ", names(r))
+    r
+  }
+})
 
-# convert into binary masks (i will need to add a background of zeroes, can be done after stacking.)
-# create rcl matrix
+# -----------------------------------------------------------------------------
+# 3. Convert to Binary Masks (Values > 0 => 1, Otherwise => 0)
+# -----------------------------------------------------------------------------
 baseES <- lapply(baseES, function(x) ifel(x > 0, 1, 0))
 
-#create background pixels, subsitute all by 0
-tmp <- subst(baseES[[2]], from= 1, to=0)
-baseES <- do.call(c, baseES)
-#trim to creae extent (because access is always an issue  because of projection)
-ext <- trim(baseES[[3]])
-baseES <- crop(baseES, ext)
-baseES <- crop(baseES,tmp)
-baseES <- mask(baseES,tmp)
-tmp <- crop(tmp, baseES)
+# Create an additional "background" raster by substituting 1 -> 0 
+# in one of the existing layers (baseES[[2]] in this case).
+tmp <- subst(baseES[[2]], from = 1, to = 0)
 
+# Combine all SpatRasters into a single multi-layer SpatRaster
+baseES <- do.call(c, baseES)
+
+# -----------------------------------------------------------------------------
+# 4. Trim and Crop Extent
+# -----------------------------------------------------------------------------
+# Use the 3rd layer to define a minimal bounding extent, then crop.
+ext <- trim(baseES[[3]])             # determines the bounding box
+baseES <- crop(baseES, ext)          # crop the entire stack to this extent
+
+# Further crop and mask by 'tmp' (the zero-background)
+baseES <- crop(baseES, tmp)
+baseES <- mask(baseES, tmp)
+tmp <- crop(tmp, baseES)             # ensure 'tmp' matches final extent
+
+# -----------------------------------------------------------------------------
+# 5. Additional Classification / Background Handling
+# -----------------------------------------------------------------------------
+# Remove the 2nd layer from 'baseES' for further processing
 tt <- baseES[[-2]]
 
-
+# Create a classification matrix:
+#   0 to Inf => 0
+# This might invert or zero out certain areas. (Double-check your logic here!)
 rcl <- matrix(c(
-  0, Inf, 0   # Any value greater than 0 becomes 1
+  0, Inf, 0
 ), ncol = 3, byrow = TRUE)
 
-#create background pixels, subsitute all by 0
-tt <- lapply(tt, function(r){
-  r <- classify(r, rcl)
-})
-tt <- do.call(merge,tt)
-baseES <- mask(baseES,tt) 
+# Apply classification to each layer in 'tt'
+tt <- lapply(tt, function(r) classify(r, rcl))
 
-baseES <- merge(baseES,tt)
+# Merge all layers into one SpatRaster
+tt <- do.call(merge, tt)
 
-    # Sum the layers of the merged raster
-serv_bra  <- app(baseES, sum)
-serv_bra <- project(serv_bra, "EPSG:32616", res=30, threads=30) 
-serv_bra <- round(serv_bra, digits=0) 
-writeRaster(serv_bra, paste0(here("Interventions", "Mexico_int_areas",'/', 'ES_occurrence.tif')))
+# Mask the original stack by 'tt'
+baseES <- mask(baseES, tt)
 
+# Merge the masked 'baseES' with 'tt'
+baseES <- merge(baseES, tt)
+
+# -----------------------------------------------------------------------------
+# 6. Sum Layers, Project, and Round
+# -----------------------------------------------------------------------------
+# Sum all layers in 'baseES'
+serv_bra <- app(baseES, sum)
+
+# Reproject to EPSG:32616 at 30 m resolution (multi-threaded if available)
+serv_bra <- project(serv_bra, "EPSG:32616", res = 30, threads = 30)
+
+# Round values to integers
+serv_bra <- round(serv_bra, digits = 0)
+
+# Write the 30 m result
+writeRaster(
+  serv_bra,
+  paste0(here("Interventions", "Mexico_int_areas"), "/", "ES_occurrence.tif"),
+  overwrite = TRUE
+)
+
+# -----------------------------------------------------------------------------
+# 7. Normalize the 30 m Raster
+# -----------------------------------------------------------------------------
+# 'normalize_raster()' is assumed to be a custom function that scales
+# values (e.g., 0–1 or min–max normalization). Make sure it's defined/loaded.
 serv_norm <- normalize_raster(serv_bra)
 
-writeRaster(serv_norm, paste0(here("Interventions", "Mexico_int_areas",'/', 'ES_occ_norm_30m.tif')),overwrite=TRUE)
+# Write the normalized 30 m output
+writeRaster(
+  serv_norm,
+  paste0(here("Interventions", "Mexico_int_areas"), "/", "ES_occ_norm_30m.tif"),
+  overwrite = TRUE
+)
 
+# -----------------------------------------------------------------------------
+# 8. Resample to 100 m Resolution
+# -----------------------------------------------------------------------------
+# Create a 100 m SpatRaster template from 'serv_norm'
 r100_tmp <- rast(serv_norm)
-res(r100_tmp) <- 100
-r100<- resample(serv_norm,r100_tmp,method='near')
-writeRaster(r100, paste0(here("Interventions", "Mexico_int_areas",'/', 'ES_occ_norm_100m.tif')))
+res(r100_tmp) <- 100  # set desired 100 m resolution
+
+# Resample (near) for categorical or masked data
+r100 <- resample(serv_norm, r100_tmp, method = "near")
+
+# Write the normalized 100 m output
+writeRaster(
+  r100,
+  paste0(here("Interventions", "Mexico_int_areas"), "/", "ES_occ_norm_100m.tif"),
+  overwrite = TRUE
+)
+
+###############################################################################
+# End of script
+###############################################################################
+
+
 ```
 
 ------------------------------------------------------------------------
