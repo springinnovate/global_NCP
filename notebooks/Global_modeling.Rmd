@@ -47,11 +47,12 @@ Use vector file, just the main biomes.
 By World Bank Region
 ```{r filter out PAs}
 poly <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
+poly <- st_transform(poly, crs = crs(tmp))
+rm(tmp)
 nam <- sort(unique(poly$region_wb))
 poly <- poly %>% filter(region_wb!="Antarctica")
 nam <- gsub("[[:punct:]]", "", nam) # Remove punctuation
 nam <- gsub(" ", "_", nam) # Replace spaces with underscores
-nam <- sort(unique(poly$region_wb))
 poly <- poly%>%split(.$region_wb)
 ```
 
@@ -59,6 +60,8 @@ poly <- poly%>%split(.$region_wb)
 By Country
 ```{r filter out PAs}
 poly <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
+poly <- st_transform(poly, crs = crs(tmp))
+rm(tmp)
 poly <- poly %>% group_by(iso3) %>% summarize(geom =st_union(geom)) %>% ungroup()
 #Exclude countries/territories too far North/South
 exclude_iso3 <- c("ATA", "FRO", "ISL", "FIN", "GRL", "NOR")
@@ -72,13 +75,15 @@ poly <- poly%>%split(.$iso3)
 
 ```{r select data to process}
 
-inpath <- "~/Documents/MN_Applied_Economics/Global_ES_mapping/Downloaded_data" 
-outpath <- "~/Documents/MN_Applied_Economics/Global_ES_mapping/country"
+inpath <- "/home/jeronimo/OneDrive/GlobalNatCAP/Global_ES_mapping/Downloaded_data" 
+outpath <- "/home/jeronimo/OneDrive/GlobalNatCAP/Global_ES_mapping/Income_level"
 # do not include data with a differnet crs here, we will deal with that on the next chunk.
 
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
 #Remove points, risk reduction baseline
 tiffes <- tiffes[-c(2,4)]
+tiffes <- tiffes[4]
+
 tf <- basename(tiffes)
 clean_filename <- function(filename){
   sub("_md5_*", "", filename)
@@ -96,6 +101,7 @@ clean_filename <- function(filename){
   #sub("_md5.*", "", filename)
   sub(".tif.*", "", filename)
 }
+
 # Loop through each geotiff file
 for (i in seq_along(tiffes)) {
   # Get the current tiff file
@@ -131,7 +137,7 @@ rs <- lapply(tiffes, rast)
 # Pending to add: run this in parallel!
 # Apply cropping and masking recursively using lapply and map
 
-num_cores <- 6
+num_cores <- 10
 # Parallelize the outer loop using mclapply
 rs_msk <- mclapply(rs, function(raster) {
   # Use lapply for the inner loop
