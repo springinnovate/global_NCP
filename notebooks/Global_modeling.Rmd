@@ -49,6 +49,7 @@ Use vector file, just the main biomes.
 By World Bank Region
 ```{r filter out PAs 1, eval=FALSE, include=FALSE}
 poly <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
+<<<<<<< HEAD
 #poly <- poly %>% filter(region_wb!="Antarctica")# %>% filter(region_wb!="East Asia & Pacific")
 nam <- sort(unique(poly$iso3))
 nam <- gsub("[[:punct:]]", "", nam) # Remove punctuation
@@ -67,6 +68,15 @@ poly <- poly %>% filter(region_wb!="Antarctica")
 nam <- gsub("[[:punct:]]", "", nam) # Remove punctuation
 nam <- gsub(" ", "_", nam) # Replace spaces with underscores
 poly <- poly%>%split(.$income_grp)
+=======
+poly <- st_transform(poly, crs = crs(tmp))
+rm(tmp)
+nam <- sort(unique(poly$region_wb))
+poly <- poly %>% filter(region_wb!="Antarctica")
+nam <- gsub("[[:punct:]]", "", nam) # Remove punctuation
+nam <- gsub(" ", "_", nam) # Replace spaces with underscores
+poly <- poly%>%split(.$region_wb)
+>>>>>>> dev
 ```
 
 By Country
@@ -93,7 +103,11 @@ outpath <- "/home/jeronimo/OneDrive/GlobalNatCAP/Global_ES_mapping/Income_level"
 
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
 #Remove points, risk reduction baseline
+<<<<<<< HEAD
 #iffes <- tiffes[-c(2,4)]
+=======
+tiffes <- tiffes[-c(2,4)]
+>>>>>>> dev
 tiffes <- tiffes[4]
 
 tf <- basename(tiffes)
@@ -106,9 +120,125 @@ tf <- clean_filename(basename(tf))
 
 This runs the same process in batch. Memory was optimized to not load all the data at thesame time, but process and write each raster individually before going to the next one.  
 
+<<<<<<< HEAD
 This is way faster than the second approach (below). 
 ```{r change_map_calc, eval=FALSE, include=FALSE}
 esat <- c(here("Downloaded_data_ES", "ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif"),here("Downloaded_data_ES", "ESACCI-LC-L4-LCCS-Map-300m-P1Y-1992-v2.0.7cds_compressed_md5_60cf30.tif"))
+=======
+
+
+```{r iterate cropMask, eval=FALSE, include=FALSE}
+clean_filename <- function(filename){
+  #sub("_md5.*", "", filename)
+  sub(".tif.*", "", filename)
+}
+
+# Loop through each geotiff file
+for (i in seq_along(tiffes)) {
+  # Get the current tiff file
+  tiff_file <- tiffes[i]
+  
+  # Load the current geotiff (don't load all at once)
+  access <- rast(tiff_file)
+  
+  # Apply crop and mask operations to each polygon
+  cropped <- map(1:length(poly), function(x) crop(access, poly[[x]]))
+  masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
+  
+  # Extract the base filename before 'md5'
+  base_filename <- clean_filename(basename(tiff_file))
+  #base_filename <- gsub("[[:punct:]]", "", base_filename) # Remove punctuation
+#base_filename <- gsub(" ", "_", base_filename) # Replace spaces with underscores
+  
+  # Write the cropped and masked rasters to files
+  map(1:length(masked), function(x) {
+    writeRaster(masked[[x]], paste0(outpath,"/", base_filename, "_", nam[x], ".tif"), overwrite = TRUE)
+  })
+  # Optionally, clear the variable to free up memory
+  rm(access, cropped, masked)
+  gc()  # Garbage collection to clear memory
+}
+```
+
+
+# By Income level
+# Region Wb
+```{r cropmask}
+rs <- lapply(tiffes, rast) 
+# Pending to add: run this in parallel!
+# Apply cropping and masking recursively using lapply and map
+
+num_cores <- 10
+# Parallelize the outer loop using mclapply
+rs_msk <- mclapply(rs, function(raster) {
+  # Use lapply for the inner loop
+  lapply(poly, function(polygon) {
+    # Crop and mask the raster
+    cropped_raster <- crop(raster, polygon)
+    masked_raster <- mask(cropped_raster, polygon)
+    return(masked_raster)
+  })
+}, mc.cores = num_cores) 
+
+# Use lapply to iterate over each list in nested_list
+lapply(seq_along(rs_msk), function(i) {
+  # For each outer list, iterate through the inner list (rasters)
+  lapply(seq_along(rs_msk[[i]]), function(j) {
+    
+    # Construct the filename using vector_1 and vector_2
+    file_name <- paste0(outpath, tf[[i]], '_', nam[[j]], '.tif')
+    
+    # Write the raster to the file
+    writeRaster(rs_msk[[i]][[j]], file_name, overwrite = TRUE)
+  })
+})
+```
+
+
+```{r}
+summary_df <- map2_dfr(seq_along(rs_msk), rs_msk, function(i, inner_list) {
+  
+  # i corresponds to the index of the outer list (e.g., 1, 2, 3...)
+  outer_label <- paste0("Outer_", i)  # Label for the outer list
+  
+  # Loop through each SpatRaster in the inner list
+  map_dfr(inner_list, function(raster) {
+    extract_raster_summary(raster, outer_label)
+  })
+})
+
+
+for (i in seq_along(rs_msk)) {
+  sublist <- rs_msk[[i]]  # Access each sublist
+  
+  for (j in seq_along(sublist)) {
+    raster <- sublist[[j]]  # Access each SpatRaster
+    raster_name <- names(raster)  # Get the name slot of the SpatRaster
+    
+    # Build the output filename
+    output_filename <- paste0(outpath, '/', raster_name, "_", nam[j], ".tif")
+    
+    # Save the raster to a .tif file
+    writeRaster(raster, filename = output_filename, overwrite = TRUE)
+  }
+}
+
+
+```
+ok I need you help drafting an email to my dissertation committee that I really struggle with 
+# Split by Countries/continents
+
+
+# mask by protected areas (all togeter, chategories I-VI)
+
+# Reclassify Land Cover maps.
+
+# Change Maps
+
+```{r change_map_calc}
+esat <- c('/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif','/Users/sputnik/Library/CloudStorage/OneDrive-TempleUniversity/personal files/PosDoc/DataOBS_op/global_products/ESACCI-LC-L4-LCCS-Map-300m-P1Y-1992-v2.0.7cds_compressed_md5_60cf30.tif')
+
+>>>>>>> dev
 
 esas <- lapply(esat,rast)
 nam <- c(2020,1992)
