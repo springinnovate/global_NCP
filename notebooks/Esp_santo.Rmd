@@ -230,6 +230,9 @@ serv_bra <- baseES
 serv_bra <- lapply(serv_bra,normalize_raster)
 serv_bra <- do.call(c, serv_bra)
 
+writeRaster(serv_bra, paste0(here("restoration_combined"),'/', 'BRA_ES_multiband.tif')). #Add Access layer before exporting. 
+
+
 tmp <- mask(tmp, pol_wgs)
 tmp <- trim(tmp)
 
