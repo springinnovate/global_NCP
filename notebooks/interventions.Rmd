@@ -13,7 +13,7 @@ editor_options:
 ```{r prep environment, eval=TRUE, include=FALSE}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
-           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign')
+           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign',  'exactextractr')
 sapply(packs, require, character.only = TRUE, quietly=TRUE)
 rm(packs)
 align_rasters <- function(raster_list, template, resample_method = "bilinear") {
@@ -55,11 +55,12 @@ This report presents a preliminary approach to estimate potential ecosystem serv
 - Madagascar (Diana Northen).
 - Vietnam (Northern Amannites).
 
+
 ## 1.2 Objectives
 
 This analysis has two objectives:
 - Identify high-value pixels for restoration purposes.
-- Estimate potential gains in ecosystem service (ES) provision if a target area (preliminarily 30,200 ha) is restored to natural vegetation within the State of Espírito Santo.
+- Estimate potential gains in ecosystem service (ES) provision if a target area (30,200 ha in Espirito Santo, 15.000 in Yucatan ) are restored to natural vegetation within the target areae 
 
 ## 1.3 Theoretical Assumptions
 
@@ -84,18 +85,17 @@ This analysis is based on the following assumptions:
 
 # 2. Study Areas
 
-## 2.1 Brazil - Espírito Santo
+# 2. Materials and Methods
 
-Espírito Santo represents a priority intervention area for restoration
-activities. The target area spans **30,200 hectares**.
+## 2.1 Study Area
 
-## 2.2 Mexico - Yucatán Peninsula
+1. The totality of Espírito Santo State, located on the Brazilian Atlantic coast. A more detailed contextualization of the region, including its geographic, environmental, demographic, and economic aspects, and how it integrates into the broader Symbiosis project can be included here. For this exercise, the total area to restore is 30,200 ha.
 
-The Yucatán Peninsula analysis includes two main intervention areas: the
+
+2. In the Yucatan Peninsula, includes two main intervention areas: the
 Jaguar Corridor and adjacent restoration polygons. The target
 intervention area spans **15,000 hectares**.
 
-## 2.3 Additional Intervention Areas.
 
 -   Peru - Madre de Dios
 -   Madagascar
@@ -103,33 +103,11 @@ intervention area spans **15,000 hectares**.
 
 ------------------------------------------------------------------------
 
-# 3. Methods
+### 2.2 Input Data
 
-## 2.2 Input Data
-
-<<<<<<< HEAD
 -   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5). Data were derived using InVEST, a suite of spatially explicit models that map and quantify nature's contributions to people. InVEST was developed by the Natural Capital Project, a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund
 
 -   **Restoration Potential:** [Adjusted Griscom restoration grided data](https://zenodo.org/records/883444)
-=======
-<<<<<<<< HEAD:notebooks/inerventions.Rmd
--   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5).
--   **Restoration Potential:** [Adjusted Griscom restoration data](https://zenodo.org/records/883444). 
--   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping
-    the planet’s critical natural
-    assets](https://www.nature.com/articles/s41559-022-01934-5).
--   **Restoration Potential:** Adjusted Griscom restoration data.
--   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5).
--   **Restoration Potential:** [Adjusted Griscom restoration data](https://zenodo.org/records/883444). 
-
-
--   **Raster Processing Tools:** `terra`, `dplyr`, and `sf` packages in R.
-========
--   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5). Data were derived using InVEST, a suite of spatially explicit models that map and quantify nature's contributions to people. InVEST was developed by the Natural Capital Project, a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund
-
--   **Restoration Potential:** [Adjusted Griscom restoration grided data](https://zenodo.org/records/883444)
->>>>>>>> c10bf2f (change name):notebooks/interventions.Rmd
->>>>>>> c10bf2f (change name)
 
 Spatial grids (raster data in GeoTIFF format) were used, where pixel values reflect estimated gains, measured in units specific to each ecosystem service. These gains represent the potential increase in ecosystem service provision if an area is restored to its potential natural vegetation, except for urban/built-up areas. The following ecosystem services were considered:
 
@@ -150,10 +128,10 @@ Spatial grids (raster data in GeoTIFF format) were used, where pixel values refl
     2022).
 
 
+
 ## 2.3 Processing Environment 
 
 Spatial Raster Processing Tools: The `terra`, `dplyr`, and `sf` packages in **R** were used for analysis. Data visualization was performed using `ggplot2`.
-
 ### 2.4 Normalization of Ecosystem Service Restoration Data 
 
 Raster data were normalized using the following formula to bring values to a common standard:
@@ -204,6 +182,8 @@ rm(lc)
 
 ## 4.1 Target Layers
 The target layers used for this analysis were: Coastal Protection, Nitrogen Export, Sediment Retention, and Pollination.
+
+
 ```{r select ES diff  data, include=FALSE}
 #Restoration:
 area <-c("BRAZIL", "MEXICO") 
@@ -216,18 +196,77 @@ tiffes <- file.path(
     pattern = "MEXICO,*\\.tif$"
   )
 )
-tiffes <- tiffes[c(1,11,15,18,22)] #just keep pollination - HAB,
+
+tiffes_bl <- tiffes[c(5,12,6,15,8)]
+tiffes <- tiffes[c(1,11,14,16,21)] #just keep pollination - AG,
 #tiffes <- tiffes[-2]
 ```
 
+# 4.2 Load Baselines
 
-## 4.1 List the Restoration Layers 
-This is if we are going to run a whole list of polygins/study regions .
-```{r select restporation change data}
-#Restoration:
-tiffes <- file.path(here("cropped_raster_data" ), list.files(paste0(here("cropped_raster_data")),pattern= '.tif$'))
-tiffes <- tiffes[c(1:5,51:55,71:75,81:90,106:110)]
+```{r apply mask AOI AP, eval=FALSE, include=FALSE}
+
+# Step 1: Extract file names, product names, and country names
+file_names <- basename(tiffes_bl)  # Extract file names from paths
+
+# Extract product names and country names
+product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
+country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
+
+# Step 2: Create a dataframe to organize the information
+file_info <- data.frame(
+  FilePath = tiffes_bl,
+  Product = product_names,
+  Country = country_names,
+  stringsAsFactors = FALSE
+)
+
+# Step 3: Sort the dataframe by Country first, then by Product
+# file_info <- file_info %>%
+#   arrange(Country, Product)
+
+# Step 4: Extract the sorted file paths
+tiffes <- file_info$FilePath
+
+baseES <- lapply(tiffes, rast)
+
+# 
+# bkg_esanto <- rast('/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Brazil_intervention/esp_santo_bkg.tif')
+# 
+# 
+# #### This is only necessary if we are working with a subset of the area, need to extract by a smaller polygon. Right now we only need that for Espirito Santo
+#  poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
+#  pol_wgs <- st_transform(poly, crs=crs(baseES[[1]]))
+#  serv_bra <- lapply(baseES, function(r){
+#    r <- crop(r,pol_wgs)
+#    r <- mask(r, pol_wgs)
+#    }) 
+# prod <- basename(tiffes)
+# # # ust assign this variable name, so we don't need to edit the whole thing 
+# map(1:length(serv_bra), function(x) writeRaster(serv_bra[[x]], paste0(here("Interventions", "espirito_santo"),'/', prod[x])))
+serv_bra <- baseES
+
+sum_val <- lapply(serv_bra, function(r){
+  s <- global(r, "sum", na.rm = TRUE)
+  })
+
+sum_val <- do.call(rbind, sum_val)
+band <- rownames(sum_val)  
+sum_val <- as_tibble(sum_val)
+sum_val <- cbind(band,sum_val)
+sum_val <- sum_val %>%
+  mutate(Service = case_when(
+    band == "ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d" ~ "Coastal Protection",
+    band == "nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb" ~ "Nature Access",
+    band == "global_n_retention_esamod2_compressed_md5_30d56daec1140d031aa62a2bd6fe1f63" ~ "Nitrogen Export",
+    band == "pollination_ppl_fed_on_ag_10s_esa2020_md5_0cf9025ab3a00691f29de359e590cf74" ~ "Pollination",
+    #band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "Pollination (people fed on Hab)",
+    band == "global_sed_retention_esamod2_compressed_md5_c7a77e50feaea7a5dc7322cd63f0f429" ~ "Sediment Export",
+    # ... add more cases for other bands ...
+    TRUE ~ band  # Keep the original band name if no match
+  ))
 ```
+
 
 
 ## 4.2 Normalization and Combination of Ecosystem Service Provision Gains 
@@ -239,7 +278,7 @@ Here, the process iterated ovder all the spatial units evaluated. Just leave it 
 ```{r apply mask AOI AP, eval=FALSE, include=FALSE}
 
 # Step 1: Extract file names, product names, and country names
-file_names <- basename(tiffes)  # Extract file names from paths
+file_names <- basename(tiffes_bl)  # Extract file names from paths
 
 # Extract product names and country names
 product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
@@ -247,15 +286,15 @@ country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country na
 
 # Step 2: Create a dataframe to organize the information
 file_info <- data.frame(
-  FilePath = tiffes,
+  FilePath = tiffes_bl,
   Product = product_names,
   Country = country_names,
   stringsAsFactors = FALSE
 )
 
 # Step 3: Sort the dataframe by Country first, then by Product
-file_info <- file_info %>%
-  arrange(Country, Product)
+# file_info <- file_info %>%
+#   arrange(Country, Product)
 
 # Step 4: Extract the sorted file paths
 tiffes <- file_info$FilePath
@@ -268,24 +307,22 @@ baseES <- lapply(baseES, function(r){
 # set the number of different products to split the list 
 num <- length(unique(product_names))
 # split again to have nested lists
-baseES <- split(baseES, rep(1:length(nam), each = num))
+#baseES <- split(baseES, rep(1:length(nam), each = num))
 
 # align, add background and sum all the values
 baseES <- process_rasters(baseES,tmp, resample_method = "bilinear")
-map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], '_ES_sum.tif')))
+#map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], '_ES_sum.tif')))
 ```
 
 ## 4.3 Load Adjusted Griscom Restoration Data and apply mask
 
-<<<<<<< HEAD
 Use the adjusted Griscom restoration data to extract the pixels includes as  Restoration Potential in Griscom's Dataset (remember to update the info toi the data we used)
 For Surendra (Yucatan) the whole peninsula, in Espirito Santo, just 
-=======
+
 Use the adjusted Griscom restoration data to extract the pixels includes as  Restoration Potential in Griscom's Dataset on [Global
 priority areas for ecosystem
 restoration](https://www.ksfire.org/woody_encroachment/documents/Global%20priority%20areas%20of%20ecosytem%20restoration.pdf).
 
->>>>>>> c10bf2f (change name)
 ```{r load Griscoms data, eval=FALSE, include=FALSE}
 # Load Griscom Data
 tiffes <- file.path(here("Restoration_Griscom"), list.files(paste0(here("Restoration_Griscom")),pattern= 'rec'))
@@ -655,15 +692,28 @@ save(all_results, file= here("Interventions", "Brazil_intervention", "all_res_br
 
 ```{r plot brazil outpus, echo=FALSE}
 load(here("Interventions", "Brazil_intervention", "all_res_bra.RData"))
-df <-all_results %>%  filter(band!="nature_access_diff_Sc3v1_PNVnoag-esa2020") %>% filter(band!= "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790")
+all_results$band <- NULL
+sum_val$band <- NULL
+sum_val <- as_tibble(sum_val)
+sum_val <- rename(sum_val, Total = sum)
+
+
+all_results <- left_join(all_results,sum_val)
+all_results <-all_results %>% 
+  filter(!is.na(Total))
+
+
+all_results <- all_results %>% mutate(perc= sum/Total)
+
+df <-all_results %>%  filter(Service !="Nature Access") 
 # Assuming your 'all_results' data frame has the columns 'Service', 'units', and 'color'
 # Assuming your 'all_results' data frame has the columns 'Service', 'units', and 'color'
 
 # Generate the ggplot object
-plot <- ggplot(df, aes(y = sum, fill = color)) +
+plot <- ggplot(df, aes(y = perc, fill = color)) +
   geom_boxplot() +
-  labs(title = str_wrap("Total estimated service change in units for the target intervention area - Espirito Santo", width = 50), 
-       y = "Total Sum Value") +
+  labs(title = str_wrap("Potential in ES gain for the target intervention area - Espirito Santo", width = 50), 
+       y = "% ES provision gain") +
   theme_bw() +
   theme(
     axis.text.x = element_blank(),
@@ -849,6 +899,10 @@ save(all_results, file=here("Interventions", "Mex_intervention", "all_results_mx
 ```
 
 ### 6.1.3 . Plot Results Yucatan
+
+
+
+
 
 ```{r plot yucatan, echo=FALSE}
 load(file=here("Interventions", "Mex_intervention", "all_results_mx.RData"))
