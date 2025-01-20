@@ -1,0 +1,404 @@
+---
+title: "Ligthning"
+author: "Jer'onimo Rodriguez"
+date: "2025-01-15"
+output: html_document
+---
+---
+title: "Preliminary Intervention Assesment NBS"
+subtitle: "Espirito Santo & Yucatan Peninsula"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r prep environment, eval=TRUE, include=FALSE}
+packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
+           'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
+           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign',  'exactextractr')
+sapply(packs, require, character.only = TRUE, quietly=TRUE)
+rm(packs)
+align_rasters <- function(raster_list, template, resample_method = "bilinear") {
+  lapply(raster_list, function(r) {
+    if (!compareGeom(r, template, stopOnError = FALSE)) {
+      message("Aligning raster: ", names(r))
+      # Resample to align with the template
+      resample(r, template, method = resample_method)
+    } else {
+      # Return raster as is if already aligned
+      message("Raster already aligned: ", names(r))
+      r
+    }
+  })
+}
+
+normalize_raster <- function(r) {
+  min_val <- min(values(r), na.rm = TRUE)
+  max_val <- max(values(r), na.rm = TRUE)
+  (r - min_val) / (max_val - min_val)
+}
+
+process_intervention_area <- function(raster_list) {
+  # Normalize each raster in the list
+  normalized_rasters <- lapply(raster_list, normalize_raster)
+  # Combine the normalized rasters by summing them
+  combined_raster <- do.call(sum, normalized_rasters)
+  return(combined_raster)}
+
+```
+
+
+
+
+# 1. Introduction
+
+This report presents a preliminary approach to estimate potential ecosystem service gains derived from restoration across five study areas prioritized in WWF's Nature-Based Solutions Originating Platfome (NbS-OP). 
+
+-  Brazil Atlantic Forest (**Espírito Santo)**  
+- **Yucatán Peninsula (Mexico)**
+- Peru (Madre de Dios) 
+- Madagascar (Diana Northen).
+- Vietnam (Northern Amannites).
+
+We evaluated follosing services:
+ 
+Coastal Protection, Nitrogen Export, Sediment Retention, Pollination and Nature Access.
+
+## 1.2 Objectives
+
+- Identify high-value pixels for restoration purposes.
+- Estimate potential gains in ecosystem service (ES) provision if a target area (30,200 ha in Espirito Santo, 15.000 in Yucatan ) is restored to a natural vegetation state within the target areae 
+
+## 1.3 Theoretical Assumptions
+
+At this stage, we incorporated following assumptions:
+
+- All ecosystem services are equally valuable.
+- Restoration likelihood is distributed uniformly across the resrartion priority pixeld .
+- The restoration target area is known set in sdvnce . The exact location of restoration efforts within the state is not yet determined, as it depends on factors such as:
+  - The willingness of landowners and managers to participate in the project.
+  - The ability to secure control over land during the project duration.
+  - The spatial configuration effects incorporated during the modeling of ecosystem service gains.
+  - Confidence intervals provide robust estimates under random distribution scenarios.
+  
+  
+### 2.4 Normalization of Ecosystem Service Restoration Data 
+
+We normalized thedts for visualization and simplification purposes 
+$$
+\text{Normalized Value} = \frac{\text{Raster Value} - \text{Min Value}}{\text{Max Value} - \text{Min Value}}
+$$
+
+Where: 
+- $\text{Raster Value}$ is the value of a given pixel. 
+- $\text{Min Value}$ and $\text{Max Value}$ represent the minimum and maximum observed values across the raster dataset.
+
+  
+---------------------------------------------------------------------
+## 1.4 Next Steps
+- Incorporate beneficiary quantification into the analysis 
+- Carbon?
+- Other key services Services
+- Extract by specific Land Covers/Protected Areas/Management strategy or tenure type. 
+
+------------------------------------------------------------------------
+```{r create tmp, eval=FALSE, include=FALSE}
+library(here)
+# add backgrounds/templates to align 
+path_lc <- here('ESA_LC') 
+# load reclassified land cover map
+tf <- file.path(path_lc, list.files(path_lc, pattern= "Rec"))
+lc <- lapply(tf,rast)
+lc <- lc[[1]]
+# create rcl matrix
+rcl <- matrix(c(
+  0, Inf, 0   # Any value greater than 0 becomes 1
+), ncol = 3, byrow = TRUE)
+
+#create background pixels, subsitute all by 0
+tmp <- lapply(lc, function(r){
+  r <- classify(r[[1]], rcl)
+})
+tmp <- tmp[[1]]
+rm(lc)
+```
+
+```{r select ES diff  data, include=FALSE}
+#Restoration:
+area <-c("BRAZIL", "MEXICO") 
+
+
+tiffes <- file.path(
+  here("cropped_raster_data"),
+  list.files(
+    here("cropped_raster_data"),
+    pattern = "BRAZIL,*\\.tif$"
+  )
+)
+
+tiffes_bl <- tiffes[c(5,12,6,15,8)]
+tiffes <- tiffes[c(1,11,14,16,21)] #just keep pollination - AG,
+#tiffes <- tiffes[-2]
+```
+
+```{r select ES diff  data, include=FALSE}
+#Restoration:
+area <-c("BRAZIL", "MEXICO") 
+
+
+tiffes <- file.path(
+  here("Interventions", "Brazil_intervention"),
+  list.files(
+    here("Interventions", "Brazil_intervention"),
+    pattern = "BRAZIL,*\\.tif$"
+  )
+)
+tiffes <- tiffes[-c(5,7)]
+```
+
+```{r apply obtain baseline output, eval=TRUE, include=FALSE}
+
+# Step 1: Extract file names, product names, and country names
+file_names <- basename(tiffes_bl)  # Extract file names from paths
+
+# Extract product names and country names
+product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
+country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
+
+# Step 2: Create a dataframe to organize the information
+file_info <- data.frame(
+  FilePath = tiffes_bl,
+  Product = product_names,
+  Country = country_names,
+  stringsAsFactors = FALSE
+)
+
+# Step 3: Sort the dataframe by Country first, then by Product
+# file_info <- file_info %>%
+#   arrange(Country, Product)
+
+# Step 4: Extract the sorted file paths
+tiffes <- file_info$FilePath
+
+baseES <- lapply(tiffes, rast)
+
+
+#bkg_esanto <- rast('/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Brazil_intervention/esp_santo_bkg.tif')
+
+
+#### This is only necessary if we are working with a subset of the area, need to extract by a smaller polygon. Right now we only need that for Espirito Santo
+ poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
+ pol_wgs <- st_transform(poly, crs=crs(baseES[[1]]))
+ serv_bra <- lapply(baseES, function(r){
+   r <- crop(r,pol_wgs)
+   r <- mask(r, pol_wgs)
+   }) 
+prod <- basename(tiffes)
+# # ust assign this variable name, so we don't need to edit the whole thing 
+#map(1:length(serv_bra), function(x) writeRaster(serv_bra[[x]], paste0(here("Interventions", "espirito_santo"),'/', prod[x])))
+sum_val <- lapply(serv_bra, function(r){
+  s <- global(r, "sum", na.rm = TRUE)
+  })
+
+sum_val <- do.call(rbind, sum_val)
+band <- rownames(sum_val)  
+sum_val <- as_tibble(sum_val)
+sum_val <- cbind(band,sum_val)
+sum_val <- sum_val %>%
+  mutate(Service = case_when(
+    band == "ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d" ~ "Coastal Protection",
+    band == "nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb" ~ "Nature Access",
+    band == "global_n_retention_esamod2_compressed_md5_30d56daec1140d031aa62a2bd6fe1f63" ~ "Nitrogen Export",
+    band == "pollination_ppl_fed_on_ag_10s_esa2020_md5_0cf9025ab3a00691f29de359e590cf74" ~ "Pollination",
+    #band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "Pollination (people fed on Hab)",
+    band == "global_sed_retention_esamod2_compressed_md5_c7a77e50feaea7a5dc7322cd63f0f429" ~ "Sediment Export",
+    # ... add more cases for other bands ...
+    TRUE ~ band  # Keep the original band name if no match
+  ))
+sum_val$band <- NULL
+sum_val <- as_tibble(sum_val)
+sum_val <- rename(sum_val, Total = sum)
+
+```
+
+
+```{r load gric om data}
+
+griscom <- rast("/home/jeronimo/Documents/WWF_nbs_op/Restoration_Griscom/recMEXICO.tif")
+griscom <- rast("/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Brazil_intervention/SS_griscom.tif")
+griscom <- project(griscom, baseES[[2]], threads=24)
+bkg_ee <- rast("/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Brazil_intervention/esp_santo_bkg.tif")
+
+```
+
+
+```{r synthesis data Surendra, eval=FALSE, include=FALSE}
+###############################################################################
+# Script:    process_ES_rasters.R
+# Author:    Jeronimo Rodriguez E.
+# Date:      2025-01-08
+# Purpose:   Read and align multiple SpatRasters, convert them to binary masks,
+#            merge and sum layers, then project and normalize the result.
+#            Finally, write outputs at 30 m and 100 m resolutions (EPSG:32616).
+###############################################################################
+
+
+# -----------------------------------------------------------------------------
+# 1. Load and Inspect Data
+# -----------------------------------------------------------------------------
+# 'tiffes' is a character vector of file paths (all .tif files).
+# Each file is read into a SpatRaster and stored in a list.
+tiffes <- tiffres[-c()]
+baseES <- lapply(tiffes,rast)
+# 'tmp' is  another SpatRaster used as the template for alignment.
+# Make sure 'tmp' is loaded or defined beforehand.
+
+# Crop 'tmp' to align it with the first raster in 'baseES'
+# (This ensures the extents match as closely as possible.)
+tt <- project(bkg_ee, "EPSG:4326")
+trim(tt)
+tmp2 <- crop(tmp, tt)
+tmp
+
+# -----------------------------------------------------------------------------
+# 2. Align All Rasters to the Reference 'tmp'
+# -----------------------------------------------------------------------------
+# Compare geometry with 'tmp': if different, resample; otherwise keep as-is.
+baseES <- lapply(baseES, function(r) {
+  if (!compareGeom(r, tmp, stopOnError = FALSE)) {
+    message("Aligning raster: ", names(r))
+    resample(r, tmp2, method = "bilinear")
+  } else {
+    message("Raster already aligned: ", names(r))
+    r
+  }
+})
+
+baseES_st <- lapply(baseES, function(r){
+  r <- mask(r, griscom)
+  r <- subst(r, from = 0, to = NA)
+})
+
+
+# Apply the function to each layer
+top_10 <- lapply(baseES_st, select_top_10_percent)
+top_10_2 <- do.call(c,top_10)
+writeRaster(top_10_2, here('Interventions', "Brazil_intervention", "top_10_br.tif"), overwrite=TRUE)
+top_10 <- lapply(top_10, function(x) ifel(x > 0, 1, NA))
+top_10 <- do.call(c,top_10)
+
+writeRaster(top_10, here('Interventions', "Brazil_intervention", "top_10_bin_br.tif"), overwrite=TRUE)
+
+writeRaster(baseES_st, here('Interventions', "Bazil_intervention", "stack_normmskd_br.tif"))
+# -----------------------------------------------------------------------------
+# 3. Convert to Binary Masks (Values > 0 => 1, Otherwise => 0)
+# -----------------------------------------------------------------------------
+baseES <- lapply(baseES, function(x) ifel(x > 0, 1, 0))
+
+# Create an additional "background" raster by substituting 1 -> 0 
+# in one of the existing layers (baseES[[2]] in this case).
+tmp <- subst(baseES[[2]], from = 1, to = 0)
+
+# Combine all SpatRasters into a single multi-layer SpatRaster
+baseES <- do.call(c, baseES)
+
+# -----------------------------------------------------------------------------
+# 4. Trim and Crop Extent
+# -----------------------------------------------------------------------------
+# Use the 3rd layer to define a minimal bounding extent, then crop.
+ext <- trim(baseES[[3]])             # determines the bounding box
+baseES <- crop(baseES, ext)          # crop the entire stack to this extent
+
+# Further crop and mask by 'tmp' (the zero-background)
+baseES <- crop(baseES, tmp)
+baseES <- mask(baseES, tmp)
+tmp <- crop(tmp, baseES)             # ensure 'tmp' matches final extent
+
+# -----------------------------------------------------------------------------
+# 5. Additional Classification / Background Handling
+# -----------------------------------------------------------------------------
+# Remove the 2nd layer from 'baseES' for further processing
+tt <- baseES[[-2]]
+
+# Create a classification matrix:
+#   0 to Inf => 0
+# This might invert or zero out certain areas. (Double-check your logic here!)
+rcl <- matrix(c(
+  0, Inf, 0
+), ncol = 3, byrow = TRUE)
+
+# Apply classification to each layer in 'tt'
+tt <- lapply(tt, function(r) classify(r, rcl))
+
+# Merge all layers into one SpatRaster
+tt <- do.call(merge, tt)
+
+# Mask the original stack by 'tt'
+baseES <- mask(baseES, tt)
+
+# Merge the masked 'baseES' with 'tt'
+baseES <- merge(baseES, tt)
+
+# -----------------------------------------------------------------------------
+# 6. Sum Layers, Project, and Round
+# -----------------------------------------------------------------------------
+# Sum all layers in 'baseES'
+serv_bra <- app(baseES, sum)
+
+# Reproject to EPSG:32616 at 30 m resolution (multi-threaded if available)
+serv_bra <- project(serv_bra, "EPSG:32616", res = 30, threads = 30)
+
+# Round values to integers
+serv_bra <- round(serv_bra, digits = 0)
+
+# Write the 30 m result
+writeRaster(
+  serv_bra,
+  paste0(here("Interventions", "Mexico_int_areas"), "/", "ES_occurrence.tif"),
+  overwrite = TRUE
+)
+
+# -----------------------------------------------------------------------------
+# 7. Normalize the 30 m Raster
+# -----------------------------------------------------------------------------
+# 'normalize_raster()' is assumed to be a custom function that scales
+# values (e.g., 0–1 or min–max normalization). Make sure it's defined/loaded.
+serv_norm <- normalize_raster(serv_bra)
+
+# Write the normalized 30 m output
+writeRaster(
+  serv_norm,
+  paste0(here("Interventions", "Mexico_int_areas"), "/", "ES_occ_norm_30m.tif"),
+  overwrite = TRUE
+)
+
+# -----------------------------------------------------------------------------
+# 8. Resample to 100 m Resolution
+# -----------------------------------------------------------------------------
+# Create a 100 m SpatRaster template from 'serv_norm'
+r100_tmp <- rast(serv_norm)
+res(r100_tmp) <- 100  # set desired 100 m resolution
+
+# Resample (near) for categorical or masked data
+r100 <- resample(serv_norm, r100_tmp, method = "near")
+
+# Write the normalized 100 m output
+writeRaster(
+  r100,
+  paste0(here("Interventions", "Mexico_int_areas"), "/", "ES_occ_norm_100m.tif"),
+  overwrite = TRUE
+)
+
+###############################################################################
+# End of script
+###############################################################################
+
+
+```
+
+
+
