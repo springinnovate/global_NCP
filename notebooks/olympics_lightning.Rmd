@@ -48,11 +48,10 @@ process_intervention_area <- function(raster_list) {
 
 # 1. Introduction
 
-This report presents a preliminary approach to estimate potential ecosystem service provision gains derived from restoration across five study areas prioritized in WWF's Nature-Based Solutions Originating Platfome (NbS-OP). 
+This report presents a preliminary approach to estimate potential ecosystem service provision gains derived from restoration across five study areas prioritized in WWF's Nature-Based Solutions Originating Platform (NbS-OP)and optimize restoration itnerventions. 
 
--  Brazil Atlantic Forest (**Espírito Santo)**  
+
 - **Yucatán Peninsula (Mexico)**
-- Peru (Madre de Dios) 
 
 
 We evaluated following ecosystem services:
@@ -62,17 +61,33 @@ Coastal Protection, Nitrogen Export, Sediment Retention, Pollination and Nature 
 ## 1.2 Objectives
 
 - Identify high-value pixels for restoration purposes.
-- Estimate potential gains in ecosystem service (ES) provision if a target surface (30,200 ha in Espirito Santo, 15.000 in Yucatan) is restored to a natural vegetation state within the intervention area 
+- Estimate potential gains in ecosystem service (ES) provision if a target surface (15.000ha) is restored to a natural vegetation state within the intervention area. 
 
 ## 1.3 Theoretical Assumptions
 
-At this stage, we incorporated following assumptions:
 
 - All ecosystem services are equally valuable.
 - Restoration likelihood is distributed uniformly across the pixels prioritized for restoration.
 - The total area to restore is known in advance, the exact location of the restoration action within the potential restoration area is not determined yet, as it is contingent on variables such as: The willingness of landowners and managers to participate in the project and the ability to secure control over land during the intended intervention duration.
   - The spatial configuration effects incorporated during the modeling of ecosystem service gains.
-  
+
+Theoretical Justification
+
+The use of stratified random sampling is justified as it ensures that
+the sample is representative of the entire population (i.e., all pixels
+within the AOI). By dividing the population into strata and sampling
+from each stratum, this method reduces the variability of the estimates
+compared to simple random sampling. This is particularly important when
+dealing with spatial data, where there may be inherent spatial
+autocorrelation or heterogeneity.
+
+The repeated sampling approach further enhances the robustness of the
+estimates by providing a distribution of possible values. This allows
+for the calculation of confidence intervals, which provide a measure of
+the uncertainty associated with the estimates. By synthesizing the
+results from multiple repetitions, the overall estimates are less
+susceptible to the influence of individual sample variations and provide
+a more accurate representation of the true population values.  
   
 ## Intervention Area 
 
@@ -97,16 +112,20 @@ tmp <- tmp[[1]]
 rm(lc)
 ```
 
+
+The intervention area  is located in the Yucatan Peninsula, and encompasses biodiversity corridors and existing protected areas across key ecosystems including the northern shoreline.
+
 ![Yucatan 2020 ESa Land  Cover map (reclassified) and Restoration Priority Areas](/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/yucatan_LC1.png)
 
 
-## 2.2 Input Data
+# 2. Methods
+## 2.1 Input Data
 
--   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5). Data were derived using InVEST, a suite of spatially explicit models that map and quantify nature's contributions to people. InVEST was developed by the Natural Capital Project, a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund
+-   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5). Data were derived using InVEST, a suite of spatially explicit models that map and quantify nature's contributions to people. InVEST was developed by the Natural Capital Project, a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund.
 
 -   **Restoration Potential:** [Adjusted Griscom restoration grided data](https://zenodo.org/records/883444)
 
-Spatial grids (raster data in GeoTIFF format) were used, where pixel values reflect estimated gains, measured in units specific to each ecosystem service. These gains represent the potential increase in ecosystem service provision if an area is restored to its potential natural vegetation, except for urban/built-up areas. The following ecosystem services were considered:
+To sets of data were used, the first one reprsenting thebaseline for the ecosysatm service provision for 2020, and a second one representing  potential increase in ecosystem service provision if an area is restored to its potential natural vegetation, except for urban/built-up areas. The following ecosystem services were considered:
 
 1.  Coastal Protection. Unitless measure, refers to a derived vulnerability index. [**InVEST Coastal Vulnerability Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
 
@@ -122,36 +141,41 @@ Spatial grids (raster data in GeoTIFF format) were used, where pixel values refl
     2022**](https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-022-01934-5/MediaObjects/41559_2022_1934_MOESM1_ESM.pdf)
 
 5.  Nature Access represented as [**the number of people within 1 hour travel of natural and semi-natural lands**](https://github.com/springinnovate/distance-to-hab-with-friction) (Chaplin-Kramer et al,
-    2022).
+    2022).## Methodology
 
 
+## 2.2 Area of Interest Definition and Sampling
+
+- Define the area of interest (AOI) within the intervetion area etent. This AOI represents the
+spatial extent from which the samples will be drawn. In this specific
+case, the AOI is defined as 15.000 ha.
+
+- Calculate the Sample Size: Based on the resolution of the raster and the
+desired AOI, the required number of pixels to be sampled is calculated.
+This ensures that the total area covered by the sampled pixels
+corresponds to the defined AOI.
+
+- Perform Repeated stratified random sampling:  Random sampling of pixels within the defined AOI. The sampling process is repeated 30 times (Bootstrapping) to estimate the sampling distribution of a statistic.
+
+Calculate Summary Statistics: For each repetition, the mean, standard
+deviation, and 95% confidence intervals are calculated for each band in
+the raster dataset. This provides a measure of the central tendency and
+variability of the sampled data.
+
+Synthesize Results: The results from all repetitions are combined to
+calculate an overall mean and confidence interval for each band. This
+provides a more robust estimate of the expected values, effectively
+correcting for potential outliers and reducing the influence of
+individual sample variations.
 
 
-  
-## 1.4 Normalization of Ecosystem Service Restoration Data 
+The model can be refined by incorporating additional parameters, such as minimum distance to boundaries, distance between points, topography, or inhabited areas. By definition, coastal risk protection only occurs at the coast; and this has to be kept in mind for example by setting sampling weights for the different  services or derived from population density data. This approach provides a distribution of possible values and allows for the calculation of confidence intervals. By synthesizing the results from multiple repetitions, the estimates are less susceptible to individual sample variations.
 
-We normalized the different ES for visualization and simplification purposes 
-$$
-\text{Normalized Value} = \frac{\text{Raster Value} - \text{Min Value}}{\text{Max Value} - \text{Min Value}}
-$$
+## 2.3 Processing Environment 
 
-Where: 
-- $\text{Raster Value}$ is the value of a given pixel. 
-- $\text{Min Value}$ and $\text{Max Value}$ represent the minimum and maximum observed values across the raster dataset.
+Spatial Raster Processing Tools: The `terra`, `dplyr`, and `sf` packages in **R** were used for analysis. Data visualization was performed using `ggplot2`.
 
-  
-# 2.5 Stratified Random Sampling to Estimate Total Ecosystem Service Gains
-
-A stratified random sampling approach was employed to estimate total gains in ES service provision given a total intervention area of 30,200 ha. The model can be refined by incorporating additional parameters, such as minimum distance to boundaries, distance between points, topography, or inhabited areas. By definition, coastal risk protection only occurs at the coast; and this has to be kept in mind for example by setting sampling weights for the different  services or derived from population density data. This approach provides a distribution of possible values and allows for the calculation of confidence intervals. By synthesizing the results from multiple repetitions, the estimates are less susceptible to individual sample variations.
-
-# 2.6 Data Alignment
-
-All raster datasets were aligned to the same spatial resolution, coordinate reference system (CRS), and origin. The global ESA Land Cover Classification Raster for 2020 (CRS: WGS-84) was used as a template. The final results were then reprojected to the South America Albers Equal Area Conic CRS
-
-
-### 3.2.3 Prepare Templates to Align the Data
-
-To perform the analysis, all the raster datasets need to be brought to the same spatial resolution, crs and aligned  to the same origin. We used the global ESA Land Cover Classification Raster for 2020 (CRS: WGS-84)
+## 3. Results
 
 ```{r create tmp, eval=FALSE, include=FALSE}
 library(here)
@@ -174,10 +198,10 @@ tmp <- tmp[[1]]
 rm(lc)
 ```
 
+
+
 ```{r select ES diff  data, include=FALSE}
 #Restoration:
-area <-c("BRAZIL", "MEXICO") 
-
 
 tiffes <- file.path(
   here("Interventions", "Mex_intervention"),
@@ -186,90 +210,7 @@ tiffes <- file.path(
     pattern = "MEXICO,*\\.tif$"
   )
 )
-tiffes <- tiffes[-c(5,7)]
-```
-
-```{r apply obtain baseline output, eval=TRUE, include=FALSE}
-
-# Step 1: Extract file names, product names, and country names
-file_names <- basename(tiffes)  # Extract file names from paths
-
-# Extract product names and country names
-product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
-country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
-
-# Step 2: Create a dataframe to organize the information
-file_info <- data.frame(
-  FilePath = tiffes_bl,
-  Product = product_names,
-  Country = country_names,
-  stringsAsFactors = FALSE
-)
-
-# Step 3: Sort the dataframe by Country first, then by Product
-# file_info <- file_info %>%
-#   arrange(Country, Product)
-
-# Step 4: Extract the sorted file paths
-tiffes <- file_info$FilePath
-
-baseES <- lapply(tiffes, rast)
-
-
-#bkg_esanto <- rast('/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Brazil_intervention/esp_santo_bkg.tif')
-
-
-# #### This is only necessary if we are working with a subset of the area, need to extract by a smaller polygon. Right now we only need that for Espirito Santo
-#  poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
-#  pol_wgs <- st_transform(poly, crs=crs(baseES[[1]]))
-#  serv_bra <- lapply(baseES, function(r){
-#    r <- crop(r,pol_wgs)
-#    r <- mask(r, pol_wgs)
-#    }) 
-# prod <- basename(tiffes)
-# # ust assign this variable name, so we don't need to edit the whole thing 
-#map(1:length(serv_bra), function(x) writeRaster(serv_bra[[x]], paste0(here("Interventions", "espirito_santo"),'/', prod[x])))
-
-serv_bra <- baseES
-
-sum_val <- lapply(serv_bra, function(r){
-  s <- global(r, "sum", na.rm = TRUE)
-  })
-
-sum_val <- do.call(rbind, sum_val)
-band <- rownames(sum_val)  
-sum_val <- as_tibble(sum_val)
-sum_val <- cbind(band,sum_val)
-sum_val <- sum_val %>%
-  mutate(Service = case_when(
-    band == "ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d" ~ "Coastal Protection",
-    band == "nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb" ~ "Nature Access",
-    band == "global_n_retention_esamod2_compressed_md5_30d56daec1140d031aa62a2bd6fe1f63" ~ "Nitrogen Export",
-    band == "pollination_ppl_fed_on_ag_10s_esa2020_md5_0cf9025ab3a00691f29de359e590cf74" ~ "Pollination",
-    #band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "Pollination (people fed on Hab)",
-    band == "global_sed_retention_esamod2_compressed_md5_c7a77e50feaea7a5dc7322cd63f0f429" ~ "Sediment Export",
-    # ... add more cases for other bands ...
-    TRUE ~ band  # Keep the original band name if no match
-  ))
-sum_val$band <- NULL
-sum_val <- as_tibble(sum_val)
-sum_val <- rename(sum_val, Total = sum)
-
-```
-
-
-```{r load gricsom data}
-
-griscom <- rast("/home/jeronimo/Documents/WWF_nbs_op/Restoration_Griscom/recMEXICO.tif")
-griscom <- rast("/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Brazil_intervention/SS_griscom.tif")
-griscom <- project(griscom, baseES[[2]], threads=24)
-bkg_ee <- rast("/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Brazil_intervention/esp_santo_bkg.tif")
-
-```
-
-```{r select ES diff  data, include=FALSE}
-#Restoration:
-area <-c("BRAZIL", "MEXICO") 
+tiffes_rest <- tiffes[-c(5,7)]
 
 
 tiffes <- file.path(
@@ -281,13 +222,20 @@ tiffes <- file.path(
 )
 
 #tiffes_bl <- tiffes[c(5,12,6,15,8)]
-tiffes <- tiffes[c(2,15,19,21,27)] #just keep pollination - AG,
+tiffes <- tiffes[c(6,8,11,16,20)] #just keep pollination - AG,
 #tiffes <- tiffes[-2]
+
+# Reaorder because frwaking file names 
+tiffes <- tiffes[c(2,3,5,1,4)]
+tiffes_rest <- tiffes_rest[c(3,5,4,1,2)]
+
+# set the order of the services here:
+
+serv <- c("Nitrogen Retention", "Sediment Retention", "Pollination", "Coastal Protection" , "Nature Access")
 ```
 
-
-
-```{r apply mask AOI AP, eval=FALSE, include=FALSE}
+# Here i am masking by the intervention area!!!
+```{r apply obtain baseline output, eval=TRUE, include=FALSE}
 
 # Step 1: Extract file names, product names, and country names
 file_names <- basename(tiffes)  # Extract file names from paths
@@ -304,27 +252,87 @@ file_info <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# Step 3: Sort the dataframe by Country first, then by Product
-file_info <- file_info %>%
-  arrange(Country, Product)
-
 # Step 4: Extract the sorted file paths
 tiffes <- file_info$FilePath
 
 baseES <- lapply(tiffes, rast)
 
-tmp2 <- crop(tmp, baseES[[1]])
- 
+griscom <- rast("/home/jeronimo/Documents/WWF_nbs_op/Restoration_Griscom/recMEXICO.tif")
+bkg_ee <- rast("/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Mex_intervention/yucatan_bkg.tif")
+griscom <- project(griscom, crs(bkg_ee), res=30, threads=24)
+griscom <- round(griscom)
+bkg_2 <- project(bkg_ee, baseES[[2]], threads=24)
 
-baseES <- lapply(baseES, function(r) {
-  if (!compareGeom(r, tmp2, stopOnError = FALSE)) {
-    message("Aligning raster: ", names(r))
-    resample(r, tmp2, method = "bilinear")
-    } else {
-      message("Raster already aligned: ", names(r))
-      r
-      }
-    })
+
+baseES <- align_rasters(baseES, bkg_2)
+
+
+# crop mask for the intervention area 
+baseES <- lapply(baseES, function(r){
+  r <- crop(r,bkg_2)
+  ext(r) <- round(ext(r), 4)
+  #r <- align(r, bkg_2)
+  r <- mask(r,bkg_2)
+})
+
+serv_bra <- baseES 
+
+
+summary <- lapply(serv_bra, function(r) {
+  list(
+    sum = global(r, "sum", na.rm = TRUE),
+    mean = global(r, "mean", na.rm = TRUE)
+  )
+})
+
+summary<- lapply(summary, function(df){
+  df <- do.call(cbind,df)
+  })
+
+summary <- do.call(rbind, summary)
+band <- rownames(summary)  
+summary <- cbind(band,summary)
+summary <- cbind(serv,summary)
+summary <- as_tibble(summary)
+
+```
+
+
+```{r apply mask AOI AP, eval=FALSE, include=FALSE}
+
+# Step 1: Extract file names, product names, and country names
+file_names <- basename(tiffes_rest)  # Extract file names from paths
+
+# Extract product names and country names
+product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
+country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
+
+# Step 2: Create a dataframe to organize the information
+file_info <- data.frame(
+  FilePath = tiffes,
+  Product = product_names,
+  Country = country_names,
+  stringsAsFactors = FALSE
+)
+
+# Step 4: Extract the sorted file paths
+tiffes <- file_info$FilePath
+
+baseES_r <- lapply(tiffes, rast)
+
+
+baseES_r <- align_rasters(baseES_r, bkg_2)
+
+# crop mask for the intervention area 
+baseES_r <- lapply(baseES_r, function(r){
+  r <- crop(r,bkg_2)
+  ext(r) <- round(ext(r), 4)
+  r <- mask(r,bkg_2)
+})
+```
+
+
+
 #### This is only necessary if we are working with a subset of the area, need to extract by a smaller polygon. Right now we only need that for Espirito Santo
 # poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
 # pol_wgs <- st_transform(poly, crs=crs(baseES[[1]]))
@@ -354,6 +362,28 @@ serv_bra  <- merge(serv_bra , tmp)
     serv_bra  <- app(serv_bra, sum)
 
 writeRaster(serv_bra, paste0(here("restoration_combined"),'/', 'MEX_ES_sum2.tif'))
+
+```
+
+
+
+
+
+## 1.4 Normalization of Ecosystem Service Restoration Data 
+
+We normalized the different ES for visualization and simplification purposes 
+$$
+\text{Normalized Value} = \frac{\text{Raster Value} - \text{Min Value}}{\text{Max Value} - \text{Min Value}}
+$$
+
+Where: 
+- $\text{Raster Value}$ is the value of a given pixel. 
+- $\text{Min Value}$ and $\text{Max Value}$ represent the minimum and maximum observed values across the raster dataset.
+
+  
+
+
+
 
 
 
