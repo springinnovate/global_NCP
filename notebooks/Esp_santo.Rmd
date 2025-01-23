@@ -1,5 +1,5 @@
 ---
-title: "Preliminary Intervention Assessment NBS for the state of Espírito Santo, Brazil"
+title: "Preliminary Intervention Assessment NbS for the state of Espírito Santo, Brazil"
 author: "Jerónimo Rodríguez-Escobar"
 output:
   word_document: default
@@ -70,13 +70,25 @@ This analysis is based on the following assumptions:
   - Confidence intervals provide robust estimates under random distribution scenarios.
 ---------------------------------------------------------------------
 
-# 2. Materials and Methods
+# 2. Methods
 
 ## 2.1 Study Area
 
 This analysis encompasses the totality of Espírito Santo State, (4'630.792 ha) on Eastern Brazil. A more detailed contextualization of the region, including its geographic, environmental, demographic, and economic aspects, and how it integrates into the broader Symbiosis project can be included here. For this exercise, the total area to restore is 30,200 ha.
+Also The Yucatan Peninsula. 
 
+```{r prepare Esp Santo Land Covers }
+
+lc <- rast(here("ESA_LC", "all_ESA_LC_Rec_2020.tif"))
+poly <-st_read("/home/jeronimo/Documents/WWF_nbs_op/Interventions/Brazil/Espirito_Santo_Albers.shp")
+poly <- st_transform(poly, crs(lc))
+plot(poly$geometry)
+lc <- lc %>% crop(poly) %>% mask(poly)
+writeRaster(lc, here("Interventions", "Brazil_intervention", "LC_ES_2020.tif"), overwrite=TRUE)
+```
 ------------------------------------------------------------------------
+![Espirito Santo2020 ESA Land Covers (reclassified) and Restoration Priority Areas](/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Espirito_Santo_LC1.png)
+
 
 ## 2.2 Input Data
 
@@ -103,6 +115,21 @@ Spatial grids (raster data in GeoTIFF format) were used, where pixel values refl
     2022).
 
 
+```{r crop rest ES}
+
+tiffes <- file.path(
+  here("cropped_raster_data"),
+  list.files(
+    here("cropped_raster_data"),
+    pattern = "BRAZIL,*\\.tif$"
+  )
+)
+
+tiffes_bl <- tiffes[c(5,12,6,15,8)]
+tiffes <- tiffes[c(1,11,14,16,21)] #just keep pollination - AG,
+#tiffes <- tiffes[-2]
+
+```
 ## 2.3 Processing Environment 
 
 Spatial Raster Processing Tools: The `terra`, `dplyr`, and `sf` packages in **R** were used for analysis. Data visualization was performed using `ggplot2`.
@@ -169,8 +196,9 @@ tiffes <- file.path(
   )
 )
 
-tiffes_bl <- tiffes[c(5,12,6,15,8)]
-tiffes <- tiffes[c(1,11,14,16,21)] #just keep pollination - AG,
+#tiffes_bl <- tiffes[c(5,12,6,15,8)]
+#tiffes <- tiffes[c(1,11,14,16,21)] #just keep pollination - AG,
+tiffes <- tiffes[-c(17)]
 #tiffes <- tiffes[-2]
 ```
 # 4.1 Load Baselines
@@ -178,7 +206,7 @@ tiffes <- tiffes[c(1,11,14,16,21)] #just keep pollination - AG,
 ```{r apply obtain baseline output, eval=TRUE, include=FALSE}
 
 # Step 1: Extract file names, product names, and country names
-file_names <- basename(tiffes_bl)  # Extract file names from paths
+file_names <- basename(tiffes)  # Extract file names from paths
 
 # Extract product names and country names
 product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
@@ -186,7 +214,7 @@ country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country na
 
 # Step 2: Create a dataframe to organize the information
 file_info <- data.frame(
-  FilePath = tiffes_bl,
+  FilePath = tiffes,
   Product = product_names,
   Country = country_names,
   stringsAsFactors = FALSE
@@ -206,37 +234,37 @@ baseES <- lapply(tiffes, rast)
 
 
 #### This is only necessary if we are working with a subset of the area, need to extract by a smaller polygon. Right now we only need that for Espirito Santo
- poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
- pol_wgs <- st_transform(poly, crs=crs(baseES[[1]]))
- serv_bra <- lapply(baseES, function(r){
-   r <- crop(r,pol_wgs)
-   r <- mask(r, pol_wgs)
-   }) 
+ # poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
+ # pol_wgs <- st_transform(poly, crs=crs(baseES[[1]]))
+ # serv_bra <- lapply(baseES, function(r){
+ #   r <- crop(r,pol_wgs)
+ #   r <- mask(r, pol_wgs)
+ #   }) 
 prod <- basename(tiffes)
 # # ust assign this variable name, so we don't need to edit the whole thing 
-#map(1:length(serv_bra), function(x) writeRaster(serv_bra[[x]], paste0(here("Interventions", "espirito_santo"),'/', prod[x])))
-sum_val <- lapply(serv_bra, function(r){
-  s <- global(r, "sum", na.rm = TRUE)
-  })
-
-sum_val <- do.call(rbind, sum_val)
-band <- rownames(sum_val)  
-sum_val <- as_tibble(sum_val)
-sum_val <- cbind(band,sum_val)
-sum_val <- sum_val %>%
-  mutate(Service = case_when(
-    band == "ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d" ~ "Coastal Protection",
-    band == "nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb" ~ "Nature Access",
-    band == "global_n_retention_esamod2_compressed_md5_30d56daec1140d031aa62a2bd6fe1f63" ~ "Nitrogen Export",
-    band == "pollination_ppl_fed_on_ag_10s_esa2020_md5_0cf9025ab3a00691f29de359e590cf74" ~ "Pollination",
-    #band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "Pollination (people fed on Hab)",
-    band == "global_sed_retention_esamod2_compressed_md5_c7a77e50feaea7a5dc7322cd63f0f429" ~ "Sediment Export",
-    # ... add more cases for other bands ...
-    TRUE ~ band  # Keep the original band name if no match
-  ))
-sum_val$band <- NULL
-sum_val <- as_tibble(sum_val)
-sum_val <- rename(sum_val, Total = sum)
+map(1:length(serv_bra), function(x) writeRaster(serv_bra[[x]], paste0(here("Interventions", "espirito_santo"),'/', prod[x])))
+# sum_val <- lapply(serv_bra, function(r){
+#   s <- global(r, "sum", na.rm = TRUE)
+#   })
+# 
+# sum_val <- do.call(rbind, sum_val)
+# band <- rownames(sum_val)  
+# sum_val <- as_tibble(sum_val)
+# sum_val <- cbind(band,sum_val)
+# sum_val <- sum_val %>%
+#   mutate(Service = case_when(
+#     band == "ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d" ~ "Coastal Protection",
+#     band == "nature_access_lspop2019_esa2020modVCFhab_md5_a6519ebd8b941444921e749da2e645bb" ~ "Nature Access",
+#     band == "global_n_retention_esamod2_compressed_md5_30d56daec1140d031aa62a2bd6fe1f63" ~ "Nitrogen Export",
+#     band == "pollination_ppl_fed_on_ag_10s_esa2020_md5_0cf9025ab3a00691f29de359e590cf74" ~ "Pollination",
+#     #band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "Pollination (people fed on Hab)",
+#     band == "global_sed_retention_esamod2_compressed_md5_c7a77e50feaea7a5dc7322cd63f0f429" ~ "Sediment Export",
+#     # ... add more cases for other bands ...
+#     TRUE ~ band  # Keep the original band name if no match
+#   ))
+# sum_val$band <- NULL
+# sum_val <- as_tibble(sum_val)
+# sum_val <- rename(sum_val, Total = sum)
 
 ```
 

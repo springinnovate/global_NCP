@@ -61,17 +61,16 @@ align_rasters <- function(raster_list, template, resample_method = "near") {
 ```{r load target area polygons}
 poly <- st_read(here("vector", "areas_nbs2.geojson")) 
 #temp: reproject if needed
-#poly <- st_transform(poly, crs = crs(tmp))
+#poly <- st_transform(poly, crs = crs(acces_rest))
 #Split the vector into a list of individual polygons
 #create vector with names
 poly <- poly%>%split(.$COUNTR)
 ```
 
+## 2.1. Serv_rasters data
+```{r select input rasters data to process}
 
-## 2.1. Restoration data
-```{r select restroration data to process}
-
-inpath <- here(("Downloaded_data_ES"))
+inpath <- here(("Downloaded_data_ES2"))
 
 #This is one of the most basic but also annoying parts of this workflow; select the rasters to process. I have not been able to come with an autoamted manner, in some cases the strings in the product names have no common patterns that i can use, the easiest way is just to sue excel to sort and filter. Just by hand is difficult and tiresome. 
 #Restoration:
@@ -80,15 +79,15 @@ inpath <- here(("Downloaded_data_ES"))
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
 #Remove points, risk reduction baseline
 tiffes <- tiffes[c(3,23,25,26,30)]
+tiffes <- tiffes[-5]
 print(tiffes)
 
 ```
 
 
-## 2.2 Acces data
+## 2.2 Access data
 ```{r select accessibility data to process}
 
-#Restoration:
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'nature_access.*\\.tif$'))
 tiffes <- tiffes[2]
 # Access restoration
@@ -99,7 +98,12 @@ clean_filename <- function(filename){
 }
 filename <- clean_filename(basename)
 
-#acces_rest <- project(acces_rest, acc2, method='bilinear')
+poly <- st_read(here("vector", "areas_nbs2.geojson")) 
+#temp: reproject if needed
+poly <- st_transform(poly, crs = crs(acces_rest))
+#Split the vector into a list of individual polygons
+#create vector with names
+poly <- poly%>%split(.$COUNTR)
 acces_rest <- map(1:length(poly), function(x) crop(acces_rest, poly[[x]]))
 acces_rest <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
 map(1:length(acces_rest), function(x) writeRaster(acces_rest[[x]], paste0(here('cropped_raster_data'),"/",filename, '_', nam[x], '.tif'), overwrite=TRUE))
@@ -109,7 +113,7 @@ map(1:length(acces_rest), function(x) writeRaster(acces_rest[[x]], paste0(here('
 
 ```
 
-## 2.3 Acces data Restoration
+## 2.3 Acces data 
 ```{r select accessibility restoration data to process, eval=FALSE, include=FALSE}
 
 #Restoration:
@@ -137,35 +141,9 @@ map(1:length(acces_rest), function(x) writeRaster(acces_rest[[x]], paste0(here('
 ```
 
 
-## 2.4 Coastal data Protection Conservation
-```{r crop coastal protection data, eval=FALSE, include=FALSE}
-
-#Restoration:
-tiffes <- file.path(here("downloaded_data_ES"), list.files(paste0(here(inpath)),pattern= 'ESAmodVCFv2_cv_habitat_value_md5.*\\.tif$'))
-# Access restoration
-basename <- basename(tiffes)
-acces_rest <- rast("~/Documents/WWF_nbs_op/Downloaded_data_ES/ESAmodVCFv2_cv_habitat_value_md5_c01e9b17aee323ead79573d66fa4020d.tif")
-
-clean_filename <- function(filename){
-  sub("_md5.*", "", filename)
-  sub(".tif.*", "", filename)
-}
-filename <- clean_filename(basename)
-
-acces_rest <- map(1:length(poly), function(x) crop(acces_rest, poly[[x]]))
-acces_rest2 <- map(1:length(acces_rest), function(x) mask(acces_rest[[x]], poly[[x]]))
-map(1:length(acces_rest), function(x) writeRaster(acces_rest[[x]], paste0(here('cropped_raster_data'),"/",filename, '_', nam[x], '.tif'), overwrite=TRUE))
-
-
-# pending access restoration. No need to export repporjected, just get everything done here. 
-
-```
-
-
-
 This runs the same process in batch. Memory was optimized to not load all the data at thesame time, but process and write each raster individually before going to the next one.  
 
-
+## Other Data (WGS - 84)
 ```{r iterate cropMask, eval=FALSE, include=FALSE}
 clean_filename <- function(filename){
   sub("_md5.*", "", filename)
@@ -181,7 +159,7 @@ for (i in seq_along(tiffes)) {
   
   # Apply crop and mask operations to each polygon
   cropped <- map(1:length(poly), function(x) crop(access, poly[[x]]))
-  cropped <- lapply(cropped,trim)
+  #cropped <- lapply(cropped,trim)
   masked <- map(1:length(cropped), function(x) mask(cropped[[x]], poly[[x]]))
   
   # Extract the base filename before 'md5'
