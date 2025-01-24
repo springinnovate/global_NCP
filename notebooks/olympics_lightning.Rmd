@@ -2,9 +2,10 @@
 title: "NBS optimization- Yucatan Peninsula"
 author: "Jeronimo Rodriguez Escobar"
 output:
+  pdf_document: default
+  word_document: default
   html_document:
     df_print: paged
-  pdf_document: default
 editor_options:
   markdown:
     wrap: 72
@@ -100,7 +101,7 @@ rm(lc)
 
 The intervention area  is located in the Yucatan Peninsula, and encompasses biodiversity corridors and existing protected areas across key ecosystems including the northern shoreline.
 
-![Yucatan 2020 ESa Land  Cover map (reclassified) and Restoration Priority Areas](/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/yucatan_LC1.png)
+![Yucatan 2020 ESa Land  Cover map (reclassified) and Restoration Priority Areas](/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Mex_intervention/yucatan_LC1.png)
 
 
 # 2. Methods
@@ -566,6 +567,12 @@ top_10 <- do.call(c,top_10)
 writeRaster(top_10, here('Interventions', "Mex_intervention", "top_10_bin_mx.tif"), overwrite=TRUE)
 
 ```
+
+
+# 3.3 Maximum Return Potential
+
+This maps shows, for each class, the pixles wit hthe highest 10% of the gain values
+
 ![Restoration Priority area per Service (top 10%)](/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Mex_intervention/Mex_fin.png)
 
 ```{r normalize, eval=FALSE, include=FALSE}
