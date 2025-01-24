@@ -13,7 +13,7 @@ editor_options:
 ```{r prep environment, eval=TRUE, include=FALSE}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
-           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign',  'exactextractr')
+           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign',  'exactextractr', 'kableExtra', 'knitr')
 sapply(packs, require, character.only = TRUE, quietly=TRUE)
 rm(packs)
 align_rasters <- function(raster_list, template, resample_method = "bilinear") {
@@ -48,15 +48,16 @@ process_intervention_area <- function(raster_list) {
 
 # 1. Introduction
 
-This report presents a preliminary approach to estimate potential ecosystem service provision gains derived from restoration across five study areas prioritized in WWF's Nature-Based Solutions Originating Platform (NbS-OP)and optimize restoration itnerventions. 
-
-
-- **Yucatán Peninsula (Mexico)**
+This report presents a preliminary approach to estimate potential ecosystem service provision gains derived from restoration across five study areas prioritized in WWF's Nature-Based Solutions Originating Platform (NbS-OP)and optimize restoration interventions. 
 
 
 We evaluated following ecosystem services:
  
-Coastal Protection, Nitrogen Export, Sediment Retention, Pollination and Nature Access.
+- Nitrogen Export 
+- Sediment Retention 
+- Pollination 
+- Coastal Protection  
+- Nature Access.
 
 ## 1.2 Objectives
 
@@ -69,25 +70,9 @@ Coastal Protection, Nitrogen Export, Sediment Retention, Pollination and Nature 
 - All ecosystem services are equally valuable.
 - Restoration likelihood is distributed uniformly across the pixels prioritized for restoration.
 - The total area to restore is known in advance, the exact location of the restoration action within the potential restoration area is not determined yet, as it is contingent on variables such as: The willingness of landowners and managers to participate in the project and the ability to secure control over land during the intended intervention duration.
-  - The spatial configuration effects incorporated during the modeling of ecosystem service gains.
 
-Theoretical Justification
 
-The use of stratified random sampling is justified as it ensures that
-the sample is representative of the entire population (i.e., all pixels
-within the AOI). By dividing the population into strata and sampling
-from each stratum, this method reduces the variability of the estimates
-compared to simple random sampling. This is particularly important when
-dealing with spatial data, where there may be inherent spatial
-autocorrelation or heterogeneity.
-
-The repeated sampling approach further enhances the robustness of the
-estimates by providing a distribution of possible values. This allows
-for the calculation of confidence intervals, which provide a measure of
-the uncertainty associated with the estimates. By synthesizing the
-results from multiple repetitions, the overall estimates are less
-susceptible to the influence of individual sample variations and provide
-a more accurate representation of the true population values.  
+The use of stratified random sampling ensures that representative of the entire population (i.e., all pixels with restoration potential within the AOI). By assessing the results from multiple repetitions, the overall estimates are less susceptible to the influence of individual sample variations and provide a more accurate representation of the true population values.  
   
 ## Intervention Area 
 
@@ -121,41 +106,42 @@ The intervention area  is located in the Yucatan Peninsula, and encompasses biod
 # 2. Methods
 ## 2.1 Input Data
 
--   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5). Data were derived using InVEST, a suite of spatially explicit models that map and quantify nature's contributions to people. InVEST was developed by the Natural Capital Project, a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund.
+-   **Ecosystem Service Data:** Chaplin-Kramer et al. (2022) [Mapping the planet’s critical natural assets](https://www.nature.com/articles/s41559-022-01934-5). Data derived using InVEST, a suite of spatially explicit models that map and quantify nature's contributions to people. InVEST was developed by the Natural Capital Project, a partnership among Stanford University, the University of Minnesota, The Nature Conservancy, and the World Wildlife Fund.
 
 -   **Restoration Potential:** [Adjusted Griscom restoration grided data](https://zenodo.org/records/883444)
 
-To sets of data were used, the first one reprsenting thebaseline for the ecosysatm service provision for 2020, and a second one representing  potential increase in ecosystem service provision if an area is restored to its potential natural vegetation, except for urban/built-up areas. The following ecosystem services were considered:
+Two sets of data were used, the first one representing the baseline for the ecosystem service provision estimated for 2020, and a second one representing  potential increase in ecosystem service provision if an area is restored to its potential natural vegetation, except for urban/built-up areas. The following ecosystem services were considered:
 
-1.  Coastal Protection. Unitless measure, refers to a derived vulnerability index. [**InVEST Coastal Vulnerability Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
 
-2.  Nitrogen Export. Derived from the Nitrogen retention modeled using the [**InVEST Nutrient Delivery Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
+1.  Nitrogen Export. Derived from the Nitrogen retention modeled using the [**InVEST Nutrient Delivery Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
     Expressed in kg/pixel/year
 
-3.  Sediment Retention. Derived using [**InVEST SDR: Sediment Delivery Ration**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html).
+2.  Sediment Retention. Derived using [**InVEST SDR: Sediment Delivery Ration**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html).
     Values in ton/pixel/year
 
-4.  Pollination. Derived from [**InVEST SDR: Pollinator Abundance Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html).
+3.  Pollination. Derived from [**InVEST SDR: Pollinator Abundance Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html).
     Units represent Polllination Change in people fed on HABitat. More information in
     [**Chaplin-Kramer, et al.
     2022**](https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-022-01934-5/MediaObjects/41559_2022_1934_MOESM1_ESM.pdf)
+    
+4.  Coastal Protection. Unitless measure, refers to a derived vulnerability index. [**InVEST Coastal Vulnerability Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
 
 5.  Nature Access represented as [**the number of people within 1 hour travel of natural and semi-natural lands**](https://github.com/springinnovate/distance-to-hab-with-friction) (Chaplin-Kramer et al,
-    2022).## Methodology
-
+    2022).
+    
 
 ## 2.2 Area of Interest Definition and Sampling
 
-- Define the area of interest (AOI) within the intervetion area etent. This AOI represents the
-spatial extent from which the samples will be drawn. In this specific
-case, the AOI is defined as 15.000 ha.
+- Define the area of interest (AOI) within the intervention area extent. This AOI represents the
+spatial extent from which the samples will be drawn. In this specific case, the AOI is set to 15.000 ha.
+
 
 - Calculate the Sample Size: Based on the resolution of the raster and the
 desired AOI, the required number of pixels to be sampled is calculated.
 This ensures that the total area covered by the sampled pixels
 corresponds to the defined AOI.
 
-- Perform Repeated stratified random sampling:  Random sampling of pixels within the defined AOI. The sampling process is repeated 30 times (Bootstrapping) to estimate the sampling distribution of a statistic.
+- Perform repeated stratified random sampling:  Random sampling of pixels within the defined AOI. The sampling process is repeated 30 times (Bootstrapping) to estimate the sampling distribution of a statistic.
 
 Calculate Summary Statistics: For each repetition, the mean, standard
 deviation, and 95% confidence intervals are calculated for each band in
@@ -177,30 +163,8 @@ Spatial Raster Processing Tools: The `terra`, `dplyr`, and `sf` packages in **R*
 
 ## 3. Results
 
-```{r create tmp, eval=FALSE, include=FALSE}
-library(here)
-# add backgrounds/templates to align 
-path_lc <- here('ESA_LC') 
-# load reclassified land cover map
-tf <- file.path(path_lc, list.files(path_lc, pattern= "Rec"))
-lc <- lapply(tf,rast)
-lc <- lc[[1]]
-# create rcl matrix
-rcl <- matrix(c(
-  0, Inf, 0   # Any value greater than 0 becomes 1
-), ncol = 3, byrow = TRUE)
 
-#create background pixels, subsitute all by 0
-tmp <- lapply(lc, function(r){
-  r <- classify(r[[1]], rcl)
-})
-tmp <- tmp[[1]]
-rm(lc)
-```
-
-
-
-```{r select ES diff  data, include=FALSE}
+```{r select ES  data, eval=FALSE, include=FALSE}
 #Restoration:
 
 tiffes <- file.path(
@@ -231,11 +195,10 @@ tiffes_rest <- tiffes_rest[c(3,5,4,1,2)]
 
 # set the order of the services here:
 
-serv <- c("Nitrogen Retention", "Sediment Retention", "Pollination", "Coastal Protection" , "Nature Access")
+Service <- c("Nitrogen Retention", "Sediment Retention", "Pollination", "Coastal Protection" , "Nature Access")
 ```
 
-# Here i am masking by the intervention area!!!
-```{r apply obtain baseline output, eval=TRUE, include=FALSE}
+```{r apply obtain baseline output, eval=FALSE, include=FALSE}
 
 # Step 1: Extract file names, product names, and country names
 file_names <- basename(tiffes)  # Extract file names from paths
@@ -263,6 +226,7 @@ griscom <- project(griscom, crs(bkg_ee), res=30, threads=24)
 griscom <- round(griscom)
 bkg_2 <- project(bkg_ee, baseES[[2]], threads=24)
 
+tot <- freq(bkg_ee)
 
 baseES <- align_rasters(baseES, bkg_2)
 
@@ -295,6 +259,8 @@ summary <- cbind(band,summary)
 summary <- cbind(serv,summary)
 summary <- as_tibble(summary)
 
+summary <- summary %>% rename(Sum = sum) %>% rename(Mean=mean)
+summary
 ```
 
 
@@ -309,7 +275,7 @@ country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country na
 
 # Step 2: Create a dataframe to organize the information
 file_info <- data.frame(
-  FilePath = tiffes,
+  FilePath = tiffes_rest,
   Product = product_names,
   Country = country_names,
   stringsAsFactors = FALSE
@@ -321,69 +287,249 @@ tiffes <- file_info$FilePath
 baseES_r <- lapply(tiffes, rast)
 
 
-baseES_r <- align_rasters(baseES_r, bkg_2)
+baseES_r <- align_rasters(baseES_r, bkg_ee)
 
 # crop mask for the intervention area 
 baseES_r <- lapply(baseES_r, function(r){
-  r <- crop(r,bkg_2)
+  r <- crop(r,bkg_ee)
   ext(r) <- round(ext(r), 4)
-  r <- mask(r,bkg_2)
+  r <- mask(r,bkg_ee)
 })
 ```
 
 
 
-#### This is only necessary if we are working with a subset of the area, need to extract by a smaller polygon. Right now we only need that for Espirito Santo
-# poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
-# pol_wgs <- st_transform(poly, crs=crs(baseES[[1]]))
-# serv_bra <- lapply(baseES, function(r){
-#   r <- crop(r,pol_wgs)
-#   r <- mask(r, pol_wgs)
-#   }) 
-# 
-# # ust assign this variable name, so we don't need to edit the whole thing 
-serv_bra <- baseES
+```{r sampling target areas Yucatan, eval=FALSE, include=FALSE}
+serv_1 <- do.call(c,baseES_r) 
+rest_m <- rast(here('Interventions', 'Mex_intervention', 'Mex_griscom.tif'))
+rcl <- matrix(c(
+  -Inf, 0, 0,  # Any value from -Infinity to 0 remains 0
+  0, Inf, 1   # Any value from 0 to Infinity becomes 1
+), ncol = 3, byrow = TRUE)
+rest_m <- classify(rest_m, rcl)
 
-serv_bra <- lapply(serv_bra,normalize_raster)
-serv_bra <- do.call(c, serv_bra)
+serv_1 <- project(serv_1, bkg_ee, method='bilinear', threads=24)
+serv_1 <- merge(serv_1,bkg_ee)
 
-writeRaster(serv_bra, paste0(here("restoration_combined"),'/', 'MEX_ES_multiband.tif'), overwrite=T) #Add Access layer before exporting. 
-# add mask with the place. 
+rest_m <- terra::project(rest_m, serv_1, threads=24)
+rest_m <- round(rest_m, digits=0)
+serv_1 <- mask(serv_1,rest_m, maskvalues=0)
+#Calculate the number of pixels needed for 30,000 hectares
+pixel_area <- 30 * 30  # Area of a single pixel in square meters (30m resolution)
+hectare_area <- 10000  # Area of one hectare in square meters
+pixels_needed <- round((15000 * hectare_area) / pixel_area)
 
-# load polygon, not just the intevention area. or not?
-# run bot hthings 
+# Count total pixels Griscom intervnetio narea
+tot <- freq(bkg_ee)
+perc_rest <- pixels_needed/tot$count[1]*100
 
-tmp <- rast(here("Interventions","Mex_intervention", "yucatan_bkg.tif"))
-tmp <- trim(tmp)
+# Number of repetitions
+n_repetitions <- 30
+# Function to perform the sampling and calculations
+sample_and_calculate <- function(i, raster, pixels_needed) {
+  # Sample pixels and directly extract values (without na.rm)
+  sample_values <- spatSample(raster, size = pixels_needed, 
+                              method = "random", 
+                              na.rm = FALSE,  
+                              as.points = FALSE, 
+                              xy = FALSE,
+                              values = TRUE) 
 
-serv_bra  <- merge(serv_bra , tmp)
-    
-    # Sum the layers of the merged raster
-    serv_bra  <- app(serv_bra, sum)
+  # Remove rows where ALL values are NA
+  sample_values <- sample_values[rowSums(is.na(sample_values)) != ncol(sample_values), ]
 
-writeRaster(serv_bra, paste0(here("restoration_combined"),'/', 'MEX_ES_sum2.tif'))
+  # If not enough samples after removing NAs, resample
+  if (nrow(sample_values) < pixels_needed) {
+    sample_values <- rbind(
+      sample_values,
+      spatSample(raster, size = pixels_needed - nrow(sample_values),
+                 method = "random", na.rm = TRUE, 
+                 as.points = FALSE, xy = FALSE, values = TRUE)
+    )
+  }
+
+  # Calculate summary statistics
+  band_stats <- apply(sample_values, 2, function(x) { 
+    mean_val <- mean(x)
+    sd_val <- sd(x)
+    n_val <- length(x)
+    se_val <- sd_val / sqrt(n_val)
+    margin_error <- qt(0.975, df = n_val - 1) * se_val
+    lower_ci <- mean_val - margin_error
+    upper_ci <- mean_val + margin_error
+    return(c(mean = mean_val, lower_ci = lower_ci, upper_ci = upper_ci))
+  })
+
+  band_stats_df <- as.data.frame(t(band_stats))
+  band_stats_df$repetition <- i
+
+  # Calculate sum of pixel values for each band
+  band_sums <- colSums(sample_values) 
+  band_stats_df$sum <- band_sums
+
+  return(band_stats_df)
+}
+
+# Using mclapply (parallel processing)
+num_cores <- 10
+results_list <- mclapply(1:n_repetitions, sample_and_calculate, 
+                         raster = serv_1, 
+                         pixels_needed = pixels_needed,
+                         mc.cores = num_cores) 
+
+results_list <- lapply(results_list, function(df){
+  df <- df %>% mutate(band=rownames(df))
+})
+# Combine all results into a single data frame
+all_results <- as_tibble(do.call(rbind, results_list))
+
+
+# Add new columns with the service names and units.
+all_results <- all_results %>%
+  mutate(Service = case_when(
+    band == "cv_habitat_value_Sc3v1-ESAmod2_v2_md5_64082b" ~ "Coastal Protection",
+    band == "nature_access_diff_Sc3v1_PNVnoag-esa2020" ~ "Nature Access",
+    band == "nitrogen_ESAmod2-Sc3v1_md5_024a36" ~ "Nitrogen Retention",
+    band == "pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag-esa2020_md5_405c88" ~ "Pollination",
+    band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "Pollination (people fed on Hab)",
+    band == "sediment_ESAmod2-Sc3v1_md5_149078" ~ "Sediment Retention",
+    # ... add more cases for other bands ...
+    TRUE ~ band  # Keep the original band name if no match
+  ))
+
+all_results <- all_results %>%
+  mutate(units = case_when(
+    band == "cv_habitat_value_Sc3v1-ESAmod2_v2_md5_64082b" ~ "Risk Reduction Index",
+    band == "nature_access_diff_Sc3v1_PNVnoag-esa2020" ~ "People within 1 hour",
+    band == "nitrogen_ESAmod2-Sc3v1_md5_024a36" ~ "Nitrogen Export (kg/ha/year)",
+    band == "pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag-esa2020_md5_405c88" ~ "Pollination (equivalent people fed)",
+    band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "Pollination (people fed on hab)",
+    band == "sediment_ESAmod2-Sc3v1_md5_149078" ~ "Sediment Export (ton/kg/year)",
+    # ... add more cases for other bands ...
+    TRUE ~ band  # Keep the original band name if no match
+  ))
+
+all_results <- all_results %>%
+  mutate(color = case_when(
+    band == "cv_habitat_value_Sc3v1-ESAmod2_v2_md5_64082b" ~ "#9e9ac8",
+    band == "nature_access_diff_Sc3v1_PNVnoag-esa2020" ~ "#A57C00",
+    band == "nitrogen_ESAmod2-Sc3v1_md5_024a36" ~ "#2c944c",
+    band == "pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag-esa2020_md5_405c88" ~ "#dd1c77",
+    band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "#dd1b56",
+    band == "sediment_ESAmod2-Sc3v1_md5_149078" ~ "#08306b",
+    # ... add more cases for other bands ...
+    TRUE ~ band  # Keep the original band name if no match
+  ))
+
+
+#drop the columnwit hthe raster name
+all_results$band <- NULL
+summary$band <- NULL
+all_results <- left_join(all_results,summary)
+
+#Get Percentages!!!
+
+all_results <- all_results %>% mutate(perc_sum= sum/Sum*100) %>% mutate(perc_mean=mean/Mean*100)
+
+# Get a final Column with the final percentages for services (move the access from mean)
+# Add the "Final" column based on the rule
+all_results <- all_results %>%
+  mutate(Final = case_when(
+    Service == "Nature Access" ~ perc_mean,  # If "Service" is "Nature Access", use "perc_mean"
+    TRUE ~ perc_sum  # For all other cases, use "perc_sum"
+  ))
+
+
+all_results <- all_results %>% mutate()
+
+
+save(all_results, file= here("Interventions", "Mex_intervention", "all_res_mex.RData"))
 
 ```
+## 3.1 EStimated ES Gain through Restoration
+
+The estimated gains in ecosystem service provision, (%) are synthetized in following table
+```{r table outputs, echo=FALSE}
+load(here("Interventions", "Mex_intervention", "all_res_mex.RData"))
+
+
+sumy <- all_results %>% group_by(Service) %>% 
+  summarise(mean_final = mean(perc_sum, na.rm = TRUE),        # Mean of Final column
+    sd_final = sd(perc_sum, na.rm = TRUE),            # Standard deviation
+    iqr_final = IQR(perc_sum, na.rm = TRUE),          # Interquartile range (optional)
+    .groups = "drop"
+  )
+
+final_summary <- all_results %>%
+  group_by(Service) %>%
+  summarise(
+    mean_final = mean(Final, na.rm = TRUE), 
+    lower_ci = quantile(Final, probs = 0.025, na.rm = TRUE),  # 2.5th percentile
+    upper_ci = quantile(Final, probs = 0.975, na.rm = TRUE),  # 97.5th percentile
+    .groups = "drop"
+  )
+# Assuming your 'all_results' data frame has the columns 'Service', 'units', and 'color'
 
 
 
+final_summary2 <- all_results %>%
+  group_by(Service) %>%
+  summarise(
+    mean_final = mean(perc_sum, na.rm = TRUE), 
+    lower_ci = quantile(perc_sum, probs = 0.025, na.rm = TRUE),  # 2.5th percentile
+    upper_ci = quantile(perc_sum, probs = 0.975, na.rm = TRUE),  # 97.5th percentile
+    .groups = "drop"
+  )
 
+final_summary2 <- final_summary2 %>%
+  mutate(across(where(is.numeric), ~ round(., 2)))
 
-## 1.4 Normalization of Ecosystem Service Restoration Data 
+final_summary2 %>%
+  kbl(
+    col.names = c("Ecosystem Service", "Mean (%)", "Lower CI (%)", "Upper CI (%)"),
+    caption = "Estimated ES Provision Gain in %  with Confidence Intervals",
+    align = "c"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE,
+    position = "center"
+  )
 
-We normalized the different ES for visualization and simplification purposes 
-$$
-\text{Normalized Value} = \frac{\text{Raster Value} - \text{Min Value}}{\text{Max Value} - \text{Min Value}}
-$$
+write.csv(final_summary2, file=here("Interventions", "Mex_intervention", "summary_interventionMex2.csv"))
+```
+These gains are achieved by restoring 15.000ha, or 0.35% of the intervention area.
+### 3.2 Result Visualization
 
-Where: 
-- $\text{Raster Value}$ is the value of a given pixel. 
-- $\text{Min Value}$ and $\text{Max Value}$ represent the minimum and maximum observed values across the raster dataset.
+```{r plot Yucatan outpus, echo=FALSE}
 
-  
+load(here("Interventions", "Mex_intervention", "all_res_mex.RData"))
 
-
-
+# Generate the ggplot object
+plot <- ggplot(all_results, aes(y = perc_sum, fill = color)) +
+  geom_boxplot() +
+  labs(title = str_wrap("Potential in ES gain for the target intervention area - Yucatan", width = 50), 
+       y = "Estimated ES provision gain (%)") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank(),
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"  # Remove legend since color is already mapped
+  ) +
+  scale_fill_identity() + 
+  facet_wrap(~ Service, scales = "free_y", labeller = labeller(Service = label_wrap_gen(width = 10))) +  
+  scale_y_continuous(labels = function(x) {
+    if (max(x, na.rm = TRUE) > 100000) {
+      paste0(format(x / 1000, big.mark = ".", decimal.mark = ","), "k")
+    } else {
+      format(x, big.mark = ".", decimal.mark = ",")
+    }
+  }) 
+plot
+```
 
 
 
@@ -403,48 +549,27 @@ Where:
 # -----------------------------------------------------------------------------
 # 'tiffes' is a character vector of file paths (all .tif files).
 # Each file is read into a SpatRaster and stored in a list.
-tiffes <- tiffres[-c()]
-baseES <- lapply(tiffes,rast)
-# 'tmp' is  another SpatRaster used as the template for alignment.
-# Make sure 'tmp' is loaded or defined beforehand.
-
-# Crop 'tmp' to align it with the first raster in 'baseES'
-# (This ensures the extents match as closely as possible.)
-tt <- project(bkg_ee, "EPSG:4326")
-trim(tt)
-tmp2 <- crop(tmp, tt)
-tmp
-
-# -----------------------------------------------------------------------------
-# 2. Align All Rasters to the Reference 'tmp'
-# -----------------------------------------------------------------------------
-# Compare geometry with 'tmp': if different, resample; otherwise keep as-is.
-baseES <- lapply(baseES, function(r) {
-  if (!compareGeom(r, tmp, stopOnError = FALSE)) {
-    message("Aligning raster: ", names(r))
-    resample(r, tmp2, method = "bilinear")
-  } else {
-    message("Raster already aligned: ", names(r))
-    r
-  }
-})
-
-baseES_st <- lapply(baseES, function(r){
-  r <- mask(r, griscom)
-  r <- subst(r, from = 0, to = NA)
-})
+#serv_1 is the potential resotration already cropped, aligned and stacked for all services
+serv_1 <- subst(serv_1, from = 0, to =NA) 
 
 
-# Apply the function to each layer
-top_10 <- lapply(baseES_st, select_top_10_percent)
+# Apply the function to each layer It is not workin g yet. don't use. 
+#top_10. <- select_top_percentile(serv_1, percentile=0.9) 
+
+top_10 <- lapply(serv_1, select_top_10_percent)
+ 
 top_10_2 <- do.call(c,top_10)
-writeRaster(top_10_2, here('Interventions', "Brazil_intervention", "top_10_br.tif"), overwrite=TRUE)
+writeRaster(top_10_2, here('Interventions', "Mex_intervention", "top_10_mx.tif"), overwrite=TRUE)
 top_10 <- lapply(top_10, function(x) ifel(x > 0, 1, NA))
 top_10 <- do.call(c,top_10)
 
-writeRaster(top_10, here('Interventions', "Brazil_intervention", "top_10_bin_br.tif"), overwrite=TRUE)
+writeRaster(top_10, here('Interventions', "Mex_intervention", "top_10_bin_mx.tif"), overwrite=TRUE)
 
-writeRaster(baseES_st, here('Interventions', "Bazil_intervention", "stack_normmskd_br.tif"))
+```
+![Restoration Priority area per Service (top 10%)](/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Mex_intervention/Mex_fin.png)
+
+```{r normalize, eval=FALSE, include=FALSE}
+#writeRaster(baseES_st, here('Interventions', "Mex_intervention", "stack_normmskd_mx.tif"))
 # -----------------------------------------------------------------------------
 # 3. Convert to Binary Masks (Values > 0 => 1, Otherwise => 0)
 # -----------------------------------------------------------------------------
@@ -550,6 +675,56 @@ writeRaster(
 
 
 ```
+
+
+```{r norm, eval=FALSE, include=FALSE}
+## 1.4 Normalization of Ecosystem Service Restoration Data 
+
+We normalized the different ES for visualization and simplification purposes 
+$$
+\text{Normalized Value} = \frac{\text{Raster Value} - \text{Min Value}}{\text{Max Value} - \text{Min Value}}
+$$
+
+Where: 
+- $\text{Raster Value}$ is the value of a given pixel. 
+- $\text{Min Value}$ and $\text{Max Value}$ represent the minimum and maximum observed values across the raster dataset.
+
+
+
+
+```{r normalize 2, eval=FALSE, include=FALSE}
+# # ust assign this variable name, so we don't need to edit the whole thing 
+
+
+serv_bra <- lapply(serv_bra,normalize_raster)
+serv_bra <- do.call(c, serv_bra)
+
+writeRaster(serv_bra, paste0(here("restoration_combined"),'/', 'MEX_ES_multiband.tif'), overwrite=T) #Add Access layer before exporting. 
+# add mask with the place. 
+
+# load polygon, not just the intevention area. or not?
+# run bot hthings 
+
+tmp <- rast(here("Interventions","Mex_intervention", "yucatan_bkg.tif"))
+tmp <- trim(tmp)
+
+serv_bra  <- merge(serv_bra , tmp)
+    
+    # Sum the layers of the merged raster
+    serv_bra  <- app(serv_bra, sum)
+
+writeRaster(serv_bra, paste0(here("restoration_combined"),'/', 'MEX_ES_sum2.tif'))
+
+```
+
+
+
+
+  
+
+
+
+
 
 
 
