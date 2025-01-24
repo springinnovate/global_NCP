@@ -13,7 +13,6 @@ editor_options:
 ```{r prep environment, eval=TRUE, include=FALSE}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
-           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign',  'exactextractr')
 sapply(packs, require, character.only = TRUE, quietly=TRUE)
 rm(packs)
 align_rasters <- function(raster_list, template, resample_method = "bilinear") {
@@ -318,10 +317,15 @@ baseES <- process_rasters(baseES,tmp, resample_method = "bilinear")
 
 Use the adjusted Griscom restoration data to extract the pixels includes as  Restoration Potential in Griscom's Dataset (remember to update the info toi the data we used)
 For Surendra (Yucatan) the whole peninsula, in Espirito Santo, just 
+<<<<<<< HEAD
 
 Use the adjusted Griscom restoration data to extract the pixels includes as  Restoration Potential in Griscom's Dataset on [Global
 priority areas for ecosystem
 restoration](https://www.ksfire.org/woody_encroachment/documents/Global%20priority%20areas%20of%20ecosytem%20restoration.pdf).
+=======
+Use the adjusted Griscom restoration data to extract the pixels includes as  Restoration Potential in Griscom's Dataset on [Global priority areas for ecosystem restoration](https://www.ksfire.org/woody_encroachment/documents/Global%20priority%20areas%20of%20ecosytem%20restoration.pdf).
+
+>>>>>>> 4a0146e (save change)
 
 ```{r load Griscoms data, eval=FALSE, include=FALSE}
 # Load Griscom Data
@@ -340,21 +344,20 @@ baseES_m <- map2(
 map(1:length(baseES), function(x) writeRaster(baseES_m[[x]], paste0(here("restoration_combined"),'/', unique(country_names)[[x]], '_ES_msk.tif'), overwrite=T))
 ```
 
-![Intervention Areas & Combiend Restoration
-Potential](/home/jeronimo/OneDrive/WWF_nbs_op/output_maps/maps_interventions.png)
+![Intervention Areas & Combiend RestorationPotential](/home/jeronimo/OneDrive/WWF_nbs_op/output_maps/maps_interventions.png)
 
 ------------------------------------------------------------------------
 
 # 5 Calculate Restoration Potential output.
 
-```{r load intevention data, include=FALSE}
+```{r load intevention data 2, include=FALSE}
 tiffes <- file.path(here("restoration_combined"), list.files(paste0(here("restoration_combined")),pattern= 'ES_msk'))
 baseES_m <- lapply(tiffes, rast)
 ```
 
 ## 5.1 Brazil Espiritu Santo
 
-```{r brazil intervention , eval=FALSE, include=FALSE}
+```{r brazil intervention, eval=FALSE, include=FALSE}
 poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
 pol_wgs <- st_transform(poly, crs=crs(baseES_m[[1]]))
 serv_bra <- baseES_m[[1]] %>% crop(pol_wgs) %>% mask(pol_wgs)
@@ -367,7 +370,7 @@ writeRaster(rest_sp, here("Interventions", "Brazil_intervention", "SS_griscom.ti
 ```
 
 
-```{r brazil intervention 1, eval=FALSE, include=FALSE}
+```{r brazil intervention 1,eval=FALSE, include=FALSE}
 poly <- st_read(here("Interventions", "Brazil_int_areas", "Espirito_Santo_Albers.shp"))
 pol_wgs <- st_transform(poly, crs=crs(tmp[[1]]))
 serv_bra <- tmp[[1]] %>% crop(pol_wgs) %>% mask(pol_wgs)
@@ -906,7 +909,7 @@ save(all_results, file=here("Interventions", "Mex_intervention", "all_results_mx
 
 ```{r plot yucatan, echo=FALSE}
 load(file=here("Interventions", "Mex_intervention", "all_results_mx.RData"))
-df <-all_results %>%  filter(band!="nature_access_diff_Sc3v1_PNVnoag-esa2020") %>% filter(band!= "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790")
+df <-all_results %>%  filter(band!="nature_access_diff_Sc3v1_PNVnoag-esa2020") %>% filter(band!="pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790"))
 # Assuming your 'all_results' data frame has the columns 'Service', 'units', and 'color'
 # Assuming your 'all_results' data frame has the columns 'Service', 'units', and 'color'
 
