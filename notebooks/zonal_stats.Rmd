@@ -1,0 +1,173 @@
+---
+title: "Summary ES"
+author: "Jeronimo Rodriguez-Escobar"
+date: "2025-01-16"
+output: html_document
+---
+
+  
+1.	Perform zonal statistics (using exactextractr).
+2.	Combine the results into a single data frame.
+3.	Create faceted bar plots (using ggplot2) for each raster statistic.
+4.	Generate choropleth maps (using ggplot2 and sf) to visualize spatial distributions.
+5.	Suggest additional insights you might glean from these results.
+
+Note: This example assumes:
+•	A polygon shapefile (or other vector format) with a column named "continent" and a column (e.g., "country") indicating each country name.
+•	You have multiple GeoTIFF files stored in a known directory.
+•	You want to compute mean and median (commonly used statistics) for each polygon.
+•	You can adapt the file paths, column names, or summary operations as needed for your actual data.
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(sf)             # For reading and working with vector data
+library(dplyr)          # For data manipulation
+library(terra)          # For reading raster data (SpatRasters)
+library(exactextractr)  # For zonal statistics
+library(ggplot2)        # For plotting
+library(forcats)        # For factor reordering
+
+# Load and Filter Polygons
+
+
+# Replace with the actual path to your polygon file (e.g., a shapefile)
+poly <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/WWF_nbs_op/globalESLatin'/global_2024-05-08.gpkg") 
+# Load polygons as an sf objectpolygons_sf <- st_read(vector_path)
+
+# Filter to retain only those features located in 'Latin America'
+polygons_latin_america <- poly %>%
+  filter(continent == "Latin America")
+
+```
+
+
+2. Load a List of GeoTIFF Rasters
+
+# Vector of raster file paths
+raster_files <- c(
+  "path/to/raster1.tif",
+  "path/to/raster2.tif",
+  "path/to/raster3.tif"
+  # Add more if needed
+)
+
+# Use terra::rast() to load each file as a SpatRaster object
+rasters_list <- lapply(raster_files, rast)
+
+# Name each raster in the list for easy reference
+names(rasters_list) <- c("Raster_1", "Raster_2", "Raster_3") 
+
+Explanation:
+  •	We specify a list of file paths to our GeoTIFFs.
+•	terra::rast() reads each TIFF into a SpatRaster.
+•	Setting names(rasters_list) helps keep track of which raster is which.
+
+3. Compute Zonal Statistics with exactextractr
+
+# We'll compute mean and median as an example
+stats_to_compute <- c("mean", "median")
+
+# exact_extract can append columns from the polygon layer;
+# here, we assume 'country' is a column in polygons_latin_america
+results_list <- lapply(names(rasters_list), function(r_name) {
+  r <- rasters_list[[r_name]]
+  
+  # Perform exact extraction
+  # - append_cols = "country" retains the country identifier with each result
+  res <- exact_extract(r, polygons_latin_america,
+                       fun = stats_to_compute,
+                       append_cols = "country")
+  
+  # Add a column labeling which raster these results are from
+  res$raster_name <- r_name
+  return(res)
+})
+
+# Combine results from all rasters into one data frame
+zonal_df <- do.call(rbind, results_list)
+
+# Optional: rename columns for clarity:
+zonal_df <- zonal_df %>%
+  rename(
+    mean_value   = mean, 
+    median_value = median
+  )
+
+# Show a snippet of the combined results
+head(zonal_df)
+
+Explanation:
+  •	exact_extract() returns a data frame (or list of data frames) with the requested summary statistics for each polygon.
+•	We loop through each raster, compute the same statistics, and store them in results_list.
+•	We bind all partial results together into zonal_df for easy plotting and analysis.
+
+4. Create Faceted Bar Plots
+
+We want separate bar plots (facets) for each raster, showing (for instance) mean or median ecosystem service values by country, sorted from high to low.
+
+# For demonstration, let's use median_value.
+ggplot(zonal_df, aes(
+  x = fct_reorder(country, median_value, .desc = TRUE), 
+  y = median_value
+)) +
+  geom_col() +
+  facet_wrap(~ raster_name, scales = "free_x") +
+  coord_flip() +
+  labs(
+    title = "Median Ecosystem Service Values by Country",
+    x = "Country",
+    y = "Median Value"
+  ) +
+  theme_minimal()
+
+Explanation:
+  •	fct_reorder(country, median_value, .desc = TRUE) reorders the countries from highest to lowest median.
+•	facet_wrap(~ raster_name) creates a separate panel for each raster.
+•	coord_flip() swaps the axes, making country names more readable (optional).
+
+Tip
+•	You can similarly create a bar plot for mean_value by substituting mean_value in the aesthetic mapping.
+
+5. Generate Choropleth Maps
+
+Use ggplot2 and the spatial geometry from our sf object to color each polygon by its statistic of interest. Faceting again by each raster is useful to compare spatial patterns.
+
+# First, merge the zonal_df results back into the polygon sf object.
+# This ensures each polygon gets a corresponding mean/median value.
+
+# We need a unique identifier. 
+# Assuming 'country' is unique per polygon, we can do a left_join:
+map_data <- polygons_latin_america %>%
+  left_join(zonal_df, by = "country")
+
+# Plot the median_value as an example
+ggplot(map_data) +
+  geom_sf(aes(fill = median_value)) +
+  facet_wrap(~ raster_name) +
+  scale_fill_viridis_c(option = "magma", na.value = "gray90") +
+  labs(
+    title = "Choropleth of Median Ecosystem Services",
+    fill = "Median Value"
+  ) +
+  theme_minimal()
+
+Explanation:
+  •	We left_join() to attach the computed statistics (per country) back onto the spatial object.
+•	geom_sf(aes(fill = median_value)) shades polygons by the median.
+•	facet_wrap(~ raster_name) again yields a panel for each raster.
+•	scale_fill_viridis_c() is a popular scale for continuous data, but you can choose others.
+
+6. Additional Insights & Suggestions
+	•	Statistical Range: In addition to mean/median, you might compute minimum, maximum, standard deviation, or other metrics that provide insight into variability.
+	•	Comparisons Across Regions: Summaries of how different countries or regions rank across multiple rasters can highlight hotspots for restoration potential or areas of concern.
+	•	Temporal Analyses: If the rasters represent different timeframes, you could compare historical vs. current vs. projected ecosystem services.
+	•	Spatial Correlation: You might check if certain ecosystem services (e.g., carbon storage vs. water retention) are positively or negatively correlated across the study area.
+	•	Further Plot Customizations: You could apply custom color palettes, dynamic labeling, or interactive mapping (e.g., using tmap or leaflet) for better stakeholder communication.
+
+Final Remarks
+	•	This script serves as a template you can adapt to your needs:
+	•	Change file paths, column names, or the specific statistics.
+	•	Modify or extend the plotting code (e.g., to generate boxplots, heatmaps, or more advanced visualizations).
+	•	Integrate additional data (socioeconomic indicators, climate layers, etc.) for enriched analyses.
+
+With these steps, you’ll be able to load, process, and visualize polygon-level statistics from multiple raster datasets, facilitating comparisons and decision-making for ecosystem assessments in Latin America—or any region of interest.
