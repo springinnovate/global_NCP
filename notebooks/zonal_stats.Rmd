@@ -26,23 +26,26 @@ library(terra)          # For reading raster data (SpatRasters)
 library(exactextractr)  # For zonal statistics
 library(ggplot2)        # For plotting
 library(forcats)        # For factor reordering
+```
+
 
 # Load and Filter Polygons
 
+```{r load polygons}
 
 # Replace with the actual path to your polygon file (e.g., a shapefile)
-poly <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/WWF_nbs_op/globalESLatin'/global_2024-05-08.gpkg") 
+poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_JJ.gpkg') 
 # Load polygons as an sf objectpolygons_sf <- st_read(vector_path)
 
 # Filter to retain only those features located in 'Latin America'
-polygons_latin_america <- poly %>%
-  filter(continent == "Latin America")
-
+poly <- poly %>%
+  filter(continent == "South America")
 ```
 
 
 2. Load a List of GeoTIFF Rasters
 
+```{r load raster es}
 # Vector of raster file paths
 raster_files <- c(
   "path/to/raster1.tif",
@@ -56,6 +59,8 @@ rasters_list <- lapply(raster_files, rast)
 
 # Name each raster in the list for easy reference
 names(rasters_list) <- c("Raster_1", "Raster_2", "Raster_3") 
+```
+
 
 Explanation:
   •	We specify a list of file paths to our GeoTIFFs.
