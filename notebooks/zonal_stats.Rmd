@@ -26,6 +26,7 @@ library(terra)          # For reading raster data (SpatRasters)
 library(exactextractr)  # For zonal statistics
 library(ggplot2)        # For plotting
 library(forcats)        # For factor reordering
+library(here)
 ```
 
 
@@ -42,46 +43,43 @@ poly <- poly %>%
   filter(continent == "South America")
 ```
 
+I am using the rasters with the modeled ES that represnet the same service for 1992 and 2020 in the same units (of course). There were not the ones originally prioritized and yhr ones i have been working on but a different set that is the only one that i can actually use
+
 
 2. Load a List of GeoTIFF Rasters
 
 ```{r load raster es}
 # Vector of raster file paths
-raster_files <- c(
-  "path/to/raster1.tif",
-  "path/to/raster2.tif",
-  "path/to/raster3.tif"
-  # Add more if needed
-)
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2'
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= '1992.*\\.tif$'))
+tiffes <- tiffes[-4]
+
+prod <- basename(tiffes)
+
 
 # Use terra::rast() to load each file as a SpatRaster object
-rasters_list <- lapply(raster_files, rast)
-
-# Name each raster in the list for easy reference
-names(rasters_list) <- c("Raster_1", "Raster_2", "Raster_3") 
+rasters_list <- lapply(tiffes, rast)
 ```
 
 
 Explanation:
-  •	We specify a list of file paths to our GeoTIFFs.
-•	terra::rast() reads each TIFF into a SpatRaster.
+Specify a list of file paths to our GeoTIFFs.
 •	Setting names(rasters_list) helps keep track of which raster is which.
 
 3. Compute Zonal Statistics with exactextractr
-
+```{r compute stats}
 # We'll compute mean and median as an example
-stats_to_compute <- c("mean", "median")
+target_stats <- c("mean", "median")
 
 # exact_extract can append columns from the polygon layer;
 # here, we assume 'country' is a column in polygons_latin_america
-results_list <- lapply(names(rasters_list), function(r_name) {
-  r <- rasters_list[[r_name]]
-  
+results_list <- lapply(rasters_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
-  res <- exact_extract(r, polygons_latin_america,
-                       fun = stats_to_compute,
-                       append_cols = "country")
+  res <- exact_extract(r, poly,
+                       fun = target_stats,
+                       append_cols = "name_long")
+  r_name <- names(r)
   
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
@@ -100,6 +98,7 @@ zonal_df <- zonal_df %>%
 
 # Show a snippet of the combined results
 head(zonal_df)
+```
 
 Explanation:
   •	exact_extract() returns a data frame (or list of data frames) with the requested summary statistics for each polygon.
