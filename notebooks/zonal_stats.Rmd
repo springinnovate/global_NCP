@@ -26,6 +26,7 @@ library(terra)          # For reading raster data (SpatRasters)
 library(exactextractr)  # For zonal statistics
 library(ggplot2)        # For plotting
 library(forcats)        # For factor reordering
+library(tidytext)
 library(here)
 ```
 
@@ -51,8 +52,8 @@ I am using the rasters with the modeled ES that represnet the same service for 1
 ```{r load raster es}
 # Vector of raster file paths
 inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2'
-tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= '1992.*\\.tif$'))
-tiffes <- tiffes[-4]
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= '.tif$'))
+tiffes <- tiffes[-c(7,8)]
 
 prod <- basename(tiffes)
 
@@ -89,40 +90,52 @@ results_list <- lapply(rasters_list, function(r) {
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
 
-# Optional: rename columns for clarity:
-zonal_df <- zonal_df %>%
-  rename(
-    mean_value   = mean, 
-    median_value = median
-  )
+raster_name <- unique(zonal_df$raster_name)
+service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each = 2)
+color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=2)
+cd <- as_tibble(cbind(raster_name, service, color))
 
-# Show a snippet of the combined results
-head(zonal_df)
+zonal_df <- left_join(zonal_df,cd)
+
+# Show a snippet of the combined resultshead(zonal_df)
+
 ```
 
-Explanation:
-  •	exact_extract() returns a data frame (or list of data frames) with the requested summary statistics for each polygon.
-•	We loop through each raster, compute the same statistics, and store them in results_list.
-•	We bind all partial results together into zonal_df for easy plotting and analysis.
+•	exact_extract() returns a data frame (or list of data frames) with the requested summary statistics for each polygon.
+•	Loop through each raster, compute the same statistics, and store them in results_list.
+• Bind all partial results together into zonal_df for easy plotting and analysis.
 
 4. Create Faceted Bar Plots
 
 We want separate bar plots (facets) for each raster, showing (for instance) mean or median ecosystem service values by country, sorted from high to low.
 
 # For demonstration, let's use median_value.
-ggplot(zonal_df, aes(
-  x = fct_reorder(country, median_value, .desc = TRUE), 
-  y = median_value
-)) +
-  geom_col() +
-  facet_wrap(~ raster_name, scales = "free_x") +
-  coord_flip() +
+```{r barplots}
+
+
+# Data preparation: reorder countries by mean for each service
+data_prepped <- zonal_df %>% filter(!is.na(mean)) %>%  # Remove rows with NA mean values
+  mutate(name_long = reorder_within(name_long, -mean, service))  # Reorder within each service
+
+# Plot
+ggplot(data_prepped, aes(x = name_long, y = mean, fill = color)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_fill_identity() +  # Use the colors from the "color" column
+  facet_wrap(~ service, scales = "free")+#, free_x) +  # Facet by service
   labs(
-    title = "Median Ecosystem Service Values by Country",
+    title = "Mean Ecosystem Service Values per Country, 1992",
     x = "Country",
-    y = "Median Value"
+    y = "Mean Value"
   ) +
-  theme_minimal()
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate x-axis labels
+  ) +
+  scale_x_reordered()  # Ensure reordering works
+
+```
+
 
 Explanation:
   •	fct_reorder(country, median_value, .desc = TRUE) reorders the countries from highest to lowest median.
