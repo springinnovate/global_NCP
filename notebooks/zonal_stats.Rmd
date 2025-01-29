@@ -1,8 +1,11 @@
 ---
 title: "Summary ES"
 author: "Jeronimo Rodriguez-Escobar"
-date: "2025-01-16"
-output: html_document
+date: "2025-01-27"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
 ---
 
   
@@ -28,12 +31,15 @@ library(ggplot2)        # For plotting
 library(forcats)        # For factor reordering
 library(tidytext)
 library(here)
+library(patchwork)
+library(tidyr)
 ```
 
+## 1. Load Polygons
 
-# Load and Filter Polygons
+Test with South America
 
-```{r load polygons}
+```{r load polygons, include=FALSE}
 
 # Replace with the actual path to your polygon file (e.g., a shapefile)
 poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_JJ.gpkg') 
@@ -49,26 +55,29 @@ I am using the rasters with the modeled ES that represnet the same service for 1
 
 2. Load a List of GeoTIFF Rasters
 
-```{r load raster es}
+Following products were assessed:
+```{r load raster es, echo=FALSE}
 # Vector of raster file paths
 inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2'
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= '.tif$'))
 tiffes <- tiffes[-c(7,8)]
 
-prod <- basename(tiffes)
-
+filename<- basename(tiffes)
 
 # Use terra::rast() to load each file as a SpatRaster object
 rasters_list <- lapply(tiffes, rast)
+service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each=2)
+filename<- as_tibble(cbind(service,filename))
+#colnames(prod) <- c("Service", "Filename")
+print(filename)
 ```
 
 
-Explanation:
-Specify a list of file paths to our GeoTIFFs.
-•	Setting names(rasters_list) helps keep track of which raster is which.
 
-3. Compute Zonal Statistics with exactextractr
-```{r compute stats}
+
+## 3. Compute Zonal Statistics with exactextractr
+
+```{r compute stats, eval=FALSE, include=FALSE}
 # We'll compute mean and median as an example
 target_stats <- c("mean", "median")
 
@@ -96,32 +105,73 @@ color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=2)
 cd <- as_tibble(cbind(raster_name, service, color))
 
 zonal_df <- left_join(zonal_df,cd)
-
+zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
+                        1992, 
+                        ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
+save(zonal_df, file=here('output_data', 'zonal_df_SA.RData'))
 # Show a snippet of the combined resultshead(zonal_df)
-
 ```
 
-•	exact_extract() returns a data frame (or list of data frames) with the requested summary statistics for each polygon.
-•	Loop through each raster, compute the same statistics, and store them in results_list.
-• Bind all partial results together into zonal_df for easy plotting and analysis.
-
-4. Create Faceted Bar Plots
 
 We want separate bar plots (facets) for each raster, showing (for instance) mean or median ecosystem service values by country, sorted from high to low.
 
-# For demonstration, let's use median_value.
-```{r barplots}
-
-
+## 4. Plot Mean ES Value
+```{r barplots, echo=FALSE, fig.height=8, fig.width=14}
+load(here('output_data', 'zonal_df_SA.RData'))
 # Data preparation: reorder countries by mean for each service
 data_prepped <- zonal_df %>% filter(!is.na(mean)) %>%  # Remove rows with NA mean values
   mutate(name_long = reorder_within(name_long, -mean, service))  # Reorder within each service
+# For each service, get min and max across *both* years (so 1992 and 2020)
+service_range <- data_prepped %>%
+  group_by(service) %>%
+  summarize(
+    min_val = min(mean, na.rm = TRUE),
+    max_val = max(mean, na.rm = TRUE),
+    .groups = "drop"
+  )
 
-# Plot
-ggplot(data_prepped, aes(x = name_long, y = mean, fill = color)) +
-  geom_bar(stat = "identity", show.legend = FALSE) +
-  scale_fill_identity() +  # Use the colors from the "color" column
-  facet_wrap(~ service, scales = "free")+#, free_x) +  # Facet by service
+
+# Pivot min_val and max_val to a "long" format so we can plot them
+range_data_1992 <- service_range %>%
+  pivot_longer(cols = c(min_val, max_val), 
+               names_to = "range_type", 
+               values_to = "mean") %>%
+  mutate(
+    # We include year=1992 so it will show up in the 1992 plot
+    year = 1992,
+    # We need some dummy country name so x won't break; 
+    # "dummy" won't appear on your real bars
+    name_long = "dummy"
+  )
+
+range_data_2020 <- service_range %>%
+  pivot_longer(cols = c(min_val, max_val), 
+               names_to = "range_type", 
+               values_to = "mean") %>%
+  mutate(
+    year = 2020,
+    name_long = "dummy"
+  )
+
+
+plot_data_1992 <- data_prepped %>% filter(year == 1992)
+
+p_1992 <- ggplot() +
+  # 1) Plot the real bars
+  geom_bar(
+    data = plot_data_1992,
+    aes(x = name_long, y = mean, fill = color),
+    stat = "identity", show.legend = FALSE
+  ) +
+  # 2) Add invisible “blank” geoms with min and max for each service
+  geom_blank(
+    data = range_data_1992,
+    aes(x = name_long, y = mean)
+  ) +
+  # Reuse your original reordering scale & color approach
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free") +
+  scale_x_reordered() +
   labs(
     title = "Mean Ecosystem Service Values per Country, 1992",
     x = "Country",
@@ -130,61 +180,134 @@ ggplot(data_prepped, aes(x = name_long, y = mean, fill = color)) +
   theme_bw() +
   theme(
     strip.text = element_text(face = "bold"),
-    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate x-axis labels
-  ) +
-  scale_x_reordered()  # Ensure reordering works
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 
+# Combine the 1992 plots in a row (or multi-row if you prefer).
+p_1992
 ```
 
 
-Explanation:
-  •	fct_reorder(country, median_value, .desc = TRUE) reorders the countries from highest to lowest median.
-•	facet_wrap(~ raster_name) creates a separate panel for each raster.
-•	coord_flip() swaps the axes, making country names more readable (optional).
+```{r ggplot 2020, echo=FALSE, fig.height=8, fig.width=14}
 
-Tip
-•	You can similarly create a bar plot for mean_value by substituting mean_value in the aesthetic mapping.
+plot_data_2020 <- data_prepped %>% filter(year == 2020)
 
-5. Generate Choropleth Maps
+p_2020 <- ggplot() +
+  geom_bar(
+    data = plot_data_2020,
+    aes(x = name_long, y = mean, fill = color),
+    stat = "identity", show.legend = FALSE
+  ) +
+  geom_blank(
+    data = range_data_2020,
+    aes(x = name_long, y = mean)
+  ) +
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free") +
+  scale_x_reordered() +
+  labs(
+    title = "Mean Ecosystem Service Values per Country, 2020",
+    x = "Country",
+    y = "Mean Value"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+p_2020
+```
+
+## 5. Generate  Maps
 
 Use ggplot2 and the spatial geometry from our sf object to color each polygon by its statistic of interest. Faceting again by each raster is useful to compare spatial patterns.
-
+```{r create maps, include=FALSE}
 # First, merge the zonal_df results back into the polygon sf object.
 # This ensures each polygon gets a corresponding mean/median value.
 
 # We need a unique identifier. 
 # Assuming 'country' is unique per polygon, we can do a left_join:
-map_data <- polygons_latin_america %>%
-  left_join(zonal_df, by = "country")
+map_data <- poly %>%
+  left_join(zonal_df, by = "name_long")
 
-# Plot the median_value as an example
-ggplot(map_data) +
-  geom_sf(aes(fill = median_value)) +
-  facet_wrap(~ raster_name) +
-  scale_fill_viridis_c(option = "magma", na.value = "gray90") +
-  labs(
-    title = "Choropleth of Median Ecosystem Services",
-    fill = "Median Value"
-  ) +
-  theme_minimal()
+map_1992 <- map_data %>% filter(year == 1992)
+services <- unique(map_1992$service)
+map_2020 <-  map_data %>% filter(year == 2020)
 
-Explanation:
-  •	We left_join() to attach the computed statistics (per country) back onto the spatial object.
-•	geom_sf(aes(fill = median_value)) shades polygons by the median.
-•	facet_wrap(~ raster_name) again yields a panel for each raster.
-•	scale_fill_viridis_c() is a popular scale for continuous data, but you can choose others.
 
-6. Additional Insights & Suggestions
-	•	Statistical Range: In addition to mean/median, you might compute minimum, maximum, standard deviation, or other metrics that provide insight into variability.
-	•	Comparisons Across Regions: Summaries of how different countries or regions rank across multiple rasters can highlight hotspots for restoration potential or areas of concern.
-	•	Temporal Analyses: If the rasters represent different timeframes, you could compare historical vs. current vs. projected ecosystem services.
-	•	Spatial Correlation: You might check if certain ecosystem services (e.g., carbon storage vs. water retention) are positively or negatively correlated across the study area.
-	•	Further Plot Customizations: You could apply custom color palettes, dynamic labeling, or interactive mapping (e.g., using tmap or leaflet) for better stakeholder communication.
+# 2) Identify unique services
+services <- unique(map_data$service)
 
-Final Remarks
-	•	This script serves as a template you can adapt to your needs:
-	•	Change file paths, column names, or the specific statistics.
-	•	Modify or extend the plotting code (e.g., to generate boxplots, heatmaps, or more advanced visualizations).
-	•	Integrate additional data (socioeconomic indicators, climate layers, etc.) for enriched analyses.
+# 3) For each service, find min/max across both years
+service_range <- map_data %>%
+  group_by(service) %>%
+  summarize(
+    min_val = min(mean, na.rm = TRUE),
+    max_val = max(mean, na.rm = TRUE),
+    unique_color = unique(color)  # we assume 1 color per service
+  )
 
-With these steps, you’ll be able to load, process, and visualize polygon-level statistics from multiple raster datasets, facilitating comparisons and decision-making for ecosystem assessments in Latin America—or any region of interest.
+plot_list_1992 <- list()
+plot_list_2020 <- list()
+
+for (s in services) {
+  # Extract global range (across both years) for service s
+  row_s <- filter(service_range, service == s)
+  s_min <- row_s$min_val
+  s_max <- row_s$max_val
+  s_color <- row_s$unique_color  # The single "unique" color for that service
+  
+  # Subset to year=1992, that service
+  df_1992 <- map_data %>%
+    filter(service == s, year == 1992)
+  
+  # Subset to year=2020, that service
+  df_2020 <- map_data %>%
+    filter(service == s, year == 2020)
+  
+  # Build the 1992 map
+  p_1992 <- ggplot(df_1992) +
+    geom_sf(aes(fill = mean), color = NA) +
+    scale_fill_gradientn(
+      colors   = c("white", s_color),  # White -> "unique_color"
+      limits   = c(s_min, s_max),      # Force the same scale min/max
+      na.value = "gray90"
+    ) +
+    labs(
+      title = paste0(s, " (1992)"),
+      fill  = "Mean"
+    ) +
+    theme_minimal()
+  
+  # Build the 2020 map
+  p_2020 <- ggplot(df_2020) +
+    geom_sf(aes(fill = mean), color = NA) +
+    scale_fill_gradientn(
+      colors   = c("white", s_color),
+      limits   = c(s_min, s_max),
+      na.value = "gray90"
+    ) +
+    labs(
+      title = paste0(s, " (2020)"),
+      fill  = "Mean"
+    ) +
+    theme_minimal()
+  
+  # Add them to the lists
+  plot_list_1992[[s]] <- p_1992
+  plot_list_2020[[s]] <- p_2020
+}
+```
+
+```{r fig.width=14, fig.height=12}
+# Combine the 1992 plots in a row (or multi-row if you prefer).
+combined_1992 <- wrap_plots(plot_list_1992, ncol = 3)
+
+# Combine the 2020 plots similarly.
+combined_2020 <- wrap_plots(plot_list_2020, ncol = 3)
+
+combined_1992
+combined_2020
+```
+
+
