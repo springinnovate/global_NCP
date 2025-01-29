@@ -74,10 +74,11 @@ print(filename)
 
 
 
-
 ## 3. Compute Zonal Statistics with exactextractr
 
 ```{r compute stats, eval=FALSE, include=FALSE}
+3. Compute Zonal Statistics with exactextractr
+```{r compute stats, include=FALSE}
 # We'll compute mean and median as an example
 target_stats <- c("mean", "median")
 
@@ -108,16 +109,21 @@ zonal_df <- left_join(zonal_df,cd)
 zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
                         1992, 
                         ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
+
 save(zonal_df, file=here('output_data', 'zonal_df_SA.RData'))
+
 # Show a snippet of the combined resultshead(zonal_df)
 ```
 
 
 We want separate bar plots (facets) for each raster, showing (for instance) mean or median ecosystem service values by country, sorted from high to low.
 
+<<<<<<< HEAD
 ## 4. Plot Mean ES Value
 ```{r barplots, echo=FALSE, fig.height=8, fig.width=14}
 load(here('output_data', 'zonal_df_SA.RData'))
+
+
 # Data preparation: reorder countries by mean for each service
 data_prepped <- zonal_df %>% filter(!is.na(mean)) %>%  # Remove rows with NA mean values
   mutate(name_long = reorder_within(name_long, -mean, service))  # Reorder within each service
@@ -192,6 +198,7 @@ p_1992
 
 plot_data_2020 <- data_prepped %>% filter(year == 2020)
 
+
 p_2020 <- ggplot() +
   geom_bar(
     data = plot_data_2020,
@@ -218,10 +225,14 @@ p_2020 <- ggplot() +
 p_2020
 ```
 
+
+
 ## 5. Generate  Maps
 
 Use ggplot2 and the spatial geometry from our sf object to color each polygon by its statistic of interest. Faceting again by each raster is useful to compare spatial patterns.
 ```{r create maps, include=FALSE}
+
+
 # First, merge the zonal_df results back into the polygon sf object.
 # This ensures each polygon gets a corresponding mean/median value.
 
@@ -300,6 +311,7 @@ for (s in services) {
 ```
 
 ```{r fig.width=14, fig.height=12}
+
 # Combine the 1992 plots in a row (or multi-row if you prefer).
 combined_1992 <- wrap_plots(plot_list_1992, ncol = 3)
 
