@@ -186,7 +186,7 @@ tiffes <- file.path(
   )
 )
 
-#tiffes_bl <- tiffes[c(5,12,6,15,8)]
+
 tiffes <- tiffes[c(6,8,11,16,20)] #just keep pollination - AG,
 #tiffes <- tiffes[-2]
 
@@ -196,7 +196,7 @@ tiffes_rest <- tiffes_rest[c(3,5,4,1,2)]
 
 # set the order of the services here:
 
-Service <- c("Nitrogen Retention", "Sediment Retention", "Pollination", "Coastal Protection" , "Nature Access")
+serv <- c("Coastal Protection", "Nitrogen Retention", "Sediment Retention", "Nature Access", "Pollination")
 ```
 
 ```{r apply obtain baseline output, eval=FALSE, include=FALSE}
@@ -259,12 +259,11 @@ band <- rownames(summary)
 summary <- cbind(band,summary)
 summary <- cbind(serv,summary)
 summary <- as_tibble(summary)
-
 summary <- summary %>% rename(Sum = sum) %>% rename(Mean=mean)
 summary
 ```
 
-
+## Load Restoration layers, align and prepare
 ```{r apply mask AOI AP, eval=FALSE, include=FALSE}
 
 # Step 1: Extract file names, product names, and country names
