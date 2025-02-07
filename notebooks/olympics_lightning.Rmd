@@ -221,8 +221,8 @@ tiffes <- file_info$FilePath
 
 baseES <- lapply(tiffes, rast)
 
-griscom <- rast("/home/jeronimo/Documents/WWF_nbs_op/Restoration_Griscom/recMEXICO.tif")
-bkg_ee <- rast("/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Mex_intervention/yucatan_bkg.tif")
+griscom <- rast(here("Restoration_Griscom", "recMEXICO.tif"))
+bkg_ee <- rast(here("Interventions", "Mex_intervention", "yucatan_bkg.tif"))
 griscom <- project(griscom, crs(bkg_ee), res=30, threads=24)
 griscom <- round(griscom)
 bkg_2 <- project(bkg_ee, baseES[[2]], threads=24)
