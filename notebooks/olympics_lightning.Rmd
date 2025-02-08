@@ -77,6 +77,7 @@ The use of stratified random sampling ensures that representative of the entire 
   
 ## Intervention Area 
 
+**Not run**
 ```{r create tmp, eval=FALSE, include=FALSE}
 library(here)
 # add backgrounds/templates to align 
@@ -166,8 +167,8 @@ Spatial Raster Processing Tools: The `terra`, `dplyr`, and `sf` packages in **R*
 
 
 ```{r select ES  data, eval=FALSE, include=FALSE}
-#Restoration:
 
+#Restoration:
 tiffes <- file.path(
   here("Interventions", "Mex_intervention"),
   list.files(
@@ -177,7 +178,7 @@ tiffes <- file.path(
 )
 tiffes_rest <- tiffes[-c(5,7)]
 
-
+# Baseline
 tiffes <- file.path(
   here("cropped_raster_data"),
   list.files(
@@ -185,47 +186,39 @@ tiffes <- file.path(
     pattern = "MEXICO,*\\.tif$"
   )
 )
-
-
 tiffes <- tiffes[c(6,8,11,16,20)] #just keep pollination - AG,
-#tiffes <- tiffes[-2]
 
-# Reaorder because frwaking file names 
+# Reaorder because freaking file names #Check this, but this should be easier
 tiffes <- tiffes[c(2,3,5,1,4)]
 tiffes_rest <- tiffes_rest[c(3,5,4,1,2)]
 
 # set the order of the services here:
-
-serv <- c("Coastal Protection", "Nitrogen Retention", "Sediment Retention", "Nature Access", "Pollination")
+serv <- c("Nitrogen Retention", "Sediment Retention", "Pollination", "Coastal Protection", "Nature Access")
 ```
 
-```{r apply obtain baseline output, eval=FALSE, include=FALSE}
+## Obtaine baselione values
+```{r  obtain baseline output, eval=FALSE, include=FALSE}
 
-# Step 1: Extract file names, product names, and country names
-file_names <- basename(tiffes)  # Extract file names from paths
+#
+# Load AOI (polygon or raster)
+poly <- st_read(here("Interventions", "Mexico_int_areas", "AREA_INTERVENCION2_CORREDORES.shp"))
+#Reproject to the reference crs if necessARY
 
-# Extract product names and country names
-product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
-country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
 
-# Step 2: Create a dataframe to organize the information
-file_info <- data.frame(
-  FilePath = tiffes,
-  Product = product_names,
-  Country = country_names,
-  stringsAsFactors = FALSE
-)
-
-# Step 4: Extract the sorted file paths
-tiffes <- file_info$FilePath
-
+# LOAD DATA TO ANALYZE # SOME OF THESE BECOEMS THE TEMPLATE FOR THE REST. 
 baseES <- lapply(tiffes, rast)
-
+# lOAD MASKS 
+#1 Restoration Mask (fix direcotries, too complex as is)
 griscom <- rast(here("Restoration_Griscom", "recMEXICO.tif"))
+#2 Background mask (fix  this also, too complicated)
 bkg_ee <- rast(here("Interventions", "Mex_intervention", "yucatan_bkg.tif"))
-griscom <- project(griscom, crs(bkg_ee), res=30, threads=24)
-griscom <- round(griscom)
-bkg_2 <- project(bkg_ee, baseES[[2]], threads=24)
+
+#Reprojections
+
+poly <- st_transform(poly, crs=crs(bkg_ee))
+griscom <- round(project(griscom, crs(bkg_ee), res=30, threads=24))
+bkg_2 <- project(bkg_ee, baseES[[2]], threads=24)   # This is necessary if a large raster is to be masked. Easier to reproject the mask to the larger object. D'uh
+bkg_ee <- mask(bkg_ee, poly) 
 
 tot <- freq(bkg_ee)
 
@@ -260,7 +253,6 @@ summary <- cbind(band,summary)
 summary <- cbind(serv,summary)
 summary <- as_tibble(summary)
 summary <- summary %>% rename(Sum = sum) %>% rename(Mean=mean)
-summary
 ```
 
 ## Load Restoration layers, align and prepare
@@ -283,10 +275,7 @@ file_info <- data.frame(
 
 # Step 4: Extract the sorted file paths
 tiffes <- file_info$FilePath
-
 baseES_r <- lapply(tiffes, rast)
-
-
 baseES_r <- align_rasters(baseES_r, bkg_ee)
 
 # crop mask for the intervention area 
@@ -300,92 +289,67 @@ baseES_r <- lapply(baseES_r, function(r){
 
 
 ```{r sampling target areas Yucatan, eval=FALSE, include=FALSE}
+# Convert the serviocsinto a single multilyr for sampling. 
 serv_1 <- do.call(c,baseES_r) 
+#load restoration mask (Griscom)
 rest_m <- rast(here('Interventions', 'Mex_intervention', 'Mex_griscom.tif'))
+
+# Crop and mask for the new area
+rest_m <- crop(rest_m,bkg_2)
+bkg_2 <- crop(bkg_2,rest_m)
+
+bkg_2 <- resample(bkg_2,rest_m)
+rest_m <- mask(rest_m,bkg_2)
+
+rest_m <- project(rest_m,serv_1)
+
 rcl <- matrix(c(
   -Inf, 0, 0,  # Any value from -Infinity to 0 remains 0
   0, Inf, 1   # Any value from 0 to Infinity becomes 1
 ), ncol = 3, byrow = TRUE)
 rest_m <- classify(rest_m, rcl)
-
-serv_1 <- project(serv_1, bkg_ee, method='bilinear', threads=24)
-serv_1 <- merge(serv_1,bkg_ee)
-
-rest_m <- terra::project(rest_m, serv_1, threads=24)
-rest_m <- round(rest_m, digits=0)
-serv_1 <- mask(serv_1,rest_m, maskvalues=0)
+# 
+# serv_1 <- project(serv_1, bkg_ee, method='bilinear', threads=24)
+# serv_1 <- merge(serv_1,bkg_ee)
+# 
+# rest_m <- terra::project(rest_m, serv_1, threads=24)
+# rest_m <- round(rest_m, digits=0)
+# serv_1 <- mask(serv_1,rest_m, maskvalues=0)
 #Calculate the number of pixels needed for 30,000 hectares
 pixel_area <- 30 * 30  # Area of a single pixel in square meters (30m resolution)
 hectare_area <- 10000  # Area of one hectare in square meters
-pixels_needed <- round((15000 * hectare_area) / pixel_area)
+pix_tot <- round((15000 * hectare_area) / pixel_area)
 
-# Count total pixels Griscom intervnetio narea
+# Count total pixels Griscom intervention area
 tot <- freq(bkg_ee)
 perc_rest <- pixels_needed/tot$count[1]*100
 
-# Number of repetitions
-n_repetitions <- 30
-# Function to perform the sampling and calculations
-sample_and_calculate <- function(i, raster, pixels_needed) {
-  # Sample pixels and directly extract values (without na.rm)
-  sample_values <- spatSample(raster, size = pixels_needed, 
-                              method = "random", 
-                              na.rm = FALSE,  
-                              as.points = FALSE, 
-                              xy = FALSE,
-                              values = TRUE) 
+# Number of CPU cores to use
+num_cores <- detectCores() - 4  # Leave 1 core free
 
-  # Remove rows where ALL values are NA
-  sample_values <- sample_values[rowSums(is.na(sample_values)) != ncol(sample_values), ]
+# Define the number of repetitions
+num_repetitions <- 30
 
-  # If not enough samples after removing NAs, resample
-  if (nrow(sample_values) < pixels_needed) {
-    sample_values <- rbind(
-      sample_values,
-      spatSample(raster, size = pixels_needed - nrow(sample_values),
-                 method = "random", na.rm = TRUE, 
-                 as.points = FALSE, xy = FALSE, values = TRUE)
-    )
-  }
+# Run parallel sampling
+results_list <- mclapply(1:num_repetitions, function(x) {
+  sample_and_calculate(raster = serv_1, pixels_needed = pix_tot, confidence = 0.95)
+}, mc.cores = num_cores)
 
-  # Calculate summary statistics
-  band_stats <- apply(sample_values, 2, function(x) { 
-    mean_val <- mean(x)
-    sd_val <- sd(x)
-    n_val <- length(x)
-    se_val <- sd_val / sqrt(n_val)
-    margin_error <- qt(0.975, df = n_val - 1) * se_val
-    lower_ci <- mean_val - margin_error
-    upper_ci <- mean_val + margin_error
-    return(c(mean = mean_val, lower_ci = lower_ci, upper_ci = upper_ci))
-  })
-
-  band_stats_df <- as.data.frame(t(band_stats))
-  band_stats_df$repetition <- i
-
-  # Calculate sum of pixel values for each band
-  band_sums <- colSums(sample_values) 
-  band_stats_df$sum <- band_sums
-
-  return(band_stats_df)
-}
-
-# Using mclapply (parallel processing)
-num_cores <- 10
-results_list <- mclapply(1:n_repetitions, sample_and_calculate, 
-                         raster = serv_1, 
-                         pixels_needed = pixels_needed,
-                         mc.cores = num_cores) 
-
+#Add product name
 results_list <- lapply(results_list, function(df){
   df <- df %>% mutate(band=rownames(df))
 })
-# Combine all results into a single data frame
-all_results <- as_tibble(do.call(rbind, results_list))
 
+# Combine results into a single data frame
+final_results <- do.call(rbind, results_list)
+
+# Add repetition index
+final_results$repetition <- rep(1:num_repetitions, each = nrow(final_results) / num_repetitions)
+
+final_results <- as_tibble(final_results)
 
 # Add new columns with the service names and units.
-all_results <- all_results %>%
+final_results <- final_results %>%
   mutate(Service = case_when(
     band == "cv_habitat_value_Sc3v1-ESAmod2_v2_md5_64082b" ~ "Coastal Protection",
     band == "nature_access_diff_Sc3v1_PNVnoag-esa2020" ~ "Nature Access",
@@ -397,50 +361,46 @@ all_results <- all_results %>%
     TRUE ~ band  # Keep the original band name if no match
   ))
 
-all_results <- all_results %>%
+final_results <- final_results %>%
   mutate(units = case_when(
-    band == "cv_habitat_value_Sc3v1-ESAmod2_v2_md5_64082b" ~ "Risk Reduction Index",
-    band == "nature_access_diff_Sc3v1_PNVnoag-esa2020" ~ "People within 1 hour",
-    band == "nitrogen_ESAmod2-Sc3v1_md5_024a36" ~ "Nitrogen Export (kg/ha/year)",
-    band == "pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag-esa2020_md5_405c88" ~ "Pollination (equivalent people fed)",
-    band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "Pollination (people fed on hab)",
-    band == "sediment_ESAmod2-Sc3v1_md5_149078" ~ "Sediment Export (ton/kg/year)",
-    # ... add more cases for other bands ...
-    TRUE ~ band  # Keep the original band name if no match
+    Service == "Coastal Protection" ~ "Risk Reduction Index",
+    Service == "Nature Access" ~ "People within 1 hour",
+    Service == "Nitrogen Retention" ~ "Nitrogen Export (kg/ha/year)",
+    Service == "Pollination" ~ "Pollination (equivalent people fed)",
+    Service == "Sediment Retention" ~ "Sediment Export (ton/kg/year)",
+    # ... add more cases for other Services ...
+    TRUE ~ Service  # Keep the original Service name if no match
   ))
 
-all_results <- all_results %>%
+final_results <- final_results %>%
   mutate(color = case_when(
-    band == "cv_habitat_value_Sc3v1-ESAmod2_v2_md5_64082b" ~ "#9e9ac8",
-    band == "nature_access_diff_Sc3v1_PNVnoag-esa2020" ~ "#A57C00",
-    band == "nitrogen_ESAmod2-Sc3v1_md5_024a36" ~ "#2c944c",
-    band == "pollination_ppl_fed_on_ag_10s_Sc3v1_PNVnoag-esa2020_md5_405c88" ~ "#dd1c77",
-    band == "pollination_ppl_fed_on_hab_Sc3v1_PNV_no_ag-ESA_md5_576790" ~ "#dd1b56",
-    band == "sediment_ESAmod2-Sc3v1_md5_149078" ~ "#08306b",
-    # ... add more cases for other bands ...
-    TRUE ~ band  # Keep the original band name if no match
+    Service == "Coastal Protection" ~ "#9e9ac8",
+    Service == "Nature Access" ~ "#A57C00",
+    Service == "Nitrogen Retention" ~ "#2c944c",
+    Service == "Pollination" ~ "#dd1c77",
+    Service == "Sediment Retention" ~ "#08306b",
+    # ... add more cases for other Services ...
+    TRUE ~ Service  # Keep the original Service name if no match
   ))
-
 
 #drop the columnwit hthe raster name
-all_results$band <- NULL
+final_results$band <- NULL
 summary$band <- NULL
-all_results <- left_join(all_results,summary)
+final_results <- left_join(final_results,summary, join_by(Service == serv))
 
 #Get Percentages!!!
 
-all_results <- all_results %>% mutate(perc_sum= sum/Sum*100) %>% mutate(perc_mean=mean/Mean*100)
+final_results <- final_results %>% mutate(perc_sum= (sum/Sum)*100) %>% mutate(perc_mean=(mean/Mean)*100)
 
 # Get a final Column with the final percentages for services (move the access from mean)
 # Add the "Final" column based on the rule
-all_results <- all_results %>%
+final_results <- final_results %>%
   mutate(Final = case_when(
     Service == "Nature Access" ~ perc_mean,  # If "Service" is "Nature Access", use "perc_mean"
     TRUE ~ perc_sum  # For all other cases, use "perc_sum"
   ))
 
 
-all_results <- all_results %>% mutate()
 
 
 save(all_results, file= here("Interventions", "Mex_intervention", "all_res_mex.RData"))
