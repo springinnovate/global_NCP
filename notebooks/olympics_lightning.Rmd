@@ -17,19 +17,6 @@ packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign',  'exactextractr', 'kableExtra', 'knitr')
 sapply(packs, require, character.only = TRUE, quietly=TRUE)
 rm(packs)
-align_rasters <- function(raster_list, template, resample_method = "bilinear") {
-  lapply(raster_list, function(r) {
-    if (!compareGeom(r, template, stopOnError = FALSE)) {
-      message("Aligning raster: ", names(r))
-      # Resample to align with the template
-      resample(r, template, method = resample_method)
-    } else {
-      # Return raster as is if already aligned
-      message("Raster already aligned: ", names(r))
-      r
-    }
-  })
-}
 
 normalize_raster <- function(r) {
   min_val <- min(values(r), na.rm = TRUE)
@@ -202,7 +189,7 @@ serv <- c("Nitrogen Retention", "Sediment Retention", "Pollination", "Coastal Pr
 #
 # Load AOI (polygon or raster)
 poly <- st_read(here("Interventions", "Mexico_int_areas", "AREA_INTERVENCION2_CORREDORES.shp"))
-#Reproject to the reference crs if necessARY
+#Reproject to the reference crs if necessary
 
 
 # LOAD DATA TO ANALYZE # SOME OF THESE BECOEMS THE TEMPLATE FOR THE REST. 
@@ -212,31 +199,42 @@ baseES <- lapply(tiffes, rast)
 griscom <- rast(here("Restoration_Griscom", "recMEXICO.tif"))
 #2 Background mask (fix  this also, too complicated)
 bkg_ee <- rast(here("Interventions", "Mex_intervention", "yucatan_bkg.tif"))
-
 #Reprojections
 
-poly <- st_transform(poly, crs=crs(bkg_ee))
-griscom <- round(project(griscom, crs(bkg_ee), res=30, threads=24))
-bkg_2 <- project(bkg_ee, baseES[[2]], threads=24)   # This is necessary if a large raster is to be masked. Easier to reproject the mask to the larger object. D'uh
-bkg_ee <- mask(bkg_ee, poly) 
+poly <- st_transform(poly, crs=crs(griscom))
+griscom <- mask(griscom, poly)
 
-tot <- freq(bkg_ee)
+rcl <- matrix(c(
+  0, Inf, 0   # Any value from 0 to Infinity becomes 1
+), ncol = 3, byrow = TRUE)
+# Create background/mask
+bkg <- trim(classify(griscom, rcl))
+bkg_proj <- trim(project(bkg, bkg_ee,threads=24))
+trim(bkg_proj)
 
-baseES <- align_rasters(baseES, bkg_2)
+# Get total area.
+exp <- expanse(bkg, unit="ha")
+tot <- lsm_c_ca(bkg_proj)
+tot2 <- freq(bkg)
 
-
-# crop mask for the intervention area 
+# Aling and mask rasters for the target area.
+baseES <- align_rasters(baseES, bkg)
 baseES <- lapply(baseES, function(r){
-  r <- crop(r,bkg_2)
-  ext(r) <- round(ext(r), 4)
-  #r <- align(r, bkg_2)
-  r <- mask(r,bkg_2)
+  r <- mask(r,bkg)
 })
 
-serv_bra <- baseES 
+#Export masked rasters for mapping # improve here. the path is not great, have to do by hand. 
+serv. <- gsub(" ", "", serv, fixed = TRUE)
+map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here('Interventions',"Mexico_int_areas"), "/", serv.[x], "_msk.tif"), overwrite=TRUE))
+
+###################
+```
 
 
-summary <- lapply(serv_bra, function(r) {
+# Summarize (get baseline )
+```{r get summaries baseline}
+
+summary <- lapply(baseES, function(r) {
   list(
     sum = global(r, "sum", na.rm = TRUE),
     mean = global(r, "mean", na.rm = TRUE)
@@ -246,7 +244,6 @@ summary <- lapply(serv_bra, function(r) {
 summary<- lapply(summary, function(df){
   df <- do.call(cbind,df)
   })
-
 summary <- do.call(rbind, summary)
 band <- rownames(summary)  
 summary <- cbind(band,summary)
@@ -258,31 +255,14 @@ summary <- summary %>% rename(Sum = sum) %>% rename(Mean=mean)
 ## Load Restoration layers, align and prepare
 ```{r apply mask AOI AP, eval=FALSE, include=FALSE}
 
-# Step 1: Extract file names, product names, and country names
-file_names <- basename(tiffes_rest)  # Extract file names from paths
+baseES_r <- lapply(tiffes_rest, rast)
+baseES_r <- align_rasters(baseES_r, bkg_proj) #Fix here, use thew original restoration layers, not repojected 
 
-# Extract product names and country names
-product_names <- sub("_[A-Z]+\\.tif$", "", file_names)  # Remove "_COUNTRY.tif" to get product name
-country_names <- sub(".*_(.*?)\\.tif$", "\\1", file_names)  # Extract country name from file name
-
-# Step 2: Create a dataframe to organize the information
-file_info <- data.frame(
-  FilePath = tiffes_rest,
-  Product = product_names,
-  Country = country_names,
-  stringsAsFactors = FALSE
-)
-
-# Step 4: Extract the sorted file paths
-tiffes <- file_info$FilePath
-baseES_r <- lapply(tiffes, rast)
-baseES_r <- align_rasters(baseES_r, bkg_ee)
-
-# crop mask for the intervention area 
+# crop mask for the intervention area . This works way better on geographic, not projected crs 
 baseES_r <- lapply(baseES_r, function(r){
-  r <- crop(r,bkg_ee)
+  r <- crop(r,bkg_proj)
   ext(r) <- round(ext(r), 4)
-  r <- mask(r,bkg_ee)
+  r <- mask(r,bkg_proj)
 })
 ```
 
@@ -292,37 +272,39 @@ baseES_r <- lapply(baseES_r, function(r){
 # Convert the serviocsinto a single multilyr for sampling. 
 serv_1 <- do.call(c,baseES_r) 
 #load restoration mask (Griscom)
-rest_m <- rast(here('Interventions', 'Mex_intervention', 'Mex_griscom.tif'))
-
+#rest_m <- rast(here('Interventions', 'Mex_intervention', 'Mex_griscom.tif'))
+griscom_p <- round(project(griscom, bkg_proj, threads=20), digits=0)
+griscom_p<- round(griscom_p, digits=0)
+# serv_1 <- mask(serv_1,rest_m, maskvalues=0)
 # Crop and mask for the new area
-rest_m <- crop(rest_m,bkg_2)
-bkg_2 <- crop(bkg_2,rest_m)
+#rest_m <- crop(rest_m,bkg_2)
+#bkg_2 <- crop(bkg_2,rest_m)
 
-bkg_2 <- resample(bkg_2,rest_m)
-rest_m <- mask(rest_m,bkg_2)
+#bkg_2 <- resample(bkg_2,rest_m)
+#rest_m <- mask(rest_m,bkg_2)
 
-rest_m <- project(rest_m,serv_1)
-
-rcl <- matrix(c(
-  -Inf, 0, 0,  # Any value from -Infinity to 0 remains 0
-  0, Inf, 1   # Any value from 0 to Infinity becomes 1
-), ncol = 3, byrow = TRUE)
-rest_m <- classify(rest_m, rcl)
+#rest_m <- project(rest_m,serv_1)
+# 
+# rcl <- matrix(c(
+#   -Inf, 0, 0,  # Any value from -Infinity to 0 remains 0
+#   0, Inf, 1   # Any value from 0 to Infinity becomes 1
+# ), ncol = 3, byrow = TRUE)
+# rest_m <- classify(rest_m, rcl)
 # 
 # serv_1 <- project(serv_1, bkg_ee, method='bilinear', threads=24)
 # serv_1 <- merge(serv_1,bkg_ee)
 # 
 # rest_m <- terra::project(rest_m, serv_1, threads=24)
-# rest_m <- round(rest_m, digits=0)
-# serv_1 <- mask(serv_1,rest_m, maskvalues=0)
-#Calculate the number of pixels needed for 30,000 hectares
+# 
+#Calculate the number of pixels needed for 15,000 hectares
 pixel_area <- 30 * 30  # Area of a single pixel in square meters (30m resolution)
 hectare_area <- 10000  # Area of one hectare in square meters
 pix_tot <- round((15000 * hectare_area) / pixel_area)
 
 # Count total pixels Griscom intervention area
-tot <- freq(bkg_ee)
-perc_rest <- pixels_needed/tot$count[1]*100
+tot <- freq(griscom_p)
+# This is the share o the total potential area that is expected to be restored. 
+perc_rest <- pix_tot/tot$count[2]*100
 
 # Number of CPU cores to use
 num_cores <- detectCores() - 4  # Leave 1 core free
@@ -347,6 +329,12 @@ final_results <- do.call(rbind, results_list)
 final_results$repetition <- rep(1:num_repetitions, each = nrow(final_results) / num_repetitions)
 
 final_results <- as_tibble(final_results)
+
+
+#drop the columnwit hthe raster name
+final_results$band <- NULL
+summary$band <- NULL
+final_results <- left_join(final_results,summary, join_by(Service == serv))
 
 # Add new columns with the service names and units.
 final_results <- final_results %>%
@@ -383,10 +371,7 @@ final_results <- final_results %>%
     TRUE ~ Service  # Keep the original Service name if no match
   ))
 
-#drop the columnwit hthe raster name
-final_results$band <- NULL
-summary$band <- NULL
-final_results <- left_join(final_results,summary, join_by(Service == serv))
+
 
 #Get Percentages!!!
 
