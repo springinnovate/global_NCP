@@ -3,23 +3,17 @@ title: "Summary ES"
 author: "Jeronimo Rodriguez-Escobar"
 date: "2025-01-27"
 output:
-  word_document: default
   html_document: default
   pdf_document: default
+  word_document: default
 ---
 
   
 1.	Perform zonal statistics (using exactextractr).
-2.	Combine the results into a single data frame.
 3.	Create faceted bar plots (using ggplot2) for each raster statistic.
 4.	Generate choropleth maps (using ggplot2 and sf) to visualize spatial distributions.
-5.	Suggest additional insights you might glean from these results.
 
-Note: This example assumes:
-•	A polygon shapefile (or other vector format) with a column named "continent" and a column (e.g., "country") indicating each country name.
-•	You have multiple GeoTIFF files stored in a known directory.
-•	You want to compute mean and median (commonly used statistics) for each polygon.
-•	You can adapt the file paths, column names, or summary operations as needed for your actual data.
+•	Compute mean and median (commonly used statistics) for each polygon.
 
 ```{r setup, include=FALSE}
 # Load required libraries
@@ -76,7 +70,7 @@ print(filename)
 
 ## 3. Compute Zonal Statistics with exactextractr
 
-```{r compute stats, eval=FALSE, include=FALSE}
+```{r compute stats 1, eval=FALSE, include=FALSE}
 3. Compute Zonal Statistics with exactextractr
 ```{r compute stats, include=FALSE}
 # We'll compute mean and median as an example
@@ -118,7 +112,6 @@ save(zonal_df, file=here('output_data', 'zonal_df_SA.RData'))
 
 We want separate bar plots (facets) for each raster, showing (for instance) mean or median ecosystem service values by country, sorted from high to low.
 
-<<<<<<< HEAD
 ## 4. Plot Mean ES Value
 ```{r barplots, echo=FALSE, fig.height=8, fig.width=14}
 load(here('output_data', 'zonal_df_SA.RData'))
@@ -282,7 +275,7 @@ for (s in services) {
     scale_fill_gradientn(
       colors   = c("white", s_color),  # White -> "unique_color"
       limits   = c(s_min, s_max),      # Force the same scale min/max
-      na.value = "gray90"
+      na.value = "gray40"
     ) +
     labs(
       title = paste0(s, " (1992)"),
@@ -296,7 +289,7 @@ for (s in services) {
     scale_fill_gradientn(
       colors   = c("white", s_color),
       limits   = c(s_min, s_max),
-      na.value = "gray90"
+      na.value = "gray40"
     ) +
     labs(
       title = paste0(s, " (2020)"),
@@ -310,7 +303,7 @@ for (s in services) {
 }
 ```
 
-```{r fig.width=14, fig.height=12}
+```{r echo=FALSE, fig.height=12, fig.width=14}
 
 # Combine the 1992 plots in a row (or multi-row if you prefer).
 combined_1992 <- wrap_plots(plot_list_1992, ncol = 3)
