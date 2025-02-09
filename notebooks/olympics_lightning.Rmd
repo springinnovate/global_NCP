@@ -2,10 +2,10 @@
 title: "NBS optimization- Yucatan Peninsula"
 author: "Jeronimo Rodriguez Escobar"
 output:
-  pdf_document: default
-  word_document: default
   html_document:
     df_print: paged
+  word_document: default
+  pdf_document: default
 editor_options:
   markdown:
     wrap: 72
@@ -175,7 +175,7 @@ tiffes <- file.path(
 )
 tiffes <- tiffes[c(6,8,11,16,20)] #just keep pollination - AG,
 
-# Reaorder because freaking file names #Check this, but this should be easier
+# Reorder because freaking file names #Check this, but this should be easier
 tiffes <- tiffes[c(2,3,5,1,4)]
 tiffes_rest <- tiffes_rest[c(3,5,4,1,2)]
 
@@ -183,7 +183,7 @@ tiffes_rest <- tiffes_rest[c(3,5,4,1,2)]
 serv <- c("Nitrogen Retention", "Sediment Retention", "Pollination", "Coastal Protection", "Nature Access")
 ```
 
-## Obtaine baselione values
+## Obtain baseline values
 ```{r  obtain baseline output, eval=FALSE, include=FALSE}
 
 #
@@ -202,7 +202,8 @@ bkg_ee <- rast(here("Interventions", "Mex_intervention", "yucatan_bkg.tif"))
 #Reprojections
 
 poly <- st_transform(poly, crs=crs(griscom))
-griscom <- mask(griscom, poly)
+griscom <- trim(mask(griscom, poly))
+
 
 rcl <- matrix(c(
   0, Inf, 0   # Any value from 0 to Infinity becomes 1
@@ -211,6 +212,11 @@ rcl <- matrix(c(
 bkg <- trim(classify(griscom, rcl))
 bkg_proj <- trim(project(bkg, bkg_ee,threads=24))
 trim(bkg_proj)
+
+
+griscom_p <- round(project(griscom, bkg_proj, threads=20), digits=0)
+griscom_p<- round(griscom_p, digits=0)
+
 
 # Get total area.
 exp <- expanse(bkg, unit="ha")
@@ -227,12 +233,21 @@ baseES <- lapply(baseES, function(r){
 serv. <- gsub(" ", "", serv, fixed = TRUE)
 map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here('Interventions',"Mexico_int_areas"), "/", serv.[x], "_msk.tif"), overwrite=TRUE))
 
+
+baseES <- lapply(baseES, function(r){
+  r <- mask(r,griscom, maskvalue=0)
+})
+
+
+# Here i masked the baselines by the Giscom restoration priority pixels, but suddenly i am not sure anymore if this is the right apprach. wha <- t is more important? To know the increase in the total ecosystems service provisoon by the whole region? Whis is nothing. 15.000 ha from 3'626.809 ha are not a lot (0.41%) or if we say that this restoration would be a share of the total 
+gmsk <- subst(griscom, from =0, to = NA)
+exp_g <- expanse(gmsk, unit = "ha")
 ###################
 ```
 
 
 # Summarize (get baseline )
-```{r get summaries baseline}
+```{r get summaries baseline, eval=FALSE, include=FALSE}
 
 summary <- lapply(baseES, function(r) {
   list(
@@ -270,32 +285,8 @@ baseES_r <- lapply(baseES_r, function(r){
 
 ```{r sampling target areas Yucatan, eval=FALSE, include=FALSE}
 # Convert the serviocsinto a single multilyr for sampling. 
-serv_1 <- do.call(c,baseES_r) 
-#load restoration mask (Griscom)
-#rest_m <- rast(here('Interventions', 'Mex_intervention', 'Mex_griscom.tif'))
-griscom_p <- round(project(griscom, bkg_proj, threads=20), digits=0)
-griscom_p<- round(griscom_p, digits=0)
-# serv_1 <- mask(serv_1,rest_m, maskvalues=0)
-# Crop and mask for the new area
-#rest_m <- crop(rest_m,bkg_2)
-#bkg_2 <- crop(bkg_2,rest_m)
+baseES_r <- do.call(c,baseES_r) 
 
-#bkg_2 <- resample(bkg_2,rest_m)
-#rest_m <- mask(rest_m,bkg_2)
-
-#rest_m <- project(rest_m,serv_1)
-# 
-# rcl <- matrix(c(
-#   -Inf, 0, 0,  # Any value from -Infinity to 0 remains 0
-#   0, Inf, 1   # Any value from 0 to Infinity becomes 1
-# ), ncol = 3, byrow = TRUE)
-# rest_m <- classify(rest_m, rcl)
-# 
-# serv_1 <- project(serv_1, bkg_ee, method='bilinear', threads=24)
-# serv_1 <- merge(serv_1,bkg_ee)
-# 
-# rest_m <- terra::project(rest_m, serv_1, threads=24)
-# 
 #Calculate the number of pixels needed for 15,000 hectares
 pixel_area <- 30 * 30  # Area of a single pixel in square meters (30m resolution)
 hectare_area <- 10000  # Area of one hectare in square meters
@@ -314,7 +305,7 @@ num_repetitions <- 30
 
 # Run parallel sampling
 results_list <- mclapply(1:num_repetitions, function(x) {
-  sample_and_calculate(raster = serv_1, pixels_needed = pix_tot, confidence = 0.95)
+  sample_and_calculate(raster = baseES_r, pixels_needed = pix_tot, confidence = 0.975)
 }, mc.cores = num_cores)
 
 #Add product name
@@ -329,12 +320,6 @@ final_results <- do.call(rbind, results_list)
 final_results$repetition <- rep(1:num_repetitions, each = nrow(final_results) / num_repetitions)
 
 final_results <- as_tibble(final_results)
-
-
-#drop the columnwit hthe raster name
-final_results$band <- NULL
-summary$band <- NULL
-final_results <- left_join(final_results,summary, join_by(Service == serv))
 
 # Add new columns with the service names and units.
 final_results <- final_results %>%
@@ -372,6 +357,10 @@ final_results <- final_results %>%
   ))
 
 
+#drop the column with the raster name
+final_results$band <- NULL
+summary$band <- NULL
+final_results <- left_join(final_results,summary, join_by(Service == serv))
 
 #Get Percentages!!!
 
@@ -386,26 +375,24 @@ final_results <- final_results %>%
   ))
 
 
-
-
-save(all_results, file= here("Interventions", "Mex_intervention", "all_res_mex.RData"))
+save(final_results, file= here("Interventions", "Mex_intervention", "all_res_mex2.RData"))
 
 ```
 ## 3.1 EStimated ES Gain through Restoration
 
 The estimated gains in ecosystem service provision, (%) are synthetized in following table
 ```{r table outputs, echo=FALSE}
-load(here("Interventions", "Mex_intervention", "all_res_mex.RData"))
+load(here("Interventions", "Mex_intervention", "all_res_mex2.RData"))
 
 
-sumy <- all_results %>% group_by(Service) %>% 
+sumy <- final_results %>% group_by(Service) %>% 
   summarise(mean_final = mean(perc_sum, na.rm = TRUE),        # Mean of Final column
     sd_final = sd(perc_sum, na.rm = TRUE),            # Standard deviation
     iqr_final = IQR(perc_sum, na.rm = TRUE),          # Interquartile range (optional)
     .groups = "drop"
   )
 
-final_summary <- all_results %>%
+final_summary <- final_results %>%
   group_by(Service) %>%
   summarise(
     mean_final = mean(Final, na.rm = TRUE), 
@@ -413,23 +400,8 @@ final_summary <- all_results %>%
     upper_ci = quantile(Final, probs = 0.975, na.rm = TRUE),  # 97.5th percentile
     .groups = "drop"
   )
-# Assuming your 'all_results' data frame has the columns 'Service', 'units', and 'color'
 
-
-
-final_summary2 <- all_results %>%
-  group_by(Service) %>%
-  summarise(
-    mean_final = mean(perc_sum, na.rm = TRUE), 
-    lower_ci = quantile(perc_sum, probs = 0.025, na.rm = TRUE),  # 2.5th percentile
-    upper_ci = quantile(perc_sum, probs = 0.975, na.rm = TRUE),  # 97.5th percentile
-    .groups = "drop"
-  )
-
-final_summary2 <- final_summary2 %>%
-  mutate(across(where(is.numeric), ~ round(., 2)))
-
-final_summary2 %>%
+final_summary %>%
   kbl(
     col.names = c("Ecosystem Service", "Mean (%)", "Lower CI (%)", "Upper CI (%)"),
     caption = "Estimated ES Provision Gain in %  with Confidence Intervals",
@@ -441,17 +413,17 @@ final_summary2 %>%
     position = "center"
   )
 
-write.csv(final_summary2, file=here("Interventions", "Mex_intervention", "summary_interventionMex2.csv"))
+#write.csv(final_summary, file=here("Interventions", "Mex_intervention", "summary_interventionMex3.csv"))
 ```
-These gains are achieved by restoring 15.000ha, or 0.35% of the intervention area.
+These gains are achieved by restoring 15.000ha, or 5.41% of the potential restoration pixels inside the intervention area.
 ### 3.2 Result Visualization
 
 ```{r plot Yucatan outpus, echo=FALSE}
 
-load(here("Interventions", "Mex_intervention", "all_res_mex.RData"))
+load(here("Interventions", "Mex_intervention", "all_res_mex2.RData"))
 
 # Generate the ggplot object
-plot <- ggplot(all_results, aes(y = perc_sum, fill = color)) +
+plot <- ggplot(final_results, aes(y = perc_sum, fill = color)) +
   geom_boxplot() +
   labs(title = str_wrap("Potential in ES gain for the target intervention area - Yucatan", width = 50), 
        y = "Estimated ES provision gain (%)") +
