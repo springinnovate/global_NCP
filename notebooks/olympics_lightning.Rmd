@@ -64,28 +64,6 @@ The use of stratified random sampling ensures that representative of the entire 
   
 ## Intervention Area 
 
-**Not run**
-```{r create tmp, eval=FALSE, include=FALSE}
-library(here)
-# add backgrounds/templates to align 
-path_lc <- here('ESA_LC') 
-# load reclassified land cover map
-tf <- file.path(path_lc, list.files(path_lc, pattern= "Rec"))
-lc <- lapply(tf,rast)
-lc <- lc[[1]]
-# create rcl matrix
-rcl <- matrix(c(
-  0, Inf, 0   # Any value greater than 0 becomes 1
-), ncol = 3, byrow = TRUE)
-
-#create background pixels, subsitute all by 0
-tmp <- lapply(lc, function(r){
-  r <- classify(r[[1]], rcl)
-})
-tmp <- tmp[[1]]
-rm(lc)
-```
-
 
 The intervention area  is located in the Yucatan Peninsula, and encompasses biodiversity corridors and existing protected areas across key ecosystems including the northern shoreline.
 
@@ -154,22 +132,20 @@ Spatial Raster Processing Tools: The `terra`, `dplyr`, and `sf` packages in **R*
 
 
 ```{r select ES  data, eval=FALSE, include=FALSE}
-
+wd <- here()
+wd <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/WWF_nbs_op"
 #Restoration:
-tiffes <- file.path(
-  here("Interventions", "Mex_intervention"),
+tiffes <- file.path(paste(wd, "Interventions", "Mex_intervention", sep = '/'),
   list.files(
-    here("Interventions", "Mex_intervention"),
+    paste(wd, "Interventions", "Mex_intervention", sep = "/"),
     pattern = "MEXICO,*\\.tif$"
   )
 )
 tiffes_rest <- tiffes[-c(5,7)]
 
 # Baseline
-tiffes <- file.path(
-  here("cropped_raster_data"),
-  list.files(
-    here("cropped_raster_data"),
+tiffes <- file.path(paste(wd, "cropped_raster_data", sep='/'),
+  list.files(paste(wd,"cropped_raster_data", sep ='/'),
     pattern = "MEXICO,*\\.tif$"
   )
 )
@@ -186,9 +162,10 @@ serv <- c("Nitrogen Retention", "Sediment Retention", "Pollination", "Coastal Pr
 ## Obtain baseline values
 ```{r  obtain baseline output, eval=FALSE, include=FALSE}
 
-#
+wd <- here()
+wd <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/WWF_nbs_op"
 # Load AOI (polygon or raster)
-poly <- st_read(here("Interventions", "Mexico_int_areas", "AREA_INTERVENCION2_CORREDORES.shp"))
+poly <- st_read(paste(wd, "Interventions", "Mexico_int_areas", "AREA_INTERVENCION2_CORREDORES.shp", sep ='/'))
 #Reproject to the reference crs if necessary
 
 
@@ -196,9 +173,9 @@ poly <- st_read(here("Interventions", "Mexico_int_areas", "AREA_INTERVENCION2_CO
 baseES <- lapply(tiffes, rast)
 # lOAD MASKS 
 #1 Restoration Mask (fix direcotries, too complex as is)
-griscom <- rast(here("Restoration_Griscom", "recMEXICO.tif"))
+griscom <- rast(paste(wd, "Restoration_Griscom", "recMEXICO.tif", sep='/'))
 #2 Background mask (fix  this also, too complicated)
-bkg_ee <- rast(here("Interventions", "Mex_intervention", "yucatan_bkg.tif"))
+bkg_ee <- rast(paste(wd, "Interventions", "Mex_intervention", "yucatan_bkg.tif", sep= "/"))
 #Reprojections
 
 poly <- st_transform(poly, crs=crs(griscom))
@@ -214,7 +191,7 @@ bkg_proj <- trim(project(bkg, bkg_ee,threads=24))
 trim(bkg_proj)
 
 
-griscom_p <- round(project(griscom, bkg_proj, threads=20), digits=0)
+griscom_p <- round(project(griscom, bkg_proj, threads=20), digits=0) #This might not be necessasry... And is wrong
 griscom_p<- round(griscom_p, digits=0)
 
 
@@ -231,7 +208,7 @@ baseES <- lapply(baseES, function(r){
 
 #Export masked rasters for mapping # improve here. the path is not great, have to do by hand. 
 serv. <- gsub(" ", "", serv, fixed = TRUE)
-map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here('Interventions',"Mexico_int_areas"), "/", serv.[x], "_msk.tif"), overwrite=TRUE))
+#map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here('Interventions',"Mexico_int_areas"), "/", serv.[x], "_msk.tif"), overwrite=TRUE))
 
 
 baseES <- lapply(baseES, function(r){
@@ -288,7 +265,7 @@ baseES_r <- lapply(baseES_r, function(r){
 baseES_r <- do.call(c,baseES_r) 
 
 #Calculate the number of pixels needed for 15,000 hectares
-pixel_area <- 30 * 30  # Area of a single pixel in square meters (30m resolution)
+pixel_area <- 300 * 300  # Area of a single pixel in square meters (30m resolution)
 hectare_area <- 10000  # Area of one hectare in square meters
 pix_tot <- round((15000 * hectare_area) / pixel_area)
 
@@ -306,7 +283,7 @@ num_repetitions <- 30
 # Run parallel sampling
 results_list <- mclapply(1:num_repetitions, function(x) {
   sample_and_calculate(raster = baseES_r, pixels_needed = pix_tot, confidence = 0.975)
-}, mc.cores = num_cores)
+}, mc.cores = num_cores-2)
 
 #Add product name
 results_list <- lapply(results_list, function(df){
@@ -375,7 +352,7 @@ final_results <- final_results %>%
   ))
 
 
-save(final_results, file= here("Interventions", "Mex_intervention", "all_res_mex2.RData"))
+save(final_results, file= here("Interventions", "Mex_intervention", "all_res_mex3.RData"))
 
 ```
 ## 3.1 EStimated ES Gain through Restoration
