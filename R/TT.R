@@ -26,3 +26,10 @@ lc_rast
 
 
 biph <- read.csv('/home/jeronimo/global_ES_modeling/esos-c/data_2/ndr/esa_biophysical_0916_md5_b2886c.csv')
+
+
+sheds <- st_read('/home/jeronimo/global_ES_modeling/esos-c/data/ndr/watersheds_gl.shp')
+sheds <- st_transform(sheds, crs= "EPSG:6933")
+st_write(sheds, '/home/jeronimo/global_ES_modeling/esos-c/data/ndr/watersheds_gl_pr.shp')
+?st_write
+
