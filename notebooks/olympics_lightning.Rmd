@@ -14,9 +14,11 @@ editor_options:
 ```{r prep environment, eval=TRUE, include=FALSE}
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
-           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign',  'exactextractr', 'kableExtra', 'knitr')
+           'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign',  'exactextractr', 'kableExtra', 'knitr', 'devtools')
 sapply(packs, require, character.only = TRUE, quietly=TRUE)
 rm(packs)
+
+load_all()
 
 normalize_raster <- function(r) {
   min_val <- min(values(r), na.rm = TRUE)
@@ -67,7 +69,8 @@ The use of stratified random sampling ensures that representative of the entire 
 
 The intervention area  is located in the Yucatan Peninsula, and encompasses biodiversity corridors and existing protected areas across key ecosystems including the northern shoreline.
 
-![Yucatan 2020 ESa Land  Cover map (reclassified) and Restoration Priority Areas](/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Mex_intervention/yucatan_LC1.png)
+
+![Yucatan 2020 ESa Land  Cover map (reclassified) and Restoration Priority Areas](/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/WWF_nbs_op/Interventions/Mex_intervention/yucatan_LC1.png)
 
 
 # 2. Methods
@@ -131,17 +134,9 @@ Spatial Raster Processing Tools: The `terra`, `dplyr`, and `sf` packages in **R*
 ## 3. Results
 
 
-```{r select ES  data, eval=FALSE, include=FALSE}
+```{r select ES  data, include=FALSE}
 wd <- here()
 wd <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/WWF_nbs_op"
-#Restoration:
-tiffes <- file.path(paste(wd, "Interventions", "Mex_intervention", sep = '/'),
-  list.files(
-    paste(wd, "Interventions", "Mex_intervention", sep = "/"),
-    pattern = "MEXICO,*\\.tif$"
-  )
-)
-tiffes_rest <- tiffes[-c(5,7)]
 
 # Baseline
 tiffes <- file.path(paste(wd, "cropped_raster_data", sep='/'),
@@ -149,20 +144,22 @@ tiffes <- file.path(paste(wd, "cropped_raster_data", sep='/'),
     pattern = "MEXICO,*\\.tif$"
   )
 )
-tiffes <- tiffes[c(6,8,11,16,20)] #just keep pollination - AG,
-
+# Select and reorganize tiffes forthe baselines
+tiffes_b <- tiffes[c(6,8,11,16,20)] #just keep pollination - AG,
 # Reorder because freaking file names #Check this, but this should be easier
-tiffes <- tiffes[c(2,3,5,1,4)]
-tiffes_rest <- tiffes_rest[c(3,5,4,1,2)]
+tiffes_b <- tiffes_b[c(2,3,5,1,4)]
 
+#Restoration:
+tiffes_rest <- tiffes[c(2,15,19,21,27)]
+tiffes_rest <- tiffes_rest[c(3,5,4,1,2)]
 # set the order of the services here:
 serv <- c("Nitrogen Retention", "Sediment Retention", "Pollination", "Coastal Protection", "Nature Access")
 ```
 
 ## Obtain baseline values
-```{r  obtain baseline output, eval=FALSE, include=FALSE}
+```{r obtain baseline output, include=FALSE}
 
-wd <- here()
+#wd <- here()
 wd <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/WWF_nbs_op"
 # Load AOI (polygon or raster)
 poly <- st_read(paste(wd, "Interventions", "Mexico_int_areas", "AREA_INTERVENCION2_CORREDORES.shp", sep ='/'))
@@ -170,35 +167,27 @@ poly <- st_read(paste(wd, "Interventions", "Mexico_int_areas", "AREA_INTERVENCIO
 
 
 # LOAD DATA TO ANALYZE # SOME OF THESE BECOEMS THE TEMPLATE FOR THE REST. 
-baseES <- lapply(tiffes, rast)
+baseES <- lapply(tiffes_b, rast)
 # lOAD MASKS 
 #1 Restoration Mask (fix direcotries, too complex as is)
 griscom <- rast(paste(wd, "Restoration_Griscom", "recMEXICO.tif", sep='/'))
 #2 Background mask (fix  this also, too complicated)
-bkg_ee <- rast(paste(wd, "Interventions", "Mex_intervention", "yucatan_bkg.tif", sep= "/"))
+#bkg_ee <- rast(paste(wd, "Interventions", "Mex_intervention", "yucatan_bkg.tif", sep= "/"))
 #Reprojections
 
 poly <- st_transform(poly, crs=crs(griscom))
 griscom <- trim(mask(griscom, poly))
-
 
 rcl <- matrix(c(
   0, Inf, 0   # Any value from 0 to Infinity becomes 1
 ), ncol = 3, byrow = TRUE)
 # Create background/mask
 bkg <- trim(classify(griscom, rcl))
-bkg_proj <- trim(project(bkg, bkg_ee,threads=24))
-trim(bkg_proj)
-
-
-griscom_p <- round(project(griscom, bkg_proj, threads=20), digits=0) #This might not be necessasry... And is wrong
-griscom_p<- round(griscom_p, digits=0)
-
+#bkg_proj <- trim(project(bkg, bkg_ee,threads=24))
+#trim(bkg_proj)
 
 # Get total area.
 exp <- expanse(bkg, unit="ha")
-tot <- lsm_c_ca(bkg_proj)
-tot2 <- freq(bkg)
 
 # Aling and mask rasters for the target area.
 baseES <- align_rasters(baseES, bkg)
@@ -208,23 +197,21 @@ baseES <- lapply(baseES, function(r){
 
 #Export masked rasters for mapping # improve here. the path is not great, have to do by hand. 
 serv. <- gsub(" ", "", serv, fixed = TRUE)
-#map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(here('Interventions',"Mexico_int_areas"), "/", serv.[x], "_msk.tif"), overwrite=TRUE))
-
+map(1:length(baseES), function(x) writeRaster(baseES[[x]], paste0(wd,"/",'Interventions',"/","Mexico_int_areas","/",  serv.[x], "_msk.tif"), overwrite=TRUE))
 
 baseES <- lapply(baseES, function(r){
   r <- mask(r,griscom, maskvalue=0)
 })
 
-
 # Here i masked the baselines by the Giscom restoration priority pixels, but suddenly i am not sure anymore if this is the right apprach. wha <- t is more important? To know the increase in the total ecosystems service provisoon by the whole region? Whis is nothing. 15.000 ha from 3'626.809 ha are not a lot (0.41%) or if we say that this restoration would be a share of the total 
-gmsk <- subst(griscom, from =0, to = NA)
+gmsk <- subst(griscom, from =c(0,1), to = c(NA,0))
 exp_g <- expanse(gmsk, unit = "ha")
 ###################
 ```
 
 
 # Summarize (get baseline )
-```{r get summaries baseline, eval=FALSE, include=FALSE}
+```{r get summaries baseline, include=FALSE}
 
 summary <- lapply(baseES, function(r) {
   list(
@@ -245,24 +232,25 @@ summary <- summary %>% rename(Sum = sum) %>% rename(Mean=mean)
 ```
 
 ## Load Restoration layers, align and prepare
-```{r apply mask AOI AP, eval=FALSE, include=FALSE}
+```{r apply mask AOI AP, include=FALSE}
 
 baseES_r <- lapply(tiffes_rest, rast)
-baseES_r <- align_rasters(baseES_r, bkg_proj) #Fix here, use thew original restoration layers, not repojected 
+baseES_r <- align_rasters(baseES_r, bkg) 
 
 # crop mask for the intervention area . This works way better on geographic, not projected crs 
 baseES_r <- lapply(baseES_r, function(r){
-  r <- crop(r,bkg_proj)
-  ext(r) <- round(ext(r), 4)
-  r <- mask(r,bkg_proj)
+  r <- crop(r,gmsk)
+  #ext(r) <- round(ext(r), 4)
+  r <- mask(r,gmsk)
 })
 ```
 
 
 
-```{r sampling target areas Yucatan, eval=FALSE, include=FALSE}
+```{r sampling target areas Yucatan, include=FALSE}
 # Convert the serviocsinto a single multilyr for sampling. 
 baseES_r <- do.call(c,baseES_r) 
+baseES_r <- merge(baseES_r, gmsk)
 
 #Calculate the number of pixels needed for 15,000 hectares
 pixel_area <- 300 * 300  # Area of a single pixel in square meters (30m resolution)
@@ -270,12 +258,12 @@ hectare_area <- 10000  # Area of one hectare in square meters
 pix_tot <- round((15000 * hectare_area) / pixel_area)
 
 # Count total pixels Griscom intervention area
-tot <- freq(griscom_p)
+tot <- freq(griscom)
 # This is the share o the total potential area that is expected to be restored. 
 perc_rest <- pix_tot/tot$count[2]*100
 
 # Number of CPU cores to use
-num_cores <- detectCores() - 4  # Leave 1 core free
+num_cores <- detectCores() - 2  # Leave 1 core free
 
 # Define the number of repetitions
 num_repetitions <- 30
@@ -283,7 +271,7 @@ num_repetitions <- 30
 # Run parallel sampling
 results_list <- mclapply(1:num_repetitions, function(x) {
   sample_and_calculate(raster = baseES_r, pixels_needed = pix_tot, confidence = 0.975)
-}, mc.cores = num_cores-2)
+}, mc.cores = num_cores)
 
 #Add product name
 results_list <- lapply(results_list, function(df){
@@ -352,14 +340,14 @@ final_results <- final_results %>%
   ))
 
 
-save(final_results, file= here("Interventions", "Mex_intervention", "all_res_mex3.RData"))
+#save(final_results, file= here("Interventions", "Mex_intervention", "all_res_mex3.RData"))
 
 ```
 ## 3.1 EStimated ES Gain through Restoration
 
 The estimated gains in ecosystem service provision, (%) are synthetized in following table
 ```{r table outputs, echo=FALSE}
-load(here("Interventions", "Mex_intervention", "all_res_mex2.RData"))
+#load(here("Interventions", "Mex_intervention", "all_res_mex3.RData"))
 
 
 sumy <- final_results %>% group_by(Service) %>% 
@@ -397,7 +385,7 @@ These gains are achieved by restoring 15.000ha, or 5.41% of the potential restor
 
 ```{r plot Yucatan outpus, echo=FALSE}
 
-load(here("Interventions", "Mex_intervention", "all_res_mex2.RData"))
+#load(here("Interventions", "Mex_intervention", "all_res_mex2.RData"))
 
 # Generate the ggplot object
 plot <- ggplot(final_results, aes(y = perc_sum, fill = color)) +
@@ -466,7 +454,7 @@ writeRaster(top_10, here('Interventions', "Mex_intervention", "top_10_bin_mx.tif
 
 This maps shows, for each class, the pixles wit hthe highest 10% of the gain values
 
-![Restoration Priority area per Service (top 10%)](/home/jeronimo/OneDrive/WWF_nbs_op/Interventions/Mex_intervention/Mex_fin.png)
+![Restoration Priority area per Service (top 10%)](/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/WWF_nbs_op/Interventions/Mex_intervention/Mex_fin.png)
 
 ```{r normalize, eval=FALSE, include=FALSE}
 #writeRaster(baseES_st, here('Interventions', "Mex_intervention", "stack_normmskd_mx.tif"))
