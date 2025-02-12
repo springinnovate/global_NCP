@@ -1,7 +1,7 @@
 ---
 title: "Summary ES"
 author: "Jeronimo Rodriguez-Escobar"
-date: "2025-01-27"
+date: "2025-02-12"
 output:
   html_document: default
   pdf_document: default
@@ -13,7 +13,7 @@ output:
 3.	Create faceted bar plots (using ggplot2) for each raster statistic.
 4.	Generate choropleth maps (using ggplot2 and sf) to visualize spatial distributions.
 
-•	Compute mean and median (commonly used statistics) for each polygon.
+Compute mean and median for each polygon. Evaluate other metrics
 
 ```{r setup, include=FALSE}
 # Load required libraries
@@ -31,8 +31,6 @@ library(tidyr)
 
 ## 1. Load Polygons
 
-Test with South America
-
 ```{r load polygons, include=FALSE}
 
 # Replace with the actual path to your polygon file (e.g., a shapefile)
@@ -40,11 +38,11 @@ poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFun
 # Load polygons as an sf objectpolygons_sf <- st_read(vector_path)
 
 # Filter to retain only those features located in 'Latin America'
-poly <- poly %>%
-  filter(continent == "South America")
+#poly <- poly %>%
+#  filter(continent == "South America")
 ```
 
-I am using the rasters with the modeled ES that represnet the same service for 1992 and 2020 in the same units (of course). There were not the ones originally prioritized and yhr ones i have been working on but a different set that is the only one that i can actually use
+I am using the rasters with the modeled ES that represent the same service for 1992 and 2020 in the same units (of course). There were not the ones originally prioritized and yhr ones i have been working on but a different set that is the only one that i can actually use
 
 
 2. Load a List of GeoTIFF Rasters
@@ -53,8 +51,8 @@ Following products were assessed:
 ```{r load raster es, echo=FALSE}
 # Vector of raster file paths
 inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2'
-tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= '.tif$'))
-tiffes <- tiffes[-c(7,8)]
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'diff'))
+tiffes <- tiffes[-c(8,9)]
 
 filename<- basename(tiffes)
 
@@ -66,46 +64,62 @@ filename<- as_tibble(cbind(service,filename))
 print(filename)
 ```
 
+# 3. Calcualte Differences (jsut in case)
 
+```{r get differences}
+outpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2"
+m_index <- length(rasters_list) %/% 2
+lab <- unique(service)
+l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
+l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
+ # test with future_map2 next time to get this to run faster. 
+
+diffs <- map2(l1,l2, function(l1,l2){
+  return(l1-l2)
+})
+
+map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", lab[x], '_diff.tif')))
+```
 
 ## 3. Compute Zonal Statistics with exactextractr
 
 ```{r compute stats 1, eval=FALSE, include=FALSE}
-3. Compute Zonal Statistics with exactextractr
-```{r compute stats, include=FALSE}
+diffs <- lapply(tiffes, rast)
 # We'll compute mean and median as an example
 target_stats <- c("mean", "median")
 
 # exact_extract can append columns from the polygon layer;
-# here, we assume 'country' is a column in polygons_latin_america
-results_list <- lapply(rasters_list, function(r) {
+# Number of CPU cores to use
+num.cores <- detectCores() - 4  # Leave 4 cores free. Adjust depending on available resources. 
+
+results_list <- mclapply(diffs, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
                        fun = target_stats,
-                       append_cols = "name_long")
+                       append_cols = "region_wb")
   r_name <- names(r)
   
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
   return(res)
-})
+},mc.cores = num.cores)
 
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
 
 raster_name <- unique(zonal_df$raster_name)
-service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each = 2)
-color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=2)
+service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each = 1)
+color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=1)
 cd <- as_tibble(cbind(raster_name, service, color))
 
 zonal_df <- left_join(zonal_df,cd)
-zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
-                        1992, 
-                        ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
+ # zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
+ #                         1992, 
+ #                         ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
 
-save(zonal_df, file=here('output_data', 'zonal_df_SA.RData'))
-
+save(zonal_df, file=here('output_data', 'diffs_wb.RData'))
+write.csv(zonal_df, here('output_data', "diffs_wb_.csv"))
 # Show a snippet of the combined resultshead(zonal_df)
 ```
 
@@ -114,8 +128,6 @@ We want separate bar plots (facets) for each raster, showing (for instance) mean
 
 ## 4. Plot Mean ES Value
 ```{r barplots, echo=FALSE, fig.height=8, fig.width=14}
-load(here('output_data', 'zonal_df_SA.RData'))
-
 
 # Data preparation: reorder countries by mean for each service
 data_prepped <- zonal_df %>% filter(!is.na(mean)) %>%  # Remove rows with NA mean values
@@ -225,7 +237,7 @@ p_2020
 Use ggplot2 and the spatial geometry from our sf object to color each polygon by its statistic of interest. Faceting again by each raster is useful to compare spatial patterns.
 ```{r create maps, include=FALSE}
 
-
+zonal_wide <- pivot_wider(zonal_df, id_cols=name_long, names_from=c(service,year), values_from = c(mean, median))
 # First, merge the zonal_df results back into the polygon sf object.
 # This ensures each polygon gets a corresponding mean/median value.
 
