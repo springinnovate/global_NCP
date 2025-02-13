@@ -15,6 +15,11 @@ output:
 
 Compute mean and median for each polygon. Evaluate other metrics
 
+
+Do this by country. Running again Using the fids for the polygons. Using country names is problematic because of geopolitics.
+Pending to do: a join to reasign the country names (we will end with the names of all territories, else this does not work. The join needs to add names, dependnecies among others). Think about the best way to this: directly to the vector file or just extract the target attributes, add them to the table and then somehow join back?
+
+
 ```{r setup, include=FALSE}
 # Load required libraries
 library(sf)             # For reading and working with vector data
@@ -36,7 +41,7 @@ library(tidyr)
 # Replace with the actual path to your polygon file (e.g., a shapefile)
 poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_JJ.gpkg') 
 # Load polygons as an sf objectpolygons_sf <- st_read(vector_path)
-
+poly_wb <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/poly_wb.geojson')
 # Filter to retain only those features located in 'Latin America'
 #poly <- poly %>%
 #  filter(continent == "South America")
@@ -51,8 +56,9 @@ Following products were assessed:
 ```{r load raster es, echo=FALSE}
 # Vector of raster file paths
 inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2'
-tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'diff'))
-tiffes <- tiffes[-c(8,9)]
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+tiffes <- tiffes[-c(1,10,13,14,17)]
+tiffes <- tiffes[-c(7,8)]
 
 filename<- basename(tiffes)
 
@@ -64,7 +70,9 @@ filename<- as_tibble(cbind(service,filename))
 print(filename)
 ```
 
-# 3. Calcualte Differences (jsut in case)
+# 3. Calcualte Differences (check with original) 
+
+Here, i still need to think how to deal wit a single one (diff) instead of pairs. Sounds banal, but keep in mind that it's me who we are talking about and nothing ever goes smoothly for me. Becasue of course. It's me. 
 
 ```{r get differences}
 outpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2"
@@ -81,7 +89,7 @@ diffs <- map2(l1,l2, function(l1,l2){
 map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", lab[x], '_diff.tif')))
 ```
 
-## 3. Compute Zonal Statistics with exactextractr
+## 3. Compute Zonal Statistics with exactextractr for each one
 
 ```{r compute stats 1, eval=FALSE, include=FALSE}
 diffs <- lapply(tiffes, rast)
@@ -97,9 +105,56 @@ results_list <- mclapply(diffs, function(r) {
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
                        fun = target_stats,
+                       append_cols = "id")
+  r_name <- names(r)
+  # Add a column labeling which raster these results are from
+  res$raster_name <- r_name
+  return(res)
+},mc.cores = num.cores)
+
+# Combine results from all rasters into one data frame
+zonal_df <- do.call(rbind, results_list)
+
+raster_name <- unique(zonal_df$raster_name)
+service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each = 2)
+color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=2)
+cd <- as_tibble(cbind(raster_name, service, color))
+
+zonal_df <- left_join(zonal_df,cd)
+  zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
+                          1992, 
+                          ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
+
+  
+poly_df <- st_drop_geometry(poly) %>% select(id, ee_r264_name,iso3,continent,region_wb,income_grp,name_long)  
+
+zonal_df <- zonal_df %>% left_join(poly_df,by = "id")
+  
+save(zonal_df, file=here('output_data', 'zonal_df_global.RData'))
+write.csv(zonal_df, here('output_data', "zonal_summaries_global.csv"))
+
+```
+
+
+## 4. Differneces 
+```{r compute stats diff, eval=FALSE, include=FALSE}
+diffs <- lapply(tiffes, rast)
+# We'll compute mean and median as an example
+target_stats <- c("mean", "median")
+
+# exact_extract can append columns from the polygon layer;
+# Number of CPU cores to use
+num.cores <- detectCores() - 4  # Leave 4 cores free. Adjust depending on available resources. 
+
+results_list <- mclapply(diffs, function(r) {
+  # Perform exact extraction
+  # - append_cols = "country" retains the country identifier with each result
+  res <- exact_extract(r, poly_wb,
+                       fun = target_stats,
                        append_cols = "region_wb")
   r_name <- names(r)
-  
+
+
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
   return(res)
@@ -113,22 +168,18 @@ service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Na
 color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=1)
 cd <- as_tibble(cbind(raster_name, service, color))
 
-zonal_df <- left_join(zonal_df,cd)
- # zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
- #                         1992, 
- #                         ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
-
 save(zonal_df, file=here('output_data', 'diffs_wb.RData'))
 write.csv(zonal_df, here('output_data', "diffs_wb_.csv"))
 # Show a snippet of the combined resultshead(zonal_df)
 ```
 
-
 We want separate bar plots (facets) for each raster, showing (for instance) mean or median ecosystem service values by country, sorted from high to low.
-
-## 4. Plot Mean ES Value
+Here there are some aspects we need to take care eventually: 
+1. Including all countries result in too many bars obviously and there are visualization issues so we need to do following (which of course is going to be easier said than done): Create "partial/interrupted barplots and include only the top and bottom values and leafe a space in the middle.
+2. We would like to be able to filter by group (eg income level/region or any other atrribute, so we need to join them so we can apply a filter for charting)
+## 4. Plot Mean ES Value for each year
 ```{r barplots, echo=FALSE, fig.height=8, fig.width=14}
-
+# here need to add the names again. Need to think which column to use for that. 
 # Data preparation: reorder countries by mean for each service
 data_prepped <- zonal_df %>% filter(!is.na(mean)) %>%  # Remove rows with NA mean values
   mutate(name_long = reorder_within(name_long, -mean, service))  # Reorder within each service
@@ -184,14 +235,14 @@ p_1992 <- ggplot() +
   facet_wrap(~ service, scales = "free") +
   scale_x_reordered() +
   labs(
-    title = "Mean Ecosystem Service Values per Country, 1992",
+    title = "Mean Ecosystem Service Values per World Bank Region, 1992",
     x = "Country",
     y = "Mean Value"
   ) +
   theme_bw() +
   theme(
     strip.text = element_text(face = "bold"),
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    axis.text.x = element_text(angle = 45, hjust = 1, size=5)
   )
 
 # Combine the 1992 plots in a row (or multi-row if you prefer).
@@ -237,14 +288,17 @@ p_2020
 Use ggplot2 and the spatial geometry from our sf object to color each polygon by its statistic of interest. Faceting again by each raster is useful to compare spatial patterns.
 ```{r create maps, include=FALSE}
 
-zonal_wide <- pivot_wider(zonal_df, id_cols=name_long, names_from=c(service,year), values_from = c(mean, median))
+zonal_wide <- pivot_wider(zonal_df, id_cols=id, names_from=c(service,year), values_from = c(mean, median))
+
+poly <- left_join(poly, zonal_wide, by= "id")
+st_write(poly, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_means.gpkg') 
 # First, merge the zonal_df results back into the polygon sf object.
 # This ensures each polygon gets a corresponding mean/median value.
 
 # We need a unique identifier. 
 # Assuming 'country' is unique per polygon, we can do a left_join:
 map_data <- poly %>%
-  left_join(zonal_df, by = "name_long")
+  left_join(zonal_df, by = "id")
 
 map_1992 <- map_data %>% filter(year == 1992)
 services <- unique(map_1992$service)
@@ -326,5 +380,21 @@ combined_2020 <- wrap_plots(plot_list_2020, ncol = 3)
 combined_1992
 combined_2020
 ```
+
+Next steps:  
+
+Run for: Biomes, Continents, income group, fao_reg?
+
+Land cover change -> assess change/area In other words what do i **exactly** need to do here?  What is my target variable? LC change? 
+
+Will have to do it using DiffeR and iterate over all countries, then assemble the dataframes and get percentage of change distributed among the main components. This is not going to be easy but i can get it. However, keep in mind that with all the original classes this becomes unmanageable. Can we produce succesive no change maps and check waht happens among the change (alloation, swaps and shifts)
+
+Take care of the beneficiaries. 
+
+
+
+
+
+
 
 
