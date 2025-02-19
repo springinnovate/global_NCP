@@ -42,7 +42,7 @@ library(tidyr)
 poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_JJ.gpkg') 
 # Load polygons as an sf objectpolygons_sf <- st_read(vector_path)
 poly_wb <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/poly_wb.geojson')
-# Filter to retain only those features located in 'Latin America'
+# filter by region (optional)
 #poly <- poly %>%
 #  filter(continent == "South America")
 ```
@@ -74,6 +74,7 @@ print(filename)
 
 Here, i still need to think how to deal wit a single one (diff) instead of pairs. Sounds banal, but keep in mind that it's me who we are talking about and nothing ever goes smoothly for me. Becasue of course. It's me. 
 
+# Pending: get the single year and re run the process. But not today 
 ```{r get differences}
 outpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2"
 m_index <- length(rasters_list) %/% 2
@@ -136,7 +137,7 @@ write.csv(zonal_df, here('output_data', "zonal_summaries_global.csv"))
 ```
 
 
-## 4. Differneces 
+## 4. Differences 
 ```{r compute stats diff, eval=FALSE, include=FALSE}
 diffs <- lapply(tiffes, rast)
 # We'll compute mean and median as an example
@@ -287,6 +288,8 @@ p_2020
 
 Use ggplot2 and the spatial geometry from our sf object to color each polygon by its statistic of interest. Faceting again by each raster is useful to compare spatial patterns.
 ```{r create maps, include=FALSE}
+
+# Very important. This line adds the new attribnutes to the polygons. I could add all here.
 
 zonal_wide <- pivot_wider(zonal_df, id_cols=id, names_from=c(service,year), values_from = c(mean, median))
 
