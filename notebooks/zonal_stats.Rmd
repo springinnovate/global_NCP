@@ -16,9 +16,8 @@ output:
 Compute mean and median for each polygon. Evaluate other metrics
 
 
-Do this by country. Running again Using the fids for the polygons. Using country names is problematic because of geopolitics.
-Pending to do: a join to reasign the country names (we will end with the names of all territories, else this does not work. The join needs to add names, dependnecies among others). Think about the best way to this: directly to the vector file or just extract the target attributes, add them to the table and then somehow join back?
-
+At a country level, this was done usinf fids for the polygons. Using country names is problematic because of geopolitics.
+Pending to do: Think how to deal with the dependencies and complex cases (GB, France, others), but i will take care of this at a later point.
 
 ```{r setup, include=FALSE}
 # Load required libraries
@@ -32,6 +31,7 @@ library(tidytext)
 library(here)
 library(patchwork)
 library(tidyr)
+library(parallel)
 ```
 
 ## 1. Load Polygons
@@ -59,9 +59,7 @@ inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 tiffes <- tiffes[-c(1,10,13,14,17)]
 tiffes <- tiffes[-c(7,8)]
-
 filename<- basename(tiffes)
-
 # Use terra::rast() to load each file as a SpatRaster object
 rasters_list <- lapply(tiffes, rast)
 service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each=2)
@@ -87,7 +85,7 @@ diffs <- map2(l1,l2, function(l1,l2){
   return(l1-l2)
 })
 
-map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", lab[x], '_diff.tif')))
+map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'change_calc', '/', lab[x], '_diff.tif')))
 ```
 
 ## 3. Compute Zonal Statistics with exactextractr for each one
@@ -137,24 +135,38 @@ write.csv(zonal_df, here('output_data', "zonal_summaries_global.csv"))
 ```
 
 
-## 4. Differences 
+## 4. Now do the differences  
 ```{r compute stats diff, eval=FALSE, include=FALSE}
+
+# load the polygons with the new attributes to add new 
+poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_means.gpkg')
+inpath <- paste0(outpath, "/", 'change_calc')
+
+# load the rasters with the calculated differences 
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+filename<- basename(tiffes)
+
+# Use terra::rast() to load each file as a SpatRaster object
+rasters_list <- lapply(tiffes, rast)
+service <- c("Coastal Protection", "Nature Access", "Nitrogen Export","Pollination","Sediment Export")
+filename<- as_tibble(cbind(service,filename))
+#colnames(prod) <- c("Service", "Filename")
+print(filename)
 diffs <- lapply(tiffes, rast)
 # We'll compute mean and median as an example
 target_stats <- c("mean", "median")
 
 # exact_extract can append columns from the polygon layer;
 # Number of CPU cores to use
-num.cores <- detectCores() - 4  # Leave 4 cores free. Adjust depending on available resources. 
+num.cores <- detectCores() - 2  # Leave 4 cores free. Adjust depending on available resources. 
 
 results_list <- mclapply(diffs, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
-  res <- exact_extract(r, poly_wb,
+  res <- exact_extract(r, poly,
                        fun = target_stats,
-                       append_cols = "region_wb")
+                       append_cols = "id")
   r_name <- names(r)
-
 
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
@@ -169,9 +181,34 @@ service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Na
 color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=1)
 cd <- as_tibble(cbind(raster_name, service, color))
 
+# Very important. This line adds the new attribnutes to the polygons. I could add all here.
+
+zonal_wide <- pivot_wider(zonal_df, id_cols=id, names_from=c(service,year), values_from = c(mean, median))
+
+poly <- left_join(poly, zonal_wide, by= "id")
+st_write(poly, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_means.gpkg') 
+
 save(zonal_df, file=here('output_data', 'diffs_wb.RData'))
 write.csv(zonal_df, here('output_data', "diffs_wb_.csv"))
 # Show a snippet of the combined resultshead(zonal_df)
+```
+
+
+```{r load raster es, echo=FALSE}
+# Vector of raster file paths
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2'
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+tiffes <- tiffes[-c(1,10,13,14,17)]
+tiffes <- tiffes[-c(7,8)]
+
+filename<- basename(tiffes)
+
+# Use terra::rast() to load each file as a SpatRaster object
+rasters_list <- lapply(tiffes, rast)
+service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each=2)
+filename<- as_tibble(cbind(service,filename))
+#colnames(prod) <- c("Service", "Filename")
+print(filename)
 ```
 
 We want separate bar plots (facets) for each raster, showing (for instance) mean or median ecosystem service values by country, sorted from high to low.
@@ -390,7 +427,7 @@ Run for: Biomes, Continents, income group, fao_reg?
 
 Land cover change -> assess change/area In other words what do i **exactly** need to do here?  What is my target variable? LC change? 
 
-Will have to do it using DiffeR and iterate over all countries, then assemble the dataframes and get percentage of change distributed among the main components. This is not going to be easy but i can get it. However, keep in mind that with all the original classes this becomes unmanageable. Can we produce succesive no change maps and check waht happens among the change (alloation, swaps and shifts)
+Will have to do it using DiffeR and iterate over all countries, then assemble the dataframes and get percentage of change distributed among the main components. This is not going to be easy but i can get it. However, keep in mind that with all the original classes this becomes unmanageable. Can we produce successive no change maps and check what happens among the change (alloation, swaps and shifts)
 
 Take care of the beneficiaries. 
 
