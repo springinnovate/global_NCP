@@ -47,9 +47,13 @@ sample_and_calculate <- function(raster, pixels_needed, confidence = 0.975) {
   if (nrow(sample_values) < pixels_needed) {
     additional_samples <- spatSample(
       raster, size = pixels_needed - nrow(sample_values),
-      method = "random", na.rm = TRUE,  # Now enforce NA removal
+      method = "random", na.rm = TRUE, 
       as.points = FALSE, xy = FALSE, values = TRUE
     )
+    # Ensure 'additional_samples' is a vector
+    if (is.matrix(additional_samples)) {
+      additional_samples <- additional_samples[, 1]  # Extract the first column (values)
+    }
     sample_values <- rbind(sample_values, additional_samples)
   }
   
