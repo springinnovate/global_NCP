@@ -38,9 +38,9 @@ library(parallel)
 ```{r load polygons, include=FALSE}
 
 # Replace with the actual path to your polygon file (e.g., a shapefile)
-poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_JJ.gpkg') 
+poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
 # Load polygons as an sf objectpolygons_sf <- st_read(vector_path)
-poly_wb <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/poly_wb.geojson')
+#poly_wb <- st_read(here(here('vector','poly_wb.geojson'))
 # filter by region (optional)
 #poly <- poly %>%
 #  filter(continent == "South America")
@@ -54,10 +54,8 @@ I am using the rasters with the modeled ES that represent the same service for 1
 Following products were assessed:
 ```{r load raster es, echo=FALSE}
 # Vector of raster file paths
-inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2'
+inpath <- here('input_ES')
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
-tiffes <- tiffes[-c(1,10,13,14,17)]
-tiffes <- tiffes[-c(7,8)]
 filename<- basename(tiffes)
 # Use terra::rast() to load each file as a SpatRaster object
 rasters_list <- lapply(tiffes, rast)
@@ -71,7 +69,7 @@ print(filename)
 
 
 ```{r get differences}
-outpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2"
+outpath <- here("input_ES")
 m_index <- length(rasters_list) %/% 2
 lab <- unique(service)
 l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
@@ -81,7 +79,6 @@ l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
 diffs <- map2(l1,l2, function(l1,l2){
   return(l1-l2)
 })
-
 map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'change_calc', '/', lab[x], '_diff.tif')))
 ```
 
@@ -138,7 +135,7 @@ write.csv(zonal_df, here('output_data', "zonal_summaries_global.csv"))
 ```{r compute stats diff, eval=FALSE, include=FALSE}
 
 # load the polygons with the new attributes to add new 
-poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_means.gpkg')
+poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
 inpath <- paste0(outpath, "/", 'change_calc')
 
 # load the rasters with the calculated differences 
@@ -157,7 +154,7 @@ target_stats <- c("mean", "median")
 
 # exact_extract can append columns from the polygon layer;
 # Number of CPU cores to use
-num.cores <- detectCores() - 2  # Leave 4 cores free. Adjust depending on available resources. 
+num.cores <- detectCores() - 2  
 
 results_list <- mclapply(diffs, function(r) {
   # Perform exact extraction
