@@ -136,7 +136,7 @@ write.csv(zonal_df, here('output_data', "zonal_summaries_global.csv"))
 
 # load the polygons with the new attributes to add new 
 poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
-inpath <- paste0(outpath, "/", 'change_calc')
+inpath <- paste0(outpath, "/", 'Change_calc')
 
 # load the rasters with the calculated differences 
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
@@ -144,7 +144,7 @@ filename<- basename(tiffes)
 
 # Use terra::rast() to load each file as a SpatRaster object
 rasters_list <- lapply(tiffes, rast)
-service <- c("Coastal Protection", "Nature Access", "Nitrogen Export","Pollination","Sediment Export")
+service <- c("Coastal Protection", "Nature Access","Nitrogen Export","Pollination","Sediment Export")
 filename<- as_tibble(cbind(service,filename))
 #colnames(prod) <- c("Service", "Filename")
 print(filename)
@@ -154,9 +154,9 @@ target_stats <- c("mean", "median")
 
 # exact_extract can append columns from the polygon layer;
 # Number of CPU cores to use
-num.cores <- detectCores() - 2  
+num.cores <- detectCores() - 2  # Leave 4 cores free. Adjust depending on available resources. 
 
-results_list <- mclapply(diffs, function(r) {
+results_list <- lapply(diffs, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -166,27 +166,31 @@ results_list <- mclapply(diffs, function(r) {
 
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
-  return(res)
-},mc.cores = num.cores)
+  return(res)})
+#},mc.cores = num.cores)
 
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
 
 raster_name <- unique(zonal_df$raster_name)
-service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each = 1)
+service <- rep(c("Coastal Protection", "Nature Access","Nitrogen Export", "Pollination","Sediment Export"), each = 1)
 color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=1)
 cd <- as_tibble(cbind(raster_name, service, color))
 
 # Very important. This line adds the new attribnutes to the polygons. I could add all here.
+zonal_df <- left_join(zonal_df,cd)
+zonal_df <- zonal_df[-c(4,6)]
+zonal_wide <- pivot_wider(zonal_df, id_cols=id, names_from=c(service), values_from = c(mean, median))
 
-zonal_wide <- pivot_wider(zonal_df, id_cols=id, names_from=c(service,year), values_from = c(mean, median))
+colnames(zonal_wide)[colnames(zonal_wide) != "id"] <- paste0(colnames(zonal_wide)[colnames(zonal_wide) != "id"], "_diff")
 
 poly <- left_join(poly, zonal_wide, by= "id")
-st_write(poly, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_means.gpkg') 
 
+st_write(poly, here('vector', 'global_poly_means.gpkg', append = FALSE) 
+
+# I don't thik this is needed anymore.         
 save(zonal_df, file=here('output_data', 'diffs_wb.RData'))
 write.csv(zonal_df, here('output_data', "diffs_wb_.csv"))
-# Show a snippet of the combined resultshead(zonal_df)
 ```
 
 
