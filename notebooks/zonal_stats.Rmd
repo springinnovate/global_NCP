@@ -39,15 +39,8 @@ library(parallel)
 
 # Replace with the actual path to your polygon file (e.g., a shapefile)
 poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
-# Load polygons as an sf objectpolygons_sf <- st_read(vector_path)
-#poly <- st_read(here('vector','poly_wb.geojson'))
-
+poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/global_poly_means.gpkg')
 # Optional dissolve to group by different vaiables (region, income, etc)
-
-poly <- poly %>%
-  group_by(region_wb) %>%   # Group by the attribute
-  summarise(geom = st_union(geom), .groups = "drop")  # Merge geometries
-
 
 ```
 
@@ -60,6 +53,7 @@ Following products were assessed:
 ```{r load raster es, echo=FALSE}
 # Vector of raster file paths
 inpath <- here('input_ES')
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES'
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 filename<- basename(tiffes)
 # Use terra::rast() to load each file as a SpatRaster object
@@ -144,19 +138,18 @@ save(zonal_df, file=here('output_data', 'zonal_df_wb.RData'))
 
 # load the polygons with the new attributes to add new 
 poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
-inpath <- paste0(outpath, "/", 'Change_calc')
+inpath <- paste0(inpath, "/", 'Change_calc')
 
 # load the rasters with the calculated differences 
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 filename<- basename(tiffes)
 
 # Use terra::rast() to load each file as a SpatRaster object
-rasters_list <- lapply(tiffes, rast)
+rast_list <- lapply(tiffes, rast)
 service <- c("Coastal Protection", "Nature Access","Nitrogen Export","Pollination","Sediment Export")
 filename<- as_tibble(cbind(service,filename))
 #colnames(prod) <- c("Service", "Filename")
 print(filename)
-diffs <- lapply(tiffes, rast)
 # We'll compute mean and median as an example
 target_stats <- c("mean", "median")
 
@@ -164,7 +157,7 @@ target_stats <- c("mean", "median")
 # Number of CPU cores to use
 num.cores <- detectCores() - 2  # Leave 4 cores free. Adjust depending on available resources. 
 
-results_list <- lapply(diffs, function(r) {
+results_list <- lapply(rast_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -193,7 +186,7 @@ zonal_wide <- pivot_wider(zonal_df, id_cols=id, names_from=c(service), values_fr
 colnames(zonal_wide)[colnames(zonal_wide) != "id"] <- paste0(colnames(zonal_wide)[colnames(zonal_wide) != "id"], "_diff")
 
 poly <- left_join(poly, zonal_wide, by= "id")
-
+st_write(poly, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/global_poly_means.gpkg', append = FALSE)
 st_write(poly, here('vector', 'global_poly_means.gpkg', append = FALSE) 
 
 # I don't thik this is needed anymore.         
