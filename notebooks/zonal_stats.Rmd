@@ -40,10 +40,15 @@ library(parallel)
 # Replace with the actual path to your polygon file (e.g., a shapefile)
 poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
 # Load polygons as an sf objectpolygons_sf <- st_read(vector_path)
-#poly_wb <- st_read(here(here('vector','poly_wb.geojson'))
-# filter by region (optional)
-#poly <- poly %>%
-#  filter(continent == "South America")
+#poly <- st_read(here('vector','poly_wb.geojson'))
+
+# Optional dissolve to group by different vaiables (region, income, etc)
+
+poly <- poly %>%
+  group_by(region_wb) %>%   # Group by the attribute
+  summarise(geom = st_union(geom), .groups = "drop")  # Merge geometries
+
+
 ```
 
 I am using the rasters with the modeled ES that represent the same service for 1992 and 2020 in the same units (of course). There were not the ones originally prioritized and yhr ones i have been working on but a different set that is the only one that i can actually use
@@ -67,8 +72,8 @@ print(filename)
 
 # 3. Calcualte Differences (check with original) 
 
-
-```{r get differences}
+ Thishas been already done, no need to do again.
+```{r get differences, eval=FALSE, include=FALSE}
 outpath <- here("input_ES")
 m_index <- length(rasters_list) %/% 2
 lab <- unique(service)
@@ -85,21 +90,24 @@ map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'c
 ## 3. Compute Zonal Statistics with exactextractr for each one
 
 ```{r compute stats 1, eval=FALSE, include=FALSE}
-diffs <- lapply(tiffes, rast)
+#load the data (this assumes 'tiffs' is the list of paths to the files, and that they are in the desired order. Make sure tha the dc dataframe with the labels matches) There is room for improvement here. 
+rast_list <- lapply(tiffes, rast)
 
 # We'll compute mean and median as an example
 target_stats <- c("mean", "median")
 
+cols <- 'region_wb'
+
 # exact_extract can append columns from the polygon layer;
 # Number of CPU cores to use
-num.cores <- detectCores() - 4  # Leave 4 cores free. Adjust depending on available resources. 
+num.cores <- length(rast_list) # set as many cores as rastersd to be evaluated. I need to take al ook at thi, the processsing times does not seem to have improved 
 # here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
 results_list <- mclapply(rasters_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
                        fun = target_stats,
-                       append_cols = "id")
+                       append_cols = cols)
   r_name <- names(r)
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
@@ -122,11 +130,11 @@ zonal_df <- left_join(zonal_df,cd)
 
 poly_df <- st_drop_geometry(poly) %>% select(id, ee_r264_name,iso3,continent,region_wb,income_grp,name_long)  
 
-zonal_df <- zonal_df %>% left_join(poly_df,by = "id")
+zonal_df <- zonal_df %>% left_join(poly_df,by = cols)
 
 # i think we don't need this anymore. Saving the outputs both as RData and csv is overkill and not that necessary  
-save(zonal_df, file=here('output_data', 'zonal_df_global.RData'))
-write.csv(zonal_df, here('output_data', "zonal_summaries_global.csv"))
+save(zonal_df, file=here('output_data', 'zonal_df_wb.RData'))
+
 
 ```
 
