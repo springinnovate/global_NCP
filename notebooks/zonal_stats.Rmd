@@ -39,8 +39,12 @@ library(parallel)
 
 # Replace with the actual path to your polygon file (e.g., a shapefile)
 poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
-poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/global_poly_means.gpkg')
-# Optional dissolve to group by different vaiables (region, income, etc)
+#
+poly <- st_read(here('vector','poly_wb.geojson'))
+# #Optional dissolve to group by different vaiables (region, income, etc) This is not working well, weird merging of the polys. Do it in QGIS for now
+# poly <- poly %>%
+#   group_by(region_wb) %>%   # Group by the attribute
+#   summarise(geom = st_union(geom), .groups = "drop")  # Merge geometries
 
 ```
 
@@ -53,20 +57,20 @@ Following products were assessed:
 ```{r load raster es, echo=FALSE}
 # Vector of raster file paths
 inpath <- here('input_ES')
-inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES'
+#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES'
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 filename<- basename(tiffes)
 # Use terra::rast() to load each file as a SpatRaster object
 rasters_list <- lapply(tiffes, rast)
+# add the names of theservices. This is slight;y annoying and one needs to make sure that the order is the same of the input data, which depends on the names of the input tiff files and that can change. Check that BEFORE running.
 service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each=2)
 filename<- as_tibble(cbind(service,filename))
-#colnames(prod) <- c("Service", "Filename")
 print(filename)
 ```
 
 # 3. Calcualte Differences (check with original) 
 
- Thishas been already done, no need to do again.
+ This     `has been already done, no need to do again.
 ```{r get differences, eval=FALSE, include=FALSE}
 outpath <- here("input_ES")
 m_index <- length(rasters_list) %/% 2
@@ -85,16 +89,14 @@ map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'c
 
 ```{r compute stats 1, eval=FALSE, include=FALSE}
 #load the data (this assumes 'tiffs' is the list of paths to the files, and that they are in the desired order. Make sure tha the dc dataframe with the labels matches) There is room for improvement here. 
-rast_list <- lapply(tiffes, rast)
 
-# We'll compute mean and median as an example
+# Initially, compute mean and median.
 target_stats <- c("mean", "median")
-
+# this is the column in the vector file taqht we are going to use. 
 cols <- 'region_wb'
 
-# exact_extract can append columns from the polygon layer;
 # Number of CPU cores to use
-num.cores <- length(rast_list) # set as many cores as rastersd to be evaluated. I need to take al ook at thi, the processsing times does not seem to have improved 
+num.cores <- length(rast_list) # set as many cores as rasters to be evaluated. I need to take a look at this, mclapply does  n ot seem to be improving performance as much as it should. In fact, for the differences, performance is quite poor.
 # here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
 results_list <- mclapply(rasters_list, function(r) {
   # Perform exact extraction
@@ -105,8 +107,7 @@ results_list <- mclapply(rasters_list, function(r) {
   r_name <- names(r)
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
-  return(res)
-},mc.cores = num.cores)
+  return(res)},mc.cores = num.cores)
 
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
