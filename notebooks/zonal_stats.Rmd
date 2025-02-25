@@ -42,7 +42,8 @@ library(parallel)
 #poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/vector/global_poly_means.gpkg')
 poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
 
-#poly <- st_read(here('vector','poly_wb.geojson'))
+poly <- st_read(here('vector','poly_wb.geojson'))
+poly <- st_read(here('vector','income_group.gpkg'))
 ```
 
 
@@ -185,7 +186,6 @@ zonal_wide <- pivot_wider(zonal_df, id_cols=id, names_from=c(service), values_fr
 colnames(zonal_wide)[colnames(zonal_wide) != "id"] <- paste0(colnames(zonal_wide)[colnames(zonal_wide) != "id"], "_diff")
 
 poly <- left_join(poly, zonal_wide, by= "id")
-st_write(poly, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/global_poly_means.gpkg', append = FALSE)
 st_write(poly, here('vector', 'global_poly_means.gpkg', append = FALSE) 
 
 # I don't thik this is needed anymore.         
@@ -210,7 +210,6 @@ filename<- as_tibble(cbind(service,filename))
 #colnames(prod) <- c("Service", "Filename")
 print(filename)
 ```
-
 
 
 ## 5 . Get the Barplots
@@ -294,6 +293,7 @@ print(p_2020)
 
 ```
 
+## 5. Here, add plots with the differences 
 
 
 ## 5. Generate  Maps
@@ -303,10 +303,32 @@ Use ggplot2 and the spatial geometry from our sf object to color each polygon by
 
 # Very important. This line adds the new attribnutes to the polygons. I could add all here.
 
-zonal_wide <- pivot_wider(zonal_df, id_cols=id, names_from=c(service,year), values_from = c(mean, median))
+col <- "region_wb"
 
-poly <- left_join(poly, zonal_wide, by= "id")
-st_write(poly, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/global_poly_means.gpkg') 
+zonal_df <-zonal_df %>% select(c(region_wb,mean, service)) 
+zonal_df <- zonal_df %>% rename(diff_mean = mean)
+
+# this is to pivot when there are two dates (each year)
+zonal_wide <- pivot_wider(zonal_df, id_cols=!!sym(col), names_from=c(service,year), values_from = c(mean, median))
+
+
+
+# this is for when there i only one value (eg differences)
+zonal_wide <- pivot_wider(zonal_df, id_cols=!!sym(col), names_from= service, values_from = diff_mean)
+
+
+#rename the columns to avoid confusions
+zonal_wide <- zonal_wide %>%
+  rename_with(~ paste0("diff_", .), -1) 
+
+poly <- left_join(poly, zonal_wide, by = col)
+
+st_write(poly,  here('vector', 'wb_poly_means.gpkg'), append=FALSE) 
+
+```
+####################################################
+
+```{r mapping f}
 # First, merge the zonal_df results back into the polygon sf object.
 # This ensures each polygon gets a corresponding mean/median value.
 
@@ -399,6 +421,8 @@ combined_2020
 Next steps:  
 
 Run for: Biomes, Continents, income group, fao_reg?
+
+
 
 Land cover change -> assess change/area In other words what do i **exactly** need to do here?  What is my target variable? LC change? 
 
