@@ -38,27 +38,21 @@ library(parallel)
 ```{r load polygons, eval=FALSE, include=FALSE}
 
 # Replace with the actual path to your polygon file (e.g., a shapefile)
-poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/vector/global_poly_means.gpkg')
-#poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
-#
-#poly <- st_read(here('vector','poly_wb.geojson'))
-# #Optional dissolve to group by different vaiables (region, income, etc) This is not working well, weird merging of the polys. Do it in QGIS for now
-# poly <- poly %>%
-#   group_by(region_wb) %>%   # Group by the attribute
-#   summarise(geom = st_union(geom), .groups = "drop")  # Merge geometries
 
+#poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/vector/global_poly_means.gpkg')
+poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
+
+#poly <- st_read(here('vector','poly_wb.geojson'))
 ```
 
-I am using the rasters with the modeled ES that represent the same service for 1992 and 2020 in the same units (of course). There were not the ones originally prioritized and yhr ones i have been working on but a different set that is the only one that i can actually use
 
-
-2. Load a List of GeoTIFF Rasters
+## 2. Load a List of GeoTIFF Rasters
 
 Following products were assessed:
 ```{r load raster es, echo=FALSE}
 # Vector of raster file paths
 inpath <- here('input_ES')
-inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES'
+#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES'
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 filename<- basename(tiffes)
 # Use terra::rast() to load each file as a SpatRaster object
@@ -71,7 +65,7 @@ print(filename)
 
 # 3. Calcualte Differences (check with original) 
 
- This     `has been already done, no need to do again.
+ This has been already done, no need to do again.
 ```{r get differences, eval=FALSE, include=FALSE}
 outpath <- here("input_ES")
 m_index <- length(rasters_list) %/% 2
@@ -98,7 +92,7 @@ cols <- 'id'
 
 # Number of CPU cores to use
 num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated. I need to take a look at this, mclapply does  not seem to be improving
-# Yes, somehow using multicore seems to be prblematicic. 
+# Somehow using multicore seems to be prblematicic. 
 num.cores <- 4
 #performance as much as it should. In fact, for the differences, performance is quite poor.
 # here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
@@ -126,9 +120,11 @@ zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name),
                           1992, 
                           ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
 
+# if the original polygons
 poly_df <- st_drop_geometry(poly) %>% select(id, ee_r264_name,iso3,continent,region_wb,income_grp,name_long)  
+ # if merged 
+poly_df <- st_drop_geometry(poly) #%>% select(id, ee_r264_name,iso3,continent,region_wb,income_grp,name_long)  
 zonal_df <- zonal_df %>% left_join(poly_df,by = cols)
-
 # i think we don't need this anymore. Saving the outputs both as RData and csv is overkill and not that necessary  
 save(zonal_df, file=here('output_data', 'zonal_df_global.RData'))
 write.csv(zonal_df, here('output_data', 'zonal_df_global.csv'))
@@ -197,7 +193,7 @@ save(zonal_df, file=here('output_data', 'diffs_wb.RData'))
 write.csv(zonal_df, here('output_data', "diffs_wb_.csv"))
 ```
 
-
+## chekc what is the point of this part. 
 ```{r load raster es1, eval=FALSE, include=FALSE}
 # Vector of raster file paths
 inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/Downloaded_data_ES2'
@@ -215,7 +211,165 @@ filename<- as_tibble(cbind(service,filename))
 print(filename)
 ```
 
+
+
 ## 5 . Get the Barplots
+
+```{r ggplot 2020, echo=FALSE, fig.height=8, fig.width=14}
+# zonal_df <- load('/Users/rodriguez/Global_ES_TS/global_NCP/output_data/zonal_df_global.RData')
+#zonal_df <- load(here('output_data', 'zonal_df_global.RData'))
+  # Needed for reorder_within()
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(tidytext)  # Needed for reorder_within()
+
+plot_ecosystem_services <- function(data, year, col) {
+  col_sym <- sym(col)  # Convert column name to symbol for dplyr
+  
+  # Step 1: Prepare Data (Remove NA values and zero mean values, then reorder names)
+  data_prepped <- data %>%
+    filter(!is.na(mean) & mean > 0 & year == !!year) %>%  # Exclude cases where mean is 0 and filter year
+    mutate(temp_col = reorder_within(!!col_sym, -mean, service))  
+
+  # Step 2: Compute min/max values for selected column
+  service_range <- data_prepped %>%
+    group_by(service) %>%
+    summarize(
+      min_val = min(mean, na.rm = TRUE),
+      max_val = max(mean, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  # Step 3: Create "invisible" data for min/max range
+  range_data <- service_range %>%
+    pivot_longer(cols = c(min_val, max_val), names_to = "range_type", values_to = "mean") %>%
+    mutate(year = !!year, temp_col = "dummy")
+
+  # Step 4: Extract top 10 and bottom 10 per selected column
+  top_10 <- data_prepped %>%
+    group_by(service) %>%
+    slice_max(order_by = mean, n = 10, with_ties = TRUE) 
+
+  bottom_10 <- data_prepped %>%
+    group_by(service) %>%
+    slice_min(order_by = mean, n = 10, with_ties = TRUE)
+
+  # Step 5: Combine only top 10 and bottom 10
+  filtered_data <- bind_rows(top_10, bottom_10) %>%
+    arrange(service, desc(mean))
+
+  # Step 6: Reorder selected column to appear correctly
+  filtered_data <- filtered_data %>%
+    mutate(temp_col = reorder_within(!!col_sym, -mean, service))
+
+  # Step 7: Plot the filtered data
+  p <- ggplot(filtered_data, aes(x = temp_col, y = mean, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    facet_wrap(~ service, scales = "free") +
+    scale_x_reordered() +  
+    labs(
+      title = paste("Mean Ecosystem Service Values,", year),
+      x = col,
+      y = "Mean Value"
+    ) +
+    theme_bw() +
+    theme(
+      strip.text = element_text(face = "bold", size = 12),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 10)
+    )
+  
+  return(p)
+}
+
+# Generate plots for different years using a specified column
+p_1992 <- plot_ecosystem_services(zonal_df, 1992, "region_wb")
+p_2020 <- plot_ecosystem_services(zonal_df, 2020, "region_wb")
+
+# Display the plots
+print(p_1992)
+print(p_2020)
+
+
+```
+
+
+
+## 4. Plot Mean ES Value for each year
+
+```{r barplots, echo=FALSE, fig.height=8, fig.width=14}
+
+# here need to add the names again. Need to think which column to use for that. 
+# Data preparation: reorder countries by mean for each service
+data_prepped <- zonal_df %>% filter(!is.na(mean)) %>%  # Remove rows with NA mean values
+  mutate(region_wb = reorder_within(region_wb, -mean, service))  # Reorder within each service
+# For each service, get min and max across *both* years (so 1992 and 2020)
+service_range <- data_prepped %>%
+  group_by(service) %>%
+  summarize(
+    min_val = min(mean, na.rm = TRUE),
+    max_val = max(mean, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+
+# Pivot min_val and max_val to a "long" format so we can plot them
+range_data_1992 <- service_range %>%
+  pivot_longer(cols = c(min_val, max_val), 
+               names_to = "range_type", 
+               values_to = "mean") %>%
+  mutate(
+    # We include year=1992 so it will show up in the 1992 plot
+    year = 1992,
+    # We need some dummy country name so x won't break; 
+    # "dummy" won't appear on your real bars
+    region_wb = "dummy"
+  )
+
+range_data_2020 <- service_range %>%
+  pivot_longer(cols = c(min_val, max_val), 
+               names_to = "range_type", 
+               values_to = "mean") %>%
+  mutate(
+    year = 2020,
+   region_wb = "dummy"
+  )
+
+
+plot_data_1992 <- data_prepped %>% filter(year == 1992)
+
+p_1992 <- ggplot() +
+  # 1) Plot the real bars
+  geom_bar(
+    data = plot_data_1992,
+    aes(x = region_wb, y = mean, fill = color),
+    stat = "identity", show.legend = FALSE
+  ) +
+  # 2) Add invisible “blank” geoms with min and max for each service
+  geom_blank(
+    data = range_data_1992,
+    aes(x = region_wb, y = mean)
+  ) +
+  # Reuse your original reordering scale & color approach
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free") +
+  scale_x_reordered() +
+  labs(
+    title = "Mean Ecosystem Service Values per World Bank Region, 1992",
+    x = "Country",
+    y = "Mean Value"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size=8)
+  )
+
+# Combine the 1992 plots in a row (or multi-row if you prefer).
+p_1992
+```
+>>>>>>> daa6126 (Sync with lilling)
 
 
 ```{r ggplot 2020, echo=FALSE, fig.height=8, fig.width=14}
@@ -223,6 +377,7 @@ print(filename)
 #zonal_df <- load(here('output_data', 'zonal_df_global.RData'))
 
 
+<<<<<<< HEAD
 plot_ecosystem_services <- function(data, year) {
   # Step 1: Prepare Data (Remove NA values and zero mean values, then reorder names)
   data_prepped <- data %>%
@@ -288,6 +443,32 @@ p_2020 <- plot_ecosystem_services(zonal_df, 2020)
 print(p_1992)
 print(p_2020)
 
+=======
+p_2020 <- ggplot() +
+  geom_bar(
+    data = plot_data_2020,
+    aes(x = region_wb, y = mean, fill = color),
+    stat = "identity", show.legend = FALSE
+  ) +
+  geom_blank(
+    data = range_data_2020,
+    aes(x = region_wb, y = mean)
+  ) +
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free") +
+  scale_x_reordered() +
+  labs(
+    title = "Mean Ecosystem Service Values per WB Region, 2020",
+    x = "Country",
+    y = "Mean Value"
+  ) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+p_2020
+>>>>>>> daa6126 (Sync with lilling)
 ```
 
 
