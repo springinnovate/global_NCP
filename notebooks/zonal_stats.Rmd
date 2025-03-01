@@ -39,28 +39,20 @@ library(parallel)
 
 # Replace with the actual path to your polygon file (e.g., a shapefile)
 
-<<<<<<< HEAD
 # By country
-set <- 'global_poly_means.gpkg'
+#set <- 'global_poly_means.gpkg'
 # By World Bank Region
-set <- 'wb_poly_means.gpkg'
+#set <- 'wb_poly_means.gpkg'
 # By Income gropup !!! This one has some isse, and is not running properly for some reason. 
-set <- 'income_grp_f.gpkg'
+#set <- 'income_grp_f.gpkg'
 # By Continent
-set <- 'continent_poly.gpkg' #change to poly_means or just poly everythingh else 
+set <- 'continent.gpkg' #change to poly_means or just poly everythingh else 
 # By Subregion
-set <- 'subregion_poly_.gpkg'
+#set <- 'subregion_poly_.gpkg'
 
 #poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/vector/global_poly_means.gpkg')
 # Countries
 poly <- st_read(here('vector', set)) 
-=======
-poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
-#poly <- st_read(here('vector','poly_wb.geojson'))
-#poly <- st_read(here('vector','income_group.gpkg'))
-#poly <- st_read(here('vector','income_group.gpkg'))
-poly <- st_read(here('vector','income_g.gpkg'))
->>>>>>> 6ee0eb4 (check some error in the order. whyyyy)
 ```
 
 
@@ -106,29 +98,14 @@ map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'c
 # Compute zonal stats. Mean for now 
 target_stats <- c("mean")
 # this is the column in the vector file that we are going to use. 
-cols <- 'income_grp'
-<<<<<<< HEAD
-col <- "income_grp" # this is for the join. Not great but gets the work done
-=======
-
->>>>>>> 6ee0eb4 (check some error in the order. whyyyy)
+cols <- 'continent'
+col <- "continent" # this is for the join. Not great but gets the work done
 # Number of CPU cores to use
 
 num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  sequentially, and there is no progress bar available 
 # here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
 
-res1 <- exact_extract(rasters_list[[1]], poly, fun = target_stats,append_cols = cols)
-res2 <- exact_extract(rasters_list[[2]], poly, fun = target_stats,append_cols = cols)
-res3 <- exact_extract(rasters_list[[3]], poly, fun = target_stats,append_cols = cols)
-res4 <- exact_extract(rasters_list[[4]], poly, fun = target_stats,append_cols = cols)
-res5 <- exact_extract(rasters_list[[5]], poly, fun = target_stats,append_cols = cols)
-res6 <- exact_extract(rasters_list[[6]], poly, fun = target_stats,append_cols = cols)
-res7 <- exact_extract(rasters_list[[7]], poly, fun = target_stats,append_cols = cols)
-res8 <- exact_extract(rasters_list[[8]], poly, fun = target_stats,append_cols = cols)
-res9 <- exact_extract(rasters_list[[9]], poly, fun = target_stats,append_cols = cols)
-res10 <- exact_extract(rasters_list[[10]], poly, fun = target_stats,append_cols = cols)
-
-results_list <- lapply(rasters_list, function(r) {
+results_list <- mclapply(rasters_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -137,7 +114,7 @@ results_list <- lapply(rasters_list, function(r) {
   r_name <- names(r)
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
-  return(res)})#,mc.cores = num.cores)
+  return(res)},mc.cores = num.cores)
 
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
@@ -168,37 +145,6 @@ write.csv(zonal_df, here('output_data', paste0('zonal_df_',cols, '.csv')))
 ```
 
 
-## This mightr not be necessary anymore either. 
-
-```{r create maps, eval=FALSE, include=FALSE}
-
-# Very important. This line adds the new attribnutes to the polygons. I could add all here.
-
-col <- "region_wb"
-
-#zonal_df <-zonal_df %>% select(c(region_wb,mean, service)) # original (most vector files except biomes)
-zonal_df <-zonal_df %>% select(c(BIOME,WWF_biome, mean, service, year)) # biomes
-zonal_df <- zonal_df %>% rename(diff_mean = mean)
-
-# this is to pivot when there are two dates (each year)
-zonal_wide <- pivot_wider(zonal_df, id_cols=!!sym(col), names_from=c(service,year), values_from = c(mean, median))
-
-
-
-# this is for when there i only one value (eg differences)
-zonal_wide <- pivot_wider(zonal_df, id_cols=!!sym(col), names_from= service, values_from = diff_mean)
-
-
-#rename the columns to avoid confusions
-zonal_wide <- zonal_wide %>%
-  rename_with(~ paste0("diff_", .), -1) 
-
-poly <- left_join(poly, zonal_wide, by = col)
-
-st_write(poly,  here('vector', 'wb_poly_means.gpkg'), append=FALSE) 
-
-```
-
 ## 4. Now do the differences  
 
 In theory, i could get everything done together but it somehow gets too complicated. The names of the input rasters don't follow the same sequence, so i need to reorganize the whole thing. Also in one case there are two years, in the differences, thats absent. There are just too many things to cosnider that it gets overly complicated. Maybe someone will be able to take from here.
@@ -220,21 +166,12 @@ filename<- basename(tiffes)
 rast_list <- lapply(tiffes, rast)
 service <- c("Coastal Protection", "Nature Access","Nitrogen Export","Pollination","Sediment Export")
 filename<- as_tibble(cbind(service,filename))
-#colnames(prod) <- c("Service", "Filename")
 print(filename)
-# We'll compute mean and median as an example
+# We'll compute mean 
 target_stats <- "mean"
-cols <- 'region_wb'
-# exact_extract can append columns from the polygon layer;
-# Number of CPU cores to use
-num.cores <- 5 #detectCores() - 2  # Leave 4 cores free. Adjust depending on available resources. 
 
-# res1 <- exact_extract(rast_list[[1]], poly, fun = target_stats,append_cols = cols)
-# res2 <- exact_extract(rast_list[[2]], poly, fun = target_stats,append_cols = cols)
-# res3 <- exact_extract(rast_list[[3]], poly, fun = target_stats,append_cols = cols)
-# res4 <- exact_extract(rast_list[[4]], poly, fun = target_stats,append_cols = cols)
-# res5 <- exact_extract(rast_list[[5]], poly, fun = target_stats,append_cols = cols)
-# for some reason "income level"is givin all kinds of issues becasue fuck me, of course. 
+# Number of CPU cores to use
+num.cores <- length(rast_list)
 results_list <- mclapply(rast_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
@@ -251,7 +188,7 @@ results_list <- mclapply(rast_list, function(r) {
 zonal_df <- do.call(rbind, results_list)
 
 raster_name <- unique(zonal_df$raster_name)
-service <- rep(c("Coastal Protection", "Nature Access","Nitrogen Export", "Pollination","Sediment Export"), each = 1)
+service <- c("Coastal Protection", "Nature Access","Nitrogen Export", "Pollination","Sediment Export")
 color <- c("#9e9ac8", "#A57C00", "#2c944c",  "#dd1c77", "#08306b")
 cd <- as_tibble(cbind(raster_name, service, color))
 
@@ -263,11 +200,9 @@ zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cols), names_from=c(service),
 colnames(zonal_wide)[colnames(zonal_wide) != cols] <- paste0(colnames(zonal_wide)[colnames(zonal_wide) != cols], "_diff")
 
 poly <- left_join(poly, zonal_wide, by= cols)
-st_write(poly, here('vector', 'biome_poly_means.gpkg'), append = FALSE) 
+st_write(poly, here('vector', set), append = FALSE) 
 
-# I don't thik this is needed anymore.         
-#save(zonal_df, file=here('output_data', 'diffs_wb.RData'))
-write.csv(zonal_df, here('output_data', "diffs_biomes_.csv"))
+write.csv(zonal_df, here('output_data', paste0('diffs_',cols, '.csv')))
 ```
 
 
@@ -551,7 +486,7 @@ combined_2020
 
 Next steps:  
 
-Run for: Biomes, Continents, income group, wb_region, subregion might be more interesting than continent?
+Run for: Biomes (done), Continents, income group (done),  wb_region(done), subregion might be more interesting than continent?
 
 
 
