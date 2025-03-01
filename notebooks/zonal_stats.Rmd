@@ -39,6 +39,7 @@ library(parallel)
 
 # Replace with the actual path to your polygon file (e.g., a shapefile)
 
+<<<<<<< HEAD
 # By country
 set <- 'global_poly_means.gpkg'
 # By World Bank Region
@@ -53,6 +54,13 @@ set <- 'subregion_poly_.gpkg'
 #poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/vector/global_poly_means.gpkg')
 # Countries
 poly <- st_read(here('vector', set)) 
+=======
+poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
+#poly <- st_read(here('vector','poly_wb.geojson'))
+#poly <- st_read(here('vector','income_group.gpkg'))
+#poly <- st_read(here('vector','income_group.gpkg'))
+poly <- st_read(here('vector','income_g.gpkg'))
+>>>>>>> 6ee0eb4 (check some error in the order. whyyyy)
 ```
 
 
@@ -99,11 +107,27 @@ map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'c
 target_stats <- c("mean")
 # this is the column in the vector file that we are going to use. 
 cols <- 'income_grp'
+<<<<<<< HEAD
 col <- "income_grp" # this is for the join. Not great but gets the work done
+=======
+
+>>>>>>> 6ee0eb4 (check some error in the order. whyyyy)
 # Number of CPU cores to use
 
 num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  sequentially, and there is no progress bar available 
 # here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
+
+res1 <- exact_extract(rasters_list[[1]], poly, fun = target_stats,append_cols = cols)
+res2 <- exact_extract(rasters_list[[2]], poly, fun = target_stats,append_cols = cols)
+res3 <- exact_extract(rasters_list[[3]], poly, fun = target_stats,append_cols = cols)
+res4 <- exact_extract(rasters_list[[4]], poly, fun = target_stats,append_cols = cols)
+res5 <- exact_extract(rasters_list[[5]], poly, fun = target_stats,append_cols = cols)
+res6 <- exact_extract(rasters_list[[6]], poly, fun = target_stats,append_cols = cols)
+res7 <- exact_extract(rasters_list[[7]], poly, fun = target_stats,append_cols = cols)
+res8 <- exact_extract(rasters_list[[8]], poly, fun = target_stats,append_cols = cols)
+res9 <- exact_extract(rasters_list[[9]], poly, fun = target_stats,append_cols = cols)
+res10 <- exact_extract(rasters_list[[10]], poly, fun = target_stats,append_cols = cols)
+
 results_list <- lapply(rasters_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
@@ -527,7 +551,7 @@ combined_2020
 
 Next steps:  
 
-Run for: Biomes, Continents, income group, wb_region?
+Run for: Biomes, Continents, income group, wb_region, subregion might be more interesting than continent?
 
 
 
