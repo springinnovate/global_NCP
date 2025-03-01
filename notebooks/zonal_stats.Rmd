@@ -39,13 +39,20 @@ library(parallel)
 
 # Replace with the actual path to your polygon file (e.g., a shapefile)
 
+# By country
+set <- 'global_poly_means.gpkg'
+# By World Bank Region
+set <- 'wb_poly_means.gpkg'
+# By Income gropup !!! This one has some isse, and is not running properly for some reason. 
+set <- 'income_grp_f.gpkg'
+# By Continent
+set <- 'continent_poly.gpkg' #change to poly_means or just poly everythingh else 
+# By Subregion
+set <- 'subregion_poly_.gpkg'
+
 #poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/vector/global_poly_means.gpkg')
-#poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
-#poly <- st_read(here('vector','poly_wb.geojson'))
-#poly <- st_read(here('vector','income_group.gpkg'))
-#poly <- st_read(here('vector','income_group.gpkg'))
-poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/income_g.gpkg')
-#poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/biomes_WWF.gpkg')
+# Countries
+poly <- st_read(here('vector', set)) 
 ```
 
 
@@ -88,18 +95,16 @@ map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'c
 ```{r compute stats 1, eval=FALSE, include=FALSE}
 #load the data (this assumes 'tiffs' is the list of paths to the files, and that they are in the desired order. Make sure tha the dc dataframe with the labels matches) There is room for improvement here. 
 
-# Initially, compute mean. I included median but it makes no sense here. Don't calculate it anymore
+# Compute zonal stats. Mean for now 
 target_stats <- c("mean")
 # this is the column in the vector file that we are going to use. 
-cols <- 'BIOME'
-col <- "WWF_biome" # this is for the join. Not great but gets the work done
+cols <- 'income_grp'
+col <- "income_grp" # this is for the join. Not great but gets the work done
 # Number of CPU cores to use
-num.cores <- 6#length(rasters_list) # set as many cores as rasters to be evaluated. I need to take a look at this, mclapply does  not seem to be improving
-# Somehow using multicore seems to be problematic. It is too irregular. Sometimes works great, sometimes takes forever and i have not been able to find out  WHY. 
 
-#performance as much as it should. In fact, for the differences, performance is quite poor.
+num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  sequentially, and there is no progress bar available 
 # here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
-results_list <- mclapply(rasters_list, function(r) {
+results_list <- lapply(rasters_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -108,7 +113,7 @@ results_list <- mclapply(rasters_list, function(r) {
   r_name <- names(r)
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
-  return(res)},mc.cores = num.cores)
+  return(res)})#,mc.cores = num.cores)
 
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
@@ -119,28 +124,23 @@ service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Na
 color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=2)
 cd <- as_tibble(cbind(raster_name, service, color))
 
+
+# add color ands service columns
 zonal_df <- left_join(zonal_df,cd)
+# Add the year. this uses the original filenames to extract the year, but miht be too hardcoded for generalization 
+
 zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
                           1992, 
                           ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
 
 
-
-zonal_wide <- pivot_wider(zonal_df, id_cols=col, names_from=c(service, year), values_from = mean)
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
 # adjust column names 
 
 poly <- left_join(poly, zonal_wide, by= col)
-st_write(poly, here('vector', 'biome_poly_means.gpkg'), append = FALSE) 
-write.csv(zonal_df, here('output_data', 'zonal_df_biomes.csv'))
+st_write(poly, here('vector', set), append = FALSE) 
+write.csv(zonal_df, here('output_data', paste0('zonal_df_',cols, '.csv')))
 
-# I think this is not necessary anymore. Consider removing. 
-# poly_df <- st_drop_geometry(poly) %>% select(id, ee_r264_name,iso3,continent,region_wb,income_grp,name_long)  
-# poly_df <- st_drop_geometry(poly) %>% select(BIOME, WWF_biome) 
-#  # if merged 
-# poly_df <- st_drop_geometry(poly) #%>% select(id, ee_r264_name,iso3,continent,region_wb,income_grp,name_long)  
-# zonal_df <- zonal_df %>% left_join(poly_df,by = cols)
-
-#best to sabe as csv. RDatas somehow get corrupted all the time
 ```
 
 
@@ -184,8 +184,9 @@ I will have to review this part. Ideally, i should get everything done together 
 ```{r compute stats diff, eval=FALSE, include=FALSE}
 
 # load the polygons with the new attributes to add new 
-inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES'
-inpath <- paste0(inpath, "/", 'Change_calc')
+#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES'
+inpath <- here('input_ES')
+inpath <- paste0(inpath, "/", 'change_calc')
 
 # load the rasters with the calculated differences 
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
@@ -199,7 +200,7 @@ filename<- as_tibble(cbind(service,filename))
 print(filename)
 # We'll compute mean and median as an example
 target_stats <- "mean"
-cols <- 'WWF_biome'
+cols <- 'region_wb'
 # exact_extract can append columns from the polygon layer;
 # Number of CPU cores to use
 num.cores <- 5 #detectCores() - 2  # Leave 4 cores free. Adjust depending on available resources. 
@@ -233,11 +234,11 @@ cd <- as_tibble(cbind(raster_name, service, color))
 # Very important. This line adds the new attribnutes to the polygons. I could add all here.
 zonal_df <- left_join(zonal_df,cd)
 #zonal_df <- zonal_df[-c(4,6)]
-zonal_wide <- pivot_wider(zonal_df, id_cols=WWF_biome, names_from=c(service), values_from = mean)
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cols), names_from=c(service), values_from = mean)
 # adjust column names 
-colnames(zonal_wide)[colnames(zonal_wide) != "WWF_biome"] <- paste0(colnames(zonal_wide)[colnames(zonal_wide) != "WWF_biome"], "_diff")
+colnames(zonal_wide)[colnames(zonal_wide) != cols] <- paste0(colnames(zonal_wide)[colnames(zonal_wide) != cols], "_diff")
 
-poly <- left_join(poly, zonal_wide, by= "id")
+poly <- left_join(poly, zonal_wide, by= cols)
 st_write(poly, here('vector', 'biome_poly_means.gpkg'), append = FALSE) 
 
 # I don't thik this is needed anymore.         
@@ -249,10 +250,11 @@ write.csv(zonal_df, here('output_data', "diffs_biomes_.csv"))
 ## 5 . Get the Barplots
 
 ```{r ggplot 2020, echo=FALSE, fig.height=8, fig.width=14}
-
 #zonal_df <- as_tibble(read.csv(here('output_data', 'zonal_df_global.csv')))
 #zonal_df <- zonal_df %>% select(id, mean, service, color, year, name_long)
 zonal_df <- zonal_df %>% select(BIOME, WWF_biome, mean, service, color, year)
+zonal_df <- zonal_df %>% select(id, mean, service, color, year, name_long)
+
 plot_ecosystem_services <- function(data, year, col) {
   col_sym <- sym(col)  # Convert column name to symbol for dplyr
   
@@ -396,6 +398,7 @@ p_diff <- plot_ecosystem_services1(zonal_df, col)
 print(p_diff)
 
 ```
+
 ## 5. Generate  Maps
 
 Use ggplot2 and the spatial geometry from our sf object to color each polygon by its statistic of interest. Faceting again by each raster is useful to compare spatial patterns.
@@ -524,7 +527,7 @@ combined_2020
 
 Next steps:  
 
-Run for: Biomes, Continents, income group, fao_reg?
+Run for: Biomes, Continents, income group, wb_region?
 
 
 
