@@ -51,15 +51,15 @@ set <- 'continent.gpkg' #change to poly_means or just poly everythingh else
 #set <- 'subregion_poly_.gpkg'
 
 #poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/vector/global_poly_means.gpkg')
-# Countries
+
+
 poly <- st_read(here('vector', set)) 
 
-
+################# For biomes, that are not on the same group
 set <- "wwf_biomes.gpkg"
 poly <- st_read(here('vector', 'biome_poly_means.gpkg'))
 
 # Set the column to append from
-
 col <- "WWF_biome"
 cols <- col
 
@@ -360,7 +360,9 @@ print(p_2020)
 
 ```{r plot diffs, fig.height=8, fig.width=14}
 
-zonal_df <- as_tibble(read.csv(here('output_data', 'diffs_biomes_.csv')))
+zonal_df <- as_tibble(read.csv(here('output_data', 'diffs_wb_.csv')))
+
+col <- 'region_wb'
 
 plot_ecosystem_services1 <- function(data, col) {
   col_sym <- sym(col)  # Convert column name to symbol for dplyr
@@ -415,11 +417,12 @@ plot_ecosystem_services1 <- function(data, col) {
     theme_bw() +
     theme(
       strip.text = element_text(face = "bold", size = 12),
-      axis.text.x = element_text(angle = 45, hjust = 1, size = 5)
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 7)
     )
   
   return(p)
 }
+
 
 # Generate plots for different years using a specified column
 p_diff <- plot_ecosystem_services1(zonal_df, col)
