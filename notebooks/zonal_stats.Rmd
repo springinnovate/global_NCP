@@ -224,7 +224,12 @@ grp <- c("Continent", "Country", "Income Group", "World Bank Region", "Biome")
 filename<- as_tibble(cbind(grp,filename))
 pols <- lapply(vecf, st_read)
 
+# Rename columns in pols[[2]]
+pols[[4]] <- pols[[4]] %>%
+  rename_with(~ gsub("^mean_", "", gsub("\\.", " ", .x)), starts_with("mean_"))
 
+# Check the new column names
+names(pols[[4]])
 ```
 # Use terra::rast() to load each file as a SpatRaster object
 rasters_list <- lapply(tiffes, rast)
