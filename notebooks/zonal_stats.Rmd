@@ -230,6 +230,48 @@ pols[[4]] <- pols[[4]] %>%
 
 # Check the new column names
 names(pols[[4]])
+
+
+# Function to compute percentage change for all relevant variables in an sf object
+calculate_percentage_change <- function(sf_obj) {
+  # Identify all variables that exist in both 1992 and 2020
+  base_vars <- c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination")
+  
+  # Iterate through each variable to compute percentage change
+  for (var in base_vars) {
+    col_1992 <- paste0(var, "_1992")  # Column name for 1992
+    col_2020 <- paste0(var, "_2020")  # Column name for 2020
+    col_pct  <- paste0(var, "_pct_ch")   # New percentage change column
+    
+    # Check if the required columns exist in the sf object
+    if (all(c(col_1992, col_2020) %in% names(sf_obj))) {
+      sf_obj <- sf_obj %>%
+        mutate(!!col_pct := ((!!sym(col_2020) - !!sym(col_1992)) / !!sym(col_1992)) * 100)
+    }
+  }
+  return(sf_obj)
+}
+
+# Apply function to all sf objects in the list
+pols <- lapply(pols, calculate_percentage_change)
+
+# Check the updated column names
+lapply(pols, names)
+
+
+# Standardize filenames by removing spaces from the "grp" column
+filename <- filename %>%
+  mutate(grp = gsub(" ", "_", grp))  # Replace spaces with underscores
+
+# Define the output directory
+output_dir <- here("vector")  # Ensure "vector" directory exists
+
+# Save each sf object in pols as a GPKG file
+lapply(seq_along(pols), function(i) {
+  filepath <- file.path(output_dir, paste0(filename$grp[i], ".gpkg"))
+  st_write(pols[[i]], filepath, delete_layer = TRUE)
+})
+
 ```
 # Use terra::rast() to load each file as a SpatRaster object
 rasters_list <- lapply(tiffes, rast)
