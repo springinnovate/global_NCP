@@ -15,7 +15,7 @@
 #'   - Sum of pixel values (`sum`)
 #'
 #' @import terra
-#' @importFrom stats qt mean sd
+#' @importFrom stats qt sd
 #' @examples
 #' library(terra)
 #' r <- rast(ncol=100, nrow=100, nlyrs=3)
@@ -59,7 +59,7 @@ sample_and_calculate <- function(raster, pixels_needed, confidence = 0.975) {
   
   # Compute summary statistics for each raster band
   band_stats <- apply(sample_values, 2, function(x) {
-    mean_val <- mean(x, na.rm = TRUE)
+    mean_val <- base::mean(x, na.rm = TRUE)
     sd_val <- sd(x, na.rm = TRUE)
     n_val <- sum(!is.na(x))  # Number of non-NA values
     

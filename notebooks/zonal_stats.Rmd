@@ -9,13 +9,14 @@ output:
 ---
 
   
-1.	Perform zonal statistics (using exactextractr).
-3.	Create faceted bar plots (using ggplot2) for each raster statistic.
-4.	Generate choropleth maps (using ggplot2 and sf) to visualize spatial distributions.
+1.	Systematically extract zonal statistics from ES global rastetsfor specific spatial units (country/territory, groups of countries, biomes, wathersheds, regular grids etc. The basic procerure is built around the R   *exactextractr* package. Reference to exactextractr is availablle in this [GitHub repository](https://github.com/isciences/exactextractr).
 
-Compute mean for each polygon. Evaluate other metrics
+2. Add and label the extracted information as additional attributes to the input polygon datasets.
 
-At a country level, this was done using the *fids* for the polygons. Using country names is problematic because of geopolitics.
+3. Create visualizations to represented the extracted statistics.
+
+Obs: certain situations and cases need t be taken care more carefgully, especially these related with dependencies and, mutiple features corrsponding to the same country, that can yield wierd results. 
+A second aspect to consider is related to small island nations and other geographic artifacts thart can 
 Pending to do: Think how to deal with the dependencies and complex cases (GB, France, others), but i will take care of this at a later point.
 
 ```{r setup, include=FALSE}
@@ -35,57 +36,66 @@ library(parallel)
 
 ## 1. Load Polygons
 
+This can be done using spatial vector files stored locally or using existing online available datasets like **GADM** 
+
 ```{r load polygons, eval=FALSE, include=FALSE}
 
-# Replace with the actual path to your polygon file (e.g., a shapefile)
-
-# By country
-#set <- 'global_poly_means.gpkg'
-# By World Bank Region
-#set <- 'wb_poly_means.gpkg'
-# By Income gropup !!! This one has some isse, and is not running properly for some reason. 
-#set <- 'income_grp_f.gpkg'
+# This assumes that the polygon files are stored in the same working directory. and have the names assigned here. Feel free to change it if necessary.  
+# The differnet subsets except for biomes are obtained from the dataset provided by Justin to which a "dissolve by attribute" operation has been performed. This is better done in Python/QGis/ArcGis, R is not great at that. 
 # By Continent
-set <- 'continent.gpkg' #change to poly_means or just poly everythingh else 
+#set <- 'continent.gpkg' 
 # By Subregion
-#set <- 'subregion_poly_.gpkg'
-
-#poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Global_ES_mapping/vector/global_poly_means.gpkg')
+#set <- 'subregion.gpkg'
+# By individual territory; "Country" 
+#set <- 'Country.gpkg'
+# By WWF biome
+# set <- 'Biome.gpkg' 
 
 
 poly <- st_read(here('vector', set)) 
 
-################# For biomes, that are not on the same group
-set <- "wwf_biomes.gpkg"
-poly <- st_read(here('vector', 'biome_poly_means.gpkg'))
+# Set the column with the attribute to group 
+# Test this, it might be possible that it is not necesary to dissolve and create the individual vector files in advance, but just change the column. However, i need to check how would it work when joining the new results as attributes. 
+# There would be two things to consider here:
+# 1. how would it actually look when displaying on a GIS (all the original polygons will be maintained). This is manageable. Waht would this imply for the subsequent analyisis.
+# 2. Practicality considerations. The final output, with all services, grouping, metrics, years can end up having too many columns at at some point that can become hard to manage. Just naming columns can be a hassle. 
 
-# Set the column to append from
 col <- "WWF_biome"
 cols <- col
-
 ```
 
 
 ## 2. Load a List of GeoTIFF Rasters
 
-Following products were assessed:
+Following products and years are assessed:
 ```{r load raster es, echo=FALSE}
 # Vector of raster file paths
 inpath <- here('input_ES')
-#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES' # use this path when working locally. 
+
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 filename<- basename(tiffes)
 # Use terra::rast() to load each file as a SpatRaster object
 rasters_list <- lapply(tiffes, rast)
-# add the names of the services. This is slightly annoying but necessary. We need to make sure that the order is the same of the input data, which depends on the names of the input tiff files and that can change. Check that BEFORE running.
+# add the names of the services. This is slightly annoying but necessary. We need to make sure that the order is the same of the input data, which depends on the names of the input tiff files and that can change. Check that BEFORE running.  # there is room for improvement here, but life would be easier if the input rasters have a more consisntent naming convention. 
 service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each=2)
-filename<- as_tibble(cbind(service,filename))
+year <- rep(c(1992,2020), rep=5)
+filename<- as_tibble(cbind(service,filename, year))
 print(filename)
+
+
+# create a table with the content to fill the table
+raster_name <- filename$filename
+# Maybe it is possible to extract automatically the specific service name being analyzed, but that is contingent of the names ofthe input rasters, and these can be quite complex and inconsistent
+service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each = length(unique(year)))
+color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=length(unique(year)))
+cd <- as_tibble(cbind(raster_name, service, color))
 ```
 
-# 3. Calcualte Differences (check with original) 
+# 3. Calcualte Differences 
 
- This has been already done, no need to do again.
+The difference in the values between both yars is calculatd with a simple substraction and the results are exported to and target destination.
+
+
 ```{r get differences, eval=FALSE, include=FALSE}
 outpath <- here("input_ES")
 m_index <- length(rasters_list) %/% 2
@@ -93,19 +103,24 @@ lab <- unique(service)
 l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
 l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
  # test with future_map2 next time to get this to run faster. 
+lab <- unique(filename$service)
 
 diffs <- map2(l1,l2, function(l1,l2){
   return(l1-l2)
 })
+# export new rasters 
 map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'change_calc', '/', lab[x], '_diff.tif')))
 ```
 
-## 4. Compute Zonal Statistics with exactextractr for each year
+## 4. Compute Zonal Statistics for each target raster/year 
+
+**Note:** Although Exact exactextractr is used  here ot obtain zonal summary statistics, in this case the mean value for each polygon, it can also return a list of dataframes, one per feature with the cell values from pte input raster. This can be very useful for further analysis. 
+Besides, it is also possible to include user-defined functions (somerthing that i am going to use for the USLE analysis).
 
 ```{r compute stats 1, eval=FALSE, include=FALSE}
-#load the data (this assumes 'tiffs' is the list of paths to the files, and that they are in the desired order. Make sure tha the dc dataframe with the labels matches) There is room for improvement here. 
+#load the data (this assumes 'tiffs' is the list of paths to the files, and that they are in the desired order. Make sure that the dataframe with the labels is correct (filename object)  There is room for improvement here. 
 
-# Compute zonal stats. Mean for now 
+# Compute zonal stats. Mean for now. Ohers can be added. Cehck extractextractr documentation for a detailed list of stats 
 target_stats <- c("mean")
 # this is the column in the vector file that we are going to use. 
 
@@ -143,7 +158,9 @@ zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name),
 
 
 zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
-# adjust column names 
+# adjust column names #
+
+######### HERE: Include a way/convention to adjust the column names autmatically. Saves work and keeps consistency. I had to do this in Stpe 6, but this is not organized. should be done herer bedore exporting
 
 poly <- left_join(poly, zonal_wide, by= col)
 st_write(poly, here('vector', set), append = FALSE) 
@@ -152,16 +169,17 @@ write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
 ```
 
 
-## 5. Calculate the differences  
+## 5. Extract zonal stats for the differences.  
 
-In theory, i could get everything done together but it somehow gets too complicated. The names of the input rasters don't follow the same sequence, so i need to reorganize the whole thing. Also in one case there are two years, in the differences, thats absent. There are just too many things to cosnider that it gets overly complicated. Maybe someone will be able to take from here.
+In theory, i could get everything done on a single run together but it somehow gets too complicated. The names of the input rasters don't always follow the same sequence, and sometiomes need to be rearranged. 
+There are two main cases: dealing with two or more different  sets of layers (eg one for each year). The second a case with on;ly one set (dealing wit the differneces for example). This is somethign that is really not that complicated and could be organized/simplified here, but needs some work that is not priority right now.
 
 I will have to review this part. Ideally, i should get everything done together but the year issue made it tricky. Easier to do each on its owrn, the problem is that there is still too much manual handling. Eventually this should be generalized.
 
 ```{r compute stats diff, eval=FALSE, include=FALSE}
 
-# load the polygons with the new attributes to add new 
-#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES'
+# set the path and load the rasters with the differences that we calcualted in step 3
+#build paths to files
 inpath <- here('input_ES')
 inpath <- paste0(inpath, "/", 'change_calc')
 
@@ -169,17 +187,18 @@ inpath <- paste0(inpath, "/", 'change_calc')
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 filename<- basename(tiffes)
 
-# Use terra::rast() to load each file as a SpatRaster object
+
 rast_list <- lapply(tiffes, rast)
 service <- c("Coastal Protection", "Nature Access","Nitrogen Export","Pollination","Sediment Export")
 filename<- as_tibble(cbind(service,filename))
-print(filename)
 # We'll compute mean 
 target_stats <- "mean"
 
-# Number of CPU cores to use
+# Number of CPU cores to use. I am still struggling with setting the this using a multicore approach. I have been using mclapply to do this, but the behavior is kind of inconsistent, sometimes it seems to hang without finishing correclty, there is no way to show the progress and error messages are not informative at all. 
+#Also, keep in mind that mclapply on;y works with Unix alike systems (Linux, MacOS but is not availalbe in Widnows. Someone (most likely me) will have to take care of this at some point) 
+
 num.cores <- length(rast_list)
-results_list <- lapply(rast_list, function(r) {
+results_list <- mclapply(rast_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -189,17 +208,11 @@ results_list <- lapply(rast_list, function(r) {
 
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
-  return(res)})#,mc.cores = num.cores)
+  return(res)}),mc.cores = num.cores)
 
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
 
-raster_name <- unique(zonal_df$raster_name)
-service <- c("Coastal Protection", "Nature Access","Nitrogen Export", "Pollination","Sediment Export")
-color <- c("#9e9ac8", "#A57C00", "#2c944c",  "#dd1c77", "#08306b")
-cd <- as_tibble(cbind(raster_name, service, color))
-
-# Very important. This line adds the new attribnutes to the polygons. I could add all here.
 zonal_df <- left_join(zonal_df,cd)
 #zonal_df <- zonal_df[-c(4,6)]
 zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cols), names_from=c(service), values_from = mean)
@@ -230,7 +243,12 @@ pols[[4]] <- pols[[4]] %>%
 
 # Check the new column names
 names(pols[[4]])
+```
 
+
+
+
+```{r extract change in %}
 
 # Function to compute percentage change for all relevant variables in an sf object
 calculate_percentage_change <- function(sf_obj) {
@@ -273,12 +291,9 @@ lapply(seq_along(pols), function(i) {
 })
 
 ```
-# Use terra::rast() to load each file as a SpatRaster object
-rasters_list <- lapply(tiffes, rast)
-vecs <- 
 
 
-## 5 . Get the Barplots
+## 7 . Get the Barplots
 
 ```{r ggplot 2020, echo=FALSE, fig.height=8, fig.width=14}
 #zonal_df <- as_tibble(read.csv(here('output_data', 'zonal_df_global.csv')))
@@ -356,7 +371,7 @@ print(p_2020)
 
 ```
 
-## 5. Here, add plots with the differences 
+## 8.Difference barplots 
 
 ```{r plot diffs, fig.height=8, fig.width=14}
 
@@ -433,7 +448,7 @@ print(p_diff)
 
 ```
 
-## 5. Generate  Maps
+## 9. Generate  Maps
 
 Use ggplot2 and the spatial geometry from our sf object to color each polygon by its statistic of interest. Faceting again by each raster is useful to compare spatial patterns.
 ```{r create maps, eval=FALSE, include=FALSE}
