@@ -1,109 +1,120 @@
-README
-================
+# Overview
 
-# RestorationES
+This repository provides a structured workflow to systematically
+extract, analyze, and visualize **zonal statistics** from global
+ecosystem service (ES) raster datasets for specific spatial units. The
+process is built around the **R `exactextractr` package** and other
+spatial analysis tools. The workflow facilitates extracting summary
+statistics, attaching them as attributes to polygon datasets, and
+generating meaningful visualizations to interpret spatial patterns.
 
-## Overview
+# Objectives
 
-**RestorationES** is an R package designed to estimate the potential
-gains in ecosystem services (ES) from restoration interventions. This
-package integrates modeled griddle ecosystem service estimations, with
-restoration priority pixels to provide actionable insights for landscape
-restoration planning. The primary objective is to estimate the benefits
-of restoration actions in a replicable, transparent, and scientifically
-robust manner.
+-   **Extract zonal statistics** from global raster datasets for
+    predefined spatial units (e.g., countries, watersheds, biomes, or
+    grid cells).
+-   **Label and integrate extracted statistics** into vector datasets
+    for further geospatial analysis.
+-   **Generate visualizations** such as bar plots and maps to represent
+    spatial patterns and temporal changes.
+-   **Automate processing steps** to ensure scalability and consistency
+    across multiple datasets.
 
-## Features
+# Dependencies
 
-- **Multi-Service Integration**: Integrates different modelded grided
-  spatial ecosystem services,: preliminary, and nitrogen sediment
-  retention, pollination, and coastal protection.
-- **Spatial Data Processing**: Tools for aligning, normalizing, and
-  aggregating raster data.
-- **Intervention Analysis**: Evaluates potential ecosystem service gains
-  under various restoration scenarios.
-- **Reproducible Workflows**: Facilitates replicable workflows for
-  multiple regions, such as Brazil, Mexico, Peru, Madagascar, and
-  Vietnam.
+The analysis is conducted using **R** with the following key libraries:
 
-## Data Sources
+# Workflow
 
-The package relies on publicly available datasets and state-of-the-art
-models: - **Ecosystem Service Data**: Chaplin-Kramer et al. (2022),
-*Mapping the Planet’s Critical Natural Assets*. - **InVEST** Integrated
-Valuation of Ecosystem Services and Tradeoffs: Natural Capital Project
-(2024) - **Restoration Potential**: Adjusted Griscom restoration data,
-focusing on priority intervention areas.
+## 1. Load Polygon Data
 
-## Installation
+Polygon datasets can be loaded from local vector files (`.gpkg` format)
+or external sources such as **GADM**. Different spatial aggregations are
+considered: **continents, subregions, countries, biomes, watersheds**.
 
-You can install the package from GitHub as follows:
+## 2. Load Global Raster Data
 
-``` r
-# Install devtools if not already installed
-install.packages("devtools")
+The script reads multiple global raster datasets (GeoTIFFs) representing
+different ecosystem services. Raster file paths are dynamically
+extracted and matched with corresponding **service names** and
+**years**.
 
-# Install RestorationES from GitHub
-devtools::install_github("git@github.com:springinnovate/nbs_op.git")
-```
+## 3. Compute Raster Differences
+
+Calculates **temporal changes** (e.g., **1992 vs. 2020**) for each
+ecosystem service by subtracting raster values. Outputs difference
+rasters are stored for later analysis.
+
+## 4. Extract Zonal Statistics
+
+Uses `exactextractr` to compute **mean values** of each ecosystem
+service per polygon. Supports additional statistics such as **median,
+standard deviation, and quantiles**. Results are merged with the
+original polygon dataset and exported.
+
+## 5. Extract Statistics for Raster Differences
+
+Similar to step 4, but applied to the **difference rasters**. Outputs
+summarized trends in ES changes over time.
+
+## 6. Standardize and Fix Column Names
+
+Automates renaming of columns to maintain consistency across outputs.
+Ensures naming conventions are clear and aligned for visualization and
+GIS integration.
+
+## 7. Generate Visualizations
+
+    library(ggplot2)
+    library(dplyr)
+
+    plot_ecosystem_services <- function(data, year, col) {
+      data_prepped <- data %>%
+        filter(!is.na(mean) & mean > 0 & year == year) %>%
+        mutate(temp_col = reorder_within(!!sym(col), -mean, service))  
+      
+      ggplot(data_prepped, aes(x = temp_col, y = mean, fill = color)) +
+        geom_bar(stat = "identity", show.legend = FALSE) +
+        scale_fill_identity() +
+        facet_wrap(~ service, scales = "free") +
+        scale_x_reordered() +  
+        labs(title = paste("Mean Ecosystem Service Values,", year),
+             x = col, y = "Mean Value") +
+        theme_bw()
+    }
 
 # Usage
 
-Below is an example of a typical workflow using the package:
+## Running the Workflow
 
-``` r
-# Load the package
-library(RestorationES)
+    git clone https://github.com/springinnovate/global_NCP.git
+    cd summary-es
 
-# Prepare data for analysis
-aligned_rasters <- align_rasters(raster_list, template)
+Open `summary_es.Rmd` in **RStudio** and execute all sections.
 
-# Normalize raster data
-normalized_raster <- normalize_raster(aligned_rasters)
+## Automating Future Runs
 
-# Calculate aggregated ecosystem services
-combined_raster <- process_intervention_area(normalized_raster)
+To streamline processing: - Convert reusable steps into **functions**
+(e.g., loading rasters, extracting statistics, plotting results). -
+Utilize **parameterized reports** for different spatial aggregations. -
+Leverage **parallel processing** (`mclapply`) for faster execution on
+large datasets.
 
-# Visualize results
-visualize_es(combined_raster, title = "Aggregated Ecosystem Services")
-```
+# Future Improvements
 
-# Methods
-
-## Alignment and Normalization
-
-Raster data is aligned to a consistent resolution and extent, normalized
-to a \[0, 1\] scale, and masked to intervention areas.
-
-## Aggregation
-
-Aggregates multiple ecosystem services to estimate the combined benefits
-of restoration efforts. Weighted or unweighted aggregation is supported,
-depending on user inputs.
-
-## Visualization
-
-Outputs include raster-based visualizations of ecosystem service
-potential, priority areas, and regional comparisons.
-
-# Contributing
-
-We welcome contributions! If you would like to contribute, please:
-
-1.  Fork the repository.
-2.  Create a feature branch (git checkout -b feature-name).
-3.  Submit a pull request.
-
-For bug reports or feature requests, please open an issue in the GitHub
-repository.
+-   Implement dynamic service name detection based on raster filenames.
+-   Improve handling of **multi-country territories** and **small island
+    states**.
+-   Expand statistical options beyond mean values (e.g., quantiles,
+    uncertainty metrics).
 
 # License
 
-This project is licensed under the MIT License. See the LICENSE file for
-details.
+This project is licensed under the **MIT License**.
 
-Acknowledgments
+# Contributors
 
-Special thanks to the team for guidance and support, as well as
-contributors to foundational data sources such as Chaplin-Kramer et
-al. (2022) and Griscom restoration models.
+-   **Jeronimo Rodriguez-Escobar** (Primary Author)
+
+For any questions or contributions, feel free to open an issue or submit
+a pull request.
