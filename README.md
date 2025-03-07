@@ -1,3 +1,9 @@
+---
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
 # Overview
 
 This repository provides a structured workflow to systematically
@@ -65,30 +71,34 @@ GIS integration.
 
 ## 7. Generate Visualizations
 
-    library(ggplot2)
-    library(dplyr)
+```         
+library(ggplot2)
+library(dplyr)
 
-    plot_ecosystem_services <- function(data, year, col) {
-      data_prepped <- data %>%
-        filter(!is.na(mean) & mean > 0 & year == year) %>%
-        mutate(temp_col = reorder_within(!!sym(col), -mean, service))  
-      
-      ggplot(data_prepped, aes(x = temp_col, y = mean, fill = color)) +
-        geom_bar(stat = "identity", show.legend = FALSE) +
-        scale_fill_identity() +
-        facet_wrap(~ service, scales = "free") +
-        scale_x_reordered() +  
-        labs(title = paste("Mean Ecosystem Service Values,", year),
-             x = col, y = "Mean Value") +
-        theme_bw()
-    }
+plot_ecosystem_services <- function(data, year, col) {
+  data_prepped <- data %>%
+    filter(!is.na(mean) & mean > 0 & year == year) %>%
+    mutate(temp_col = reorder_within(!!sym(col), -mean, service))  
+  
+  ggplot(data_prepped, aes(x = temp_col, y = mean, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    facet_wrap(~ service, scales = "free") +
+    scale_x_reordered() +  
+    labs(title = paste("Mean Ecosystem Service Values,", year),
+         x = col, y = "Mean Value") +
+    theme_bw()
+}
+```
 
 # Usage
 
 ## Running the Workflow
 
-    git clone https://github.com/springinnovate/global_NCP.git
-    cd summary-es
+```         
+git clone https://github.com/springinnovate/global_NCP.git
+cd summary-es
+```
 
 Open `summary_es.Rmd` in **RStudio** and execute all sections.
 
