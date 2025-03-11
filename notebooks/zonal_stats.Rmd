@@ -229,8 +229,8 @@ zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, y
 
 poly <- left_join(poly, zonal_wide, by= col)
 st_write(poly, here('vector', set), append = FALSE) 
-write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
-
+write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv'))),
+,
 ```
 
 
@@ -277,7 +277,7 @@ cd <- as_tibble(cbind(raster_name, service, color))
 
 # add color ands service columns
 zonal_df <- left_join(zonal_df,cd)
-# Add the year. this uses the original filenames to extract the year, but miht be too hardcoded for generalization 
+# Add the year. this uses the original filenames to extract the year, but miht be too hardcoded for, generalization 
 
 zonal_df <- zonal_df %>% mutate(year = case_when(grepl("1992", raster_name) ~ "1992", grepl("2020", raster_name) ~ "2020", grepl("diff", raster_name) ~ "diff",TRUE ~ NA_character_ )) # Ensures NA values are treated as characters
 
@@ -319,7 +319,7 @@ filename<- as_tibble(cbind(service,filename))
 # We'll compute mean 
 target_stats <- "mean"
 
-# Number of CPU cores to use. I am still struggling with setting the this using a multicore approach. I have been using mclapply to do this, but the behavior is kind of inconsistent, sometimes it seems to hang without finishing correclty, there is no way to show the progress and error messages are not informative at all. 
+# Number of CPU cores to use. I am still struggling with setting the this using a multicore approach. I have been using ,mclapply to do this, but the behavior is kind of inconsistent, sometimes it seems to hang without finishing correclty, there is no way to show the progress and error messages are not informative at all. 
 #Also, keep in mind that mclapply on;y works with Unix alike systems (Linux, MacOS but is not availalbe in Widnows. Someone (most likely me) will have to take care of this at some point) 
 
 num.cores <- length(rast_list)
@@ -364,13 +364,19 @@ rast_list1 <- lapply(tiffes1, rast)
 rast_list2 <- lapply(tiffes2, rast)
 pot_s_loss <- mclapply(seq_along(rast_list2),function(i){
   rast_list2[[i]]/(rast_list2[[i]]-rast_list1[[i]])}, mc.cores=num_cores)
+
+
+
+year <- c(1992,1995,1998,2001,2004)
+
+pot_s_loss <- Map(function(r1,r2) r2/(r2-r1), rast_list1, rast_list2)
+
+map(1:length(pot_s_loss), function(x) writeRaster(pot_s_loss[[x]], paste0(inpath, '/', 'pot_s_loss_', year[x],'.tif')))
+
   
-
-
-
 ```
 
-
+`
 
 
 ## **7. Compute Zonal Statistics for Differences**
