@@ -43,7 +43,7 @@ This can be done using spatial vector files stored locally or using existing onl
 # This assumes that the polygon files are stored in the same working directory. and have the names assigned here. Feel free to change it if necessary.  
 # The differnet subsets except for biomes are obtained from the dataset provided by Justin to which a "dissolve by attribute" operation has been performed. This is better done in Python/QGis/ArcGis, R is not great at that. 
 # By Continent
-#set <- 'continent.gpkg' 
+set <- 'Continent.gpkg' 
 # By Subregion
 #set <- 'subregion.gpkg'
 # By individual territory; "Country" 
@@ -60,7 +60,11 @@ poly <- st_read(here('vector', set))
 # 1. how would it actually look when displaying on a GIS (all the original polygons will be maintained). This is manageable. Waht would this imply for the subsequent analyisis.
 # 2. Practicality considerations. The final output, with all services, grouping, metrics, years can end up having too many columns at at some point that can become hard to manage. Just naming columns can be a hassle. 
 
+<<<<<<< HEAD
 col <- "id"
+=======
+col <- 'continent'
+>>>>>>> ea226d7 (-extracting metrics export 92-2020 pero spatial unit. Testing withh the new data.)
 cols <- col
 ```
 
@@ -118,7 +122,11 @@ map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'c
 ```
 
 # Prepare Potential of N retention data.
+<<<<<<< HEAD
 
+=======
+ wee did it once, no neeit again for the et exportessary for the new data tha Becky wat
+>>>>>>> ea226d7 (-extracting metrics export 92-2020 pero spatial unit. Testing withh the new data.)
 
 ```{r getpotential N retention , eval=FALSE, include=FALSE}
 inpath <- here("input_ES", "Pot_Sed_retention")
@@ -166,7 +174,11 @@ writeRaster(diff, paste0(inpath, '/', 'pot_Sed_r_diff.tif'), overwrite)
 
 ```
 
+<<<<<<< HEAD
 
+=======
+## Prpepare the yearly summamry data
+>>>>>>> ea226d7 (-extracting metrics export 92-2020 pero spatial unit. Testing withh the new data.)
 
 ## 4. Compute Zonal Statistics for each target raster/year 
 
