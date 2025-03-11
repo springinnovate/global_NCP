@@ -45,29 +45,22 @@ library(parallel)       # Parallel computing
 # By Continent
 #set <- 'Continent.gpkg' 
 # By Subregion
-set <- 'subregion.gpkg'
+#set <- 'subregion.gpkg'
 # By individual territory; "Country" 
-#set <- 'Country.gpkg'
+set <- 'Country.gpkg'
 # By WWF biome
-# set <- 'Biome.gpkg' 
-
+## set <- 'Biome.gpkg' 
 
 poly <- st_read(here('vector', set)) 
 
-# Set the column with the attribute to group 
-# Test this, it might be possible that it is not necesary to dissolve and create the individual vector files in advance, but just change the column. However, i need to check how would it work when joining the new results as attributes. 
-# There would be two things to consider here:
-# 1. how would it actually look when displaying on a GIS (all the original polygons will be maintained). This is manageable. Waht would this imply for the subsequent analyisis.
-# 2. Practicality considerations. The final output, with all services, grouping, metrics, years can end up having too many columns at at some point that can become hard to manage. Just naming columns can be a hassle. 
-
-#col <- "id"
+col <- "id"
 #col <- "WWF_biome"
 #col <- 'continent'
 col <- 'subregion'
 cols <- col
 ```
 
-## **4. Load Global Raster Data**
+## **4. Load Global ES as Raster Data**
 
 don't run this anymore ,for 92-2020 we have the basid services, now we are adding the new ones
 ```{r load raster es, eval=FALSE, include=FALSE}
@@ -86,7 +79,7 @@ filename <- as_tibble(cbind(service, filename, year))
 ```
 
 
-## **5. Compute Raster Differences**
+## **5. Compute Differences**
 ```{r get differences, eval=FALSE, include=FALSE}
 outpath <- here("input_ES")
 m_index <- length(rasters_list) %/% 2
@@ -108,7 +101,8 @@ map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/chang
 
 
 ## **6. Compute Zonal Statistics for Each Year**
-# Prepare Potential of N retention data.
+
+### 6.1  Prepare Potential of N retention data.
 
 ```{r getpotential N retention , eval=FALSE, include=FALSE}
 inpath <- here("input_ES", "Pot_Sed_retention")
@@ -156,10 +150,28 @@ writeRaster(diff, paste0(inpath, '/', 'pot_Sed_r_diff.tif'), overwrite)
 
 ```
 
+### 6.2 Calculate new data modeled sediment retention layers
 
-## Prpepare the yearly summamry data
+Why am i doing this?
 
-## 4. Compute Zonal Statistics for each target raster/year 
+```{r load calculate sed retention potential raster es, eval=FALSE, include=FALSE}
+inpath <- here('input_ES')
+
+tiffes <- file.path(inpath, list.files(inpath, pattern= 'tif$'))
+filename <- basename(tiffes)
+
+# Load raster files
+rasters_list <- lapply(tiffes, rast)
+
+# Define service names and colors
+service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each=2)
+year <- rep(c(1992,2020), 5)
+filename <- as_tibble(cbind(service, filename, year))
+```
+
+## 7 Prepare the yearly summary data
+
+### 7.1 Compute Zonal Statistics for each target raster/year 
 
 **Note:** Although Exact exactextractr is used  here ot obtain zonal summary statistics, in this case the mean value for each polygon, it can also return a list of dataframes, one per feature with the cell values from pte input raster. This can be very useful for further analysis. 
 Besides, it is also possible to include user-defined functions (somerthing that i am going to use for the USLE analysis).
@@ -213,10 +225,11 @@ write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
 
 
 
-## 4.1. Compute States of Sed Export potential
+### 7.2. Compute States of Sed Export potential
 ```{r compute stats potential, eval=FALSE, include=FALSE}
 #load the data (this assumes 'tiffs' is the list of paths to the files, and that they are in the desired order. Make sure that the dataframe with the labels is correct (filename object)  There is room for improvement here. 
 inpath <- here("input_ES", "Pot_Sed_retention")
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES/Pot_Sed_retention'
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 # Compute zonal stats. Mean for now. Ohers can be added. Cehck extractextractr documentation for a detailed list of stats 
 target_stats <- c("mean")
@@ -226,11 +239,11 @@ tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 tiffes <- tiffes[c(5:7)]
 filename<- basename(tiffes)
 # Use terra::rast() to load each file as a SpatRaster object
-# rasters_list <- lapply(tiffes, rast)
+ rasters_list <- lapply(tiffes, rast)
 # 
-# names(rasters_list[[1]]) <- "diff_export"
+ names(rasters_list[[1]]) <- "diff_export"
 # 
-# rasters_list <- list(diff, psr_92, psr_20)
+ rasters_list <- list(diff, psr_92, psr_20)
 
 
 num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  sequentially, and there is no progress bar available 
@@ -276,7 +289,7 @@ write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
 
 
 
-## 5. Extract zonal stats for the differences.  
+### 7.3. Extract zonal stats for the differences.  
 
 In theory, i could get everything done on a single run together but it somehow gets too complicated. The names of the input rasters don't always follow the same sequence, and sometiomes need to be rearranged. 
 There are two main cases: dealing with two or more different  sets of layers (eg one for each year). The second a case with on;ly one set (dealing wit the differneces for example). This is somethign that is really not that complicated and could be organized/simplified here, but needs some work that is not priority right now.
@@ -332,11 +345,11 @@ st_write(poly, here('vector', set), append = FALSE)
 write.csv(zonal_df, here('output_data', paste0('diffs_',cols, '.csv')))
 ```
 
-## 6. Fix column names
+### 7.4  Fix column names
 
 This is very leikely to not  be necessary anymore. I already fixed the column names
 
-```{r fix column names vectors}
+```{r fix column names vectors, eval=FALSE, include=FALSE}
 inpath <- here('vector')
 
 vecf <- file.path(inpath, list.files(paste0(inpath),pattern= 'gpkg$'))
