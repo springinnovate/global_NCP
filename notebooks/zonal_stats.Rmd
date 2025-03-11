@@ -49,7 +49,15 @@ set <- 'Continent.gpkg'
 # By individual territory; "Country" 
 set <- 'Country.gpkg'
 # By WWF biome
+<<<<<<< HEAD
 ## set <- 'Biome.gpkg' 
+=======
+# set <- 'Biome.gpkg' 
+# by WB Region
+#set <- "World_Bank_Region.gpkg"
+set <- "Country.gpkg"
+
+>>>>>>> 02572fa (innally, single countres. Lilling is temperamental, internet speed a the office is horrible and i think the keyboard ran out of battery here. EEverything wrong in short.)
 
 poly <- st_read(here('vector', set)) 
 
@@ -72,6 +80,8 @@ col <- "id"
 #col <- "WWF_biome"
 #col <- 'continent'
 col <- 'subregion'
+col <- 'region_wb'
+col <- 'id'
 cols <- col
 ```
 
@@ -372,6 +382,28 @@ st_write(poly, here('vector', set), append = FALSE)
 
 write.csv(zonal_df, here('output_data', paste0('diffs_',cols, '.csv')))
 ```
+
+## 8. Calculte export potential
+
+```{r get retention potential per year}
+
+inpath <- here('input_ES', 'mod_sed_ret')
+num_cores <- 5
+
+#load the rasters with the calculated differences 
+tiffes1 <- file.path(inpath, list.files(paste0(inpath),pattern= 'export'))
+tiffes2 <- file.path(inpath, list.files(paste0(inpath),pattern= 'retention'))
+rast_list1 <- lapply(tiffes1, rast)
+rast_list2 <- lapply(tiffes2, rast)
+pot_s_loss <- mclapply(seq_along(rast_list2),function(i){
+  rast_list2[[i]]/(rast_list2[[i]]-rast_list1[[i]])}, mc.cores=num_cores)
+  
+
+
+
+```
+
+
 
 
 ## **7. Compute Zonal Statistics for Differences**
