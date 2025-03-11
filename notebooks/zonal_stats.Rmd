@@ -273,11 +273,6 @@ tiffes <- tiffes[c(5:7)]
 filename<- basename(tiffes)
 # Use terra::rast() to load each file as a SpatRaster object
  rasters_list <- lapply(tiffes, rast)
-# 
- names(rasters_list[[1]]) <- "diff_export"
-# 
- rasters_list <- list(diff, psr_92, psr_20)
-
 
 num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  sequentially, and there is no progress bar available 
 # here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
@@ -297,7 +292,7 @@ results_list <- mclapply(rasters_list, function(r) {
 zonal_df <- do.call(rbind, results_list)
 
 # create a table with the zonal to fill the table
-raster_name <- c(unique(zonal_df$raster_name)
+raster_name <- c(unique(zonal_df$raster_name))
 service <- rep(c("Pot. Sediment Retention"), each = 3)
 color <- rep("#08306b", each=3)
 cd <- as_tibble(cbind(raster_name, service, color))
@@ -378,31 +373,24 @@ st_write(poly, here('vector', set), append = FALSE)
 write.csv(zonal_df, here('output_data', paste0('diffs_',cols, '.csv')))
 ```
 
-### 7.4  Fix column names
 
-This is very leikely to not  be necessary anymore. I already fixed the column names
+## **7. Compute Zonal Statistics for Differences**
+```{r compute stats diff, eval=FALSE, include=FALSE}
+diff_rasters <- file.path(here('input_ES', 'change_calc'), list.files(here('input_ES', 'change_calc'), pattern='tif$'))
+rast_list <- lapply(diff_rasters, rast)
 
-```{r fix column names vectors, eval=FALSE, include=FALSE}
-inpath <- here('vector')
+target_stats <- "mean"
+results_list <- mclapply(rast_list, function(r) {
+  res <- exact_extract(r, poly, fun = target_stats, append_cols = cols)
+  res$raster_name <- names(r)
+  return(res)
+}, mc.cores = length(rast_list))
 
-vecf <- file.path(inpath, list.files(paste0(inpath),pattern= 'gpkg$'))
-vecf <- vecf[-4]
-filename<- basename(vecf)
-grp <- c("Continent", "Country", "Income Group", "World Bank Region", "Biome")
-
-filename<- as_tibble(cbind(grp,filename))
-pols <- lapply(vecf, st_read)
-
-# Rename columns in pols[[2]]
-pols[[4]] <- pols[[4]] %>%
-  rename_with(~ gsub("^mean_", "", gsub("\\.", " ", .x)), starts_with("mean_"))
-
-# Check the new column names
-names(pols[[4]])
+zonal_df <- do.call(rbind, results_list)
+zonal_df <- left_join(zonal_df, filename)
 ```
 
-
-#This might not be necesary anymore, i got the amount of change 
+### 7.X get change in terms of % (do at the end)
 
 ```{r extract change in %}
 
@@ -459,21 +447,6 @@ zonal_df <- left_join(zonal_df, filename)
 zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 1992, 2020)
 ```
 
-## **7. Compute Zonal Statistics for Differences**
-```{r compute stats diff, eval=FALSE, include=FALSE}
-diff_rasters <- file.path(here('input_ES', 'change_calc'), list.files(here('input_ES', 'change_calc'), pattern='tif$'))
-rast_list <- lapply(diff_rasters, rast)
-
-target_stats <- "mean"
-results_list <- mclapply(rast_list, function(r) {
-  res <- exact_extract(r, poly, fun = target_stats, append_cols = cols)
-  res$raster_name <- names(r)
-  return(res)
-}, mc.cores = length(rast_list))
-
-zonal_df <- do.call(rbind, results_list)
-zonal_df <- left_join(zonal_df, filename)
-```
 
 ## **8. Generate Bar Plots**
 ```{r ggplot 2020, echo=FALSE, fig.height=8, fig.width=14}
