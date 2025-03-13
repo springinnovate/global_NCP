@@ -1,0 +1,41 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Produce Change maps
+
+
+
+```{r load data}
+
+inpsath <- '/home/jeronimo/OneDrive/Global_ES_mapping/ESA_LC'
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+filename<- basename(tiffes)
+#set <- 'continent.gpkg' 
+
+raster_list <- lapply(rast,fiffes)
+
+poly <- st_read(here('vector', set)) 
+
+poly <- poly %>% filter(continent=='South America')
+
+
+raster_list <- lapply(raster_list, function(r){
+  r <- crop(r,poly)
+  r <- mask(r,poly)
+}
+
+n_ch_sa <- noch_msk(raster_list, type='nochange')
+
+
+
+
+poly <- 
+# Use terra::rast() to load each file as a SpatRaster object
+
+
+
+
+
+```
