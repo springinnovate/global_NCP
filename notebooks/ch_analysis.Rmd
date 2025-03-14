@@ -3,15 +3,39 @@ title: "R Notebook"
 output: html_notebook
 ---
 
+```{r setup, include=FALSE}
+library(sf)             # Spatial vector operations
+library(dplyr)          # Data manipulation
+library(terra)          # Raster processing
+library(exactextractr)  # Zonal statistics
+library(ggplot2)        # Visualization
+library(forcats)        # Factor reordering
+library(tidytext)
+library(here)           # Managing paths
+library(patchwork)      # Combining plots
+library(tidyr)
+library(parallel)       # Parallel computing
+library(purrr)
+```
 
 
+## **1. Compute Differences**
 
-## **5. Compute Differences**
 
-
-##### NOT RUN #######
 
 ```{r get differences, eval=FALSE, include=FALSE}
+
+# Define service names and colors
+service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination"), each=2)
+year <- rep(c(1992,2020), 6)
+filename <- as_tibble(cbind(service, raster_name, year))
+
+# create a table with the content to fill the table
+color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#A57C00", "#dd1c77"), each=2)
+cd <- as_tibble(cbind(filename, color))
+rm(filename)
+cd
+
 outpath <- here("input_ES")
 m_index <- length(rasters_list) %/% 2
 lab <- unique(service)
@@ -29,7 +53,8 @@ map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/chang
 ```
 
 
-### 6.1  Prepare Potential of Sed retention data.
+
+## 2.  Prepare Potential of Sed retention data.
 
 ```{r getpotential Sed retention , eval=FALSE, include=FALSE}
 inpath <- here("input_ES", "Pot_Sed_retention")
@@ -69,31 +94,36 @@ writeRaster(diff, paste0(inpath, '/', 'pot_Sed_r_diff.tif'), overwrite)
 ```
 
 
-## 8. Calculte export potential
-
+## 3. Calculte export potential
+Here , I need to add the target rasters and organzie them by lists. i think i already did that but need to revisit here
 ```{r get retention potential per year}
 
-inpath <- here('Input_ES', 'mode_set_ret')
+inpath <- here('Input_ES', 'mod_n_ret')
 
 
 #load the rasters with the calculated differences 
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 filename<- basename(tiffes)
-cd
+ # here, adjust to call the correct ones and buld thje corresponding lists.
 
-rast_list <- lapply(tiffes, rast)
+rasters_list <- lapply(tiffes, rast)
 
-# year <- c(1992,1995,1998,2001,2004)
+l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
+l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
+ # test with future_map2 next time to get this to run faster. 
+ year <- c(1992,1995,1998,2001,2004)
 # 
-# pot_s_loss <- Map(function(r1,r2) r2/(r2-r1), rast_list1, rast_list2)
+ pot_s_loss <- Map(function(r1,r2) r2/(r2-r1), rast_list1, rast_list2)
 # 
-# map(1:length(pot_s_loss), function(x) writeRaster(pot_s_loss[[x]], paste0(inpath, '/', 'pot_s_loss_', year[x],'.tif')))
+ map(1:length(pot_s_loss), function(x) writeRaster(pot_s_loss[[x]], paste0(inpath, '/', 'pot_n_loss_', year[x],'.tif')))
 
+ 
+# pending to check: max min values, nas and visuialization
 
 ```
 
 
-Produce Change maps
+Here, i need to think if iu add the new extracted values to the existing polygons or waht to do wit hthat. Variables: potentiaL 
 
 
 
@@ -127,5 +157,47 @@ poly <-
 
 
 
+
+```
+
+
+
+
+### 6.1  Prepare Potential of Sed retention data.
+
+```{r getpotential Sed retention , eval=FALSE, include=FALSE}
+inpath <- here("input_ES", "Pot_Sed_retention")
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+filename<- basename(tiffes)
+# Use terra::rast() to load each file as a SpatRaster object
+
+
+rasters_list <- lapply(tiffes, rast) # why am i doingthis? There is a good reasoner, but now i don't know anymore 
+rcl <- matrix(c(
+  -Inf, 0, NA   # Any value from 0 to Infinity becomes 1
+), ncol = 3, byrow = TRUE)
+
+rasters_list <- lapply(rasters_list, function(r){
+  r <- classify(r,rcl, right=FALSE)
+})
+
+m_index <- length(rasters_list) %/% 2
+#lab <- unique(service)
+l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
+l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
+ # test with future_map2 next time to get this to run faster. 
+
+pot_SedRet1 <- (l1[[2]]-l1[[1]])/l1[[2]]
+
+
+pot_SedRet2 <- (l2[[2]]-l2[[1]])/l2[[2]]
+
+psr_92 <- classify(pot_SedRet1,rcl, right=FALSE)
+psr_20 <- classify(pot_SedRet2,rcl, right=FALSE)
+
+writeRaster(psr_92, paste0(inpath, '/', 'pot_SedRet_92.tif'), overwrite=TRUE)
+writeRaster(psr_20, paste0(inpath, '/', 'pot_SedRet_20.tif'), overwrite=TRUE)
+diff <- psr_92 - psr_20
+writeRaster(diff, paste0(inpath, '/', 'pot_Sed_r_diff.tif'), overwrite)
 
 ```
