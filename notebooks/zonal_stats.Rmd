@@ -11,7 +11,7 @@ output:
 # Overview
 This document outlines the steps to systematically extract zonal statistics from global **Ecosystem Service (ES)** raster datasets for specific spatial units (e.g., countries, biomes, watersheds, etc.).
 
-## **1. Objectives**
+## 1. Objectives
 1. Extract zonal statistics from ES global raster datasets using the `exactextractr` package.
 2. Integrate extracted statistics as attributes to spatial polygon datasets.
 3. Generate visualizations (bar plots, maps) for spatial representation of results.
@@ -20,7 +20,7 @@ This document outlines the steps to systematically extract zonal statistics from
 - Dependencies and overlapping regions (e.g., GB, France) need special handling.
 - Small island nations and unique geographic cases require additional checks.
 
-## **2. Load Required Libraries**
+
 ```{r setup, include=FALSE}
 library(sf)             # Spatial vector operations
 library(dplyr)          # Data manipulation
@@ -36,7 +36,9 @@ library(parallel)       # Parallel computing
 library(purrr)
 ```
 
-## **3. Load Polygon Data**
+# 2. Prepare Input data
+
+## 2.1. Load Polygon Data
 
 
 This assumes that the polygon files are stored in the same working directory. Feel free to change it if necessary.  The different subsets except for biomes are obtained from the dataset provided by Justin to which a "dissolve by attribute" operation has been performed. This is better done in Python/QGis/ArcGis, R is not great at that. 
@@ -49,34 +51,38 @@ This assumes that the polygon files are stored in the same working directory. Fe
 #set <- 'Continent.gpkg' 
 # By Subregion
 #set <- 'subregion.gpkg'
+# By Income Group
+set <- "Income_Group.gpkg"
+
 # By individual territory; "Country" 
 #set <- 'Country.gpkg'
-#set <- "Income_Group.gpkg"
 # By WWF biome
  set <- 'Biome.gpkg' 
 # by WB Region
 #set <- "World_Bank_Region.gpkg"
-
 # load polygons
 poly <- st_read(here('vector', set)) 
+poly <- poly[1]
 
 # select column with the asttribute to iterate through.
 #col <- "id"
 col <- "WWF_biome"
 #col <- 'continent'
+#col <- "WWF_biome"
+#col <- 'continent'
+col <- "income_grp"
 #col <- 'subregion'
 #col <- 'region_wb'
-#col <- "income_grp"
-#col <- 'id'
 cols <- col
 ```
 
-## **4. Load Global ES as Raster Data**
+## 2.2 Load Global ES as Raster Data**
 
 service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination")
 ```{r load raster es, include=FALSE}
 inpath <- here('input_ES')
 
+inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES"
 tiffes <- file.path(inpath, list.files(inpath, pattern= 'tif$'))
 filename <- basename(tiffes)
 raster_name <- gsub(".tif$", "", filename)
@@ -95,72 +101,12 @@ rm(filename)
 cd
 ```
 
-## **5. Compute Differences**
 
+# 3. Extract Zonal Statis per Saptila Unit
 
-##### NOT RUN #######
+Compute Zonal Statistics for each target raster/year 
 
-```{r get differences, eval=FALSE, include=FALSE}
-outpath <- here("input_ES")
-m_index <- length(rasters_list) %/% 2
-lab <- unique(service)
-lab <- gsub(" ", "_", lab)
-
-
-l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
-l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
- # test with future_map2 next time to get this to run faster. 
-
-diffs <- map2(l2, l1, ~ .x - .y)
-
-# Export difference rasters
-map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/change_calc/", lab[x], '_diff.tif'),overwrite=TRUE))
-```
-
-
-### 6.1  Prepare Potential of Sed retention data.
-
-```{r getpotential Sed retention , eval=FALSE, include=FALSE}
-inpath <- here("input_ES", "Pot_Sed_retention")
-tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
-filename<- basename(tiffes)
-# Use terra::rast() to load each file as a SpatRaster object
-
-
-rasters_list <- lapply(tiffes, rast) # why am i doingthis? There is a good reasoner, but now i don't know anymore 
-rcl <- matrix(c(
-  -Inf, 0, NA   # Any value from 0 to Infinity becomes 1
-), ncol = 3, byrow = TRUE)
-
-rasters_list <- lapply(rasters_list, function(r){
-  r <- classify(r,rcl, right=FALSE)
-})
-
-m_index <- length(rasters_list) %/% 2
-#lab <- unique(service)
-l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
-l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
- # test with future_map2 next time to get this to run faster. 
-
-pot_SedRet1 <- (l1[[2]]-l1[[1]])/l1[[2]]
-
-
-pot_SedRet2 <- (l2[[2]]-l2[[1]])/l2[[2]]
-
-psr_92 <- classify(pot_SedRet1,rcl, right=FALSE)
-psr_20 <- classify(pot_SedRet2,rcl, right=FALSE)
-
-writeRaster(psr_92, paste0(inpath, '/', 'pot_SedRet_92.tif'), overwrite=TRUE)
-writeRaster(psr_20, paste0(inpath, '/', 'pot_SedRet_20.tif'), overwrite=TRUE)
-diff <- psr_92 - psr_20
-writeRaster(diff, paste0(inpath, '/', 'pot_Sed_r_diff.tif'), overwrite)
-
-```
-
-
-## 7 Prepare the yearly summary data
-
-### 7.1 Compute Zonal Statistics for each target raster/year 
+## 3.1 Global ES for 1992 and 2020
 
 **Note:** Although Exact exactextractr is used  here ot obtain zonal summary statistics, in this case the mean value for each polygon, it can also return a list of dataframes, one per feature with the cell values from pte input raster. This can be very useful for further analysis. 
 Besides, it is also possible to include user-defined functions (somerthing that i am going to use for the USLE analysis).
@@ -197,14 +143,16 @@ zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name),
 zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
 # adjust column names #
 
-######### HERE: Include a way/convention to adjust the column names autmatically. Saves work and keeps consistency. I had to do this in Stpe 6, but this is not organized. should be done herer bedore exporting
+######### HERE: Include a way/convention to adjust the column names autmatically. Saves work and keeps consistency. I had to do this in Stpe 6, but this is not organized. should +be done herer bedore exporting
 
 poly <- left_join(poly, zonal_wide, by= col)
 st_write(poly, here('vector', set), append = FALSE) 
 write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
 
 ```
-### 7.3. Extract zonal stats for the differences.  
+
+
+### 3.2. Zonal stats for the differences.  
 
 In theory, i could get everything done on a single run together but it somehow gets too complicated. The names of the input rasters don't always follow the same sequence, and sometiomes need to be rearranged. 
 There are two main cases: dealing with two or more different  sets of layers (eg one for each year). The second a case with on;ly one set (dealing wit the differneces for example). This is somethign that is really not that complicated and could be organized/simplified here, but needs some work that is not priority right now.
@@ -215,9 +163,9 @@ I will have to review this part. Ideally, i should get everything done together 
 
 # set the path and load the rasters with the differences that we calcualted in step 3
 #build paths to files
-inpath <- here('input_ES')
+#inpath <- here('input_ES')
 inpath <- paste0(inpath, "/", 'change_calc')
-
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES/change_calc'
 # load the rasters with the calculated differences 
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 filename<- basename(tiffes)
@@ -259,12 +207,12 @@ poly <- left_join(poly, zonal_wide, by= cols)
 st_write(poly, here('vector', set), append = FALSE) 
 
 zonal_df <- rbind(zonal_df, zonal_df_diff)
-
-
-write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
+write.csv(zonal_df, here('output_data', paste0('zonal_df_', col, '.csv')))
 ```
 
-### 7.X get change in terms of % (do at the end)
+
+
+### 3.3 get change in terms of % (do at the end)
 
 
 
@@ -299,13 +247,12 @@ poly <- calculate_percentage_change(poly)
 # Check the updated column names
 
 # get pct as standalone data to add to the table
-
 plt <- st_drop_geometry(poly)
 plt  <- plt %>%
   select(1, contains("pct"))
 
 write.csv(plt, here('output_data', paste0('pct_chg_',cols, '.csv')))
 
-#st_write(poly, here('vector', set), append = FALSE) 
+st_write(poly, here('vector', set), append = FALSE) 
 ```
 
