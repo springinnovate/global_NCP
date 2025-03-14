@@ -46,13 +46,14 @@ This assumes that the polygon files are stored in the same working directory. Fe
 # Set attribute column for analysis
  
 # By Continent
-set <- 'Continent.gpkg' 
+#set <- 'Continent.gpkg' 
 # By Subregion
 #set <- 'subregion.gpkg'
 # By individual territory; "Country" 
 #set <- 'Country.gpkg'
+#set <- "Income_Group.gpkg"
 # By WWF biome
-# set <- 'Biome.gpkg' 
+ set <- 'Biome.gpkg' 
 # by WB Region
 #set <- "World_Bank_Region.gpkg"
 
@@ -61,17 +62,18 @@ poly <- st_read(here('vector', set))
 
 # select column with the asttribute to iterate through.
 #col <- "id"
-#col <- "WWF_biome"
-col <- 'continent'
+col <- "WWF_biome"
+#col <- 'continent'
 #col <- 'subregion'
 #col <- 'region_wb'
+#col <- "income_grp"
 #col <- 'id'
 cols <- col
 ```
 
 ## **4. Load Global ES as Raster Data**
 
-
+service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination")
 ```{r load raster es, include=FALSE}
 inpath <- here('input_ES')
 
@@ -125,7 +127,7 @@ filename<- basename(tiffes)
 # Use terra::rast() to load each file as a SpatRaster object
 
 
-rasters_list <- lapply(tiffes, rast)
+rasters_list <- lapply(tiffes, rast) # why am i doingthis? There is a good reasoner, but now i don't know anymore 
 rcl <- matrix(c(
   -Inf, 0, NA   # Any value from 0 to Infinity becomes 1
 ), ncol = 3, byrow = TRUE)
@@ -230,7 +232,7 @@ target_stats <- "mean"
 
 # Iterate function over the rasters
 num.cores <- length(rasters_list)
-results_list <- mclapply(rasters_list, function(r) {
+results_list <- lapply(rasters_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -240,7 +242,7 @@ results_list <- mclapply(rasters_list, function(r) {
 
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
-  return(res)},mc.cores = num.cores)
+  return(res)})#,mc.cores = num.cores)
 
 # Combine results from all rasters into one data frame
 zonal_df_diff <- do.call(rbind, results_list)
