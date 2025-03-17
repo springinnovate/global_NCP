@@ -217,7 +217,7 @@ raster_name <- gsub(".tif$", "", filename)
 rasters_list <- lapply(tiffes, rast)
 # Define service names and colors
 #service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination"), each=2)
-year <- c(1992,1995,198,2001,2004)
+year <- c(1992,1995,1998,2001,2004)
 filename <- as_tibble(cbind(raster_name, year))
 
 ```
@@ -238,19 +238,79 @@ results_list <- mclapply(rasters_list, function(r) {
   res$raster_name <- r_name
   return(res)},mc.cores = num.cores)
 
+
+
+results_list <- Map(function(df,y)  {
+  df$year <- y
+  return(df)
+}, results_list, year) 
+
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
+
+
+
+zonal_df <- as_tibble(zonal_df)
+
+
+
+```
+
+
+
+```{r tinmeseries plot}
+
+library(ggplot2)
+
+# Create the line plot
+ggplot(zonal_df, aes(x = year, y = mean, color = subregion, group = subregion)) +
+  geom_line(size = 1) +          # Add lines for each subregion
+  geom_point(size = 2) +         # Add points for visibility
+  labs(
+    title = "Ecosystem Service Trends by Subregion",
+    x = "Year",
+    y = "Mean Value"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")  # Adjust legend position
+```
+```{r faceted plot fig.height=12, fig.width=14}
+
+
+ggplot(zonal_df, aes(x = year, y = mean, group = subregion)) +
+  geom_line(size = 1, color = "blue") +
+  geom_point(size = 2, color = "red") +
+  facet_wrap(~ subregion, scales = "free_y", ncol = 4) +
+  labs(
+    title = "Pot N Loss by Subregion",
+    x = "Year",
+    y = "Mean Value"
+  ) +
+  theme(
+    legend.position = "right",
+    text = element_text(size = 12),  # Reduce overall text size
+    axis.text.x = element_text(size = 10, angle = 45, hjust = 1),  # Adjust x-axis labels
+    axis.text.y = element_text(size = 6),  # Adjust y-axis labels
+    legend.text = element_text(size = 6),  # Reduce legend font size
+    legend.title = element_text(size = 6),  # Adjust legend title size
+    strip.text = element_text(size = 8)  # Adjust facet labels (if using facets)
+  )
+
+  
+
+```
+
+
+
+
 
 # add color and service columns
 zonal_df <- left_join(zonal_df,cd)
 # Add the year. this uses the original filenames to extract the year, but might be too hardcoded for generalization 
 
-zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
-                          1992, 
-                          ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
 
 
-zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=year, values_from = mean)
 # adjust column names #
 
 ######### HERE: Include a way/convention to adjust the column names autmatically. Saves work and keeps consistency. I had to do this in Stpe 6, but this is not organized. should +be done herer bedore exporting
@@ -261,6 +321,7 @@ write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
 
 
 
+zonal_df
 
 
 
