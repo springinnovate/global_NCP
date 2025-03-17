@@ -70,7 +70,9 @@ rcl <- matrix(c(
 
 rasters_list <- lapply(rasters_list, function(r){
   r <- classify(r,rcl, right=FALSE)
-})
+},mc.cores = num.cores))
+
+
 
 m_index <- length(rasters_list) %/% 2
 #lab <- unique(service)
@@ -98,32 +100,167 @@ writeRaster(diff, paste0(inpath, '/', 'pot_Sed_r_diff.tif'), overwrite)
 Here , I need to add the target rasters and organzie them by lists. i think i already did that but need to revisit here
 ```{r get retention potential per year}
 
-inpath <- here('Input_ES', 'mod_n_ret')
+inpath <- here('input_ES', 'mod_n_ret')
 
 
 #load the rasters with the calculated differences 
-tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'global'))
+tiffes <- tiffes[-c(1,3,5,9,11,15)]
+tiffes <- tiffes[c(1,6,2,7,3,8,4,9,5,10)]
 filename<- basename(tiffes)
  # here, adjust to call the correct ones and buld thje corresponding lists.
 
 rasters_list <- lapply(tiffes, rast)
+rcl <- matrix(c(
+  -Inf, 0, NA,    # Values strictly less than 0 become NA
+  5000, Inf, NA   # Values greater than 3000 become NA
+), ncol = 3, byrow = TRUE)
+
+r2 <- classify(rasters_list[[2]],rcl)
+writeRaster(r2, paste0(inpath, '/', names(r2), '_rec.tif'))
+r2 <- classify(rasters_list[[3]],rcl)
+writeRaster(r2, paste0(inpath, '/', names(r2), '_rec.tif'))
+r2 <- classify(rasters_list[[4]],rcl)
+writeRaster(r2, paste0(inpath, '/', names(r2), '_rec.tif'))
+r2 <- classify(rasters_list[[5]],rcl)
+writeRaster(r2, paste0(inpath, '/', names(r2), '_rec.tif'))
+r2 <- classify(rasters_list[[6]],rcl)
+writeRaster(r2, paste0(inpath, '/', names(r2), '_rec.tif'))
+r2 <- classify(rasters_list[[7]],rcl)
+writeRaster(r2, paste0(inpath, '/', names(r2), '_rec.tif'))
+r2 <- classify(rasters_list[[8]],rcl)
+writeRaster(r2, paste0(inpath, '/', names(r2), '_rec.tif'))
+r2 <- classify(rasters_list[[9]],rcl)
+writeRaster(r2, paste0(inpath, '/', names(r2), '_rec.tif'))
+r2 <- classify(rasters_list[[10]],rcl)
+writeRaster(r2, paste0(inpath, '/', names(r2), '_rec.tif'))
+
+
+
+rasters_list2 <- lapply(rasters_list, function(r){
+  r <- classify(r,rcl)
+  return(r)
+})#, mc.cores = 10)
+
+map(1:length(rasters_list2), function(x) writeRaster(rasters_list[[x]], paste0(inpath, '/', names(rasters_list[[x]]), '_rec.tif')))
+
+rasters_list <- list(r1,r)
+
+
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'rec'))
+tiffes <- tiffes[c(1,6,2,7,3,8,4,9,5,10)]
+filename<- basename(tiffes)
+ # here, adjust to call the correct ones and buld thje corresponding lists.
+
+rasters_list <- lapply(tiffes, rast)
+
 
 l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
 l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
  # test with future_map2 next time to get this to run faster. 
  year <- c(1992,1995,1998,2001,2004)
 # 
- pot_s_loss <- Map(function(r1,r2) r2/(r2-r1), rast_list1, rast_list2)
+ pot_s_loss <- Map(function(r1,r2) r2/(r2+r1), l1,l2)
 # 
- map(1:length(pot_s_loss), function(x) writeRaster(pot_s_loss[[x]], paste0(inpath, '/', 'pot_n_loss_', year[x],'.tif')))
+ map(1:length(pot_s_loss), function(x) writeRaster(pot_s_loss[[x]], paste0(inpath, '/', 'pot_n_loss_', year[x],'2.tif')))
 
  
 # pending to check: max min values, nas and visuialization
 
 ```
+```{r load poly]}
+# Read spatial polygon dataset
+# Set attribute column for analysis
+ 
+# By Continent
+#set <- 'Continent.gpkg' 
+# By Subregion
+set <- 'subregion.gpkg'
+# By Income Group
+# set <- "Income_Group.gpkg"
+# By individual territory; "Country" 
+#set <- 'Country.gpkg'
+# By WWF biome
+# set <- 'Biome.gpkg' 
+# by WB Region
+#set <- "World_Bank_Region.gpkg"
+# load polygons
+poly <- st_read(here('vector', set)) 
+poly <- poly[1]
 
-
+# select column with the asttribute to iterate through.
+#col <- "id"
+#col <- "WWF_biome"
+#col <- 'continent'
+#col <- "WWF_biome"
+#col <- 'continent'
+#col <- "income_grp"
+col <- 'subregion'
+#col <- 'region_wb'
+cols <- col
+```
 Here, i need to think if iu add the new extracted values to the existing polygons or waht to do wit hthat. Variables: potentiaL 
+
+```{r load raster es, include=FALSE}
+inpath <- here('input_ES', 'mod_n_ret')
+
+
+#load the rasters with the calculated differences 
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern='pot'))
+
+inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES"
+tiffes <- file.path(inpath, list.files(inpath, pattern= 'tif$'))
+filename <- basename(tiffes)
+raster_name <- gsub(".tif$", "", filename)
+
+# Load raster files
+rasters_list <- lapply(tiffes, rast)
+# Define service names and colors
+#service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination"), each=2)
+year <- c(1992,1995,198,2001,2004)
+filename <- as_tibble(cbind(raster_name, year))
+
+```
+
+```{r compute stats 1, message=TRUE, include=FALSE}
+target_stats <- c("mean")
+num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  sequentially, and there is no progress bar available 
+# here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
+
+results_list <- mclapply(rasters_list, function(r) {
+  # Perform exact extraction
+  # - append_cols = "country" retains the country identifier with each result
+  res <- exact_extract(r, poly,
+                       fun = target_stats,
+                       append_cols = cols)
+  r_name <- names(r)
+  # Add a column labeling which raster these results are from
+  res$raster_name <- r_name
+  return(res)},mc.cores = num.cores)
+
+# Combine results from all rasters into one data frame
+zonal_df <- do.call(rbind, results_list)
+
+# add color and service columns
+zonal_df <- left_join(zonal_df,cd)
+# Add the year. this uses the original filenames to extract the year, but might be too hardcoded for generalization 
+
+zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
+                          1992, 
+                          ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
+
+
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
+# adjust column names #
+
+######### HERE: Include a way/convention to adjust the column names autmatically. Saves work and keeps consistency. I had to do this in Stpe 6, but this is not organized. should +be done herer bedore exporting
+
+poly <- left_join(poly, zonal_wide, by= col)
+st_write(poly, here('vector', set), append = FALSE) 
+write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
+
+
+
 
 
 
