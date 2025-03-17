@@ -46,33 +46,34 @@ This assumes that the polygon files are stored in the same working directory. Fe
 ```{r load polygons, eval=FALSE, include=FALSE}
 # Read spatial polygon dataset
 # Set attribute column for analysis
- 
+
+# By individual territory; "Country" 
+#set <- 'Country.gpkg'
 # By Continent
 #set <- 'Continent.gpkg' 
 # By Subregion
 #set <- 'subregion.gpkg'
-# By Income Group
-set <- "Income_Group.gpkg"
-# By individual territory; "Country" 
-#set <- 'Country.gpkg'
+## By Income Group
+#set <- "Income_Group.gpkg"
 # By WWF biome
-# set <- 'Biome.gpkg' 
+ set <- 'Biome.gpkg' 
 # by WB Region
-#set <- "World_Bank_Region.gpkg"
+set <- "World_Bank_Region.gpkg"
 # load polygons
 poly <- st_read(here('vector', set)) 
-poly <- poly[1]
+#poly <- poly[1]
 
 # select column with the asttribute to iterate through.
-#col <- "id"
-#col <- "WWF_biome"
-#col <- 'continent'
-#col <- "WWF_biome"
-#col <- 'continent'
-col <- "income_grp"
+col <- "id"
+col <- 'continent'
 #col <- 'subregion'
-#col <- 'region_wb'
+col <- "income_grp"
+col <- "WWF_biome"
+#col <- "WWF_biome"
+col <- 'region_wb'
 cols <- col
+
+
 ```
 
 ## 2.2 Load Global ES as Raster Data**
@@ -255,6 +256,77 @@ write.csv(plt, here('output_data', paste0('pct_chg_',cols, '.csv')))
 st_write(poly, here('vector', set), append = FALSE) 
 ```
 
+
+### 3.4 Potential Retention and Export
+
+```{r extract pot sed Retenion}
+
+# set the path and load the rasters with the differences that we calcualted in step 3
+#build paths to files
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES/Pot_Sed_retention'
+# load the rasters with the calculated differences 
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+tiffes <- tiffes[c(3,2,1)]
+filename<- basename(tiffes)
+
+raster_name <- c("Pot_Sed_ret_1992", "Pot_Sed_ret_2020", "Pot_Sed_ret_diff")
+
+rasters_list <- lapply(tiffes, rast)
+rasters_list <- Map(function(r,new_name){
+  names(r) <- new_name
+  return(r)
+  }, rasters_list, raster_name)
+
+year <- rep(c(1992,2020, "diff"))
+# create a table with the content to fill the table
+color <- c("#08606b", "#08606b", "#68606b")
+cd <- as_tibble(cbind(raster_name, color,year))
+rm(filename)
+cd
+
+
+target_stats <- "mean"
+
+# Iterate function over the rasters
+num.cores <- length(rasters_list)
+results_list <- mclapply(rasters_list, function(r) {
+  # Perform exact extraction
+  # - append_cols = "country" retains the country identifier with each result
+  res <- exact_extract(r, poly,
+                       fun = target_stats,
+                       append_cols = cols)
+  r_name <- names(r)
+
+  # Add a column labeling which raster these results are from
+  res$raster_name <- r_name
+  return(res)},mc.cores = num.cores)
+
+# Combine results from all rasters into one data frame
+zonal_df_diff <- do.call(rbind, results_list)
+#Adjust column so i can assemble the whole thing (yearly and difference values) in the same dataframe
+cd <- cd %>% mutate(year='diff')
+
+zonal_df_diff <- left_join(zonal_df_diff,cd)
+#zonal_df <- zonal_df[-c(4,6)]
+zonal_wide <- pivot_wider(zonal_df_diff, id_cols=all_of(cols), names_from=c(raster_name), values_from = mean)
+
+
+zonal_wide <- zonal_wide %>%
+  mutate(Pot_Sed_ret_pct_ch = (Pot_Sed_ret_2020 - Pot_Sed_ret_1992) / Pot_Sed_ret_1992 * 100)
+
+
+
+poly <- left_join(poly, zonal_wide, by= cols)
+st_write(poly, here('vector', set), append = FALSE) 
+write.csv(zonal_df_diff, here('output_data', paste0('pot_sed_ret_df_', col, '.csv')))
+
+```
+
+
+
+rasters_list <- lapply(tiffes, rast)
+service <- c("Coastal Protection", "Nature Access","Nitrogen Export","Pollination","Sediment Export", "Usle")
+service <- gsub(" ", "_", service)
 
 
 
