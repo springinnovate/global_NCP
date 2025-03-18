@@ -175,27 +175,27 @@ l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
 # By Continent
 #set <- 'Continent.gpkg' 
 # By Subregion
-set <- 'subregion.gpkg'
+# set <- 'subregion.gpkg'
 # By Income Group
 # set <- "Income_Group.gpkg"
 # By individual territory; "Country" 
 #set <- 'Country.gpkg'
 # By WWF biome
-# set <- 'Biome.gpkg' 
+set <- 'Biome.gpkg' 
 # by WB Region
 #set <- "World_Bank_Region.gpkg"
 # load polygons
 poly <- st_read(here('vector', set)) 
-poly <- poly[1]
+poly <- poly[c(1,2)]
 
 # select column with the asttribute to iterate through.
 #col <- "id"
 #col <- "WWF_biome"
 #col <- 'continent'
-#col <- "WWF_biome"
+col <- "WWF_biome"
 #col <- 'continent'
 #col <- "income_grp"
-col <- 'subregion'
+#col <- 'subregion'
 #col <- 'region_wb'
 cols <- col
 ```
@@ -208,22 +208,21 @@ inpath <- here('input_ES', 'mod_n_ret')
 #load the rasters with the calculated differences 
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern='pot'))
 
-inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES"
-tiffes <- file.path(inpath, list.files(inpath, pattern= 'tif$'))
+# inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES"
+# tiffes <- file.path(inpath, list.files(inpath, pattern= 'tif$'))
 filename <- basename(tiffes)
 raster_name <- gsub(".tif$", "", filename)
 
 # Load raster files
 rasters_list <- lapply(tiffes, rast)
 # Define service names and colors
-#service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination"), each=2)
 year <- c(1992,1995,1998,2001,2004)
 filename <- as_tibble(cbind(raster_name, year))
 
 ```
 
 ```{r compute stats 1, message=TRUE, include=FALSE}
-target_stats <- c("mean")
+target_stats <- c("mean", "stdev")
 num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  sequentially, and there is no progress bar available 
 # here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
 
@@ -251,14 +250,13 @@ zonal_df <- do.call(rbind, results_list)
 
 
 zonal_df <- as_tibble(zonal_df)
-
-
+write.csv(zonal_df, here('output_data', 'TS_biome.csv'))
 
 ```
 
 
 
-```{r tinmeseries plot}
+```{r timeseries plot}
 
 library(ggplot2)
 
@@ -274,7 +272,7 @@ ggplot(zonal_df, aes(x = year, y = mean, color = subregion, group = subregion)) 
   theme_minimal() +
   theme(legend.position = "right")  # Adjust legend position
 ```
-```{r faceted plot fig.height=12, fig.width=14}
+```{r faceted plot fig.height=18, fig.width=18}
 
 
 ggplot(zonal_df, aes(x = year, y = mean, group = subregion)) +
