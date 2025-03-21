@@ -108,26 +108,26 @@ l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
 ```{r load poly]}
 # Read spatial polygon dataset
 # Set attribute column for analysis
-#set <- 'Country_id.gpkg'
+set <- 'Country_id.gpkg'
 #set <- 'Continent.gpkg' 
 # set <- 'subregion.gpkg'
 # set <- "Income_grp.gpkg"
 # set <- 'Biome.gpkg' 
 #set <- "WB_region.gpkg"
-# set <- "IPBES_subregion.gpkg"
+#set <- "IPBES_subregion.gpkg"
 # load polygons
 poly <- st_read(here('vector', set)) 
-poly <- poly[1]
+poly <- poly[c(1,2)]
 t <- names(poly)
 write.csv(t, here('vector', 'names.csv'))
 # select column with the asttribute to iterate through.
 col <- "id"
 # col <- 'continent'
 # #col <- 'subregion'
-# col <- "income_grp"
+#col <- "income_grp"
 # col <- "WWF_biome"
 #col <- 'region_wb'
-col <- "Sub_Region"
+#col <- "Sub_Region"
 cols <- col
 ```
 Here, i need to think if iu add the new extracted values to the existing polygons or waht to do wit hthat. Variables: potentiaL 
