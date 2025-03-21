@@ -190,7 +190,7 @@ l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
 # By Subregion
 # set <- 'subregion.gpkg'
 # By Income Group
-# set <- "Income_Group.gpkg"
+# set <- "Income_grp.gpkg"
 # By individual territory; "Country" 
 #set <- 'Country.gpkg'
 # By WWF biome
@@ -259,11 +259,18 @@ results_list <- Map(function(df,y)  {
 
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
+zonal_df <- zonal_df %>% mutate(service = "n_ret")
 
+zonal_wide <- pivot_wider(zonal_df, id_cols=c(col), names_from=c(year, service), values_from = c(mean, stdev))
+
+
+poly <- left_join(poly,zonal_wide)
+
+st_write(poly, paste0(here('vector'), '/', cols, '_sdr_chg.gpkg'))
 
 
 zonal_df <- as_tibble(zonal_df)
-write.csv(zonal_df, here('output_data', 'TS_biome.csv'))
+write.csv(zonal_df, here('output_data', 'TS_Biome.csv'))
 
 ```
 
@@ -288,10 +295,10 @@ ggplot(zonal_df, aes(x = year, y = mean, color = subregion, group = subregion)) 
 ```{r faceted plot fig.height=18, fig.width=18}
 
 
-ggplot(zonal_df, aes(x = year, y = mean, group = subregion)) +
+ggplot(zonal_df, aes(x = year, y = mean, group = WWF_biome)) +
   geom_line(size = 1, color = "blue") +
   geom_point(size = 2, color = "red") +
-  facet_wrap(~ subregion, scales = "free_y", ncol = 4) +
+  facet_wrap(~ WWF_biome, scales = "free_y", ncol = 4) +
   labs(
     title = "Pot N Loss by Subregion",
     x = "Year",
@@ -300,7 +307,7 @@ ggplot(zonal_df, aes(x = year, y = mean, group = subregion)) +
   theme(
     legend.position = "right",
     text = element_text(size = 12),  # Reduce overall text size
-    axis.text.x = element_text(size = 10, angle = 45, hjust = 1),  # Adjust x-axis labels
+    axis.text.x = element_text(size = 6, angle = 45, hjust = 1),  # Adjust x-axis labels
     axis.text.y = element_text(size = 6),  # Adjust y-axis labels
     legend.text = element_text(size = 6),  # Reduce legend font size
     legend.title = element_text(size = 6),  # Adjust legend title size
