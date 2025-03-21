@@ -19,82 +19,6 @@ library(purrr)
 ```
 
 
-## **1. Compute Differences**
-
-
-
-```{r get differences, eval=FALSE, include=FALSE}
-
-# Define service names and colors
-service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination"), each=2)
-year <- rep(c(1992,2020), 6)
-filename <- as_tibble(cbind(service, raster_name, year))
-
-# create a table with the content to fill the table
-color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#A57C00", "#dd1c77"), each=2)
-cd <- as_tibble(cbind(filename, color))
-rm(filename)
-cd
-
-outpath <- here("input_ES")
-m_index <- length(rasters_list) %/% 2
-lab <- unique(service)
-lab <- gsub(" ", "_", lab)
-
-
-l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
-l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
- # test with future_map2 next time to get this to run faster. 
-
-diffs <- map2(l2, l1, ~ .x - .y)
-
-# Export difference rasters
-map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/change_calc/", lab[x], '_diff.tif'),overwrite=TRUE))
-```
-
-
-
-## 2.  Prepare Potential of Sed retention data.
-
-```{r getpotential Sed retention , eval=FALSE, include=FALSE}
-inpath <- here("input_ES", "Pot_Sed_retention")
-tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
-filename<- basename(tiffes)
-# Use terra::rast() to load each file as a SpatRaster object
-
-
-rasters_list <- lapply(tiffes, rast)
-rcl <- matrix(c(
-  -Inf, 0, NA   # Any value from 0 to Infinity becomes 1
-), ncol = 3, byrow = TRUE)
-
-rasters_list <- lapply(rasters_list, function(r){
-  r <- classify(r,rcl, right=FALSE)
-},mc.cores = num.cores))
-
-
-
-m_index <- length(rasters_list) %/% 2
-#lab <- unique(service)
-l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
-l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
- # test with future_map2 next time to get this to run faster. 
-
-pot_SedRet1 <- (l1[[2]]-l1[[1]])/l1[[2]]
-
-
-pot_SedRet2 <- (l2[[2]]-l2[[1]])/l2[[2]]
-
-psr_92 <- classify(pot_SedRet1,rcl, right=FALSE)
-psr_20 <- classify(pot_SedRet2,rcl, right=FALSE)
-
-writeRaster(psr_92, paste0(inpath, '/', 'pot_SedRet_92.tif'), overwrite=TRUE)
-writeRaster(psr_20, paste0(inpath, '/', 'pot_SedRet_20.tif'), overwrite=TRUE)
-diff <- psr_92 - psr_20
-writeRaster(diff, paste0(inpath, '/', 'pot_Sed_r_diff.tif'), overwrite)
-
-```
-
 
 
 # Multi Temporal Analysis on NDR.
@@ -184,32 +108,26 @@ l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
 ```{r load poly]}
 # Read spatial polygon dataset
 # Set attribute column for analysis
- 
-# By Continent
+#set <- 'Country_id.gpkg'
 #set <- 'Continent.gpkg' 
-# By Subregion
 # set <- 'subregion.gpkg'
-# By Income Group
 # set <- "Income_grp.gpkg"
-# By individual territory; "Country" 
-#set <- 'Country.gpkg'
-# By WWF biome
-set <- 'Biome.gpkg' 
-# by WB Region
-#set <- "World_Bank_Region.gpkg"
+# set <- 'Biome.gpkg' 
+#set <- "WB_region.gpkg"
+# set <- "IPBES_subregion.gpkg"
 # load polygons
 poly <- st_read(here('vector', set)) 
-poly <- poly[c(1,2)]
-
+poly <- poly[1]
+t <- names(poly)
+write.csv(t, here('vector', 'names.csv'))
 # select column with the asttribute to iterate through.
-#col <- "id"
-#col <- "WWF_biome"
-#col <- 'continent'
-col <- "WWF_biome"
-#col <- 'continent'
-#col <- "income_grp"
-#col <- 'subregion'
+col <- "id"
+# col <- 'continent'
+# #col <- 'subregion'
+# col <- "income_grp"
+# col <- "WWF_biome"
 #col <- 'region_wb'
+col <- "Sub_Region"
 cols <- col
 ```
 Here, i need to think if iu add the new extracted values to the existing polygons or waht to do wit hthat. Variables: potentiaL 
@@ -270,7 +188,7 @@ st_write(poly, paste0(here('vector'), '/', cols, '_sdr_chg.gpkg'))
 
 
 zonal_df <- as_tibble(zonal_df)
-write.csv(zonal_df, here('output_data', 'TS_Biome.csv'))
+write.csv(zonal_df, paste0(here('output_data'), '/', 'TS_', cols, '.csv'))
 
 ```
 
