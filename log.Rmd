@@ -1,0 +1,123 @@
+---
+title: "Clean Mapping Data"
+output: html_notebook
+---
+
+
+Here, write down the output of Yesterday meeting and what i need to do. 
+
+1. Organize output Dataframes (make sure that they are complete and correclty named)
+
+2. Make sure all the Vector files have the necessary attributes.
+
+a. Subregion (IPBES) *done*
+b. Countries top/less change *running to complete*
+c. Biomes 
+d. Income level *done*
+e. regioin_wb *done*
+f. Continent *done*
+
+
+```{r load polygons, eval=FALSE, include=FALSE}
+# Read spatial polygon dataset
+# Set attribute column for analysis
+# By individual territory; "Country" 
+set <- 'Country_id.gpkg'
+# By Continent
+#set <- 'Continent.gpkg' 
+# By Subregion
+set <- 'subregion.gpkg'
+## By Income Group
+set <- "Income_grp.gpkg"
+# By WWF biome
+set <- 'Biome.gpkg' 
+# by WB Region
+set <- "WB_region.gpkg"
+# By Continent
+set <- "Continent.gpkg"
+# load polygons
+poly <- st_read(here('vector', set)) 
+#poly <- poly[1]
+t <- names(poly)
+write.csv(t, here('vector', 'names.csv'))
+# select column with the asttribute to iterate through.
+col <- "id"
+col <- 'continent'
+#col <- 'subregion'
+col <- "income_grp"
+col <- "WWF_biome"
+#col <- "WWF_biome"
+col <- 'region_wb'
+cols <- col
+
+```
+
+
+
+```{r get amounts of lc chnage}
+
+
+
+
+
+Percentage of Change. This is the key. I almot have it for everything! 
+
+
+Variables: 
+
+Pot. Sediment Retention for Each Grouping (Initial/ Final)
+
+######################################################################
+
+Time Series!!!
+
+% percentage of change in the charts.... amount.
+
+
+
+
+
+I extract change stats (stdev + mean) for 
+
+- Subregions (repeat for stdev)
+- Biome (running right now, lost connection to the internet, but just adusting to add the new columns to the vector file)
+- Country. Here to ee those with the most change (%) It's the same, its a ratio, so we don't need to put too much effort normalizing or stuff
+- Income
+ 
+ 
+Get all the differentials and include % change in service and in export (so retention and export)....make sure i know which inputs am i using.
+
+Paper: Review question to make sure that i
+
+Pending:
+
+Incorporate the Fertilier EASA database to improve Fertilizer (N) mode.
+
+M<ake sure i m using the right dstasert and olumn! Wrtite tomorrow to justin!!!
+
+Connecting LC analysis -> is it possible to identify s relationship betwe them?
+
+How do the amoung of change between nwture tono nature relatw with the amount of change in the provision. This is zero banal
+
+Get emtrics for Retention, export and the calcualtion (in short repeat the whole thing. again)
+
+
+
+Re run the export part
+
+```{r create list of columns}
+
+poly <- st_read('/Users/rodriguez/Global_ES_TS/global_NCP/vector/vector_f/Continent.gpkg')
+
+serv <- names(poly)
+serv <- serv[-c(1,30)]
+serv
+
+
+#Get filenames (add paths to stored data)
+
+
+
+
+
+```
