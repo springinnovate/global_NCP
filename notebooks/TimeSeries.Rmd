@@ -97,13 +97,6 @@ map(1:length(pot_s_loss), function(x) writeRaster(pot_s_loss[[x]], paste0(inpath
 
 
 
-
-
-
-
-
-
-
 ###############################################################################
 
 ### 6.2 Calculate new data modeled sediment retention layers
@@ -194,25 +187,6 @@ pot_s_loss <- Map(function(r1,r2) r2/(r2-r1), rast_list1, rast_list2)
 map(1:length(pot_s_loss), function(x) writeRaster(pot_s_loss[[x]], paste0(inpath, '/', 'pot_s_loss_', year[x],'.tif')))
 
   
-```
-
-`
-
-
-## **7. Compute Zonal Statistics for Differences**
-```{r compute stats diff, eval=FALSE, include=FALSE}
-diff_rasters <- file.path(here('input_ES', 'change_calc'), list.files(here('input_ES', 'change_calc'), pattern='tif$'))
-rast_list <- lapply(diff_rasters, rast)
-
-target_stats <- "mean"
-results_list <- mclapply(rast_list, function(r) {
-  res <- exact_extract(r, poly, fun = target_stats, append_cols = cols)
-  res$raster_name <- names(r)
-  return(res)
-}, mc.cores = length(rast_list))
-
-zonal_df <- do.call(rbind, results_list)
-zonal_df <- left_join(zonal_df, filename)
 ```
 
 
