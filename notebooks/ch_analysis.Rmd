@@ -96,9 +96,13 @@ writeRaster(diff, paste0(inpath, '/', 'pot_Sed_r_diff.tif'), overwrite)
 ```
 
 
-## 3. Calculte export potential
+
+# Multi Temporal Analysis on NDR.
+
+
+## 3. Calculte N export potential
 Here , I need to add the target rasters and organzie them by lists. i think i already did that but need to revisit here
-```{r get retention potential per year}
+```{r prepare retention potential per year}
 
 inpath <- here('input_ES', 'mod_n_ret')
 
@@ -109,6 +113,10 @@ tiffes <- tiffes[-c(1,3,5,9,11,15)]
 tiffes <- tiffes[c(1,6,2,7,3,8,4,9,5,10)]
 filename<- basename(tiffes)
  # here, adjust to call the correct ones and buld thje corresponding lists.
+
+
+# There must be a better way to do this, but basically the datatype in wehich geosharding/gdealtrnaslatre export result in issues when performing map algebra. I think the best way to fix this is someho to specify the data type. Keeep in mind for the next iteratioons, but for some reson it dd not iterate well (lapply/mclapply) so i ended up doing this stupid think i had to finish. 
+# The important thing is i did that and we don't need anymore. (mnaybe for map making) 
 
 rasters_list <- lapply(tiffes, rast)
 rcl <- matrix(c(
@@ -136,7 +144,7 @@ r2 <- classify(rasters_list[[10]],rcl)
 writeRaster(r2, paste0(inpath, '/', names(r2), '_rec.tif'))
 
 
-
+# This is waht somehow did not work, but i am sure there is a better way to handle this. 
 rasters_list2 <- lapply(rasters_list, function(r){
   r <- classify(r,rcl)
   return(r)
@@ -144,7 +152,9 @@ rasters_list2 <- lapply(rasters_list, function(r){
 
 map(1:length(rasters_list2), function(x) writeRaster(rasters_list[[x]], paste0(inpath, '/', names(rasters_list[[x]]), '_rec.tif')))
 
-rasters_list <- list(r1,r)
+```
+
+```{r get retention potential} 
 
 
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'rec'))
@@ -164,10 +174,13 @@ l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
 # 
  map(1:length(pot_s_loss), function(x) writeRaster(pot_s_loss[[x]], paste0(inpath, '/', 'pot_n_loss_', year[x],'2.tif')))
 
- 
+ # i think i need to extract some percentages from here. 
 # pending to check: max min values, nas and visuialization
 
 ```
+
+
+
 ```{r load poly]}
 # Read spatial polygon dataset
 # Set attribute column for analysis

@@ -9,7 +9,7 @@ output:
 ---
 
 # Overview
-This document outlines the steps to systematically extract zonal statistics from global **Ecosystem Service (ES)** raster datasets for specific spatial units (e.g., countries, biomes, watersheds, etc.).
+This workfoe outlines the steps to systematically extract zonal statistics from global **Ecosystem Service (ES)** raster datasets for specific spatial units (e.g., countries, biomes, watersheds, etc.).
 
 ## 1. Objectives
 1. Extract zonal statistics from ES global raster datasets using the `exactextractr` package.
@@ -18,7 +18,7 @@ This document outlines the steps to systematically extract zonal statistics from
 
 **Important Considerations:**
 - Dependencies and overlapping regions (e.g., GB, France) need special handling.
-- Small island nations and unique geographic cases require additional checks.
+- Small island nations and unique geographic cases require additional checks, and case specific decisions.
 
 
 ```{r setup, include=FALSE}
@@ -46,33 +46,35 @@ This assumes that the polygon files are stored in the same working directory. Fe
 ```{r load polygons, eval=FALSE, include=FALSE}
 # Read spatial polygon dataset
 # Set attribute column for analysis
-
 # By individual territory; "Country" 
-#set <- 'Country.gpkg'
-# By Continent
-#set <- 'Continent.gpkg' 
-# By Subregion
-#set <- 'subregion.gpkg'
-## By Income Group
-#set <- "Income_Group.gpkg"
-# By WWF biome
+set <- 'Country_id.gpkg'
+# # By Continent
+# #set <- 'Continent.gpkg' 
+# # By Subregion
+# set <- 'subregion.gpkg'
+# ## By Income Group
+# set <- "Income_grp.gpkg"
+#  By WWF biome
  set <- 'Biome.gpkg' 
-# by WB Region
-set <- "World_Bank_Region.gpkg"
-# load polygons
+# # by WB Region
+#set <- "WB_region.gpkg"
+# # By Continent
+# set <- "Continent.gpkg"
+set <- "IPBES_subregion.gpkg"
+# # load polygons
 poly <- st_read(here('vector', set)) 
 #poly <- poly[1]
-
+t <- names(poly)
+write.csv(t, here('vector', 'names.csv'))
 # select column with the asttribute to iterate through.
 col <- "id"
-col <- 'continent'
-#col <- 'subregion'
-col <- "income_grp"
-col <- "WWF_biome"
-#col <- "WWF_biome"
-col <- 'region_wb'
+# col <- 'continent'
+# #col <- 'subregion'
+# col <- "income_grp"
+# col <- "WWF_biome"
+#col <- 'region_wb'
+col <- "Sub_Region"
 cols <- col
-
 
 ```
 
@@ -102,7 +104,7 @@ cd
 ```
 
 
-# 3. Extract Zonal Statis per Saptila Unit
+# 3. Extract Zonal Statis per Saptial Unit
 
 Compute Zonal Statistics for each target raster/year 
 
@@ -117,7 +119,7 @@ target_stats <- c("mean")
 num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  sequentially, and there is no progress bar available 
 # here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
 
-results_list <- mclapply(rasters_list, function(r) {
+results_list <- lapply(rasters_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -126,7 +128,7 @@ results_list <- mclapply(rasters_list, function(r) {
   r_name <- names(r)
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
-  return(res)},mc.cores = num.cores)
+  return(res)})#,mc.cores = num.cores)
 
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
@@ -146,8 +148,8 @@ zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, y
 ######### HERE: Include a way/convention to adjust the column names autmatically. Saves work and keeps consistency. I had to do this in Stpe 6, but this is not organized. should +be done herer bedore exporting
 
 poly <- left_join(poly, zonal_wide, by= col)
-st_write(poly, here('vector', set), append = FALSE) 
-write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
+#st_write(poly, here('vector', set), append = FALSE) 
+#write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
 
 ```
 
@@ -180,7 +182,7 @@ target_stats <- "mean"
 
 # Iterate function over the rasters
 num.cores <- length(rasters_list)
-results_list <- mclapply(rasters_list, function(r) {
+results_list <- lapply(rasters_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -190,7 +192,7 @@ results_list <- mclapply(rasters_list, function(r) {
 
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
-  return(res)},mc.cores = num.cores)
+  return(res)})#,mc.cores = num.cores)
 
 # Combine results from all rasters into one data frame
 zonal_df_diff <- do.call(rbind, results_list)
@@ -198,13 +200,12 @@ zonal_df_diff <- do.call(rbind, results_list)
 cd <- cd %>% mutate(year='diff')
 
 zonal_df_diff <- left_join(zonal_df_diff,cd)
-#zonal_df <- zonal_df[-c(4,6)]
 zonal_wide <- pivot_wider(zonal_df_diff, id_cols=all_of(cols), names_from=c(service), values_from = mean)
 # adjust column names 
 colnames(zonal_wide)[colnames(zonal_wide) != cols] <- paste0(colnames(zonal_wide)[colnames(zonal_wide) != cols], "_diff")
 
 poly <- left_join(poly, zonal_wide, by= cols)
-st_write(poly, here('vector', set), append = FALSE) 
+#st_write(poly, here('vector', set), append = FALSE) 
 
 zonal_df <- rbind(zonal_df, zonal_df_diff)
 write.csv(zonal_df, here('output_data', paste0('zonal_df_', col, '.csv')))
@@ -250,14 +251,23 @@ poly <- calculate_percentage_change(poly)
 plt <- st_drop_geometry(poly)
 plt  <- plt %>%
   select(1, contains("pct"))
+################## THIS IS VERY IMPPORTAnt. Instead of struggling  with the multiple dataframes, it is easier to load the vector file swith all the column and pivot longer as necessary. Easier to manage, adjust on the fly!
+plt <- plt %>%
+  pivot_longer(
+    cols = ends_with("pct_ch"),  # Select all columns ending with "pct_ch"
+    names_to = "service",        # New column to store the service names
+    values_to = "pct_ch"         # New column to store the percentage change values
+  )
+
 
 write.csv(plt, here('output_data', paste0('pct_chg_',cols, '.csv')))
 
-st_write(poly, here('vector', set), append = FALSE) 
+#st_write(poly, here('vector', set), append = FALSE) 
 ```
 
 
 ### 3.4 Potential Retention and Export
+
 
 ```{r extract pot sed Retenion}
 
@@ -289,7 +299,7 @@ target_stats <- "mean"
 
 # Iterate function over the rasters
 num.cores <- length(rasters_list)
-results_list <- mclapply(rasters_list, function(r) {
+results_list <- lapply(rasters_list, function(r) {
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -299,7 +309,7 @@ results_list <- mclapply(rasters_list, function(r) {
 
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
-  return(res)},mc.cores = num.cores)
+  return(res)})#,mc.cores = num.cores)
 
 # Combine results from all rasters into one data frame
 zonal_df_diff <- do.call(rbind, results_list)
@@ -318,8 +328,7 @@ zonal_wide <- zonal_wide %>%
 
 poly <- left_join(poly, zonal_wide, by= cols)
 st_write(poly, here('vector', set), append = FALSE) 
-write.csv(zonal_df_diff, here('output_data', paste0('pot_sed_ret_df_', col, '.csv')))
-
+write.csv(zonal_df_diff, here('output_data', paste0('pot_sed_ret_df_', col, '.csv')))# acá viene el problema!
 ```
 
 
