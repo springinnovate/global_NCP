@@ -3,10 +3,9 @@ title: "Clean Mapping Data"
 output: html_notebook
 ---
 
-
 Here, write down the output of Yesterday meeting and what i need to do. 
 
-1. Organize output Dataframes (make sure that they are complete and correclty named)
+1. Organize output Data frames (make sure that they are complete and correctly named)
 
 2. Make sure all the Vector files have the necessary attributes.
 
@@ -21,9 +20,9 @@ f. Continent *done*
 ```{r load polygons, eval=FALSE, include=FALSE}
 # Read spatial polygon dataset
 # Set attribute column for analysis
-#set <- 'Country_id_t.gpkg'
-#set <- 'IPBES_subregion.gpkg'
-# set <- "Income_grp.gpkg"
+set <- 'Country_id_t.gpkg'
+set <- 'IPBES_subregion2.gpkg'
+ set <- "Income_grp.gpkg"
 # set <- 'Biome.gpkg' 
 # set <- "WB_region.gpkg"
 # set <- "Continent.gpkg"
@@ -33,18 +32,18 @@ poly <- st_read(here('vector', set))#, layer= 'Country_id'))
 t <- names(poly)
 write.csv(t, here('vector', 'names.csv'))
 # select column with the asttribute to iterate through.
-col <- "id"
+#col <- "id"
 # col <- 'continent'
 # #col <- 'subregion'
-# col <- "income_grp"
- col <- "WWF_biome"
+ col <- "income_grp"
+# col <- "WWF_biome"
 # col <- 'region_wb'
-# col <- "Sub_Region"
+ col <- "Sub_Region"
 cols <- col
 
 ```
 
-```{r biomes ghott}
+```{r biomes short}
 biome_labels <- c(
   "Temperate Grasslands, Savannas & Shrublands" = "Temperate Grasslands",
   "Tropical & Subtropical Moist Broadleaf Forests" = "Moist Broadleaf Forests",
@@ -64,7 +63,7 @@ biome_labels <- c(
 )
 ```
 
-```{r get amounts of lc chnage}
+```{r get amounts of lc change}
 
 
 # get pct as standalone data to add to the table
@@ -96,11 +95,11 @@ plt <- plt %>%
 plt <- left_join(plt,cd)
 plt <- plt%>% filter(!is.na(pct_ch))
 
-plt <- plt %>%
-  mutate(biome_short = recode(WWF_biome, !!!biome_labels))
+# Only for biomes, t make names shorter
+# plt <- plt %>%
+#   mutate(biome_short = recode(WWF_biome, !!!biome_labels))
  
 ```
-
 
 ```{r ggplot 2020, echo=FALSE, fig.height=8, fig.width=14}
 #
@@ -177,13 +176,14 @@ print(p_2020)
 
 ## 5. Here, add plots with the differences 
 
-```{r plot chg, fig.height=8, fig.width=14}
+```{r plot chg 8, fig.height=8, fig.width=14}
 library(dplyr)
 library(ggplot2)
 library(tidytext)
 library(rlang)
 
-col <- "biome_short"
+#For biomes
+#col <- "biome_short"
 
 plot_es_changes <- function(data, label_col = col, 
                             filter_type = "top_bottom", filter_val = 10) {
@@ -255,15 +255,203 @@ plot_es_changes(plt, filter_type = "all")
 
 ```
 
+```{r timeseries plot}
 
-```{r plot chg, fig.height=8, fig.width=14}
+
+inpath <- here('output_data')
+zonal_csv <- file.path(inpath, list.files(paste0(inpath),pattern= 'TS'))
+
+n <- 4
+zonal_df <- as_tibble(read.csv(zonal_csv[n]))
 
 
+# Only for biomes, t make names shorter
+ # zonal_df <- zonal_df %>%
+ #   mutate(biome_short = recode(WWF_biome, !!!biome_labels))
+
+library(ggplot2)
+
+#zonal_df <- zonal_df %>% filter(WWF_biome!="Lakes")
+
+# Create the line plot
+ggplot(zonal_df, aes(x = year, y = mean, color = biome_short, group = biome_short)) +
+  geom_line(size = 1) +          # Add lines for each subregion
+  geom_point(size = 2) +         # Add points for visibility
+  labs(
+    title = paste("Ecosystem Service Trends by ", col, sep= ""),
+    x = "Year",
+    y = "Mean Value"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")  # Adjust legend position
+```
+
+```{r faceted plot stdev, fig.height=18, fig.width=18}
+
+zonal_df <- zonal_df %>% filter(Sub_Region!="Antarctica")
+
+ggplot(zonal_df, aes(x = year, y = stdev, group = Sub_Region)) +
+  geom_line(size = 1, color = "blue") +
+  geom_point(size = 2, color = "red") +
+  facet_wrap(~ Sub_Region, scales = "free_y", ncol = 3) +
+  labs(
+    title = paste("NDR - st_dev", col, sep= ", "),
+    x = "Year",
+    y = "Mean Value"
+  ) +
+  theme(
+    legend.position = "right",
+    text = element_text(size = 14),  # Reduce overall text size
+    axis.text.x = element_text(size = 10, angle = 45, hjust = 1),  # Adjust x-axis labels
+    axis.text.y = element_text(size = 10),  # Adjust y-axis labels
+    legend.text = element_text(size = 8),  # Reduce legend font size
+    legend.title = element_text(size = 0.1),  # Adjust legend title size
+    strip.text = element_text(size = 12)  # Adjust facet labels (if using facets)
+  )
+
+
+```
+
+```{r chartTS country filter}
+
+# Filter to exclude NA values and "Lakes"
+
+# Filter top 5 and bottom 5 per service
+top_bottom_df <- zonal_df %>%
+  group_by(service, year) %>%
+  slice_max(mean, n = 5, with_ties = FALSE) %>%
+  bind_rows(
+    zonal_df %>%
+      group_by(service, year) %>%
+      slice_min(mean, n = 5, with_ties = FALSE)
+  ) %>%
+  ungroup()
+
+ggplot(top_bottom_df, aes(x = year, y = mean, color = name_long, group = name_long)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  labs(
+    title = paste("Ecosystem Service Trends by ", col, sep = ""),
+    x = "Year",
+    y = "Mean Value"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    legend.text = element_text(size = 8)
+  )
+```
+
+
+```{r faceted plot count, fig.height=18, fig.width=18}
+
+
+# 1. Filter valid records
+filtered <- zonal_df %>%
+  filter(!is.na(mean), !is.na(name_long))
+
+# 2. Compute average change per country (across years) per service
+ranked <- filtered %>%
+  group_by(service, name_long) %>%
+  summarize(avg_mean = mean(mean, na.rm = TRUE), .groups = "drop")
+
+# 3. Extract top and bottom 5 countries per service
+top_bottom <- ranked %>%
+  group_by(service) %>%
+  slice_max(avg_mean, n = 5, with_ties = FALSE) %>%
+  bind_rows(
+    ranked %>% 
+      group_by(service) %>% 
+      slice_min(avg_mean, n = 5, with_ties = FALSE)
+  ) %>%
+  ungroup()
+
+# 4. Filter original data to only those countries and prepare labels
+plot_data <- filtered %>%
+  filter(name_long %in% top_bottom$name_long) %>%
+  mutate(label = reorder_within(name_long, -mean, service))  # reorder per facet
+
+# 5. Plot
+ggplot(plot_data, aes(x = year, y = mean, group = name_long, color = name_long)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_color_viridis_d(option = "C", begin = 0.2, end = 0.9) +
+  scale_x_continuous(breaks = unique(zonal_df$year)) +
+  scale_y_continuous() +
+  labs(
+    title = "Top and Bottom 5 Country Values per Ecosystem Service",
+    x = "Year",
+    y = "Mean Value"
+  ) +
+  scale_color_discrete(guide = guide_legend(title = "Country")) +
+  theme_bw() +
+  theme(
+    strip.text = element_text(face = "bold", size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    axis.text.y = element_text(size = 8),
+    legend.position = "bottom",
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 8)
+  )
+
+```
+
+```{r ttt}
 library(dplyr)
 library(ggplot2)
-library(forcats)
 
+# Step 1: Filter valid rows
+filtered <- zonal_df %>%
+  filter(!is.na(mean), !is.na(name_long))
 
+# Step 2: Calculate average mean per country across all years, by service
+ranked <- filtered %>%
+  group_by(service, name_long) %>%
+  summarize(avg_mean = mean(mean, na.rm = TRUE), .groups = "drop")
+
+# Step 3: Select top 5 and bottom 5 countries per service
+top_bottom <- ranked %>%
+  group_by(service) %>%
+  slice_max(avg_mean, n = 10, with_ties = FALSE) %>%
+  bind_rows(
+    ranked %>%
+      group_by(service) %>%
+      slice_min(avg_mean, n = 0, with_ties = FALSE)
+  ) %>%
+  ungroup()
+
+# Step 4: Filter zonal_df to keep only those countries
+zonal_top_bottom <- filtered %>%
+  filter(name_long %in% top_bottom$name_long)
+
+# Optional: Add a shortened country label if needed
+zonal_top_bottom <- zonal_top_bottom %>%
+  mutate(country_short = name_long)  # you can shorten names if needed
+
+# Step 5: Plot (same structure as your original one, just updated to use countries)
+ggplot(zonal_top_bottom, aes(x = year, y = mean, group = name_long)) +
+  geom_line(size = 1, color = "blue") +
+  geom_point(size = 2, color = "red") +
+  facet_wrap(~ name_long, scales = "free_y", ncol = 4) +
+  labs(
+    title = paste("NDR - Means,", "Top 10 Countries", sep= ", "),
+    x = "Year",
+    y = "Mean Value"
+  ) +
+  theme(
+    legend.position = "right",
+    text = element_text(size = 14),
+    axis.text.x = element_text(size = 8, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 8),
+    legend.text = element_text(size = 8),
+    legend.title = element_text(size = 8),
+    strip.text = element_text(size = 10)
+  )
+
+```
+
+```{r plot chg2, fig.height=8, fig.width=14}
 
 # 1. Filter out "Nature_Access"
 filtered_plt <- plt %>%
@@ -305,10 +493,6 @@ ggplot(top_bottom, aes(x = name_long, y = pct_ch, fill = color)) +
 
 
 
-
-
-
-
 write.csv(plt, here('output_data', paste0('pct_chg_',cols, '.csv')))
 
 
@@ -326,34 +510,24 @@ Time Series!!!
 
 % percentage of change in the charts.... amount.
 
-
-
-
-
 I extract change stats (stdev + mean) for 
 
-- Subregions (repeat for stdev)
-- Biome (running right now, lost connection to the internet, but just adusting to add the new columns to the vector file)
-- Country. Here to ee those with the most change (%) It's the same, its a ratio, so we don't need to put too much effort normalizing or stuff
-- Income
- 
  
 Get all the differentials and include % change in service and in export (so retention and export)....make sure i know which inputs am i using.
 
-Paper: Review question to make sure that i
+
 
 Pending:
 
 Incorporate the Fertilier EASA database to improve Fertilizer (N) mode.
 
-M<ake sure i m using the right dstasert and olumn! Wrtite tomorrow to justin!!!
+Make sure i m using the right dstasert and olumn! Wrtite tomorrow to justin!!!
 
 Connecting LC analysis -> is it possible to identify s relationship betwe them?
 
 How do the amoung of change between nwture tono nature relatw with the amount of change in the provision. This is zero banal
 
-Get emtrics for Retention, export and the calcualtion (in short repeat the whole thing. again)
-
+Get metrics for Retention, export and the calcualtion (in short repeat the whole thing. again)
 
 
 Re run the export part
