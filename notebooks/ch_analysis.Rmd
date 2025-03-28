@@ -16,7 +16,6 @@ library(patchwork)      # Combining plots
 library(tidyr)
 library(parallel)       # Parallel computing
 library(purrr)
-library(stringr)
 ```
 
 
@@ -105,30 +104,30 @@ l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
 ```
 
 
+
 ```{r load poly]}
 # Read spatial polygon dataset
 # Set attribute column for analysis
-set <- 'Country_id.gpkg'
+#set <- 'Country_id.gpkg'
 #set <- 'Continent.gpkg' 
 # set <- 'subregion.gpkg'
 # set <- "Income_grp.gpkg"
-set <- 'Biome.gpkg' 
+# set <- 'Biome.gpkg' 
 #set <- "WB_region.gpkg"
-#set <- "IPBES_subregion.gpkg"
+# set <- "IPBES_subregion.gpkg"
 # load polygons
 poly <- st_read(here('vector', set)) 
+poly <- poly[1]
 t <- names(poly)
 write.csv(t, here('vector', 'names.csv'))
 # select column with the asttribute to iterate through.
-col <- "WWF_biome"
-
-#col <- "id"
+col <- "id"
 # col <- 'continent'
 # #col <- 'subregion'
-#col <- "income_grp"
-
+# col <- "income_grp"
+# col <- "WWF_biome"
 #col <- 'region_wb'
-#col <- "Sub_Region"
+col <- "Sub_Region"
 cols <- col
 ```
 Here, i need to think if iu add the new extracted values to the existing polygons or waht to do wit hthat. Variables: potentiaL 
@@ -197,32 +196,20 @@ write.csv(zonal_df, paste0(here('output_data'), '/', 'TS_', cols, '.csv'))
 
 ```{r timeseries plot}
 
-
-inpath <- here('output_data')
-zonal_csv <- file.path(inpath, list.files(paste0(inpath),pattern= 'TS'))
-
-n <- 1
-zonal_df <- read.csv(zonal_csv[n])
-
 library(ggplot2)
 
-zonal_df_f <- zonal_df %>% filter(WWF_biome!="Lakes")
-
 # Create the line plot
-ggplot(zonal_df_f, aes(x = year, y = mean, color = WWF_biome, group = WWF_biome)) +
+ggplot(zonal_df, aes(x = year, y = mean, color = subregion, group = subregion)) +
   geom_line(size = 1) +          # Add lines for each subregion
   geom_point(size = 2) +         # Add points for visibility
   labs(
-    title = paste("Ecosystem Service Trends by ", col, sep= ""),
+    title = "Ecosystem Service Trends by Subregion",
     x = "Year",
     y = "Mean Value"
   ) +
   theme_minimal() +
   theme(legend.position = "right")  # Adjust legend position
 ```
-
-
-
 ```{r faceted plot fig.height=18, fig.width=18}
 
 
@@ -231,7 +218,7 @@ ggplot(zonal_df, aes(x = year, y = mean, group = WWF_biome)) +
   geom_point(size = 2, color = "red") +
   facet_wrap(~ WWF_biome, scales = "free_y", ncol = 4) +
   labs(
-    title = "Nitrogen Service",
+    title = "Pot N Loss by Subregion",
     x = "Year",
     y = "Mean Value"
   ) +
