@@ -31,6 +31,8 @@ library(tidyr)
 library(parallel)        # Parallel computing
 library(purrr)
 library(stringr)
+library(gganimate)
+
 ```
 
 # 2 Load Watgershed Polygon Data
@@ -118,6 +120,7 @@ write.csv(zonal_df, here('output_data', paste0('pot_sed_ret_df_', col, '.csv')))
 ```{r get modeled N retention potential} 
 
 inpath <- here('input_ES', 'mod_n_ret')
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES/mod_n_ret'
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'loss'))
 filename<- basename(tiffes)
  # here, adjust to call the correct ones and buld thje corresponding lists.
@@ -127,7 +130,7 @@ rasters_list <- lapply(tiffes, rast)
 
 # Define service names and colors
 year <- c(1992,1995,1998,2001,2004)
-filename <- as_tibble(cbind(raster_name, year))
+filename <- as_tibble(cbind(filename, year))
 
 
 target_stats <- c("mean", "stdev")
@@ -157,12 +160,143 @@ zonal_df <- do.call(rbind, results_list)
 zonal_df <- zonal_df %>% mutate(service = "n_ret")
 
 zonal_wide <- pivot_wider(zonal_df, id_cols=c(col), names_from=c(year, service), values_from = c(mean, stdev))
+library(dplyr)
+
+# Calculate % change between consecutive years
+zonal_wide <- zonal_wide %>%
+  mutate(
+    pct_ch_1995_1992 = 100 * (mean_1995_n_ret - mean_1992_n_ret) / mean_1992_n_ret,
+    pct_ch_1998_1995 = 100 * (mean_1998_n_ret - mean_1995_n_ret) / mean_1995_n_ret,
+    pct_ch_2001_1998 = 100 * (mean_2001_n_ret - mean_1998_n_ret) / mean_1998_n_ret,
+    pct_ch_2004_2001 = 100 * (mean_2004_n_ret - mean_2001_n_ret) / mean_2001_n_ret
+  )
 
 
 poly <- left_join(poly,zonal_wide)
 
-st_write <- poly(here('vector', 'hydrosheds_lev6.gpkg'))
+st_write(poly, (here('vector', 'hydrosheds_lev6.gpkg')), append=FALSE)
+
+#keep only colimn wotj the % change (waht if we had some variability measure?)
+polyt <- poly[c(1, 24:27)]
+#reshape data 
+polyt_long <- polyt %>%
+  pivot_longer(
+    cols = starts_with("pct_ch_"),
+    names_to = "year_step",
+    values_to = "pct_ch"
+  ) %>%
+  mutate(
+    year_step = gsub("pct_ch_", "", year_step),
+    year_step = factor(year_step, levels = unique(year_step))  # ensure correct order
+  )
+
+#get top/bottom X% or N units 
+polyt_long <- polyt_long %>%
+  group_by(year_step) %>%
+  mutate(
+    change_class = case_when(
+      ntile(pct_ch, 10) == 10 ~ "Top 10%",     # highest change
+      ntile(pct_ch, 10) == 1  ~ "Bottom 10%",  # lowest change
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  ungroup()
+
+polyt_long <- polyt_long %>%
+  mutate(year = as.integer(sub("_.*", "", year_step)))
+
+# If year_step is an integer like 1995, convert it to date (optional but recommended)
+polyt_long <- polyt_long %>%
+  mutate(time = as.Date(paste0(year, "-01-01")))
+
+# Save to GeoPackage or Shapefile (GeoPackage is better for multi-features and attributes)
+st_write(polyt_long, here('vector', "hydrosheds_temporal.gpkg"), layer = "sediment_change", delete_dsn = TRUE)
+
+
+
+library(ggplot2)
+
+ggplot(polyt_long %>% filter(!is.na(change_class)), 
+       aes(fill = change_class)) +
+  geom_sf() +
+  facet_wrap(~year_step, ncol = 2) +
+  scale_fill_manual(values = c("Top 10%" = "darkred", "Bottom 10%" = "blue")) +
+  theme_minimal() +
+  labs(
+    title = "Extreme % Change in Service by Basin",
+    fill = "Change Class"
+  )
+
+
 ```
+
+
+```{r }
+library(ggplot2)
+library(sf)
+library(dplyr)
+library(tidyr)
+
+# Assuming your long data is already prepared in `polyt_long`
+# and contains: geometry, year_step, pct_ch, etc.
+
+# Create a highlight column: Top 10%, Bottom 10%, or Neutral
+polyt_long <- polyt_long %>%
+  group_by(year_step) %>%
+  mutate(
+    change_class = case_when(
+      ntile(pct_ch, 10) == 10 ~ "Top 10%",
+      ntile(pct_ch, 10) == 1  ~ "Bottom 10%",
+      TRUE ~ "Neutral"
+    )
+  ) %>%
+  ungroup()
+
+# Order the factor to control legend
+polyt_long$change_class <- factor(polyt_long$change_class, levels = c("Top 10%", "Bottom 10%", "Neutral"))
+
+# Define colors: highlight extremes, gray everything else
+change_colors <- c(
+  "Top 10%" = "#d7191c",      # Red
+  "Bottom 10%" = "#2c7bb6",   # Blue
+  "Neutral" = "#eeeeee"       # Light gray
+)
+
+# Plot
+ggplot(polyt_long, aes(fill = change_class)) +
+  geom_sf(color = "gray", size = 0.00005) +  # Thin polygon borders
+  facet_wrap(~ year_step, ncol = 2) +
+  scale_fill_manual(values = change_colors) +
+  coord_sf(expand = FALSE) +
+  labs(
+    title = "% Change in Nitrogen Retention by Basin",
+    fill = "Change Class"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(face = "bold", size = 10),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    legend.position = "bottom"
+  )
+```
+
+
+
+library(gganimate)
+
+ggplot(polyt_long, aes(fill = pct_ch)) +
+  geom_sf() +
+  scale_fill_viridis_c(option = "turbo") +
+  theme_minimal() +
+  labs(title = "Pct Change Over Time: {closest_state}") +
+  transition_states(year_step, transition_length = 2, state_length = 1) +
+  ease_aes('linear')
+
+```
+
+
 
 # 3.1 Visualize change distributiion 
 
