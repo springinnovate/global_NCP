@@ -41,9 +41,9 @@ Obtained from [Hydrosheds](https://www.hydrosheds.org/), we are using level 6 an
 
 ```{r load watersheds lev 6}
 
-poly <- st_read(here('vector', 'hydrosheds2.gpkg'), layer='hydrosheds2')
+poly <- st_read(here('vector', 'Hydrosheds_lv7.gpkg'))#, layer='hydrosheds2')
 col <- "HYBAS_ID"
-cols <- col
+cols <- "hydrosheds_lv7"
 ```
 
 
@@ -100,10 +100,10 @@ results_list <- mclapply(rasters_list, function(r) {
 zonal_df <- do.call(rbind, results_list)
 #Adjust column so i can assemble the whole thing (yearly and difference values) in the same dataframe
 
-
+cls <- "HYBAS_ID"
 
 zonal_df <- left_join(zonal_df,cd)
-zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cols), names_from=c(raster_name), values_from = c(mean,stdev))
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cls), names_from=c(raster_name), values_from = c(mean,stdev))
 
 
 # Calculate % of change 
@@ -111,16 +111,16 @@ zonal_wide <- zonal_wide %>%
   mutate(Pot_Sed_ret_pct_ch = ((mean_Pot_Sed_ret_2020 - mean_Pot_Sed_ret_1992) / mean_Pot_Sed_ret_1992) * 100)
 
 
-poly <- left_join(poly, zonal_wide, by= cols)
-st_write(poly, here('vector', "hydrosheds2.gpkg"), append = FALSE) 
-write.csv(zonal_df, here('output_data', paste0('pot_sed_ret_df_', col, '.csv')))# acá viene el problema!
+poly <- left_join(poly, zonal_wide, by= cls)
+st_write(poly, here('vector', "Hydrosheds_lv7.gpkg"), append = TRUE) 
+write.csv(zonal_df, here('output_data', paste0('pot_sed_ret_df_lv7', col, '.csv')))# acá viene el problema!
 ```
 
 
 ```{r get modeled N retention potential} 
 
 inpath <- here('input_ES', 'mod_n_ret')
-inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES/mod_n_ret'
+#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES/mod_n_ret'
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'loss'))
 filename<- basename(tiffes)
  # here, adjust to call the correct ones and buld thje corresponding lists.
@@ -142,7 +142,7 @@ results_list <- mclapply(rasters_list, function(r) {
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
                        fun = target_stats,
-                       append_cols = cols)
+                       append_cols = col)
   r_name <- names(r)
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
@@ -174,10 +174,10 @@ zonal_wide <- zonal_wide %>%
 
 poly <- left_join(poly,zonal_wide)
 
-st_write(poly, (here('vector', 'hydrosheds_lev6.gpkg')), append=FALSE)
+st_write(poly, (here('vector', 'hydrosheds_lv7.gpkg')), append=FALSE)
 
-#keep only colimn wotj the % change (waht if we had some variability measure?)
-polyt <- poly[c(1, 24:27)]
+#keep only column with the % change (what if we had some variability measure?. Take care of that later)
+polyt <- poly[c(1,33:37)]
 #reshape data 
 polyt_long <- polyt %>%
   pivot_longer(
@@ -210,7 +210,7 @@ polyt_long <- polyt_long %>%
   mutate(time = as.Date(paste0(year, "-01-01")))
 
 # Save to GeoPackage or Shapefile (GeoPackage is better for multi-features and attributes)
-st_write(polyt_long, here('vector', "hydrosheds_temporal.gpkg"), layer = "sediment_change", delete_dsn = TRUE)
+st_write(polyt_long, here('vector', "hydrosheds_temporal_lv7.gpkg"), layer = "sediment_change", delete_dsn = TRUE)
 
 
 
