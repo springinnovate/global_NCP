@@ -1,8 +1,6 @@
----
-editor_options: 
-  markdown: 
-    wrap: 72
----
+README
+================
+Jeronimo Rodriguez Escobar
 
 # Overview
 
@@ -16,15 +14,15 @@ generating meaningful visualizations to interpret spatial patterns.
 
 # Objectives
 
--   **Extract zonal statistics** from global raster datasets for
-    predefined spatial units (e.g., countries, watersheds, biomes, or
-    grid cells).
--   **Label and integrate extracted statistics** into vector datasets
-    for further geospatial analysis.
--   **Generate visualizations** such as bar plots and maps to represent
-    spatial patterns and temporal changes.
--   **Automate processing steps** to ensure scalability and consistency
-    across multiple datasets.
+- **Extract zonal statistics** from global raster datasets for
+  predefined spatial units (e.g., countries, watersheds, biomes, or grid
+  cells).
+- **Label and integrate extracted statistics** into vector datasets for
+  further geospatial analysis.
+- **Generate visualizations** such as bar plots and maps to represent
+  spatial patterns and temporal changes.
+- **Automate processing steps** to ensure scalability and consistency
+  across multiple datasets.
 
 # Dependencies
 
@@ -71,34 +69,30 @@ GIS integration.
 
 ## 7. Generate Visualizations
 
-```         
-library(ggplot2)
-library(dplyr)
+    library(ggplot2)
+    library(dplyr)
 
-plot_ecosystem_services <- function(data, year, col) {
-  data_prepped <- data %>%
-    filter(!is.na(mean) & mean > 0 & year == year) %>%
-    mutate(temp_col = reorder_within(!!sym(col), -mean, service))  
-  
-  ggplot(data_prepped, aes(x = temp_col, y = mean, fill = color)) +
-    geom_bar(stat = "identity", show.legend = FALSE) +
-    scale_fill_identity() +
-    facet_wrap(~ service, scales = "free") +
-    scale_x_reordered() +  
-    labs(title = paste("Mean Ecosystem Service Values,", year),
-         x = col, y = "Mean Value") +
-    theme_bw()
-}
-```
+    plot_ecosystem_services <- function(data, year, col) {
+      data_prepped <- data %>%
+        filter(!is.na(mean) & mean > 0 & year == year) %>%
+        mutate(temp_col = reorder_within(!!sym(col), -mean, service))  
+      
+      ggplot(data_prepped, aes(x = temp_col, y = mean, fill = color)) +
+        geom_bar(stat = "identity", show.legend = FALSE) +
+        scale_fill_identity() +
+        facet_wrap(~ service, scales = "free") +
+        scale_x_reordered() +  
+        labs(title = paste("Mean Ecosystem Service Values,", year),
+             x = col, y = "Mean Value") +
+        theme_bw()
+    }
 
 # Usage
 
 ## Running the Workflow
 
-```         
-git clone https://github.com/springinnovate/global_NCP.git
-cd summary-es
-```
+    git clone https://github.com/springinnovate/global_NCP.git
+    cd summary-es
 
 Open `summary_es.Rmd` in **RStudio** and execute all sections.
 
@@ -112,11 +106,11 @@ large datasets.
 
 # Future Improvements
 
--   Implement dynamic service name detection based on raster filenames.
--   Improve handling of **multi-country territories** and **small island
-    states**.
--   Expand statistical options beyond mean values (e.g., quantiles,
-    uncertainty metrics).
+- Implement dynamic service name detection based on raster filenames.
+- Improve handling of **multi-country territories** and **small island
+  states**.
+- Expand statistical options beyond mean values (e.g., quantiles,
+  uncertainty metrics).
 
 # License
 
@@ -124,7 +118,7 @@ This project is licensed under the **MIT License**.
 
 # Contributors
 
--   **Jeronimo Rodriguez-Escobar** (Primary Author)
+- **Jeronimo Rodriguez-Escobar** (Primary Author)
 
 For any questions or contributions, feel free to open an issue or submit
 a pull request.
