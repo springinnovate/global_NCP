@@ -1,0 +1,66 @@
+---
+title: "LC Reclassify"
+output: html_notebook
+---
+
+
+Here i am creating my maps of land cover change. Just from natuiral to tramnsformed. As usual, this is easier said thatn done
+
+
+```{r load LC maps}
+inpath <-  '/home/jeronimo/global_ES_modeling/esos-c/data/ndr'
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'landcover'))
+filename<- basename(tiffes)
+#set <- 'continent.gpkg' 
+
+raster_list <- lapply(tiffes,rast)
+num.cores <- length(raster_list)
+
+# Define the reclassification rules in one operation
+reclass_table <- data.frame(
+  from = c(10, 11, 12, 20, 30, 40, 50, 60, 61, 62, 70, 71, 72, 80, 81, 82, 90, 100,
+           110, 120, 121, 122, 130, 140, 150, 151, 152, 153, 160, 170, 180,
+           190, 200, 201, 202, 210, 220),
+  to = c(1, 1, 1, 1, 1, 1,   # Cultivated
+         2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,  # Forests
+         3, 3, 3, 3, 3,   # Grasses and Shrubs
+         4, 4, 4, 4, 4,   # Sparse Vegetation
+         5, 5, 5,   # Mangroves
+         6,   # Urban
+         7, 7, 7,   # Bare
+         8,   # Water
+         9)   # Ice
+)
+
+
+raster_list <- lapply(raster_list, function(r) {
+  subst(r, from = reclass_table$from, to = reclass_table$to)
+})#,mc.cores = num.cores)
+
+#save rasters 
+lapply(1:length(raster_list), function(x) writeRaster(raster_list[[x]], paste0(here("input_ES", "LandCovers"),'/', filename[x])))
+
+inpath <- here("input_ES", "LandCovers")
+
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'landcover'))
+filename<- basename(tiffes)
+
+raster_list <- lapply(tiffes,rast)
+
+
+reclass_table <- data.frame(
+  from = c(3,4,5,6,7,8,9),
+  to = c(2,2,2,1,2,2,2)
+)
+
+raster_list <- lapply(raster_list, function(r) {
+  subst(r, from = reclass_table$from, to = reclass_table$to)
+})#,mc.cores = num.cores)
+
+#save rasters 
+lapply(1:length(raster_list), function(x) writeRaster(raster_list[[x]], paste0(here("input_ES", "LandCovers"),'/', "rec_", filename[x])))
+
+
+# second reclassifciation Natural-not natural 
+
+```
