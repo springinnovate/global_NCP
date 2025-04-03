@@ -1,0 +1,659 @@
+---
+title: "Summary ES Analysis by HydroBasin"
+author: "Jeronimo Rodriguez-Escobar"
+date: "2025-04-02"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+
+# Overview
+
+This workflow outlines a structured approach to extract and analyze zonal statistics for **Ecosystem Services (ES)** at the global scale using **hydrological basins** as spatial units, based on the HydroBASINS Level 6 and 7  from [HydroSHEDS](https://www.hydrosheds.org/products/hydrobasins).
+
+Buoding upon the broader multi-service analysis conducted for 1992 and 2020, this pilot focuses exclusively on the **Nutrient Delivery Ratio (NDR)** model, assessing changes in nitrogen export and retention for five time points: **1992, 1995, 1998, 2001, and 2004**. The purpose is to test the workflow over time, extract consistent zonal statistics, and begin exploring temporal dynamics in nutrient regulation.
+
+This is a **preliminary version**, developed while we address technical issues with the global geosharding implementation, which currently cannot process locations located **above 60° North**. Despite that, this workflow allows us to:
+- Validate the core zonal processing steps,
+- Generate preliminary results for exploratory analysis, and
+- Ensure the overall reproducibility and readiness of the methodology once full global coverage becomes available.
+
+# 1. Objectives
+
+1. Extract zonal summary statistics for modeled **NDR Export and Retention** layers at five time points using the `exactextractr` package.
+2. Integrate these statistics into hydrological basin polygons as new attribute fields.
+3. Visualize spatial and temporal patterns in nitrogen retention and export using faceted maps, line plots, and summary tables.
+4. Identify trends, outliers, and regions of interest for further investigation.
+
+> **Note:** The hydrological basin appears to be a promising spatial unit for ecosystem service analysis, providing consistency across scales and enabling meaningful aggregation for regional and global assessments.
+
+A new iteration includes hexes/gridded area.
+
+---
+
+Let me know if you’d like this added to an `.Rmd` file or need help formatting the rest of the workflow!
+
+
+```{r setup, include=FALSE}
+library(sf)             # Spatial vector operations
+library(dplyr)          # Data manipulation
+library(terra)          # Raster processing
+library(exactextractr)  # Zonal statistics
+library(ggplot2)        # Visualization
+library(forcats)        # Factor reordering
+library(tidytext)
+library(here)           # Managing paths
+library(patchwork)      # Combining plots
+library(tidyr)
+library(parallel)       # Parallel computing
+library(purrr)
+library(stringr)
+library(knitr)
+library(kableExtra)
+```
+
+# 2 Load Watgershed Polygon Data
+
+Obtained from [Hydrosheds](https://www.hydrosheds.org/), we are using level 6 and level 7 for the analysis
+
+```{r load watersheds lev 6}
+sets <- c("hydrosheds_lev6.gpkg", "Hydrosheds_lv7_2.gpkg")
+# Select the tatget datyaset from the list 
+cols <- c("HYBAS_ID", "HYBAS_ID")
+sets <- cbind(sets, cols)
+
+# Set an index to selct the desired dataset
+
+t <- 2
+# Select the target dataset from the list 
+set <- sets[t]
+# # load polygons
+poly <- st_read(here('vector', set)) 
+
+
+# Convert to data frame for nicer display
+sets_df <- as.data.frame(sets)
+colnames(sets_df) <- c("GPKG Layer", "Attribute Column")
+
+# Print nicely
+kable(sets_df, format = "html", caption = "Geopackage Layers and Associated Attribute Columns") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+
+# 3 Extract % change Sediment Retention
+
+For this we are processing the Potential Sediment Retention data for 1992, 2020 and the calcualted differnece. The formula used is:
+
+Potential of Sediment Retention: (USLE-Export)/USLE
+*Note* There is 
+
+```{r extract pot sed Retenion}
+
+# set the path and load the rasters with the differences that we calcualted in step 3
+#build paths to files
+
+inpath <- here('input_ES', "Pot_Sed_retention")
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+ filename<- basename(tiffes)
+
+# raster_name <- c("Pot_Sed_ret_1992", "Pot_Sed_ret_2020", "Pot_Sed_ret_diff")
+
+rasters_list <- lapply(tiffes, rast)
+rasters_list <- Map(function(r,new_name){
+  names(r) <- new_name
+  return(r)
+  }, rasters_list, filename)
+
+year <- rep(c(1992,2020, "diff"))
+# create a table with the content to fill the table
+color <- c("#08606b", "#08606b", "#68606b")
+cd <- as_tibble(cbind(raster_name, color,year))
+rm(filename)
+cd
+
+
+target_stats <- c("mean","stdev")
+
+# Iterate function over the rasters
+num.cores <- length(rasters_list)
+results_list <- mclapply(rasters_list, function(r) {
+  # Perform exact extraction
+  # - append_cols = "country" retains the country identifier with each result
+  res <- exact_extract(r, poly,
+                       fun = target_stats,
+                       append_cols = col)
+  r_name <- names(r)
+
+  # Add a column labeling which raster these results are from
+  res$raster_name <- r_name
+  return(res)},mc.cores = num.cores)
+
+# Combine results from all rasters into one data frame
+zonal_df <- do.call(rbind, results_list)
+#Adjust column so i can assemble the whole thing (yearly and difference values) in the same dataframe
+
+cls <- "HYBAS_ID"
+
+zonal_df <- left_join(zonal_df,cd)
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cls), names_from=c(raster_name), values_from = c(mean,stdev))
+
+
+# Calculate % of change 
+zonal_wide <- zonal_wide %>%
+  mutate(Pot_Sed_ret_pct_ch = ((mean_Pot_Sed_ret_2020 - mean_Pot_Sed_ret_1992) / mean_Pot_Sed_ret_1992) * 100)
+
+
+poly <- left_join(poly, zonal_wide, by= cls)
+st_write(poly, here('vector', "Hydrosheds_lv7_2.gpkg"), append = FALSE) 
+write.csv(zonal_df, here('output_data', paste0('pot_sed_ret_df_lv7', col, '.csv')))# acá viene el problema!
+```
+
+
+```{r get modeled N retention potential} 
+#navigate to the directory with the input data (modeled N export and retention layers)
+inpath <- here('input_ES', 'mod_n_ret')
+
+#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES/mod_n_ret'
+tiffes <- list.files(
+  path = inpath,
+  pattern = "export.*\\.tif$",
+  full.names = TRUE
+)
+
+filename<- basename(tiffes)
+rasters_list <- lapply(tiffes, rast)
+
+
+# Define service names and colors
+year <- c(1992,1995,1998,2001,2004)
+filename <- as_tibble(cbind(filename, year))
+
+# Set the target statistics to calculate
+target_stats <- c("sum", "mean", "stdev")
+num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  
+# iterate over the input rasters 
+results_list <- mclapply(rasters_list, function(r) {
+  # Perform exact extraction
+  # - append_cols = "country" retains the country identifier with each result
+  res <- exact_extract(r, poly,
+                       fun = target_stats,
+                       append_cols = cols[t])
+  r_name <- names(r)
+  # Add a column labeling which raster these results are from
+  res$raster_name <- r_name
+  return(res)},mc.cores = num.cores)
+
+
+ results_list <- Map(function(df,y)  {
+  df$year <- y
+  return(df)
+}, results_list, year) 
+
+# Combine results from all rasters into one data frame
+zonal_df <- do.call(rbind, results_list)
+zonal_df <- zonal_df %>% mutate(service = "N_export")
+
+zonal_wide <- pivot_wider(zonal_df, id_cols=c(cols[t]), names_from=c(year, service), values_from = c(sum, mean, stdev))
+
+
+# here i am running out of ideas on how to name all these columns. Also there must be a smarter way to do this 
+# Calculate % change between consecutive years
+zonal_wide <- zonal_wide %>%
+  mutate(
+    pct_ch_1995_1992 = 100 * (mean_1995_n_ret - mean_1992_n_ret) / mean_1992_n_ret,
+    pct_ch_1998_1995 = 100 * (mean_1998_n_ret - mean_1995_n_ret) / mean_1995_n_ret,
+    pct_ch_2001_1998 = 100 * (mean_2001_n_ret - mean_1998_n_ret) / mean_1998_n_ret,
+    pct_ch_2004_2001 = 100 * (mean_2004_n_ret - mean_2001_n_ret) / mean_2001_n_ret
+  )
+
+
+# here i am running out of ideas on how to name all these columns
+# Calculate % change between consecutive years
+zonal_wide <- zonal_wide %>%
+  mutate(
+    pct_ch_1995_1992_n_export = 100 * (mean_1995_N_export - mean_1992_N_export) / mean_1992_N_export,
+    pct_ch_1998_1995_n_export = 100 * (mean_1998_N_export - mean_1995_N_export) / mean_1995_N_export,
+    pct_ch_2001_1998_n_export = 100 * (mean_2001_N_export - mean_1998_N_export) / mean_1998_N_export,
+    pct_ch_2004_2001_n_export = 100 * (mean_2004_N_export - mean_2001_N_export) / mean_2001_N_export
+  )
+
+
+poly <- poly[c(1:13)]
+poly <- left_join(poly,zonal_wide)
+
+
+
+#st_write(poly, (here('vector', 'hydrosheds_lv7.gpkg')), append=FALSE)
+
+
+
+# Find all 'sum' columns for N_export
+sum_cols <- names(poly)[str_detect(names(poly), "^sum_\\d{4}_N_export")]
+
+# Iterate through them and create new columns
+for (col in sum_cols) {
+  year <- str_extract(col, "\\d{4}")  # Extract the year
+  new_col <- paste0("N_export_ha_", year)  # Construct new column name
+  
+  poly[[new_col]] <- poly[[col]] / poly$SUB_AREA  # Divide by area (assumed in ha)
+}
+
+st_write(poly, paste0(here('vector'),'/', "N_export_", set), append=TRUE)
+
+
+```
+#keep only column with the % change (what if we had some variability measure?. Take care of that later)
+polyt <- poly[c(1,33:37)]
+#reshape data 
+polyt_long <- polyt %>%
+  pivot_longer(
+    cols = starts_with("pct_ch_"),
+    names_to = "year_step",
+    values_to = "pct_ch"
+  ) %>%
+  mutate(
+    year_step = gsub("pct_ch_", "", year_step),
+    year_step = factor(year_step, levels = unique(year_step))  # ensure correct order
+  )
+
+#get top/bottom X% or N units 
+polyt_long <- polyt_long %>%
+  group_by(year_step) %>%
+  mutate(
+    change_class = case_when(
+      ntile(pct_ch, 10) == 10 ~ "Top 10%",     # highest change
+      ntile(pct_ch, 10) == 1  ~ "Bottom 10%",  # lowest change
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  ungroup()
+
+polyt_long <- polyt_long %>%
+  mutate(year = as.integer(sub("_.*", "", year_step)))
+
+# If year_step is an integer like 1995, convert it to date (optional but recommended)
+polyt_long <- polyt_long %>%
+  mutate(time = as.Date(paste0(year, "-01-01")))
+
+# Save to GeoPackage or Shapefile (GeoPackage is better for multi-features and attributes)
+st_write(polyt_long, here('vector', "hydrosheds_temporal_lv7.gpkg"), layer = "sediment_change", delete_dsn = TRUE)
+
+
+
+library(ggplot2)
+
+ggplot(polyt_long %>% filter(!is.na(change_class)), 
+       aes(fill = change_class)) +
+  geom_sf() +
+  facet_wrap(~year_step, ncol = 2) +
+  scale_fill_manual(values = c("Top 10%" = "darkred", "Bottom 10%" = "blue")) +
+  theme_minimal() +
+  labs(
+    title = "Extreme % Change in Service by Basin",
+    fill = "Change Class"
+  )
+
+
+```
+
+
+```{r }
+library(ggplot2)
+library(sf)
+library(dplyr)
+library(tidyr)
+
+# Assuming your long data is already prepared in `polyt_long`
+# and contains: geometry, year_step, pct_ch, etc.
+
+# Create a highlight column: Top 10%, Bottom 10%, or Neutral
+polyt_long <- polyt_long %>%
+  group_by(year_step) %>%
+  mutate(
+    change_class = case_when(
+      ntile(pct_ch, 10) == 10 ~ "Top 10%",
+      ntile(pct_ch, 10) == 1  ~ "Bottom 10%",
+      TRUE ~ "Neutral"
+    )
+  ) %>%
+  ungroup()
+
+# Order the factor to control legend
+polyt_long$change_class <- factor(polyt_long$change_class, levels = c("Top 10%", "Bottom 10%", "Neutral"))
+
+# Define colors: highlight extremes, gray everything else
+change_colors <- c(
+  "Top 10%" = "#d7191c",      # Red
+  "Bottom 10%" = "#2c7bb6",   # Blue
+  "Neutral" = "#eeeeee"       # Light gray
+)
+
+# Plot
+ggplot(polyt_long, aes(fill = change_class)) +
+  geom_sf(color = "gray", size = 0.00005) +  # Thin polygon borders
+  facet_wrap(~ year_step, ncol = 2) +
+  scale_fill_manual(values = change_colors) +
+  coord_sf(expand = FALSE) +
+  labs(
+    title = "% Change in Nitrogen Retention by Basin",
+    fill = "Change Class"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(face = "bold", size = 10),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    legend.position = "bottom"
+  )
+```
+
+
+
+library(gganimate)
+
+ggplot(polyt_long, aes(fill = pct_ch)) +
+  geom_sf() +
+  scale_fill_viridis_c(option = "turbo") +
+  theme_minimal() +
+  labs(title = "Pct Change Over Time: {closest_state}") +
+  transition_states(year_step, transition_length = 2, state_length = 1) +
+  ease_aes('linear')
+
+```
+
+
+
+# 3.1 Visualize change distributiion 
+
+Just a basic plot and actually looks quite normal jsut like that. Waht if we weighted by area?
+Add area to the zonal_df object so we can use it to weight (not sure how righ now) but this needs to be incorporated
+
+```{r plot diffs, fig.height=8, fig.width=14}
+#filtered
+z_fin <- zonal_df %>% filter(year=='diff')
+library(ggplot2)
+
+z_fin <- left_join(z_fin, zonal_wide[c(1,8)])
+
+
+ggplot(z_fin, aes(x = Pot_Sed_ret_pct_ch)) +
+  geom_density(fill = "skyblue", alpha = 0.6) +
+  labs(
+    title = "Density Plot of Value Column",
+    x = "Value",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+```
+
+
+## 5 . Identify Hotspots 
+
+Extract top 10 percent gains/loses. we don't even need something too fancy. Just load the data and extract it. Should try this in Pyton!!!!
+
+```{r ggplot 2020, echo=FALSE, fig.height=8, fig.width=14}
+# zonal_df <- load('/Users/rodriguez/Global_ES_TS/global_NCP/output_data/zonal_df_global.RData')
+#zonal_df <- load(here('output_data', 'zonal_df_global.RData'))
+  # Needed for reorder_within()
+
+
+plot_ecosystem_services <- function(data, year, col) {
+  col_sym <- sym(col)  # Convert column name to symbol for dplyr
+  
+  # Step 1: Prepare Data (Remove NA values and zero mean values, then reorder names)
+  data_prepped <- data %>%
+    filter(!is.na(mean) & mean > 0 & year == !!year) %>%  # Exclude cases where mean is 0 and filter year
+    mutate(temp_col = reorder_within(!!col_sym, -mean, service))  
+
+  # Step 2: Compute min/max values for selected column
+  service_range <- data_prepped %>%
+    group_by(service) %>%
+    summarize(
+      min_val = min(mean, na.rm = TRUE),
+      max_val = max(mean, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  # Step 3: Create "invisible" data for min/max range
+  range_data <- service_range %>%
+    pivot_longer(cols = c(min_val, max_val), names_to = "range_type", values_to = "mean") %>%
+    mutate(year = !!year, temp_col = "dummy")
+
+  # Step 4: Extract top 10 and bottom 10 per selected column
+  top_10 <- data_prepped %>%
+    group_by(service) %>%
+    slice_max(order_by = mean, n = 10, with_ties = TRUE) 
+
+  bottom_10 <- data_prepped %>%
+    group_by(service) %>%
+    slice_min(order_by = mean, n = 10, with_ties = TRUE)
+
+  # Step 5: Combine only top 10 and bottom 10
+  filtered_data <- bind_rows(top_10, bottom_10) %>%
+    arrange(service, desc(mean))
+
+  # Step 6: Reorder selected column to appear correctly
+  filtered_data <- filtered_data %>%
+    mutate(temp_col = reorder_within(!!col_sym, -mean, service))
+
+  # Step 7: Plot the filtered data
+  p <- ggplot(filtered_data, aes(x = temp_col, y = mean, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    facet_wrap(~ service, scales = "free") +
+    scale_x_reordered() +  
+    labs(
+      title = paste("Mean Ecosystem Service Values,", year),
+      x = col,
+      y = "Mean Value"
+    ) +
+    theme_bw() +
+    theme(
+      strip.text = element_text(face = "bold", size = 12),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 10)
+    )
+  
+  return(p)
+}
+
+# Generate plots for different years using a specified column
+p_1992 <- plot_ecosystem_services(zonal_df, 1992, "region_wb")
+p_2020 <- plot_ecosystem_services(zonal_df, 2020, "region_wb")
+
+# Display the plots
+print(p_1992)
+print(p_2020)
+
+
+```
+
+
+
+
+```{r barplot}
+plot_ecosystem_services_diff <- function(data, col) {
+  data_prepped <- data %>% filter(!is.na(mean)) %>% mutate(temp_col = reorder_within(!!sym(col), -mean, service))
+  
+  ggplot(data_prepped, aes(x = temp_col, y = mean, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    facet_wrap(~ service, scales = "free") +
+    scale_x_reordered() +  
+    labs(title = "Difference in Mean Ecosystem Service Values (1992-2020)",
+         x = col, y = "Mean Difference Value") +
+    theme_bw()
+}
+
+p_diff <- plot_ecosystem_services_diff(zonal_df, col)
+print(p_diff)
+```
+
+
+
+
+
+### 3.3 get change in terms of % (do at the end)
+
+
+
+This is a WIP. I need to be able to add the numbers as columns at the end....nooo
+easier. We are going to calculate them dikrectly fro mthe filtered zonal_df dataframe, but not now. We need to think about the differences calculated and the % of difference. anyway i already have that piece of data. 
+
+```{r extract change in %}
+
+# Function to compute percentage change for all relevant variables in an sf object
+calculate_percentage_change <- function(sf_obj) {
+  # Identify all variables that exist in both 1992 and 2020
+  base_vars <- service#c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination")
+  
+  # Iterate through each variable to compute percentage change
+  for (var in base_vars) {
+    col_1992 <- paste0(var, "_1992")  # Column name for 1992
+    col_2020 <- paste0(var, "_2020")  # Column name for 2020
+    col_pct  <- paste0(var, "_pct_ch")   # New percentage change column
+    
+    # Check if the required columns exist in the sf object
+    if (all(c(col_1992, col_2020) %in% names(sf_obj))) {
+      sf_obj <- sf_obj %>%
+        mutate(!!col_pct := ((!!sym(col_2020) - !!sym(col_1992)) / !!sym(col_1992)) * 100)
+    }
+  }
+  return(sf_obj)
+}
+
+# Apply function to all sf objects in the list
+#pols <- lapply(poly, calculate_percentage_change)
+poly <- calculate_percentage_change(poly)
+# Check the updated column names
+
+# get pct as standalone data to add to the table
+plt <- st_drop_geometry(poly)
+plt  <- plt %>%
+  select(1, contains("pct"))
+################## THIS IS VERY IMPPORTAnt. Instead of struggling  with the multiple dataframes, it is easier to load the vector file swith all the column and pivot longer as necessary. Easier to manage, adjust on the fly!
+plt <- plt %>%
+  pivot_longer(
+    cols = ends_with("pct_ch"),  # Select all columns ending with "pct_ch"
+    names_to = "service",        # New column to store the service names
+    values_to = "pct_ch"         # New column to store the percentage change values
+  )
+
+
+write.csv(plt, here('output_data', paste0('pct_chg_',cols, '.csv')))
+
+#st_write(poly, here('vector', set), append = FALSE) 
+```
+
+
+
+
+## 5. Generate  Maps
+
+Use ggplot2 and the spatial geometry from our sf object to color each polygon by its statistic of interest. Faceting again by each raster is useful to compare spatial patterns.
+```{r create maps, include=FALSE}
+
+
+# First, merge the zonal_df results back into the polygon sf object.
+# This ensures each polygon gets a corresponding mean/median value.
+
+# We need a unique identifier. 
+# Assuming 'country' is unique per polygon, we can do a left_join:
+map_data <- poly %>%
+  left_join(zonal_df, by = "name_long")
+
+map_1992 <- map_data %>% filter(year == 1992)
+services <- unique(map_1992$service)
+map_2020 <-  map_data %>% filter(year == 2020)
+
+
+# 2) Identify unique services
+services <- unique(map_data$service)
+
+# 3) For each service, find min/max across both years
+service_range <- map_data %>%
+  group_by(service) %>%
+  summarize(
+    min_val = min(mean, na.rm = TRUE),
+    max_val = max(mean, na.rm = TRUE),
+    unique_color = unique(color)  # we assume 1 color per service
+  )
+
+plot_list_1992 <- list()
+plot_list_2020 <- list()
+
+for (s in services) {
+  # Extract global range (across both years) for service s
+  row_s <- filter(service_range, service == s)
+  s_min <- row_s$min_val
+  s_max <- row_s$max_val
+  s_color <- row_s$unique_color  # The single "unique" color for that service
+  
+  # Subset to year=1992, that service
+  df_1992 <- map_data %>%
+    filter(service == s, year == 1992)
+  
+  # Subset to year=2020, that service
+  df_2020 <- map_data %>%
+    filter(service == s, year == 2020)
+  
+  # Build the 1992 map
+  p_1992 <- ggplot(df_1992) +
+    geom_sf(aes(fill = mean), color = NA) +
+    scale_fill_gradientn(
+      colors   = c("white", s_color),  # White -> "unique_color"
+      limits   = c(s_min, s_max),      # Force the same scale min/max
+      na.value = "gray40"
+    ) +
+    labs(
+      title = paste0(s, " (1992)"),
+      fill  = "Mean"
+    ) +
+    theme_minimal()
+  
+  # Build the 2020 map
+  p_2020 <- ggplot(df_2020) +
+    geom_sf(aes(fill = mean), color = NA) +
+    scale_fill_gradientn(
+      colors   = c("white", s_color),
+      limits   = c(s_min, s_max),
+      na.value = "gray40"
+    ) +
+    labs(
+      title = paste0(s, " (2020)"),
+      fill  = "Mean"
+    ) +
+    theme_minimal()
+  
+  # Add them to the lists
+  plot_list_1992[[s]] <- p_1992
+  plot_list_2020[[s]] <- p_2020
+}
+```
+
+```{r echo=FALSE, fig.height=12, fig.width=14}
+
+# Combine the 1992 plots in a row (or multi-row if you prefer).
+combined_1992 <- wrap_plots(plot_list_1992, ncol = 3)
+
+# Combine the 2020 plots similarly.
+combined_2020 <- wrap_plots(plot_list_2020, ncol = 3)
+
+combined_1992
+combined_2020
+```
+
+
+
+
+rasters_list <- lapply(tiffes, rast)
+service <- c("Coastal Protection", "Nature Access","Nitrogen Export","Pollination","Sediment Export", "Usle")
+service <- gsub(" ", "_", service)
+
+
+
+
