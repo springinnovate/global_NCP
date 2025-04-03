@@ -24,9 +24,36 @@ generating meaningful visualizations to interpret spatial patterns.
 - **Automate processing steps** to ensure scalability and consistency
   across multiple datasets.
 
+This repository provides a structured workflow to systematically
+extract, analyze, and visualize **zonal statistics** from global
+ecosystem service (ES) raster datasets for specific spatial units. The
+process is built around the R `exactextractr` package and other spatial
+analysis tools. The workflow facilitates extracting summary statistics,
+attaching them as attributes to polygon datasets, and generating
+meaningful visualizations to interpret spatial patterns and changes over
+time.
+
+# Objectives
+
+- **Extract zonal statistics** from global raster datasets for
+  predefined spatial units (e.g., countries, watersheds, biomes).
+- **Integrate statistics into vector data**, attaching them as
+  attributes for further geospatial analysis.
+- **Visualize outputs** through plots and maps to communicate spatial
+  trends and service dynamics.
+- **Enable automation** for large-scale and repeatable workflows,
+  following reproducible science practices.
+
 # Dependencies
 
-The analysis is conducted using **R** with the following key libraries:
+The analysis is conducted using **R** and the following packages:
+
+``` r
+install.packages(c(
+  "sf", "terra", "exactextractr", "ggplot2", "patchwork",
+  "parallel", "tidyverse", "here", "forcats", "kableExtra"
+))
+```
 
 # Workflow
 
@@ -36,7 +63,47 @@ Polygon datasets can be loaded from local vector files (`.gpkg` format)
 or external sources such as **GADM**. Different spatial aggregations are
 considered: **continents, subregions, countries, biomes, watersheds**.
 
-## 2. Load Global Raster Data
+Polygon files are stored in the vector/ directory in .gpkg format.
+Multiple levels of aggregation are supported: - Countries and
+territories - Continents - World Bank regions - Income groups - WWF
+Biomes - Hydrosheds Level 6 and 7 watersheds Dissolved polygon layers
+are generated externally (e.g., in QGIS or ArcGIS) to ensure topology
+and attribute consistency.
+
+## 2. Load Raster Data
+
+Raster inputs are located in input_ES/. They represent global ES values
+modeled with InVEST, covering two key years (1992 and 2020), plus
+multi-year outputs (e.g., 1992–2004 for NDR). Each raster is labeled
+with: Ecosystem service name Year of modeling Units (e.g., kg/ha, people
+fed)
+
+1.  Nitrogen Export. Derived from the Nitrogen retention modeled using
+    the [**InVEST Nutrient Delivery
+    Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
+    Expressed in kg/pixel/year
+
+2.  Sediment Retention. Derived using [**InVEST SDR: Sediment Delivery
+    Ration**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html).
+    Values in ton/pixel/year
+
+3.  Soil Erosion derived using the *Revised Universal Soil Loss
+    Equation-USLE*
+
+4.  Pollination. Derived from [**InVEST SDR: Pollinator Abundance
+    Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html).
+    Units represent Polllination Change in people fed on HABitat. More
+    information in [**Chaplin-Kramer, et
+    al. 2022**](https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-022-01934-5/MediaObjects/41559_2022_1934_MOESM1_ESM.pdf)
+
+5.  Coastal Protection. Unitless measure, refers to a derived
+    vulnerability index. [**InVEST Coastal Vulnerability
+    Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
+
+6.  Nature Access represented as [**the number of people within 1 hour
+    travel of natural and semi-natural
+    lands**](https://github.com/springinnovate/distance-to-hab-with-friction)
+    (Chaplin-Kramer et al, 2022).
 
 The script reads multiple global raster datasets (GeoTIFFs) representing
 different ecosystem services. Raster file paths are dynamically
@@ -56,12 +123,31 @@ service per polygon. Supports additional statistics such as **median,
 standard deviation, and quantiles**. Results are merged with the
 original polygon dataset and exported.
 
-## 5. Extract Statistics for Raster Differences
+## 3. Compute Raster Differences
+
+Temporal differences (e.g., 2020 - 1992) are calculated for each service
+and saved as separate rasters. This step is optional but improves
+clarity in later summaries.
+
+## 4. Extract Zonal Statistics
+
+Using `exactextractr`, summaery metrics (means, stdev, sum, max) are
+computed per polygon. Results are then: - Stored in long and wide
+format - Joined back to the original vector file - Exported as CSV or
+updated .gpkg
+
+## 5. Analyze Differences
 
 Similar to step 4, but applied to the **difference rasters**. Outputs
 summarized trends in ES changes over time.
 
-## 6. Standardize and Fix Column Names
+Zonal statistics can also be extracted directly from difference rasters
+(e.g., NDR_diff_1992_2020.tif), which sometimes gives more robust
+results. Two methods are supported: Compute difference after extracting
+zonal means in the correpsonding column. Extract statistics from
+difference rasters Both are documented and compared.
+
+## 6. Normalize/Standardize Column Names
 
 Automates renaming of columns to maintain consistency across outputs.
 Ensures naming conventions are clear and aligned for visualization and
@@ -69,34 +155,56 @@ GIS integration.
 
 ## 7. Generate Visualizations
 
-    library(ggplot2)
-    library(dplyr)
+A utility step to clean up column names, replacing inconsistent patterns
+(e.g., dots or duplicate separators) with snake_case for easier
+manipulation and plotting.
 
-    plot_ecosystem_services <- function(data, year, col) {
-      data_prepped <- data %>%
-        filter(!is.na(mean) & mean > 0 & year == year) %>%
-        mutate(temp_col = reorder_within(!!sym(col), -mean, service))  
-      
-      ggplot(data_prepped, aes(x = temp_col, y = mean, fill = color)) +
-        geom_bar(stat = "identity", show.legend = FALSE) +
-        scale_fill_identity() +
-        facet_wrap(~ service, scales = "free") +
-        scale_x_reordered() +  
-        labs(title = paste("Mean Ecosystem Service Values,", year),
-             x = col, y = "Mean Value") +
-        theme_bw()
-    }
+## 7. Generate Visualizations
+
+The workflow supports automated charting of top/bottom 5 values per
+service, faceted plots over time, and basin-level change maps. Example
+plotting function:
+
+``` r
+library(ggplot2)
+library(dplyr)
+
+plot_ecosystem_services <- function(data, year, col) {
+  data_prepped <- data %>%
+    filter(!is.na(mean) & mean > 0 & year == year) %>%
+    mutate(temp_col = reorder_within(!!sym(col), -mean, service))  
+  
+  ggplot(data_prepped, aes(x = temp_col, y = mean, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    facet_wrap(~ service, scales = "free") +
+    scale_x_reordered() +  
+    labs(title = paste("Mean Ecosystem Service Values,", year),
+         x = col, y = "Mean Value") +
+    theme_bw()
+}
+```
 
 # Usage
 
 ## Running the Workflow
 
+Clone the repository:
+
     git clone https://github.com/springinnovate/global_NCP.git
-    cd summary-es
+    cd global_NCP
+    Open zonal_stats.Rmd and zonal_stats_hs.Rmd in RStudio and run each section interactively or knit to HTML.
+
+## Running the Workflow
+
+``` r
+git clone https://github.com/springinnovate/global_NCP.git
+cd summary-es
+```
 
 Open `summary_es.Rmd` in **RStudio** and execute all sections.
 
-## Automating Future Runs
+# Automating Future Runs
 
 To streamline processing: - Convert reusable steps into **functions**
 (e.g., loading rasters, extracting statistics, plotting results). -
@@ -104,17 +212,36 @@ Utilize **parameterized reports** for different spatial aggregations. -
 Leverage **parallel processing** (`mclapply`) for faster execution on
 large datasets.
 
-# Future Improvements
+## Recommended practices:
+
+- Wrap reusable logic into R functions
+- Use parameterized reports for different spatial units
+- Enable parallel processing with mclapply (on Unix systems)
+- Export clean vector outputs for visualization in QGIS
+
+# Known (current) Limitations
 
 - Implement dynamic service name detection based on raster filenames.
+
 - Improve handling of **multi-country territories** and **small island
   states**.
+
 - Expand statistical options beyond mean values (e.g., quantiles,
   uncertainty metrics).
 
+- Inconsistent raster file naming sometimes requires manual reordering
+
+- Global models with geosharding currently have issues above 60°N
+
+# Future Work
+
+Support for additional services and years Integration with model output
+pipelines (e.g., InVEST workflows) Interactive dashboards for results
+Simplified config and UI for non-technical users
+
 # License
 
-This project is licensed under the **MIT License**.
+MIT License Contributors
 
 # Contributors
 
@@ -122,3 +249,6 @@ This project is licensed under the **MIT License**.
 
 For any questions or contributions, feel free to open an issue or submit
 a pull request.
+
+Jeronimo Rodriguez Escobar (Primary Author) If you use this workflow or
+have ideas to improve it, feel free to open an issue or pull request.
