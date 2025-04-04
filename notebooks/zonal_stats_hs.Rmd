@@ -59,18 +59,15 @@ library(kableExtra)
 Obtained from [Hydrosheds](https://www.hydrosheds.org/), we are using level 6 and level 7 for the analysis
 
 ```{r load watersheds lev 6}
-sets <- c("hydrosheds_lev6.gpkg", "Hydrosheds_lv7_2.gpkg")
-# Select the tatget datyaset from the list 
-cols <- c("HYBAS_ID", "HYBAS_ID")
-sets <- cbind(sets, cols)
-
-# Set an index to selct the desired dataset
+inpath <- here("vector")
+sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
+# Set an index to select the desired dataset
 
 t <- 2
 # Select the target dataset from the list 
 set <- sets[t]
 # # load polygons
-poly <- st_read(here('vector', set)) 
+poly <- st_read(set) 
 
 
 # Convert to data frame for nicer display
@@ -227,7 +224,7 @@ poly <- left_join(poly,zonal_wide)
 
 
 #st_write(poly, (here('vector', 'hydrosheds_lv7.gpkg')), append=FALSE)
-
+# This is to add a temporal attribute to the data. I am still experimenting here, trying to get some animations or more refined visualizations 
 
 
 # Find all 'sum' columns for N_export

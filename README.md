@@ -9,8 +9,9 @@ zonal summary statistics from global ecosystem service (ES) raster
 datasets and track changes in ES provision over time while linking these
 changes to meaningful spatial units.
 
-The entire process is built around the `exactextractr` package in R,
-which offers efficient and precise zonal statistics for raster data
+The entire process is built around the
+[`exactextractr`](https://github.com/isciences/exactextractr) package in
+‘R’, which offers efficient and precise zonal statistics for raster data
 using polygon geometries. This workflow builds upon this functionality
 and introduces standardized methods to automate extraction, attach
 results as attributes, and visualize patterns across time and space.
@@ -34,14 +35,15 @@ considered: **continents, subregions, countries, biomes, watersheds**.
 Polygon files are stored in the vector/ directory in .gpkg format.
 Multiple levels of aggregation are supported: - Countries and
 territories - Continents - World Bank regions - Income groups - WWF
-Biomes - Hydrosheds Level 6 and 7 watersheds Dissolved polygon layers
-are generated externally (e.g., in QGIS or ArcGIS) to ensure topology
-and attribute consistency.
+Biomes - Hydrosheds Level 6 and 7 watersheds.
+
+Dissolved polygon layers are generated externally (e.g., in QGIS or
+ArcGIS) to ensure topology and attribute consistency.
 
 ## 2. Load Raster Data
 
-Raster inputs are located in input_ES/. They represent global ES values
-modeled with InVEST, covering two key years (1992 and 2020), plus
+Raster inputs are located in ‘input_ES/’. They represent global ES
+values modeled with InVEST, covering two key years (1992 and 2020), plus
 multi-year outputs (e.g., 1992–2004 for NDR). Each raster is labeled
 with: Ecosystem service name Year of modeling Units (e.g., kg/ha, people
 fed)
@@ -73,10 +75,12 @@ fed)
     lands**](https://github.com/springinnovate/distance-to-hab-with-friction)
     (Chaplin-Kramer et al, 2022).
 
-The script reads multiple global raster datasets (GeoTIFFs) representing
-different ecosystem services. Raster file paths are dynamically
-extracted and matched with corresponding **service names** and
-**years**.
+## Input Services
+
+<p div style="display: flex; gap: 10px;">
+<img src="output_maps/OriginalServices_92.png" width="45%" style="margin-right: 10px;"/>
+<img src="output_maps/OriginalServices_2020.png" width="48%" />
+</div>
 
 ## 3. Compute Raster Differences
 
@@ -84,35 +88,40 @@ Calculates **temporal changes** (e.g., **1992 vs. 2020**) for each
 ecosystem service by subtracting raster values. Outputs difference
 rasters are stored for later analysis.
 
+<p div style="display: flex; gap: 10px;">
+<img src="output_maps/OriginalServices_chg_1992_2020.png" style="margin-right: 10px;"/>
+</div>
+
 ## 4. Extract Zonal Statistics
 
-Uses `exactextractr` to compute **mean values** of each ecosystem
-service per polygon. Supports additional statistics such as **median,
-standard deviation, and quantiles**. Results are merged with the
-original polygon dataset and exported.
+Uses `exactextractr` to compute different summary statistics (mean,
+stdev, sum) of each ecosystem service per polygon for each year.
+Supports additional statistics such as **median, standard deviation, and
+quantiles**. Result values are joined to the original polygon dataset
+and exported.
 
-## 5. Analyze Differences
+We apply the same approach to Similar to step 4, but to the bi temporal
+**difference rasters**. Outputs summarized trends in ES changes over
+time.
 
-Similar to step 4, but applied to the **difference rasters**. Outputs
-summarized trends in ES changes over time.
-
-Zonal statistics can also be extracted directly from difference rasters
-(e.g., NDR_diff_1992_2020.tif), which sometimes gives more robust
-results. Two methods are supported: Compute difference after extracting
-zonal means in the correpsonding column. Extract statistics from
-difference rasters Both are documented and compared.
+Zonal statistics where extracted directly from difference rasters (e.g.,
+NDR_diff_1992_2020.tif), or the differneces can be calcualted from the
+extracted summary values for the individual years. The result is very
+similar but not identical, and i am still figuring out what this
+actually means. I suspect extracting the value direcly from the input
+rasters is a more robust method, but is more demanding computationally.
 
 ## 6. Normalize/Standardize Column Names
 
 Automates renaming of columns to maintain consistency across outputs.
-Ensures naming conventions are clear and aligned for visualization and
-GIS integration.
+Ensures naming conventions are clear and facilitates data visualization
+and map production.
 
 ## 7. Generate Visualizations
 
-The workflow supports automated charting of top/bottom 5 values per
-service, faceted plots over time, and basin-level change maps. Example
-plotting function:
+The workflow supports charting of top/bottom 5 values per service,
+faceted plots over time, and basin-level change maps. Example plotting
+function:
 
 ``` r
 library(ggplot2)
@@ -134,6 +143,18 @@ plot_ecosystem_services <- function(data, year, col) {
 }
 ```
 
+The % of change in NDR at the hydroshed level for 5 different time
+points (1992,1995,1998,2001 and 2004) are mapped here: *All values*:
+<p div style="display: flex; gap: 10px;">
+<img src="output_maps/Hydrosheds_2_1.png" style="margin-right: 10px;"/>
+</div>
+
+*Top/bottom values*
+
+<p div style="display: flex; gap: 10px;">
+<img src="output_maps/Hydrosheds_2.png" style="margin-right: 10px;"/>
+</div>
+
 # Usage
 
 ## Running the Workflow
@@ -141,10 +162,11 @@ plot_ecosystem_services <- function(data, year, col) {
 Clone the repository:
 
     git clone https://github.com/springinnovate/global_NCP.git
-    cd global_NCP
-    Open zonal_stats.Rmd and zonal_stats_hs.Rmd in RStudio and run each section interactively or knit to HTML.
+    cd notebooks
+    Open zonal_stats.Rmd and zonal_stats_hs.Rmd in RStudio and run each section interactively or knit to HTML. to recreate the extraction. Charting is done in visualizations.Rmd
 
-The Data to run the analyisis is stored in thie OnedRive.
+The raster and vector data required to run the analysis are stored in
+the shared OneDrive workspace.
 
 # Automating Future Runs
 
