@@ -7,48 +7,12 @@ output: github_document
 
 # Overview
 
+Structured workflow to systematically extract, analyze, and visualize zonal summary statistics from global ecosystem service (ES) raster datasets and track changes in ES provision over time while linking these changes to meaningful spatial units.
 
-This repository provides a structured workflow to systematically
-extract, analyze, and visualize **zonal statistics** from global
-ecosystem service (ES) raster datasets for specific spatial units. The
-process is built around the **R `exactextractr` package** and other
-spatial analysis tools. The workflow facilitates extracting summary
-statistics, attaching them as attributes to polygon datasets, and
-generating meaningful visualizations to interpret spatial patterns.
+The entire process is built around the `exactextractr` package in R, which offers efficient and precise zonal statistics for raster data using polygon geometries. This workflow builds upon this functionality and introduces standardized methods to automate extraction, attach results as attributes, and visualize patterns across time and space.
 
-# Objectives
-
--   **Extract zonal statistics** from global raster datasets for
-    predefined spatial units (e.g., countries, watersheds, biomes, or
-    grid cells).
--   **Label and integrate extracted statistics** into vector datasets
-    for further geospatial analysis.
--   **Generate visualizations** such as bar plots and maps to represent
-    spatial patterns and temporal changes.
--   **Automate processing steps** to ensure scalability and consistency
-    across multiple datasets.
-
-This repository provides a structured workflow to systematically extract, analyze, and visualize **zonal statistics** from global ecosystem service (ES) raster datasets for specific spatial units. The process is built around the R `exactextractr` package and other spatial analysis tools. The workflow facilitates extracting summary statistics, attaching them as attributes to polygon datasets, and generating meaningful visualizations to interpret spatial patterns and changes over time.
-
-# Objectives
-
--   **Extract zonal statistics** from global raster datasets for predefined spatial units (e.g., countries, watersheds, biomes).
--   **Integrate statistics into vector data**, attaching them as attributes for further geospatial analysis.
--   **Visualize outputs** through plots and maps to communicate spatial trends and service dynamics.
--   **Enable automation** for large-scale and repeatable workflows, following reproducible science practices.
-
-
-# Dependencies
-
-The analysis is conducted using **R** and the following packages:
-
-
-``` r
-install.packages(c(
-  "sf", "terra", "exactextractr", "ggplot2", "patchwork",
-  "parallel", "tidyverse", "here", "forcats", "kableExtra"
-))
-```
+This still is a preliminary exploratory phase,  we’re developing and refining methods to characterize spatial-temporal patterns in ES provision using modeled raster outputs (e.g., InVEST). Initial tests were performed using countries, regions, and income groups to test the concept. 
+Now focus on hydrological basins—the same spatial framework used for many of the ES models themselves—to enhance alignment between model resolution and spatial unit of analysis.
 
 
 # Workflow
@@ -98,14 +62,6 @@ service per polygon. Supports additional statistics such as **median,
 standard deviation, and quantiles**. Results are merged with the
 original polygon dataset and exported.
 
-## 3. Compute Raster Differences
-
-Temporal differences (e.g., 2020 - 1992) are calculated for each service and saved as separate rasters. This step is optional but improves clarity in later summaries.
-
-## 4. Extract Zonal Statistics
-
-Using `exactextractr`, summaery metrics (means, stdev, sum, max) are computed per polygon. Results are then: - Stored in long and wide format - Joined back to the original vector file - Exported as CSV or updated .gpkg
-
 
 ## 5. Analyze Differences
 
@@ -122,11 +78,6 @@ Automates renaming of columns to maintain consistency across outputs.
 Ensures naming conventions are clear and aligned for visualization and
 GIS integration.
 
-## 7. Generate Visualizations
-
-       
-
-A utility step to clean up column names, replacing inconsistent patterns (e.g., dots or duplicate separators) with snake_case for easier manipulation and plotting.
 
 ## 7. Generate Visualizations
 
@@ -166,14 +117,8 @@ cd global_NCP
 Open zonal_stats.Rmd and zonal_stats_hs.Rmd in RStudio and run each section interactively or knit to HTML.
 ```
 
-## Running the Workflow
 
-```{r run_workflow, eval=FALSE}
-git clone https://github.com/springinnovate/global_NCP.git
-cd summary-es
-```
-
-Open `summary_es.Rmd` in **RStudio** and execute all sections.
+The Data to run the analyisis is stored in thie OnedRive. 
 
 # Automating Future Runs
 
@@ -183,13 +128,6 @@ To streamline processing: - Convert reusable steps into **functions**
 Utilize **parameterized reports** for different spatial aggregations. -
 Leverage **parallel processing** (`mclapply`) for faster execution on
 large datasets.
-
-## Recommended practices:
-- Wrap reusable logic into R functions
-- Use parameterized reports for different spatial units
-- Enable parallel processing with mclapply (on Unix systems)
-- Export clean vector outputs for visualization in QGIS
-
 
 # Known (current) Limitations
 
@@ -223,7 +161,3 @@ Contributors
 
 For any questions or contributions, feel free to open an issue or submit
 a pull request.
-
-Jeronimo Rodriguez Escobar (Primary Author)
-If you use this workflow or have ideas to improve it, feel free to open an issue or pull request.
-
