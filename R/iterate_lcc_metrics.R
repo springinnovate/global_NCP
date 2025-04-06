@@ -9,6 +9,7 @@
 #' @param verbose Logical. If TRUE, prints progress.
 #' @param mc Logical. If TRUE, uses parallel::mclapply for parallel execution.
 #' @param ncores Integer. Number of cores to use if `mc = TRUE`. Default is NULL.
+#' @param digits Integer. Number of decimal digits to keep in the change metrics (passed to diffTablej). Default is 0.
 #'
 #' @return A single data.frame with land cover change metrics for all year steps and polygon units.
 #' @export
@@ -19,7 +20,8 @@
 #' #                    id_col = "id")
 #'
 iterate_lcc_metrics <- function(raster_list, polygons, id_col = "id", 
-                                percent = TRUE, verbose = TRUE, mc = FALSE, ncores = NULL) {
+                                percent = TRUE, verbose = TRUE, mc = FALSE, ncores = NULL,
+                                digits = 0) {
   stopifnot(is.list(raster_list) && all(sapply(raster_list, inherits, "SpatRaster")))
   
   if (!mc && !is.null(ncores)) {
@@ -40,7 +42,8 @@ iterate_lcc_metrics <- function(raster_list, polygons, id_col = "id",
       year_step = paste0(y2, "_", y1),
       percent = percent,
       mc = mc,
-      ncores = ncores
+      ncores = ncores,
+      digits = digits
     )
   })
   
