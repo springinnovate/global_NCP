@@ -1,10 +1,24 @@
 ---
-title: "LC Reclassify"
-output: html_notebook
+title: "Land Cover Change Metrics Workflow"
+author: "Jeronimo Rodriguez-Escobar"
+output: html_document
 ---
 
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+# source the helper functions
+source("utils_lcc_metrics.R")
+```
 
-Here i am creating my maps of land cover change. Just from natuiral to tramnsformed. As usual, this is easier said thatn done
+
+Here i am creating my maps of land cover change. Just from natuiral to tramnsformed. As usual, this is easier said that n done
 
 
 ```{r load LC maps}
@@ -65,6 +79,69 @@ lapply(1:length(raster_list), function(x) writeRaster(raster_list[[x]], paste0(h
 
 ```
 
+## Load Inputs
+
+```{r load-data}
+# Example file paths (replace with actual paths)
+landcover_files <- list.files("input_ES/landcover_reclassified", 
+                              pattern = "^lcc_\\d{4}.*tif$", full.names = TRUE)
+
+# Name rasters by year
+names(landcover_files) <- stringr::str_extract(basename(landcover_files), "\\d{4}")
+landcover_rasters <- lapply(landcover_files, terra::rast)
+
+# Load polygon spatial units (e.g., HydroBASINS level 6)
+basins <- st_read("vector/hydrosheds_lev6.gpkg")
+```
+
+## Run Land Cover Change Metric Extraction
+
+```{r run-extraction}
+lcc_metrics_df <- iterate_zonal_lcc_metrics(
+  rasters = landcover_rasters,
+  polygons = basins,
+  id_col = "HYBAS_ID",
+  percent = TRUE,
+  verbose = TRUE
+)
+
+# Save to CSV (optional)
+readr::write_csv(lcc_metrics_df, "output_data/lcc_metrics_results.csv")
+```
+
+## Inspect Results
+
+```{r summarize-results}
+# Summarize by year and metric
+summary_df <- lcc_metrics_df %>%
+  group_by(year_step, Category) %>%
+  summarize(across(c(Gain, Persistence, Loss, Quantity, Exchange, Shift), 
+                   mean, na.rm = TRUE), .groups = "drop")
+
+# Preview
+head(summary_df)
+```
+
+## Plot Change Metrics Over Time
+
+```{r plot-changes}
+ggplot(summary_df, aes(x = year_step, y = Gain, group = Category, color = Category)) +
+  geom_line(size = 1) +
+  geom_point() +
+  labs(title = "Average Gain in Transformed vs Natural Land Over Time",
+       x = "Year Step",
+       y = "% Area Changed") +
+  theme_minimal()
+```
+
+---
+
+This RMarkdown file shows how to:
+
+1. Load land cover rasters and polygon units
+2. Apply `extract_zonal_lcc_metrics()` and `iterate_zonal_lcc_metrics()`
+3. Export the results
+4. Summarize and plot key land cover transition metrics
 
 
 ```{r landcover_differ_change, message=TRUE, warning=FALSE, eval=FALSE}
