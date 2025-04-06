@@ -97,7 +97,7 @@ landcover_rasters <- lapply(landcover_files, terra::rast)
 # Load polygon spatial units (e.g., HydroBASINS level 6)
 #prelimnarily test only in South America and on;y fpr 3 years. 
 basins <- st_read(here('hydrosheds',"hybas_sa_lev01-12_v1c", "hybas_sa_lev06_v1c.shp"))
-#basins <- st_read(here("vector", "hydrosheds_lev6.gpkg"))
+basins <- st_read(here("vector", "hydrosheds_lev6.gpkg"))
 ```
 
 ## Run Land Cover Change Metric Extraction
@@ -110,13 +110,14 @@ lcc_metrics_df <- iterate_lcc_metrics(
   percent = TRUE,
   verbose = TRUE,
   mc = TRUE,
-  ncores = 3
+  ncores = 12,
+  digits = 3
 )
 
 
 
 # Save to CSV (optional)
-readr::write_csv(lcc_metrics_df, "output_data/lcc_ch_metrics_lv6.csv")
+#readr::write_csv(lcc_metrics_df, "output_data/lcc_ch_metrics_lv6.csv")
 ```
 
 ## Inspect Results
