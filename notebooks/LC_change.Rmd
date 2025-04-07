@@ -95,8 +95,7 @@ names(landcover_files) <- stringr::str_extract(basename(landcover_files), "\\d{4
 landcover_rasters <- lapply(landcover_files, terra::rast)
 
 # Load polygon spatial units (e.g., HydroBASINS level 6)
-#prelimnarily test only in South America and on;y fpr 3 years. 
-basins <- st_read(here('hydrosheds',"hybas_sa_lev01-12_v1c", "hybas_sa_lev06_v1c.shp"))
+
 basins <- st_read(here("vector", "hydrosheds_lev6.gpkg"))
 ```
 
@@ -115,7 +114,33 @@ lcc_metrics_df <- iterate_lcc_metrics(
 )
 
 
+lcc_metrics_wide <- lcc_metrics_df %>%
+  tidyr::pivot_wider(
+    id_cols = c(cols[1]),
+    names_from = c(Category, year_step),
+    values_from = c(Gain, Persistence, Loss, Quantity, Exchange, Shift),
+    names_glue = "{.value}_{Category}_{year_step}"
+  )
 
+# Remove service change attributes from poly (btw, to avoid this is we can save each appended dataset as a new layer in the geopakage)
+basins <- basins[c(1:13)]
+
+class(basins$HYBAS_ID)
+
+class(lcc_metrics_wide$HYBAS_ID)
+
+
+# Convert both to character, just to be safe
+basins <- basins %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+lcc_metrics_wide <- lcc_metrics_wide %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+head(sort(basins$HYBAS_ID))
+head(sort(lcc_metrics_wide$HYBAS_ID))
+
+
+basins <- left_join(basins, lcc_metrics_wide)
+
+
+sf::st_write(basins, here("vector", "hydrosheds_lev6.gpkg"), layer = "lcc_change_metrics", append = FALSE)
 # Save to CSV (optional)
 #readr::write_csv(lcc_metrics_df, "output_data/lcc_ch_metrics_lv6.csv")
 ```
