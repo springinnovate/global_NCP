@@ -2,7 +2,8 @@
 % Please edit documentation in R/utils_lcc_metrics.R
 \name{extract_lcc_metrics}
 \alias{extract_lcc_metrics}
-\title{Extract zonal land cover change metrics from raster pairs}
+\title{Extract zonal land cover change metrics from raster pairs
+Extract zonal land cover change metrics from raster pairs}
 \usage{
 extract_lcc_metrics(
   r1,
@@ -11,7 +12,9 @@ extract_lcc_metrics(
   id_col = "id",
   year_step = NULL,
   percent = TRUE,
-  mc = FALSE
+  mc = FALSE,
+  ncores = NULL,
+  digits = 0
 )
 }
 \arguments{
@@ -28,11 +31,15 @@ extract_lcc_metrics(
 \item{percent}{Logical. If TRUE, values are in percentage; otherwise, in pixel counts.}
 
 \item{mc}{Logical. If TRUE, uses mclapply for parallel execution (Unix only). Default is FALSE.}
+
+\item{ncores}{Integer. Number of cores to use if \code{mc = TRUE}. Default is NULL.}
+
+\item{digits}{Integer. Number of decimal digits to keep in the change metrics. Default is 0.}
 }
 \value{
 A data.frame with metrics labeled by ID and year_step.
 }
 \description{
-Applies diffeR::crosstabm and diffeR::difftablej to compute land cover change metrics
+Applies diffeR::crosstabm and diffeR::diffTablej to compute land cover change metrics
 between two SpatRaster layers over each polygon unit in an \code{sf} object.
 }
