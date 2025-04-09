@@ -4,6 +4,17 @@ author: "Jeronimo Rodriguez-Escobar"
 output: html_document
 ---
 
+---
+
+This RMarkdown file shows how to:
+
+1. Load land cover classification rasters and polygon units
+2. E
+2. Apply `extract_zonal_lcc_metrics()` and `iterate_zonal_lcc_metrics()`
+3. Append the extracted metrics to the input polygon data.
+4. Summarize and plot key land cover transition metrics
+
+
 ```{r setup, message=FALSE, warning=FALSE}
 library(terra)
 library(sf)
@@ -96,7 +107,7 @@ landcover_rasters <- lapply(landcover_files, terra::rast)
 
 # Load polygon spatial units (e.g., HydroBASINS level 6)
 
-basins <- st_read(here("vector", "hydrosheds_lev6.gpkg"))
+basins <- st_read(here("vector", "hydrosheds_lv7.gpkg"))
 ```
 
 ## Run Land Cover Change Metric Extraction
@@ -129,18 +140,16 @@ class(basins$HYBAS_ID)
 
 class(lcc_metrics_wide$HYBAS_ID)
 
-
 # Convert both to character, just to be safe
 basins <- basins %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
 lcc_metrics_wide <- lcc_metrics_wide %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
 head(sort(basins$HYBAS_ID))
 head(sort(lcc_metrics_wide$HYBAS_ID))
 
-
 basins <- left_join(basins, lcc_metrics_wide)
 
 
-sf::st_write(basins, here("vector", "hydrosheds_lev6.gpkg"), layer = "lcc_change_metrics", append = FALSE)
+sf::st_write(basins, here("vector", "hydrosheds_lv7.gpkg"), layer = "lcc_change_metrics", append = FALSE)
 # Save to CSV (optional)
 #readr::write_csv(lcc_metrics_df, "output_data/lcc_ch_metrics_lv6.csv")
 ```
@@ -157,7 +166,36 @@ summary_df <- lcc_metrics_df %>%
 # Preview
 head(summary_df)
 ```
+```{r produce reference for the attributes}
 
+# Extract column names (excluding ID column)
+col_names <- names(lcc_metrics_wide)[!names(lcc_metrics_wide) %in% c("HYBAS_ID")]
+
+# Parse components from column names using regex
+ref_df <- tibble(
+  column_name = col_names
+) %>%
+  mutate(
+    component = str_extract(column_name, "^(Gain|Persistence|Loss|Quantity|Exchange|Shift)"),
+    class = case_when(
+      str_detect(column_name, "_1_") ~ "Transformed (class 1)",
+      str_detect(column_name, "_2_") ~ "Natural (class 2)",
+      str_detect(column_name, "_Overall_") ~ "Overall change",
+      TRUE ~ "Unknown"
+    ),
+    year_step = str_extract(column_name, "[0-9]{4}_[0-9]{4}"),
+    description = paste(component, "for", class, "during", year_step)
+  )
+
+# Optional: arrange for readability
+ref_df <- ref_df %>% select(column_name, description)
+
+# Write output as reference CSV
+write.csv(ref_df, here("vector", "lcc_column_reference.csv"))
+
+
+
+```
 ## Plot Change Metrics Over Time
 
 ```{r plot-changes}
@@ -170,14 +208,7 @@ ggplot(summary_df, aes(x = year_step, y = Gain, group = Category, color = Catego
   theme_minimal()
 ```
 
----
 
-This RMarkdown file shows how to:
-
-1. Load land cover rasters and polygon units
-2. Apply `extract_zonal_lcc_metrics()` and `iterate_zonal_lcc_metrics()`
-3. Export the results
-4. Summarize and plot key land cover transition metrics
 
 
 ```{r landcover_differ_change, message=TRUE, warning=FALSE, eval=FALSE}
