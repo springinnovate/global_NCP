@@ -33,12 +33,20 @@ or external sources such as **GADM**. Different spatial aggregations are
 considered: **continents, subregions, countries, biomes, watersheds**.
 
 Polygon files are stored in the vector/ directory in .gpkg format.
-Multiple levels of aggregation are supported: - Countries and
-territories - Continents - World Bank regions - Income groups - WWF
-Biomes - Hydrosheds Level 6 and 7 watersheds.
+Multiple levels of aggregation are currently included :
 
-Dissolved polygon layers are generated externally (e.g., in QGIS or
-ArcGIS) to ensure topology and attribute consistency.
+- Countries and territories
+- Continents
+- World Bank regions
+- Income groups Derived from the global teritories dataset
+  *cartographic_ee_ee_r264_correspondence.gpkg* (Provided by Justin
+  Johnson) Dissolved polygon layers are generated externally (e.g., in
+  QGIS or ArcGIS) to ensure topology and attribute consistency.
+
+Additionally two other global polygon datasets where used:
+
+- WWF Biomes
+- Hydrosheds Level 6 and 7 watersheds.
 
 ## 2. Load Raster Data
 
