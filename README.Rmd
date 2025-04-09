@@ -5,7 +5,6 @@ output: github_document
 ---
 
 
-
 ##### ####
 
 # Overview
@@ -49,6 +48,7 @@ All layers are provided as `.gpkg` files.
 
 ## Raster Layers 
 
+
 Raster inputs are located in 'input_ES/'. They represent global ES values modeled with InVEST, covering two key years (1992 and 2020), plus multi-year outputs (e.g., 1992–2004 for NDR). Each raster is labeled with: Ecosystem service name Year of modeling Units (e.g., kg/ha, people fed)
 
 1.  Nitrogen Export. Derived from the Nitrogen retention modeled using the [**InVEST Nutrient Delivery Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html). Expressed in kg/pixel/year
@@ -84,6 +84,7 @@ Additionally, reclassified **ESA LC 300m** maps (1992–2020) are used for land 
 
 # Workflow Steps
 
+
 ## 1. Extract Zonal Summary Statistics for ES Rasters
 
 Using `exactextractr`, compute mean values per polygon unit for each raster. This is repeated for 1992 and 2020 layers, then differences are calculated.
@@ -91,6 +92,7 @@ Using `exactextractr`, compute mean values per polygon unit for each raster. Thi
 ## 2. Analyze Change Over Time
 
 For multi-year modeled outputs (e.g., NDR from 1992 to 2004), compute % change and trends per spatial unit. Results are stored in long format and pivoted as needed.
+
 
 
 ## 3. Land Cover Change Analysis Using Contingency Matrices
@@ -112,6 +114,7 @@ The following metrics are computed for each class and overall:
 
 These metrics are produced for each **polygon** and each **temporal transition** (e.g., 1992–1995, 1995–1998, ...).
 
+
 ### Example Output Table (Long Format)
 
 | Category | Gain  | Persistence | Loss  | Quantity | Exchange | Shift | HYBAS_ID | year_step |
@@ -121,6 +124,7 @@ These metrics are produced for each **polygon** and each **temporal transition**
 | Overall  | 0.004 | 99.996      | 0.004 | 0.004    | 0.000    | 0.000  | 1070000010 | 1995_1992 |
 
 ### Example Pivoted Output for Export
+
 
 ```r
 lcc_metrics_wide <- lcc_metrics_df %>%
@@ -139,11 +143,14 @@ basins_export <- left_join(basins, lcc_metrics_wide, by = "HYBAS_ID")
 st_write(basins_export, "vector/basins.gpkg", layer = "lcc_change_metrics", append = FALSE)
 ```
 
+
 ---
 
 # Visualization & Interpretation
 
 Bar plots and faceted maps are created using `ggplot2`. Changes can be visualized per service or per transition.
+
+
 
 ![](outputs/es_change_barplot.png)
 
@@ -173,5 +180,8 @@ MIT License
 **Jeronimo Rodriguez-Escobar**  
 Primary author and developer
 
+
 For questions or contributions, please [open an issue](https://github.com/springinnovate/global_NCP/issues) or submit a pull request.
+
+
 
