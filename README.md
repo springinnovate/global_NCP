@@ -2,158 +2,190 @@ README
 ================
 Jeronimo Rodriguez Escobar
 
-##### 
-
 # Overview
 
-This repository documents the development of a structured and scalable
-workflow to extract, analyze, and visualize **zonal summary statistics**
-from global **ecosystem service (ES)** and **land cover (LC)** raster
-datasets using meaningful spatial units such as hydrological basins,
-countries, income groups, or WWF biomes.
+Working version of a structured workflow for extracting, analyzing, and
+visualizing **zonal summary statistics** from global **ecosystem service
+(ES)** and **land cover (LC)** raster datasets. The analysis focuses on
+detecting spatial and temporal change using multiple modeling outputs
+and spatial aggregation levels (e.g., countries, income groups, basins).
 
-At its core, the workflow relies on the
-[`exactextractr`](https://github.com/isciences/exactextractr) package in
-R, which enables fast and precise zonal operations between raster and
-vector data. The extracted statistics are systematically attached to
-polygon geometries and exported for downstream use in GIS software,
-tabular analysis, or visualization.
+The core of this workflow is built around the R package
+[`exactextractr`](https://github.com/isciences/exactextractr), which
+allows for efficient zonal statistics operations between raster and
+vector data. More recent additions to the workflow include:
 
-Recent additions extend the functionality beyond two-date comparisons,
-introducing:
+- Temporal analysis of **Nitrogen Delivery Ratio (NDR)** using modeled
+  global outputs from 1992–2004.
+- Systematic **land cover change analysis** using square contingency
+  matrices and change components from the
+  [`diffeR`](https://cran.r-project.org/package=diffeR) package,
+  following the approach proposed by Pontius and Santacruz.
+- Use of reclassified global land cover maps (ESA 300m) into **natural**
+  and **transformed** classes.
+- Modular, parallelized processing over large vector datasets (e.g.,
+  16,000+ basins at HydroBASINS level 6).
 
-- **Multi-temporal analysis** of **Nitrogen Delivery Ratio (NDR)** using
-  modeled outputs for 1992, 1995, 1998, 2001, and 2004.
-- **Systematic land cover change analysis**, using square contingency
-  matrices and change metrics from the
-  [`diffeR`](https://cran.r-project.org/package=diffeR) package. These
-  methods quantify not only the amount of change, but its structure —
-  separating **gain**, **loss**, **persistence**, **exchange**, and
-  **shift**
-- **Modular and parallelized functions** for batch-processing raster
-  data across thousands of spatial units (e.g., HydroBASINS levels 6 and
-  7), minimizing memory overhead and improving reproducibility.
+These tools and methods are designed to enable rapid and reproducible
+summaries of change in ES provision and land cover composition across
+any defined spatial units — from countries and continents to basins and
+sub-basins.
 
-This framework supports early-stage exploration of ES and LC dynamics,
-with the potential to scale toward regular monitoring, hotspot
-detection, and distributional equity analysis across jurisdictions and
-social groups.
+### Key Capabilities
+
+- Temporal analysis of **Nitrogen Delivery Ratio (NDR)** using modeled
+  outputs from 1992–2004.
+- Land cover change detection using ESA 300m global maps reclassified
+  into **natural vs. transformed**.
+- Application of **change metrics** to land cover matrices.
+- Fully parallelized, reusable functions for batch analysis over
+  multiple spatial units
+- Modular and reproducible architecture for application to any polygon
+  layer (countries, income groups, basins, etc.).
 
 # Objectives
 
-- Extract zonal summary statistics from global ES raster layers.
-- Compute multi-year trends and **percent changes** in ES provision.
-- Reclassify global land cover into **natural** and **transformed**
-  categories and analyze change dynamics using square contingency
-  matrices.
-- Derive and summarize **components of land cover change** per unit
-  (gain, persistence, loss, quantity, exchange, shift).
-- Join outputs to spatial polygon datasets for export, visualization, or
-  spatial modeling.
+- Extract and standardize zonal summary statistics for ES rasters using
+  `exactextractr`.
+- Compute multi-year percentage changes in ES provision (e.g.,
+  1992–2020).
+- Compute **land cover change matrices** and summarize **gain, loss,
+  persistence, exchange**, and other components using `diffeR`.
+- Merge all statistics into the input vector files and export for
+  visualization or further analysis.
+- Provide reusable functions and scalable workflows.
 
 # Input Data
 
-## Vector Layers
+- Raster datasets are stored in the `input_ES/` folder.
+- Polygon vector datasets are stored in the `vector/` folder and include
+  country boundaries, income groupings, WWF biomes, and HydroBASINS
+  levels 6 and 7.
 
-Polygon datasets can be loaded from local vector files (`.gpkg` format)
-or external sources such as **GADM**. Different spatial aggregations are
-considered: **continents, subregions, countries, biomes, watersheds**.
+## Modeled Ecosystem Services
 
-Vector data are stored in the `vector/` directory and include:
+1.  **Nitrogen Export**  
+    [InVEST
+    NDR](https://naturalcapitalproject.stanford.edu/software/invest):
+    kg/pixel/year
 
-- Country-level boundaries
-- WWF Biomes
-- Income and WB region groups
-- Hydrological units from
-  [HydroSHEDS](https://www.hydrosheds.org/products/hydrobasins) (levels
-  6 and 7)
+2.  **Sediment Retention**  
+    [InVEST
+    SDR](https://naturalcapitalproject.stanford.edu/software/invest):
+    ton/pixel/year
 
-All layers are provided as `.gpkg` files.
+3.  **Soil Erosion**  
+    Derived from the *Revised Universal Soil Loss Equation*
+    [USLE](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html)
 
-## Raster Layers
+4.  **Pollination**  
+    [InVEST Pollination
+    Model](https://naturalcapitalproject.stanford.edu/software/invest):
+    People fed on habitat
 
-Raster inputs are located in ‘input_ES/’. They represent global ES
-values modeled with InVEST, covering two key years (1992 and 2020), plus
-multi-year outputs (e.g., 1992–2004 for NDR). Each raster is labeled
-with: Ecosystem service name Year of modeling Units (e.g., kg/ha, people
-fed)
+5.  **Coastal Protection**  
+    [InVEST Coastal
+    Vulnerability](https://naturalcapitalproject.stanford.edu/software/invest):
+    Unitless vulnerability index
 
-1.  Nitrogen Export. Derived from the Nitrogen retention modeled using
-    the [**InVEST Nutrient Delivery
-    Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
-    Expressed in kg/pixel/year
+6.  **Nature Access**  
+    [Distance-to-nature
+    dataset](https://github.com/springinnovate/distance-to-hab-with-friction):
+    Population within 1 hour
 
-2.  Sediment Retention. Derived using [**InVEST SDR: Sediment Delivery
-    Ration**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html).
-    Values in ton/pixel/year
+## Input Services
 
-3.  Soil Erosion derived using the *Revised Universal Soil Loss
-    Equation-USLE*
+<div style="display: flex; gap: 10px;">
 
-4.  Pollination. Derived from [**InVEST SDR: Pollinator Abundance
-    Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html).
-    Units represent Polllination Change in people fed on HABitat. More
-    information in [**Chaplin-Kramer, et
-    al. 2022**](https://static-content.springer.com/esm/art%3A10.1038%2Fs41559-022-01934-5/MediaObjects/41559_2022_1934_MOESM1_ESM.pdf)
+<img src="output_maps/OriginalServices_92.png" width="45%" />
+<img src="output_maps/OriginalServices_2020.png" width="45%" />
 
-5.  Coastal Protection. Unitless measure, refers to a derived
-    vulnerability index. [**InVEST Coastal Vulnerability
-    Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
-
-6.  Nature Access represented as [**the number of people within 1 hour
-    travel of natural and semi-natural
-    lands**](https://github.com/springinnovate/distance-to-hab-with-friction)
-    (Chaplin-Kramer et al, 2022).
-
-Additionally, reclassified **ESA LC 300m** maps (1992–2020) are used for
-land cover change analysis. LC is simplified into two classes:
-
-- 1: Transformed land (cropland, urban, etc.)
-- 2: Natural land cover (forest, grassland, wetlands, etc.)
-
-<p div style="display: flex; gap: 10px;">
-<img src="output_maps/OriginalServices_92.png" width="45%" style="margin-right: 10px;"/>
-<img src="output_maps/OriginalServices_2020.png" width="48%" />
-</div>
-
-# Differences
-
-<p div style="display: flex; gap: 10px;">
-<img src="output_maps/OriginalServices_chg_1992_2020.png" style="margin-right: 10px;"/>
 </div>
 
 ------------------------------------------------------------------------
 
-Clone the repository:
+## Land Cover Layers
 
-    git clone https://github.com/springinnovate/global_NCP.git
-    cd global_NCP
-    Open zonal_stats.Rmd zonal_stats_hs.Rmd and LC_change.Rmd in RStudio and run each section interactively or knit to HTML.
+Global land cover maps are based on ESA 300m layers. These are
+reclassified into:
 
-# Workflow Steps
+- Class 1: Transformed
+- Class 2: Natural
 
-## 1. Extract Zonal Summary Statistics for ES Rasters
+Currently, the land cover change analysis includes 8 modeled time
+points. A simplified two-class system is used to ensure tractability for
+now, with plans to expand into finer class differentiation.
 
-Using `exactextractr`, compute mean values per polygon unit for each
-raster. This is repeated for 1992 and 2020 layers, then differences are
-calculated.
+# Workflow
 
-## 2. Analyze Change Over Time
+## 1. Load Polygon Data
 
-For multi-year modeled outputs (e.g., NDR from 1992 to 2004), compute %
-change and trends per spatial unit. Results are stored in long format
-and pivoted as needed.
+Polygon datasets are stored in the `vector/` directory in `.gpkg` format
+and include:
 
-## 3. Land Cover Change Analysis Using Contingency Matrices
+- Countries and territories
+- Continents
+- World Bank regions
+- Income groups
+- WWF biomes
+- HydroBASINS (Levels 6 & 7)
 
-Land cover transitions are analyzed between successive dates using the
-`diffeR::crosstabm()` and `diffeR::diffTablej()` functions.
+Layers are dissolved externally (e.g., in QGIS) to ensure topology and
+attribute consistency.
 
-For each polygon (e.g., basin), we compute a **square contingency
-matrix** that summarizes pixel transitions between natural and
-transformed classes.
+## 2. Load Raster Data
 
-### Change Components Extracted
+Raster inputs are located in `input_ES/`. These represent global ES
+models for 1992 and 2020 (and intermediate years for NDR). Relative path
+to the specifc sub directories and routines to list and load the input
+data are included in the Rmd notebooks.
+
+## 3. Compute Raster Differences
+
+Temporal changes are computed by subtracting raster values between years
+(e.g., `ES_2020 - ES_1992`) to generate bi-temporal **difference
+rasters**.
+
+<div style="display: flex; gap: 10px;">
+
+<img src="output_maps/OriginalServices_chg_1992_2020.png" width="60%" />
+
+</div>
+
+## 4. Extract Zonal Statistics
+
+Zonal statistics (mean, sum, stdev) are extracted using
+`exactextractr::exact_extract()` and joined back to the polygons.
+
+Zonal statistics are extracted: - Directly from the **ES rasters** (per
+year) - Directly from the **difference rasters**
+
+The two approaches produce nearly identical results, although extracting
+from difference rasters may be more robust.
+
+## 5. Land Cover Change Detection
+
+For the land cover component, ESA 300m land cover maps were reclassified
+into two categories:
+
+- **1 = Transformed**
+- **2 = Natural**
+
+**Contingency matrix extraction**: - For each polygon, a square matrix
+is computed using `diffeR::crosstabm()` that compares land cover at time
+`t` and time `t+1`. - This results in a 2x2 matrix representing
+stability and transition between classes.
+
+``` r
+diffeR::crosstabm(comp = r1, ref = r2, percent = TRUE)
+```
+
+Then we summarize components of change following the method by Pontius &
+Santacruz (2014) using:
+
+``` r
+diffeR::diffTablej(tab, analysis = "change", digits = 3)
+```
 
 The following metrics are computed for each class and overall:
 
@@ -167,6 +199,9 @@ The following metrics are computed for each class and overall:
 These metrics are produced for each **polygon** and each **temporal
 transition** (e.g., 1992–1995, 1995–1998, …).
 
+Each basin and year transition receives 3 rows (one per class +
+Overall). Here’s an example of the output before pivoting:
+
 ### Example Output Table (Long Format)
 
 | Category | Gain  | Persistence | Loss  | Quantity | Exchange | Shift | HYBAS_ID   | year_step |
@@ -175,7 +210,41 @@ transition** (e.g., 1992–1995, 1995–1998, …).
 | 2        | 0.000 | 99.555      | 0.004 | 0.004    | 0.000    | 0.000 | 1070000010 | 1995_1992 |
 | Overall  | 0.004 | 99.996      | 0.004 | 0.004    | 0.000    | 0.000 | 1070000010 | 1995_1992 |
 
-### Example Pivoted Output for Export
+### Pivot and Append
+
+- The long-format output is pivoted into wide format, e.g.:
+
+<!-- -->
+
+    Gain_1_1995_1992, Gain_2_1995_1992, Gain_Overall_1995_1992, ..., Shift_Overall_2004_2001
+
+- These metrics are joined back to the polygon dataset and exported
+  using `st_write()`.
+
+- To avoid clutter, each layer is saved separately in the `.gpkg` file
+  (e.g., `"lcc_change_metrics"`), preserving existing datasets.
+
+# Usage
+
+Clone the repository:
+
+``` bash
+git clone https://github.com/springinnovate/global_NCP.git
+```
+
+Then, open any of the `Rmd` notebooks:
+
+- `notebooks/zonal_stats.Rmd`
+- `notebooks/zonal_stats_hs.Rmd`
+- `notebooks/visualizations.Rmd`
+
+Data folders:
+
+- Raster files: `input_ES/`
+- Polygon files: `vector/`
+
+All file paths in the scripts are set up relative to the project root
+and should work locally.
 
 ``` r
 lcc_metrics_wide <- lcc_metrics_df %>%
@@ -209,16 +278,12 @@ Additional interpretation tools include:
 - Longitudinal comparisons across basins
 - Potential use in equity/distributional analyses
 
-------------------------------------------------------------------------
-
-# Future Directions
-
-- Add more refined LC classes and extend beyond binary classification
-- Integrate InVEST model output pipelines for continuous updates
-- Automate report generation with `rmarkdown::render()`
-- Integrate a Shiny dashboard or QGIS-compatible plugin
-
-------------------------------------------------------------------------
+|  |
+|----|
+| \# Notes on Scalability |
+| \- All processing steps can be parallelized using `mclapply()` (Unix-based systems only). - Designed for batch-processing thousands of polygon units (e.g., HydroBASINS level 6 and 7). |
+| \# Future Directions |
+| \- Add more refined LC classes and extend beyond binary classification - Integrate InVEST model output pipelines for continuous updates - Automate report generation with `rmarkdown::render()` - Integrate a Shiny dashboard or QGIS-compatible plugin |
 
 # License
 
