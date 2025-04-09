@@ -124,6 +124,12 @@ land cover change analysis. LC is simplified into two classes:
 
 ------------------------------------------------------------------------
 
+Clone the repository:
+
+    git clone https://github.com/springinnovate/global_NCP.git
+    cd global_NCP
+    Open zonal_stats.Rmd zonal_stats_hs.Rmd and LC_change.Rmd in RStudio and run each section interactively or knit to HTML.
+
 # Workflow Steps
 
 ## 1. Extract Zonal Summary Statistics for ES Rasters
