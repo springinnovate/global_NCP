@@ -11,29 +11,32 @@ output:
 
 # Overview
 
-This workflow outlines a structured approach to extract and analyze zonal statistics for **Ecosystem Services (ES)** at the global scale using **hydrological basins** as spatial units, based on the HydroBASINS Level 6 and 7  from [HydroSHEDS](https://www.hydrosheds.org/products/hydrobasins).
+Extract and analyze zonal statistics for **hydrological basins**  based on the HydroBASINS Level 6 and 7  from [HydroSHEDS](https://www.hydrosheds.org/products/hydrobasins).
 
-Buoding upon the broader multi-service analysis conducted for 1992 and 2020, this pilot focuses exclusively on the **Nutrient Delivery Ratio (NDR)** model, assessing changes in nitrogen export and retention for five time points: **1992, 1995, 1998, 2001, and 2004**. The purpose is to test the workflow over time, extract consistent zonal statistics, and begin exploring temporal dynamics in nutrient regulation.
+This focuses exclusively on the **Nutrient Delivery Ratio (NDR)** data , for changes in nitrogen export and retention for five time points: **1992, 1995, 1998, 2001, and 2004**. The purpose is to test the workflow over time, extract consistent zonal statistics, and begin exploring temporal dynamics in nutrient regulation.
 
-This is a **preliminary version**, developed while we address technical issues with the global geosharding implementation, which currently cannot process locations located **above 60° North**. Despite that, this workflow allows us to:
+This is a **preliminary version**, developed while we address technical issues with the global geosharding implementation, which currently cannot process locations located **above 60° North**.
+
 - Validate the core zonal processing steps,
-- Generate preliminary results for exploratory analysis, and
-- Ensure the overall reproducibility and readiness of the methodology once full global coverage becomes available.
+- Generate preliminary results for exploratory analysis
+- Ensure the overall reproducibility and readiness of the methodology .
 
 # 1. Objectives
 
-1. Extract zonal summary statistics for modeled **NDR Export and Retention** layers at five time points using the `exactextractr` package.
+1. Extract zonal summary statistics for modeled **NDR Export and Retention** layers at five time points.
 2. Integrate these statistics into hydrological basin polygons as new attribute fields.
+
+## Future Work!!!
+
 3. Visualize spatial and temporal patterns in nitrogen retention and export using faceted maps, line plots, and summary tables.
 4. Identify trends, outliers, and regions of interest for further investigation.
 
-> **Note:** The hydrological basin appears to be a promising spatial unit for ecosystem service analysis, providing consistency across scales and enabling meaningful aggregation for regional and global assessments.
+> **Note:** The hydrological basin appears looks promising spatial unit for ecosystem service analysis, providing consistency across scales and enabling meaningful aggregation for regional and global assessments.
+
 
 A new iteration includes hexes/gridded area.
 
 ---
-
-Let me know if you’d like this added to an `.Rmd` file or need help formatting the rest of the workflow!
 
 
 ```{r setup, include=FALSE}
@@ -58,25 +61,18 @@ library(kableExtra)
 
 Obtained from [Hydrosheds](https://www.hydrosheds.org/), we are using level 6 and level 7 for the analysis
 
-```{r load watersheds lev 6}
+
+```{r load input polygon data}
+
+#Builds a list of files in the vector directory
 inpath <- here("vector")
 sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
-# Set an index to select the desired dataset
 
+# Set and select an index to load the desired dastaset
 t <- 2
-# Select the target dataset from the list 
 set <- sets[t]
 # # load polygons
 poly <- st_read(set) 
-
-
-# Convert to data frame for nicer display
-sets_df <- as.data.frame(sets)
-colnames(sets_df) <- c("GPKG Layer", "Attribute Column")
-
-# Print nicely
-kable(sets_df, format = "html", caption = "Geopackage Layers and Associated Attribute Columns") %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
 
@@ -149,6 +145,10 @@ write.csv(zonal_df, here('output_data', paste0('pot_sed_ret_df_lv7', col, '.csv'
 ```
 
 
+# 4. EXTRACT METRICS FOR THE MODELED NITROGEN LAYERS
+
+Initially for 4 years. 
+This script gets the job done, but needs a lot of improvement.
 ```{r get modeled N retention potential} 
 #navigate to the directory with the input data (modeled N export and retention layers)
 inpath <- here('input_ES', 'mod_n_ret')
@@ -222,11 +222,6 @@ poly <- poly[c(1:13)]
 poly <- left_join(poly,zonal_wide)
 
 
-
-#st_write(poly, (here('vector', 'hydrosheds_lv7.gpkg')), append=FALSE)
-# This is to add a temporal attribute to the data. I am still experimenting here, trying to get some animations or more refined visualizations 
-
-
 # Find all 'sum' columns for N_export
 sum_cols <- names(poly)[str_detect(names(poly), "^sum_\\d{4}_N_export")]
 
@@ -237,23 +232,15 @@ for (col in sum_cols) {
   
   poly[[new_col]] <- poly[[col]] / poly$SUB_AREA  # Divide by area (assumed in ha)
 }
-
+# I think this is great as gpkg because it exports the new thing as a layer. We should edit here to export as layer/ 
 st_write(poly, paste0(here('vector'),'/', "N_export_", set), append=TRUE)
-
-
 ```
 
 
 #################################################################################################################################################################
 
+From here everyting is for some visualizations, but stupid me does not remember whenre all of them come from, might not be relevant anymore. So it might be scratch but we might come back here for ideas. 
 
-Next Steps:
-
-- Extract Spatial units with the highest increases/decreases date to date in the variables of interest
-- Produce Maps (working on it)
-- Create glossary with the variable/column names. 
-- Make suree naming conventions are consistent. 
-- Knit /finish explainer
 
 
 ```{r}
@@ -363,7 +350,7 @@ ggplot(polyt_long, aes(fill = change_class)) +
   )
 ```
 
-
+```
 
 library(gganimate)
 
@@ -486,7 +473,6 @@ print(p_2020)
 
 
 
-
 ```{r barplot}
 plot_ecosystem_services_diff <- function(data, col) {
   data_prepped <- data %>% filter(!is.na(mean)) %>% mutate(temp_col = reorder_within(!!sym(col), -mean, service))
@@ -507,65 +493,8 @@ print(p_diff)
 
 
 
-
-
-### 3.3 get change in terms of % (do at the end)
-
-
-
-This is a WIP. I need to be able to add the numbers as columns at the end....nooo
-easier. We are going to calculate them dikrectly fro mthe filtered zonal_df dataframe, but not now. We need to think about the differences calculated and the % of difference. anyway i already have that piece of data. 
-
-```{r extract change in %}
-
-# Function to compute percentage change for all relevant variables in an sf object
-calculate_percentage_change <- function(sf_obj) {
-  # Identify all variables that exist in both 1992 and 2020
-  base_vars <- service#c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination")
-  
-  # Iterate through each variable to compute percentage change
-  for (var in base_vars) {
-    col_1992 <- paste0(var, "_1992")  # Column name for 1992
-    col_2020 <- paste0(var, "_2020")  # Column name for 2020
-    col_pct  <- paste0(var, "_pct_ch")   # New percentage change column
-    
-    # Check if the required columns exist in the sf object
-    if (all(c(col_1992, col_2020) %in% names(sf_obj))) {
-      sf_obj <- sf_obj %>%
-        mutate(!!col_pct := ((!!sym(col_2020) - !!sym(col_1992)) / !!sym(col_1992)) * 100)
-    }
-  }
-  return(sf_obj)
-}
-
-# Apply function to all sf objects in the list
-#pols <- lapply(poly, calculate_percentage_change)
-poly <- calculate_percentage_change(poly)
-# Check the updated column names
-
-# get pct as standalone data to add to the table
-plt <- st_drop_geometry(poly)
-plt  <- plt %>%
-  select(1, contains("pct"))
-################## THIS IS VERY IMPPORTAnt. Instead of struggling  with the multiple dataframes, it is easier to load the vector file swith all the column and pivot longer as necessary. Easier to manage, adjust on the fly!
-plt <- plt %>%
-  pivot_longer(
-    cols = ends_with("pct_ch"),  # Select all columns ending with "pct_ch"
-    names_to = "service",        # New column to store the service names
-    values_to = "pct_ch"         # New column to store the percentage change values
-  )
-
-
-write.csv(plt, here('output_data', paste0('pct_chg_',cols, '.csv')))
-
-#st_write(poly, here('vector', set), append = FALSE) 
-```
-
-
-
-
 ## 5. Generate  Maps
-
+# 
 Use ggplot2 and the spatial geometry from our sf object to color each polygon by its statistic of interest. Faceting again by each raster is useful to compare spatial patterns.
 ```{r create maps, include=FALSE}
 
@@ -658,14 +587,6 @@ combined_2020 <- wrap_plots(plot_list_2020, ncol = 3)
 combined_1992
 combined_2020
 ```
-
-
-
-
-rasters_list <- lapply(tiffes, rast)
-service <- c("Coastal Protection", "Nature Access","Nitrogen Export","Pollination","Sediment Export", "Usle")
-service <- gsub(" ", "_", service)
-
 
 
 
