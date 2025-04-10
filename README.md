@@ -93,6 +93,12 @@ sub-basins.
     dataset](https://github.com/springinnovate/distance-to-hab-with-friction):
     Population within 1 hour
 
+7.  Sediment Retention Service: $$
+    \text{Potential Sediment Retention} = \frac{\text{USLE} - \text{Export}}{\text{USLE}}
+    $$
+
+8.  Costal Protection
+
 ## Input Services
 
 <div style="display: flex; gap: 10px;">
@@ -118,7 +124,7 @@ now, with plans to expand into finer class differentiation.
 
 # Workflow
 
-## 1. Load Polygon Data
+## 1. Load Overlay Polygon Data
 
 Polygon datasets are stored in the `vector/` directory in `.gpkg` format
 and include:
@@ -163,7 +169,23 @@ year) - Directly from the **difference rasters**
 The two approaches produce nearly identical results, although extracting
 from difference rasters may be more robust.
 
-## 5. Land Cover Change Detection
+## 5.
+
+Calculate by temporal % of change *This needs to be expanded/refined*
+
+The % of change in NDR at the hydroshed level for 5 different time
+points (1992,1995,1998,2001 and 2004) are mapped here: *All values*:
+<p div style="display: flex; gap: 10px;">
+<img src="output_maps/Hydrosheds_2_1.png" style="margin-right: 10px;"/>
+</div>
+
+*Top/bottom values*
+
+<p div style="display: flex; gap: 10px;">
+<img src="output_maps/Hydrosheds_2.png" style="margin-right: 10px;"/>
+</div>
+
+## 6. Land Cover Change Detection
 
 For the land cover component, ESA 300m land cover maps were reclassified
 into two categories:
