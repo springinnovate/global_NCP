@@ -1,0 +1,75 @@
+---
+title: "Basic Change Analyisis Workflow"
+output: html_notebook
+---
+
+# Change Analysis
+
+
+```{r cropmask LC_maps, eval=FALSE, include=FALSE}
+esas <- rast(here("ESA_LC",'ESA_LC_1992_2020.tif'))
+
+
+poly <- st_read(here('natcap_data', 'cartographic_ee_ee_r264_correspondence.gpkg'))
+#poly <- st_transform(poly, crs = crs(tmp))
+rm(tmp)
+poly <- poly %>% filter(region_wb!="Antarctica")
+nam <- sort(unique(poly$region_wb))
+nam <- gsub("[[:punct:]]", "", nam) # Remove punctuation
+nam <- gsub(" ", "_", nam) # Replace spaces with underscores
+nam <- gsub("__", "_", nam) # Replace spaces with underscores
+poly <- poly%>%split(.$region_wb)
+# # Extract forests
+# esas <- lapply(esas, function(r) {
+#   subst(r, from = 2, to =1, others=NA)
+# })
+# 
+# writeRaster(esas, paste0(here("LC", "ESA_FORESTS_1992-2020.tif")))
+
+
+lapply(poly, function(polygon) {
+    # Crop and mask the raster
+    cropped_raster <- crop(raster, polygon)
+    masked_raster <- mask(cropped_raster, polygon)
+    return(masked_raster)
+  })
+# Use lapply to iterate over each list in nested_list
+lapply(seq_along(rs_msk), function(i) {
+  # For each outer list, iterate through the inner list (rasters)
+  lapply(seq_along(rs_msk[[i]]), function(j) {
+    
+    # Construct the filename using vector_1 and vector_2
+    file_name <- paste0(outpath, tf[[i]], '_', nam[[j]], '.tif')
+    
+    # Write the raster to the file
+    writeRaster(rs_msk[[i]][[j]], file_name, overwrite = TRUE)
+  })
+})
+
+
+# Pending to add: run this in parallel!
+# Apply cropping and masking recursively using lapply and map
+outpath <- here("ESA_LC")
+num_cores <- 10
+# Parallelize the outer loop using mclapply
+rs_msk <- mclapply(poly, function(p) {
+    r <- crop(esas, p)
+    r <- mask(r,p)
+    return(r)
+  },mc.cores = num_cores) 
+
+map(1:length(rs_msk),function(x) writeRaster(rs_msk[[x]], paste0(here("ESA_LC", "wb_region"),'/', "LC_", nam[x], ".tif")))
+# Use lapply to iterate over each list in nested_list
+lapply(seq_along(rs_msk), function(i) {
+  # For each outer list, iterate through the inner list (rasters)
+  lapply(seq_along(rs_msk[[i]]), function(j){
+    
+    # Construct the filename using vector_1 and vector_2
+    file_name <- paste0(outpath, tf[[i]], '_', nam[[j]], '.tif')
+    
+    # Write the raster to the file
+    writeRaster(rs_msk[[i]][[j]], file_name, overwrite = TRUE)
+  })
+})
+
+```

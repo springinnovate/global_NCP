@@ -69,7 +69,7 @@ inpath <- here("vector")
 sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
 
 # Set and select an index to load the desired dastaset
-t <- 2
+t <- 1
 set <- sets[t]
 # # load polygons
 poly <- st_read(set) 
@@ -138,7 +138,82 @@ write.csv(zonal_df, here('output_data', paste0('pot_sed_ret_df_lv7', col, '.csv'
 ```
 
 
-# 4. EXTRACT METRICS FOR THE MODELED NITROGEN LAYERS
+
+# 4 Add N Export / ha
+
+```{r load raster export, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+library(kableExtra)
+
+inpath <- here('input_ES')
+# Override inpath manually if needed
+inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES"
+
+# List and clean file names
+tiffes <- file.path(inpath, list.files(inpath, pattern = 'export'))
+filename <- basename(tiffes)
+raster_name <- gsub(".tif$", "", filename)
+
+# Assign services and years
+service <- rep(c("Nitrogen", "Sediment"), each = 2)
+year <- rep(c(1992, 2020), 2)
+
+# Create color mapping
+color <- rep(c("#2c944c", "#08306b"), each = 2)
+
+# Create and display clean table
+cd <- tibble(service, raster_name, year, color)
+
+kable(cd, format = "html", caption = "Input Raster datasets 1992–2020") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+
+
+
+```{r compute export/ha  for each year, eval=FALSE, message=TRUE, include=FALSE}
+# Set the target metrics to extract. Most Standard R summary metrics are available, for more information run ?exactextractr 
+target_stats <- c("sum")
+
+# Set the number of cores to run on parallel. This approach only works on Unix-based systems (Linux & MacOS). I still have to find the alternative for parallelzing on Windows. 
+num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  The number of cores to user is also contingent on the amount of RAM available.
+
+#start extracting the summary statisticss
+results_list <- mclapply(rasters_list, function(r) {
+  # Perform exact extraction
+  res <- exact_extract(r, poly,
+                       fun = target_stats,
+                       append_cols = cols)
+  r_name <- names(r)
+  # Add a column labeling which raster these results are from
+  res$raster_name <- r_name
+  return(res)},mc.cores = num.cores)
+
+# Combine results from all evaluated rasters into a single data frame
+zonal_df <- do.call(rbind, results_list)
+
+# add color and service columns
+zonal_df <- left_join(zonal_df,cd)
+
+
+# Add the year. this uses the original filenames to extract the year, this works here, but might be too hardcoded for generalization 
+
+zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
+                          1992, ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
+
+# Pivot wider to have all the attributes in Different columns
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
+# adjust column names #
+
+# Join the extracted data to the polygon files
+poly <- left_join(poly, zonal_wide, by= col)
+
+st_write(poly, here('vector', set), append = FALSE) # save optional
+#write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
+```
+
+
+
+# 5. EXTRACT METRICS FOR THE MODELED NITROGEN LAYERS
 
 Initially for 4 years. 
 This script gets the job done, but needs a lot of improvement.
