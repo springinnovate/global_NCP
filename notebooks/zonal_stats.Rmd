@@ -188,8 +188,7 @@ zonal_df <- left_join(zonal_df,cd)
 
 # Add the year. this uses the original filenames to extract the year, this works here, but might be too hardcoded for generalization 
 
-zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
-                          1992, ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
+zonal_df$year <- str_extract(zonal_df$raster_name, "\\d{4}")
 
 # Pivot wider to have all the attributes in Different columns
 zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
@@ -278,6 +277,26 @@ The next step calculates the percentage change in ecosystem service provision be
 
 # Function to compute percentage change for all relevant variables in an sf object
 # There is plenty of room for optimization here.
+# 1. Extract year columns only (excluding the ID column)
+value_cols <- names(zonal_wide)[-1]  # assuming first column is the ID
+years <- str_extract(value_cols, "\\d{4}") |> as.numeric()
+years <- sort(years)
+
+# 2. Loop over year pairs and calculate % change
+for (i in seq_along(years)[-1]) {
+  y_prev <- years[i - 1]
+  y_curr <- years[i]
+  
+  col_prev <- paste0("n_export_", y_prev)
+  col_curr <- paste0("n_export_", y_curr)
+  new_col <- paste0("pct_ch_", y_curr, "_", y_prev)
+  
+  zonal_wide[[new_col]] <- (zonal_wide[[col_curr]] - zonal_wide[[col_prev]]) / 
+                            zonal_wide[[col_prev]] * 100
+}
+
+
+
 calculate_percentage_change <- function(sf_obj) {
   # Identify all variables that exist in both 1992 and 2020
   base_vars <- service
