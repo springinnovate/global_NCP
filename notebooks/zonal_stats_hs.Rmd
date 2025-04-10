@@ -77,11 +77,11 @@ poly <- st_read(set)
 
 
 # 3 Extract % change Sediment Retention
-
-For this we are processing the Potential Sediment Retention data for 1992, 2020 and the calcualted differnece. The formula used is:
+ **Note**. I think the name of this variable is not accurate. 
+For this we are processing the *Potential Sediment Retention* data for 1992, 2020 and the calcualted differnece. The formula used is:
 
 Potential of Sediment Retention: (USLE-Export)/USLE
-*Note* There is 
+
 
 ```{r extract pot sed Retenion}
 
@@ -91,8 +91,6 @@ Potential of Sediment Retention: (USLE-Export)/USLE
 inpath <- here('input_ES', "Pot_Sed_retention")
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
  filename<- basename(tiffes)
-
-# raster_name <- c("Pot_Sed_ret_1992", "Pot_Sed_ret_2020", "Pot_Sed_ret_diff")
 
 rasters_list <- lapply(tiffes, rast)
 rasters_list <- Map(function(r,new_name){
@@ -105,34 +103,29 @@ year <- rep(c(1992,2020, "diff"))
 color <- c("#08606b", "#08606b", "#68606b")
 cd <- as_tibble(cbind(raster_name, color,year))
 rm(filename)
-cd
-
 
 target_stats <- c("mean","stdev")
 
 # Iterate function over the rasters
 num.cores <- length(rasters_list)
 results_list <- mclapply(rasters_list, function(r) {
-  # Perform exact extraction
-  # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
                        fun = target_stats,
                        append_cols = col)
   r_name <- names(r)
-
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
   return(res)},mc.cores = num.cores)
 
-# Combine results from all rasters into one data frame
+# Combine results from all rasters into one single data frame
 zonal_df <- do.call(rbind, results_list)
+
 #Adjust column so i can assemble the whole thing (yearly and difference values) in the same dataframe
 
 cls <- "HYBAS_ID"
 
 zonal_df <- left_join(zonal_df,cd)
 zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cls), names_from=c(raster_name), values_from = c(mean,stdev))
-
 
 # Calculate % of change 
 zonal_wide <- zonal_wide %>%
