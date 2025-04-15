@@ -27,10 +27,12 @@ library(diffeR)
 library(here)
 # source the helper functions
 source(here::here("R", "utils_lcc_metrics.R"))
+source("R/utils_pct_change.R")
 ```
 
+# Prepare data
 
-Reclassify originAl LC maps into 
+Reclassify original LC maps into 
 a) Simplified 9 class LC maps
 b) Binary transformed/natural LC maps.
 
@@ -75,7 +77,6 @@ filename<- basename(tiffes)
 
 raster_list <- lapply(tiffes,rast)
 
-
 reclass_table <- data.frame(
   from = c(3,4,5,6,7,8,9),
   to = c(2,2,2,1,2,2,2)
@@ -97,12 +98,12 @@ lapply(1:length(raster_list), function(x) writeRaster(raster_list[[x]], paste0(h
 
 ```{r load-data}
 # Example file paths (replace with actual paths)
+inpath <- here(here("input_ES","LandCovers"))
 landcover_files <- list.files(
-  here("input_ES/LandCovers"),
+  inpath,
   pattern = "rec.*\\.tif$", 
   full.names = TRUE
 )
-
 
 # Name rasters by year
 names(landcover_files) <- stringr::str_extract(basename(landcover_files), "\\d{4}")
@@ -110,7 +111,7 @@ landcover_rasters <- lapply(landcover_files, terra::rast)
 
 # Load polygon spatial units (e.g., HydroBASINS level 6)
 
-basins <- st_read(here("vector", "hydrosheds_lv6.gpkg"))#, layer = "lcc_change_metrics")
+basins <- st_read(here("vector", "hydrosheds_lv6.gpkg"), layer= "lcc_change_metrics")
 ```
 
 ## Run Land Cover Change Metric Extraction
@@ -137,16 +138,20 @@ lcc_metrics_wide <- lcc_metrics_df %>%
     values_from = c(Gain, Persistence, Loss, Quantity, Exchange, Shift),
     names_glue = "{.value}_{Category}_{year_step}"
   )
-# Note: there is something fishy going on here, the last run for 202 had some isses, so i did not iterate the fucntio nand got better results 
-# Remove service change attributes from poly (btw, to avoid this is we can save each appended dataset as a new layer in the geopakage)
+# Note: there is something fishy going on here, the last run for 1992-2020 had some issues, when. iterating, but just running extract_lcc_metrics() without wrapping it for multiple time steps ( i need a technical way to refer to this) did solve the issue. Pending to check in the multi temporal assesment. 
+# when doing thjat, keep two things presnet: set the number of digits to 4, add the column with the *direction* of change. For now, Shift is not necessary, possibly several columns are not needed at this point (especially those about Overall, ther is a lot of redudancy, it is *literarolly like balancing a budget. In fact, this is called a budget) Add the new column, but make sure to limit the number of digits, to 4. I am not sure if more digits make sense, and also, this results in a huge file. No need.
+# Remove service change attributes from poly (btw, to avoid this is we can save each appended dataset as a new layer in the geopackage)
+
 basins <- basins[c(1:13)]
 
 ##################################################
 # Run the function with only two dates 
 lcc_m2 <- extract_lcc_metrics(landcover_rasters[[1]], landcover_rasters[[2]], basins, "HYBAS_ID", percent=TRUE, mc = TRUE, ncores = 10, digits = 4)
 # get qunatiy in terms of gain loss (the function does not provide the direction of the change, only the absolute value. 
+lcc_m2 <- lcc_m2 %>%
+  mutate(dir_ch = round(Gain - Loss, digits = 4)) # we set the number of dits to 4 to make te file more manageable
 
-lcc_m2 <- lcc_m2 %>% mutate(dir_ch=Gain-Loss)
+
 lcc_metrics_wide <- lcc_m2 %>%
   tidyr::pivot_wider(
     id_cols = c(cols[1]),
@@ -161,10 +166,8 @@ lcc_metrics_wide <- lcc_metrics_wide %>% mutate(HYBAS_ID = as.character(HYBAS_ID
 
 basins <- left_join(basins, lcc_metrics_wide)
 
-
+sf::st_write(basins,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer = "1992_2020_lcc_change_metrics", append = FALSE)
 sf::st_write(basins, here("vector", "hydrosheds_lv6.gpkg"), layer = "1992_2020_lcc_change_metrics", append = FALSE)
-# Save to CSV (optional)
-#readr::write_csv(lcc_metrics_df, "output_data/lcc_ch_metrics_lv6.csv")
 ```
 
 ## Inspect Results

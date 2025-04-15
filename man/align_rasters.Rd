@@ -11,7 +11,7 @@ align_rasters(raster_list, template, resample_method = "bilinear")
 
 \item{template}{A \code{SpatRaster} object used as the reference for alignment.}
 
-\item{resample_method}{Character. The resampling method to use if alignment is needed.
+\item{method}{Character. The resampling method to use if alignment is needed.
 Options are \code{"bilinear"} (default), \code{"near"} (nearest neighbor), \code{"cubic"}, \code{"cubicspline"}, etc.}
 }
 \value{
@@ -35,6 +35,6 @@ r2 <- rast(ncol=12, nrow=12)  # Different resolution
 template <- rast(ncol=10, nrow=10)
 
 rasters <- list(r1, r2)
-aligned_rasters <- align_rasters(rasters, template, resample_method = "bilinear")
+aligned_rasters <- align_rasters(rasters, template, method = "bilinear")
 
 }
