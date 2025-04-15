@@ -14,14 +14,14 @@
 #' library(terra)
 #' r <- rast(ncol=10, nrow=10)
 #' values(r) <- runif(ncell(r), min=0, max=100)
-#' top_10 <- select_top_percentile(r, percentile=0.9)
+#' top_10 <- quantile(r, percentile=0.9)
 #'
 #' # For multi-band rasters
 #' multi_r <- c(r, r * 2)
 #' top_multi <- select_top_percentile(multi_r, percentile=0.8)
 #' 
 #' @export
-select_top_percentile <- function(raster, percentile = 0.9) {
+quantile_select <- function(raster, percentile = 0.9) {
   # Ensure the input is a SpatRaster
   if (!inherits(raster, "SpatRaster")) {
     stop("Input must be a SpatRaster object.")

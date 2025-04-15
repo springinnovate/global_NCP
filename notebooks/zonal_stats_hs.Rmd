@@ -254,7 +254,26 @@ hydrosheds_lv6 <- poly
 
 ```
 
+# Build Synthesis spreadshet
 
+```{r buid synthesis}
+
+# Check Layers 
+
+st_layers("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg")
+
+basins1 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer= 'hydrosheds_lev6') # Change N_ret 1992-2004 #not needed right now
+
+basins1 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer= 'layer1')
+
+basins2 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer= '1992_2020_lcc_change_metrics')
+
+
+basins3 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer="S_Sed_export_ha")
+sf::st_write(basins,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer = "1992_2020_lcc_change_metrics", append = FALSE)
+
+
+```
 
 # 5. EXTRACT METRICS FOR THE MODELED NITROGEN LAYERS
 
