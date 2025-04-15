@@ -6,7 +6,7 @@
 #'
 #' @param raster_list A list of `SpatRaster` objects to be checked and aligned.
 #' @param template A `SpatRaster` object used as the reference for alignment.
-#' @param resample_method Character. The resampling method to use if alignment is needed.
+#' @param method Character. The resampling method to use if alignment is needed.
 #'        Options are `"bilinear"` (default), `"near"` (nearest neighbor), `"cubic"`, `"cubicspline"`, etc.
 #'
 #' @return A list of `SpatRaster` objects, where each raster is either unchanged (if already aligned)
@@ -26,7 +26,7 @@
 #' template <- rast(ncol=10, nrow=10)
 #'
 #' rasters <- list(r1, r2)
-#' aligned_rasters <- align_rasters(rasters, template, resample_method = "bilinear")
+#' aligned_rasters <- align_rasters(rasters, template, method = "bilinear")
 #'
 #' @export
 align_rasters <- function(raster_list, template, resample_method = "bilinear") {
