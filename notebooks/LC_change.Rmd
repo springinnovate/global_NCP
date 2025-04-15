@@ -107,7 +107,7 @@ landcover_rasters <- lapply(landcover_files, terra::rast)
 
 # Load polygon spatial units (e.g., HydroBASINS level 6)
 
-basins <- st_read(here("vector", "hydrosheds_lv7.gpkg"))
+basins <- st_read(here("vector", "hydrosheds_lv6.gpkg"))#, layer = "lcc_change_metrics")
 ```
 
 ## Run Land Cover Change Metric Extraction
@@ -119,7 +119,7 @@ lcc_metrics_df <- iterate_lcc_metrics(
   id_col = "HYBAS_ID",
   percent = TRUE,
   verbose = TRUE,
-  mc = TRUE,
+  mc = FALSE,
   ncores = 12,
   digits = 3
 )

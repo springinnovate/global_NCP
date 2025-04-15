@@ -32,11 +32,11 @@ sets <- file.path(inpath, list.files(inpath, pattern= 'gpkg$'))
 #cols <- c("id", "continent", "income_grp", "region_wb", "WWF_biome", "HYBAS_ID", "HYBAS_ID")
 #sets <- cbind(sets, cols)
 # Set an index to select the desired dataset
-t <- 10
+t <- 5
 # Select the target dataset from the list 
 set <- sets[t]
 # # load polygons
-poly <- st_read(set) 
+poly <- st_read(set, layer = "lcc_change_metrics") 
 
 #get the name of the column withthe unique ids of the input vector
 col <- colnames(poly[1])[1]
@@ -50,15 +50,71 @@ kable(sets_df, format = "html", caption = "Geopackage Layers") %>%
 ```
 
 
-# Get Change Maps 
+```{r load and reshape processed geometries}
 
-```{r calculate change maps}
+# get pct as standalone data to add to the table
+poly <- st_transform(poly, crs = 5880)
 
-inpath <- '~/Documents/MN_Applied_Economics/Global_ES_mapping/ESA_LC'
-tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
 
-es <- lapply(tiffes, rast)
-ch <- ch_mapR(es)
+plt <- st_drop_geometry(poly)
+
+plt <- as_tibble(plt)
+#filter all thins smaller than 150.000 ha (takes away the 54 smallest features) 
+
+
+service <- c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination", "Pot_Sed_ret")
+color <- c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#A57C00", "#dd1c77", "#8C510A")
+cd <- as_tibble(cbind(service,color))
+
+################## THIS IS VERY IMPPORTAnt. Instead of struggling  with the multiple dataframes, it is easier to load the vector file swith all the column and pivot longer as necessary. Easier to manage, adjust on the fly!
+plt <- as_tibble(plt %>%
+  pivot_longer(
+    cols = c(ends_with("pct_ch")),  # Select all columns ending with "pct_ch"
+    names_to = "service",        # New column to store the service names
+    values_to = "pct_ch"         # New column to store the percentage change values
+  ))
+
+plt <- plt %>%
+  mutate(service = str_remove(service, "_pct_ch$"))
+plt <- left_join(plt,cd)
+plt <- plt%>% filter(!is.na(pct_ch))
+
+
+```
+
+
+
+```{r load and reshape processed geometries}
+
+# get pct as standalone data to add to the table
+poly <- st_transform(poly, crs = 5880)
+poly$area_ha <- as.numeric(st_area(poly))/10000
+
+plt <- st_drop_geometry(poly)
+
+plt <- as_tibble(plt)
+#filter all thins smaller than 150.000 ha (takes away the 54 smallest features) 
+plt  <- plt %>% select(1,2, area_ha,contains("pct"))#%>% filter(area_ha>400000)
+
+
+service <- c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination", "Pot_Sed_ret")
+color <- c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#A57C00", "#dd1c77", "#8C510A")
+cd <- as_tibble(cbind(service,color))
+
+################## THIS IS VERY IMPPORTAnt. Instead of struggling  with the multiple dataframes, it is easier to load the vector file swith all the column and pivot longer as necessary. Easier to manage, adjust on the fly!
+plt <- as_tibble(plt %>%
+  pivot_longer(
+    cols = c(ends_with("pct_ch")),  # Select all columns ending with "pct_ch"
+    names_to = "service",        # New column to store the service names
+    values_to = "pct_ch"         # New column to store the percentage change values
+  ))
+
+plt <- plt %>%
+  mutate(service = str_remove(service, "_pct_ch$"))
+plt <- left_join(plt,cd)
+plt <- plt%>% filter(!is.na(pct_ch))
+
+
 ```
 
 
@@ -113,39 +169,6 @@ sankeyNetwork(Links = linkInfo, Nodes = nodeInfo,
               colourScale = JS(colorScaleJS))
 ```
 
-
-```{r load and reshape processed geometries}
-
-# get pct as standalone data to add to the table
-poly <- st_transform(poly, crs = 5880)
-poly$area_ha <- as.numeric(st_area(poly))/10000
-
-plt <- st_drop_geometry(poly)
-
-plt <- as_tibble(plt)
-#filter all thins smaller than 150.000 ha (takes away the 54 smallest features) 
-plt  <- plt %>% select(1,2, area_ha,contains("pct"))#%>% filter(area_ha>400000)
-
-
-service <- c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination", "Pot_Sed_ret")
-color <- c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#A57C00", "#dd1c77", "#8C510A")
-cd <- as_tibble(cbind(service,color))
-
-################## THIS IS VERY IMPPORTAnt. Instead of struggling  with the multiple dataframes, it is easier to load the vector file swith all the column and pivot longer as necessary. Easier to manage, adjust on the fly!
-plt <- as_tibble(plt %>%
-  pivot_longer(
-    cols = c(ends_with("pct_ch")),  # Select all columns ending with "pct_ch"
-    names_to = "service",        # New column to store the service names
-    values_to = "pct_ch"         # New column to store the percentage change values
-  ))
-
-plt <- plt %>%
-  mutate(service = str_remove(service, "_pct_ch$"))
-plt <- left_join(plt,cd)
-plt <- plt%>% filter(!is.na(pct_ch))
-
-
-```
 
 *Note* This is on;y necessary fof WWF Biomnes, because the names are too long and are hard to fit inside the charts
 
@@ -566,6 +589,59 @@ ggplot(top_bottom, aes(x = name_long, y = pct_ch, fill = color)) +
 ```
 
 
+
+
+
+# Get Sankey Diagrams
+
+```{r Sankey Diagram}
+classes <- c("Cultivated", "Forests", "Grasses/shrubs", "Sparse", "Mangroves", "Urban", "Bare", "Water")
+groupColor <- c("#dcf064","#00b809","#8ca000","#ffebaf",'#009678', "#c31400", "#fff5d7", "#0046c8")
+
+years <- c(1992,2020)
+
+
+nodeInfo <- nodeInfoR(years, classes, groupColor)
+
+NodeCols<- sort(unique(nodeInfo$nodeCol))
+
+#create paths to the rasters/bands
+num_bands <- length(NodeCols)
+tf <- list.files(wd, pattern= "Rec")
+tf <- file.path(wd,tf)
+fileInfo <- tibble(
+  nodeCol = seq_along(tf),
+  rast = tf,
+  rasterBand = 1
+)
+
+# join path strings to nodeInfo
+nodeInfo <- dplyr::left_join(nodeInfo, fileInfo, by='nodeCol') 
+linkInfo <- linkInfoR(NodeCols, nodeInfo)
+
+
+fontSize <- 0.5
+nodeWidth <-30
+fontFamily <- "sans-serif"
+colorScaleJS <- sprintf("d3.scaleOrdinal().domain(%s).range(%s)",
+                        jsonlite::toJSON(unique(nodeInfo$nodeGroup)),
+                        jsonlite::toJSON(unique(nodeInfo$groupColor)))
+
+
+sankeyNetwork(Links = linkInfo, Nodes = nodeInfo,
+              Source = "source",
+              Target = "target",
+              Value = "value",
+              NodeID = "nodeName",
+              NodeGroup = "nodeGroup",
+              LinkGroup = "LinkGroup",
+              fontSize = fontSize,
+              fontFamily = fontFamily,
+              nodePadding = 10,
+              margin=1,
+              nodeWidth = nodeWidth,
+              colourScale = JS(colorScaleJS))
+```
 
 
 write.csv(plt, here('output_data', paste0('pct_chg_',cols, '.csv')))

@@ -153,6 +153,9 @@ tiffes <- file.path(inpath, list.files(inpath, pattern = 'export'))
 filename <- basename(tiffes)
 raster_name <- gsub(".tif$", "", filename)
 
+
+rasters_list <- lapply(tiffes,rast)
+
 # Assign services and years
 service <- rep(c("Nitrogen", "Sediment"), each = 2)
 year <- rep(c(1992, 2020), 2)
@@ -190,19 +193,43 @@ results_list <- mclapply(rasters_list, function(r) {
 
 # Combine results from all evaluated rasters into a single data frame
 zonal_df <- do.call(rbind, results_list)
-zonal_df[2] <- NULL#
 
 
 zonal_df$year <- str_extract(zonal_df$raster_name, "\\d{4}")
-zonal_df$service <- sub("global_(n_export).*", "\\1", zonal_df$raster_name)
+
+
+zonal_df <- zonal_df %>%
+  mutate(service = str_extract(raster_name, ".*?export"))
+
 
 # Pivot wider to have all the attributes in Different columns
 zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cls), names_from=c(service, year), values_from = sum)
 
-# 1. Extract year columns only (excluding the ID column)
-value_cols <- names(zonal_wide)[-1]  # assuming first column is the ID
-years <- str_extract(value_cols, "\\d{4}") |> as.numeric()
-years <- sort(years)
+poly <- left_join(poly, zonal_wide)
+
+
+
+
+
+poly <- poly %>%
+  mutate(across(
+    .cols = starts_with("global_"),
+    .fns = ~ .x / SUB_AREA,
+    .names = "{.col}_per_ha"
+  ))
+
+
+poly <- poly %>%
+  mutate(
+    n_export_pct_ch = ((global_n_export_2020_per_ha - global_n_export_1992_per_ha) / global_n_export_1992_per_ha) * 100,
+    sed_export_pct_ch = ((global_sed_export_2020_per_ha - global_sed_export_1992_per_ha) / global_sed_export_1992_per_ha) * 100
+  )
+
+
+st_write(poly, set, layer = "S_Sed_export_ha", append = FALSE)
+
+
+#####################################################
 
 # 2. Loop over year pairs and calculate % change
 for (i in seq_along(years)[-1]) {
@@ -225,8 +252,6 @@ poly <- left_join(poly, zonal_wide, by= cls)
 hydrosheds_lv6 <- poly
 
 
-st_write(hydrosheds_lv6, set, append = TRUE) # save optional
-#write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
 ```
 
 
