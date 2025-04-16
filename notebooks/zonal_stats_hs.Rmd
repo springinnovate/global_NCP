@@ -71,9 +71,12 @@ sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
 # Set and select an index to load the desired dastaset
 t <- 1
 set <- sets[t]
-# # load polygons
-poly <- st_read(set) 
+
+# check available layers:
+lyrs <- st_layers(set)
+print(lyrs)
 ```
+
 
 
 # 3 Extract % change Sediment Retention
@@ -86,7 +89,9 @@ $$
 
 
 ```{r extract pot sed Retenion}
-
+# Load target polygons
+# # load polygons
+poly <- st_read(set) 
 # set the path and load the rasters with the differences that we calcualted in step 3
 #build paths to files
 
