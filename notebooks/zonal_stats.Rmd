@@ -162,7 +162,7 @@ $$
 
 ```{r compute stats for each year, eval=FALSE, message=TRUE, include=FALSE}
 # Set the target metrics to extract. Most Standard R summary metrics are available, for more information run ?exactextractr 
-target_stats <- c("mean")
+target_stats <- c("mean", "stdev")
 
 rasters_list <- lapply(tiffes, rast)
 # Set the number of cores to run on parallel. This approach only works on Unix-based systems (Linux & MacOS). I still have to find the alternative for parallelzing on Windows. 
@@ -197,7 +197,10 @@ zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cols), names_from=c(service, 
 # Join the extracted data to the polygon files
 poly <- left_join(poly, zonal_wide, by= cols)
 
-st_write(poly, here('vector', set), append = FALSE) # save optional
+
+
+
+st_write(poly,set, layer = "no_water_services", append = FALSE)# 
 #write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
 
 ```

@@ -78,9 +78,11 @@ poly <- st_read(set)
 
 # 3 Extract % change Sediment Retention
  **Note**. I think the name of this variable is not accurate. 
-For this we are processing the *Potential Sediment Retention* data for 1992, 2020 and the calcualted differnece. The formula used is:
+For this we are processing the *Potential Sediment Retention* data for 1992, 2020 and the calculated difference. The formula used is:
 
-Potential of Sediment Retention: (USLE-Export)/USLE
+$$
+\text{Potential Sediment Retention} = \frac{\text{USLE} - \text{Export}}{\text{USLE}}
+$$
 
 
 ```{r extract pot sed Retenion}
@@ -93,6 +95,7 @@ tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
  filename<- basename(tiffes)
 
 rasters_list <- lapply(tiffes, rast)
+# Adjust raster name. This is useful to keep data more manageable
 rasters_list <- Map(function(r,new_name){
   names(r) <- new_name
   return(r)
@@ -104,7 +107,7 @@ color <- c("#08606b", "#08606b", "#68606b")
 cd <- as_tibble(cbind(raster_name, color,year))
 rm(filename)
 
-target_stats <- c("mean","stdev")
+target_stats <- c("mean")#,"stdev") I am not sure how relevant it is to have stdev here. I also am not sure if there is some per/ha thing. 
 
 # Iterate function over the rasters
 num.cores <- length(rasters_list)
@@ -207,10 +210,6 @@ zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cls), names_from=c(service, y
 
 poly <- left_join(poly, zonal_wide)
 
-
-
-
-
 poly <- poly %>%
   mutate(across(
     .cols = starts_with("global_"),
@@ -218,7 +217,7 @@ poly <- poly %>%
     .names = "{.col}_per_ha"
   ))
 
-
+#### Here, repalce this horrible thing with the fucntion. This is all hardcoded. 
 poly <- poly %>%
   mutate(
     n_export_pct_ch = ((global_n_export_2020_per_ha - global_n_export_1992_per_ha) / global_n_export_1992_per_ha) * 100,
@@ -276,7 +275,7 @@ sf::st_write(basins,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlif
 ```
 
 # 5. EXTRACT METRICS FOR THE MODELED NITROGEN LAYERS
-
+Multi temporal analysis. 
 Initially for 4 years. 
 This script gets the job done, but needs a lot of improvement.
 ```{r get modeled N retention potential} 
