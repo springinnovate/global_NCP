@@ -148,6 +148,24 @@ st_write(poly, here('vector', "hydrosheds_lv6.gpkg"), layer = "ch_92_2020",  app
 
 ```
 
+```{r test the ch function thing}
+
+set1 <- st_make_valid(set1)
+set2 <- st_make_valid(set2)
+set2_ng <- st_drop_geometry(set2)
+set1 <- left_join(set1,set2_ng)
+set1_ng <- st_drop_geometry(set1)
+
+set1_ng <- set1_ng %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+set3<- set3 %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+
+set_f <- left_join(set3, set1_ng)
+sf::st_write(set_f,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synthesis.gpkg", layer = "synthesis", append = FALSE)
+
+set_fng <- st_drop_geometry(set_f)
+
+write.csv(set_fng, file= '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/synth_table')
+```
 
 
 # 4 Add N Export / ha
@@ -271,12 +289,12 @@ st_layers("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/
 
 basins1 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer= 'hydrosheds_lev6') # Change N_ret 1992-2004 #not needed right now
 
-basins1 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer= 'layer1')
+basins2 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer= 'layer1')
 
-basins2 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer= '1992_2020_lcc_change_metrics')
+basins3 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer= '1992_2020_lcc_change_metrics')
 
 
-basins3 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer="S_Sed_export_ha")
+basins4 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer="S_Sed_export_ha")
 sf::st_write(basins,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer = "1992_2020_lcc_change_metrics", append = FALSE)
 
 
