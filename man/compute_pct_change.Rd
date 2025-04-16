@@ -2,27 +2,36 @@
 % Please edit documentation in R/pct_change_calc.R
 \name{compute_pct_change}
 \alias{compute_pct_change}
-\title{Compute Percentage Change Between Two Years for Selected Variables}
+\title{Compute Percentage Change Between Year Pairs for Selected Variables}
 \usage{
-compute_pct_change(df, services, year_pairs, suffix = "")
+compute_pct_change(
+  df,
+  year_pairs = NULL,
+  services = NULL,
+  suffix = "",
+  round_digits = NULL
+)
 }
 \arguments{
-\item{df}{A data.frame or sf object containing the variables.}
+\item{df}{A data.frame or sf object.}
 
-\item{services}{Character vector of service prefixes (e.g., "global_n_export").}
+\item{year_pairs}{A list of year pairs. Each element should be a character vector of length 2.
+If NULL, will auto-detect all valid year pairs for each service.}
 
-\item{year_pairs}{A list of year pairs (e.g., list(c("1992", "2020"))).}
+\item{services}{Optional character vector of service prefixes to include. If NULL, uses all detected.}
 
 \item{suffix}{Optional suffix string (e.g., "_per_ha"). Default is "".}
+
+\item{round_digits}{Number of digits to round results. Default is NULL (no rounding).}
 }
 \value{
-The input data.frame with new columns for each computed \% change.
+A data.frame with added percentage change columns.
 }
 \description{
-Computes the percentage change between specified pairs of columns for each service.
-Assumes columns follow the naming convention: \if{html}{\out{<prefix>}}_\if{html}{\out{<year>}}
+This function computes percentage change between year pairs for specified services
+or auto-detects all available year pairs if none are specified. It assumes columns
+follow the naming convention: \if{html}{\out{<service>}}_\if{html}{\out{<year>}}.
 }
 \examples{
-compute_pct_change(df, services = c("global_n_export"), year_pairs = list(c("1992", "2020")))
-
+compute_pct_change_all(df, year_pairs = list(c("1992", "2020")), services = c("Usle"))
 }

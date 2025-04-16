@@ -92,20 +92,22 @@ $$
 
 inpath <- here('input_ES', "Pot_Sed_retention")
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
- filename<- basename(tiffes)
+
+
+raster_name<- basename(tiffes)
 
 rasters_list <- lapply(tiffes, rast)
 # Adjust raster name. This is useful to keep data more manageable
 rasters_list <- Map(function(r,new_name){
   names(r) <- new_name
   return(r)
-  }, rasters_list, filename)
+  }, rasters_list, raster_name)
 
-year <- rep(c(1992,2020, "diff"))
+year <- rep(c("diff",2020,1992))
 # create a table with the content to fill the table
-color <- c("#08606b", "#08606b", "#68606b")
+color <- c("#68606b","#08606b", "#08606b")
 cd <- as_tibble(cbind(raster_name, color,year))
-rm(filename)
+
 
 target_stats <- c("mean")#,"stdev") I am not sure how relevant it is to have stdev here. I also am not sure if there is some per/ha thing. 
 
@@ -127,17 +129,23 @@ zonal_df <- do.call(rbind, results_list)
 
 cls <- "HYBAS_ID"
 
+service <- "Sed_retention_ratio"
+zonal_df <- zonal_df %>% mutate(Service=service)
 zonal_df <- left_join(zonal_df,cd)
-zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cls), names_from=c(raster_name), values_from = c(mean,stdev))
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cls), names_from=c(Service,year), values_from = c(mean))#,stdev))
 
 # Calculate % of change 
-zonal_wide <- zonal_wide %>%
-  mutate(Pot_Sed_ret_pct_ch = ((mean_Pot_Sed_ret_2020 - mean_Pot_Sed_ret_1992) / mean_Pot_Sed_ret_1992) * 100)
+sr <- c("Sed_retention_ratio")
+year <- list(year[-1])
+zonal_wide <- compute_pct_change(zonal_wide, year_pairs=year, sr, round_digits = 4)
 
+poly <- compute_pct_change(poly, year_pairs=year, round_digits = 4)
 
 poly <- left_join(poly, zonal_wide, by= cls)
-st_write(poly, here('vector', "Hydrosheds_lv7_2.gpkg"), append = FALSE) 
-write.csv(zonal_df, here('output_data', paste0('pot_sed_ret_df_lv7', col, '.csv')))# acá viene el problema!
+
+
+st_write(poly, here('vector', "hydrosheds_lv6.gpkg"), layer = "ch_92_2020",  append = FALSE) 
+
 ```
 
 
