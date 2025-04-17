@@ -23,7 +23,43 @@ d. Income level *done*
 e. regioin_wb *done*
 f. Continent *done*
 
+Clean the data 
 
+
+# LOAD TTHE DATA
+
+
+```{r load input polygon data}
+
+#Builds a list of files in the vector directory
+inpath <- here("vector")
+sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
+
+# Set and select an index to load the desired dastaset
+t <- 4
+set <- sets[t]
+
+lyr <- st_layers(set)
+# # load polygons
+print(lyr)
+```
+
+```{r refine columns}
+basin <- st_read(set, layer= "hydrosheds_lev6") 
+basin <- basin[c(1:13)]
+poly <- st_read(set, layer= "layer1") 
+bas1 <- st_drop_geometry(poly)
+bas1 <- bas1[c(1,14,15,17)]
+poly <- st_read(set, layer= "ch_92_2020") 
+bas2 <- st_drop_geometry(poly)
+bas2 <- bas2[c(1,14:15,23,22,17,18,19,20,24)]
+poly <- st_read(set, layer = "no_water_services")
+
+#poly <- st_read(set, layer= "ch_92_2020") 
+#poly
+basin <- left_join(basin, bas1)
+basin <- left_join(basin,bas2)
+```
 
 ```{r get amounts of lc chnage}
 
