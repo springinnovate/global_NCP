@@ -182,6 +182,8 @@ summary_df <- lcc_metrics_df %>%
 # Preview
 head(summary_df)
 ```
+
+
 ```{r produce reference for the attributes}
 
 # Extract column names (excluding ID column)
@@ -206,9 +208,6 @@ ref_df <- tibble(
 # Optional: arrange for readability
 ref_df <- ref_df %>% select(column_name, description)
 
-# Write output as reference CSV
-write.csv(ref_df, here("vector", "lcc_column_reference.csv"))
-
 
 
 ```
@@ -224,94 +223,4 @@ ggplot(summary_df, aes(x = year_step, y = Gain, group = Category, color = Catego
   theme_minimal()
 ```
 
-
-# I think this can be removed.
-
-
-
-```{r landcover_differ_change, message=TRUE, warning=FALSE, eval=FALSE}
-
-library(terra)
-library(sf)
-library(diffeR)
-library(dplyr)
-library(tidyr)
-library(purrr)
-library(progress)
-
-# 1. Define inputs ----
-
-# Path to input rasters
-raster_dir <- here("input_landcover")
-raster_files <- list.files(raster_dir, pattern = "\\.tif$", full.names = TRUE)
-
-# Sort chronologically (assuming names contain 4-digit years)
-raster_files <- raster_files[order(gsub("\\D", "", basename(raster_files)))]
-years <- gsub("\\D", "", basename(raster_files))
-
-# Load reclassified land cover rasters
-lc_rasters <- lapply(raster_files, terra::rast)
-
-# Load spatial units
-polygons <- vect(here("vector", "hydrosheds_lev6.gpkg"))  # or lev7
-
-# Ensure proper alignment
-lc_rasters <- lapply(lc_rasters, function(r) terra::project(r, crs(polygons)))
-
-# 2. Function to extract diffeR metrics per polygon and year ----
-
-extract_differ_metrics <- function(poly, lc_list, years) {
-  n_years <- length(lc_list)
-  results <- list()
-
-  for (i in 1:(n_years - 1)) {
-    r1 <- lc_list[[i]]
-    r2 <- lc_list[[i + 1]]
-    year_pair <- paste0(years[i + 1], "_", years[i])
-
-    # Crop/mask to polygon on-the-fly
-    r1_crop <- crop(r1, poly) |> mask(poly)
-    r2_crop <- crop(r2, poly) |> mask(poly)
-
-    # Skip if empty
-    if (is.na(global(r1_crop, fun = "sum", na.rm = TRUE))) next
-
-    # Crosstab and difference metrics
-    tab <- crosstabm(comp = r1_crop, ref = r2_crop, percent = TRUE)
-    diff_stats <- difftablej(tab, analysis = "change")
-
-    # Format result
-    diff_stats$fid <- poly$HYBAS_ID
-    diff_stats$year_step <- year_pair
-    results[[length(results) + 1]] <- diff_stats
-  }
-
-  bind_rows(results)
-}
-
-# 3. Iterate over all polygons with progress bar ----
-
-pb <- progress_bar$new(
-  total = nrow(polygons),
-  format = "  Processing [:bar] :percent in :elapsed",
-  clear = FALSE, width = 60
-)
-
-all_results <- map_dfr(1:nrow(polygons), function(i) {
-  pb$tick()
-  extract_differ_metrics(polygons[i, ], lc_rasters, years)
-})
-
-# 4. Clean and export ----
-
-# Pivot to long format
-diff_long <- all_results %>%
-  pivot_longer(cols = c("Gain", "Persistence", "Loss", "Quantity", "Exchange", "Shift"),
-               names_to = "metric", values_to = "value")
-
-# Export table for plotting or analysis
-write.csv(diff_long, here("output_data", "lc_change_metrics.csv"), row.names = FALSE)
-
-
-```
 
