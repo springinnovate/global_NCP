@@ -108,9 +108,9 @@ rasters_list <- Map(function(r,new_name){
   return(r)
   }, rasters_list, raster_name)
 
-year <- rep(c("diff",2020,1992))
+year <- rep(c(2020,1992))
 # create a table with the content to fill the table
-color <- c("#68606b","#08606b", "#08606b")
+color <- c("#08606b", "#08606b")
 cd <- as_tibble(cbind(raster_name, color,year))
 
 
@@ -127,6 +127,9 @@ results_list <- mclapply(rasters_list, function(r) {
   res$raster_name <- r_name
   return(res)},mc.cores = num.cores)
 
+# ADjsut to assigne the service here. not ready. 
+service <- "Sed_retention_ratio"
+zonal_df <- zonal_df %>% mutate(Service=service)
 # Combine results from all rasters into one single data frame
 zonal_df <- do.call(rbind, results_list)
 
@@ -134,8 +137,6 @@ zonal_df <- do.call(rbind, results_list)
 
 cls <- "HYBAS_ID"
 
-service <- "Sed_retention_ratio"
-zonal_df <- zonal_df %>% mutate(Service=service)
 zonal_df <- left_join(zonal_df,cd)
 zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(cls), names_from=c(Service,year), values_from = c(mean))#,stdev))
 
@@ -148,7 +149,7 @@ poly <- compute_pct_change(poly, year_pairs=year, round_digits = 4)
 
 poly <- left_join(poly, zonal_wide, by= cls)
 
-
+# think better the layer names, 
 st_write(poly, here('vector', "hydrosheds_lv6.gpkg"), layer = "ch_92_2020",  append = FALSE) 
 
 ```
