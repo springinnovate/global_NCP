@@ -154,26 +154,6 @@ st_write(poly, here('vector', "hydrosheds_lv6.gpkg"), layer = "ch_92_2020",  app
 
 ```
 
-```{r test the ch function thing}
-
-set1 <- st_make_valid(set1)
-set2 <- st_make_valid(set2)
-set2_ng <- st_drop_geometry(set2)
-set1 <- left_join(set1,set2_ng)
-set1_ng <- st_drop_geometry(set1)
-
-set1_ng <- set1_ng %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
-set3<- set3 %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
-
-set_f <- left_join(set3, set1_ng)
-sf::st_write(set_f,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synthesis.gpkg", layer = "synthesis", append = FALSE)
-
-set_fng <- st_drop_geometry(set_f)
-
-write.csv(set_fng, file= '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/synth_table')
-```
-
-
 # 4 Add N Export / ha
 
 ```{r load raster export, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
@@ -204,7 +184,6 @@ cd <- tibble(service, raster_name, year, color)
 kable(cd, format = "html", caption = "Input Raster datasets 1992–2020") %>%
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
-
 
 
 
@@ -249,34 +228,7 @@ poly <- poly %>%
     .names = "{.col}_per_ha"
   ))
 
-#### Here, repalce this horrible thing with the fucntion. This is all hardcoded. 
-poly <- poly %>%
-  mutate(
-    n_export_pct_ch = ((global_n_export_2020_per_ha - global_n_export_1992_per_ha) / global_n_export_1992_per_ha) * 100,
-    sed_export_pct_ch = ((global_sed_export_2020_per_ha - global_sed_export_1992_per_ha) / global_sed_export_1992_per_ha) * 100
-  )
-
-
 st_write(poly, set, layer = "S_Sed_export_ha", append = FALSE)
-
-
-#####################################################
-
-# 2. Loop over year pairs and calculate % change
-for (i in seq_along(years)[-1]) {
-  y_prev <- years[i - 1]
-  y_curr <- years[i]
-  
-  col_prev <- paste0("n_export_", y_prev)
-  col_curr <- paste0("n_export_", y_curr)
-  new_col <- paste0("pct_ch_", y_curr, "_", y_prev)
-  
-  zonal_wide[[new_col]] <- (zonal_wide[[col_curr]] - zonal_wide[[col_prev]]) / 
-                            zonal_wide[[col_prev]] * 100
-}
-
-
-# adjust column names #
 
 # Join the extracted data to the polygon files
 poly <- left_join(poly, zonal_wide, by= cls)
@@ -286,7 +238,7 @@ hydrosheds_lv6 <- poly
 ```
 
 # Build Synthesis spreadshet
-
+Temporary. Data cleaning because of course.
 ```{r buid synthesis}
 
 # Check Layers 

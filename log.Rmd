@@ -107,8 +107,63 @@ names(basin) <- ifelse(
   gsub("_2020_1992$", "", names(basin)),
   names(basin))
 st_write(basin, paste0('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector', '/', "hydrosheds_lv6_synthesis.gpkg"), append=FALSE)
+
 ```
 
+## Add broader infor spatial units 
+Here, we will add the names of the broadrr sptial units:
+
+country
+WWF biome
+Ecoregion
+
+```{r join spatial unit names}
+
+inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector"
+
+basins <- st_read(paste0(inpath, "/", "hydrosheds_lv6_synthesis.gpkg"))
+
+basins <- basins[c(1:13)]
+
+cnt <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/cartographic_ee_ee_r264_correspondence.gpkg')
+cnt <- cnt[c(1,22)]
+
+tmp <- rast(tiffes[[1]])
+#load a template
+# Create a raster template that covers all basins
+equal_area_crs <- "EPSG:6933"  # World Cylindrical Equal Area
+# Reproject both layers
+cnt <- st_transform(cnt, crs = "EPSG:6933")
+bas_eq <- st_transform(basins, crs = "EPSG:6933")
+
+
+# Proceed with the same logic using 'countries_eq' and 'basins_eq'
+
+template <- terra::rast(bas_eq, resolution = 300)  # adjust resolution as needed
+
+# Rasterize the country polygons
+r_country <- terra::rasterize(vect(cnt), template, field = "id")
+
+# Step 2: Extract coverage fraction for each basin
+country_weights <- exactextractr::exact_extract(r_country, basins, weights = "area")
+
+# Step 3: For each basin, find the country with max coverage
+dominant_country <- lapply(country_weights, function(tbl) {
+  tbl <- tbl %>% group_by(value) %>% summarise(weight = sum(weight, na.rm = TRUE))
+  tbl <- tbl %>% slice_max(weight, n = 1)
+  return(tbl$value)
+})
+
+# Step 4: Map back to country name
+dominant_country <- unlist(dominant_country)
+basins$country_id <- dominant_country
+basins <- left_join(basins, countries %>% st_drop_geometry() %>% select(country_id, country_name), by = "country_id")
+
+
+
+
+
+```
 
 
 
