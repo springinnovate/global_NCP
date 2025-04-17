@@ -60,6 +60,8 @@ poly <- st_read(set)
 #poly
 basin <- left_join(basin, bas1)
 basin <- left_join(basin,bas2)
+basin <- basin[c(1:13,17:20,14,15,21,22,23,25,16,24)]
+st_write(basin, here('vector', "hydrosheds_lv6_tmp.gpkg"))
 ```
 
 ```{r load input polygon data cumaribo}
