@@ -5,27 +5,6 @@ output: html_notebook
 
 
 
-Here, write down the output of Yesterday meeting and what i need to do. 
-
-1. Organize output Dataframes (make sure that they are complete and correclty named)
-
-Here, write down the output of Yesterday meeting and what i need to do. 
-
-1. Organize output Data frames (make sure that they are complete and correctly named)
-
-
-2. Make sure all the Vector files have the necessary attributes.
-
-a. Subregion (IPBES) *done*
-b. Countries top/less change *running to complete*
-c. Biomes 
-d. Income level *done*
-e. regioin_wb *done*
-f. Continent *done*
-
-Clean the data 
-
-
 # LOAD TTHE DATA
 
 
@@ -231,6 +210,21 @@ basins$ecoregion <- dominant_bm
 
 st_write(basins, here("vector", "basins_bm.gpkg"), append=FALSE)
 
+
+
+bas1 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/basins_bm.gpkg')
+
+
+bas_lyr <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synthesis.gpkg')
+bas_lyr <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synthesis.gpkg', layer = "hydrosheds_lv6_synthesis")
+bas_lyr <- bas_lyr[c(1, 14:36)]
+
+bas1 <- left_join(bas1, bas_lyr %>% st_drop_geometry(), by= "HYBAS_ID")
+
+st_write(bas1, here("vector", "hydrosheds_lv6_synth.gpkg"), append=FALSE)
+
+bas1 <- st_drop_geometry(bas1)
+write.csv(bas1, file= here("vector", "synth_table.csv"))
 ```
 
 

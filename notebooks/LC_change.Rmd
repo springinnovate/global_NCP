@@ -9,10 +9,9 @@ output: html_document
 This RMarkdown file shows how to:
 
 1. Load land cover classification rasters and polygon units
-2. E
 2. Apply `extract_zonal_lcc_metrics()` and `iterate_zonal_lcc_metrics()`
 3. Append the extracted metrics to the input polygon data.
-4. Summarize and plot key land cover transition metrics
+4. Summarize and plot key land cover transition metrics [pending]
 
 
 ```{r setup, message=FALSE, warning=FALSE}
@@ -41,7 +40,6 @@ b) Binary transformed/natural LC maps.
 inpath <-  '/home/jeronimo/global_ES_modeling/esos-c/data/ndr'
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'landcover'))
 filename<- basename(tiffes)
-#set <- 'continent.gpkg' 
 
 raster_list <- lapply(tiffes,rast)
 num.cores <- length(raster_list)
@@ -61,7 +59,6 @@ reclass_table <- data.frame(
          8,   # Water
          9)   # Ice
 )
-
 
 raster_list <- lapply(raster_list, function(r) {
   subst(r, from = reclass_table$from, to = reclass_table$to)
@@ -88,10 +85,7 @@ raster_list <- lapply(raster_list, function(r) {
 
 #save rasters 
 lapply(1:length(raster_list), function(x) writeRaster(raster_list[[x]], paste0(here("input_ES", "LandCovers"),'/', "rec_", filename[x])))
-
-
 # second reclassifciation Natural-not natural 
-
 ```
 
 ## Load Inputs
@@ -110,8 +104,11 @@ names(landcover_files) <- stringr::str_extract(basename(landcover_files), "\\d{4
 landcover_rasters <- lapply(landcover_files, terra::rast)
 
 # Load polygon spatial units (e.g., HydroBASINS level 6)
+'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/basins_bm.gpkg'
+basins <- st_read(here("vector", "hydrosheds_lv6_synth.gpkg"))
 
-basins <- st_read(here("vector", "hydrosheds_lv6.gpkg"), layer= "lcc_change_metrics")
+#if only the basic hydroshed columns.
+basins <- basins[c(1:13)]
 ```
 
 ## Run Land Cover Change Metric Extraction
@@ -138,11 +135,6 @@ lcc_metrics_wide <- lcc_metrics_df %>%
     values_from = c(Gain, Persistence, Loss, Quantity, Exchange, Shift),
     names_glue = "{.value}_{Category}_{year_step}"
   )
-# Note: there is something fishy going on here, the last run for 1992-2020 had some issues, when. iterating, but just running extract_lcc_metrics() without wrapping it for multiple time steps ( i need a technical way to refer to this) did solve the issue. Pending to check in the multi temporal assesment. 
-# when doing thjat, keep two things presnet: set the number of digits to 4, add the column with the *direction* of change. For now, Shift is not necessary, possibly several columns are not needed at this point (especially those about Overall, ther is a lot of redudancy, it is *literarolly like balancing a budget. In fact, this is called a budget) Add the new column, but make sure to limit the number of digits, to 4. I am not sure if more digits make sense, and also, this results in a huge file. No need.
-# Remove service change attributes from poly (btw, to avoid this is we can save each appended dataset as a new layer in the geopackage)
-
-basins <- basins[c(1:13)]
 
 ##################################################
 # Run the function with only two dates 
