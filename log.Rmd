@@ -122,26 +122,25 @@ Ecoregion
 ```{r join spatial unit names}
 
 inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector"
-
-basins <- st_read(paste0(inpath, "/", "hydrosheds_lv6_synthesis.gpkg"))
+inpath <- here('vector')
+basins <- st_read(paste0(inpath, "/", "hydrosheds_lv6_cp.gpkg"))
 
 basins <- basins[c(1:13)]
+basins <- st_make_valid(basins)
 
-cnt <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/cartographic_ee_ee_r264_correspondence.gpkg')
-cnt <- cnt[c(1,22)]
+st_write(basins, here('vector', 'hydrosheds_lv_6_tmp.gpkg'), append=FALSE)
 
-tmp <- rast(tiffes[[1]])
-#load a template
-# Create a raster template that covers all basins
-equal_area_crs <- "EPSG:6933"  # World Cylindrical Equal Area
+
+
+
+cnt <- st_read(here('vector', 'cartographic_ee_ee_r264_correspondence.gpkg'))
+cnt <- cnt[c(1,12,22)]
+
 # Reproject both layers
 cnt <- st_transform(cnt, crs = "EPSG:6933")
 bas_eq <- st_transform(basins, crs = "EPSG:6933")
 
-
-# Proceed with the same logic using 'countries_eq' and 'basins_eq'
-
-template <- terra::rast(bas_eq, resolution = 300)  # adjust resolution as needed
+template <- terra::rast(bas_eq, resolution = 300)
 
 # Rasterize the country polygons
 r_country <- terra::rasterize(vect(cnt), template, field = "id")
@@ -158,12 +157,51 @@ dominant_country <- lapply(country_weights, function(tbl) {
 
 # Step 4: Map back to country name
 dominant_country <- unlist(dominant_country)
-basins$country_id <- dominant_country
-basins <- left_join(basins, countries %>% st_drop_geometry() %>% select(country_id, country_name), by = "country_id")
+basins$id <- dominant_country
 
 
+basins <- left_join(basins, cnt %>% st_drop_geometry(), by = "id")
+st_write(basins, here("vector", "basins_ct.gpkg"))
+#######################################
+
+basins <- st_read(paste0(inpath, "/", "hydrosheds_lv_tmp.gpkg"), layer = 'clipped')
+bas_eq <- st_transform(basins, crs = "EPSG:6933")
+
+template <- terra::rast(bas_eq, resolution = 300)
+wwf_biome <- st_read(here("vector", "Biomes_WWF", "wwf_terr_ecos.shp"))
+wwf_biome <-  st_transform(wwf_biome, crs = "EPSG:6933")
 
 
+wwf_biome <- wwf_biome[c(1,4,6)]
+r_bm <- terra::rasterize(vect(wwf_biome), template, field = "BIOME")
+bm_weights <- exactextractr::exact_extract(r_bm, basins, weights = "area")
+
+#  For each basin, find the unit with max coverage
+dominant_bm <- map_dbl(bm_weights, function(tbl) {
+  tbl %>%
+    group_by(value) %>%
+    summarise(weight = sum(weight, na.rm = TRUE), .groups = "drop") %>%
+    slice_max(order_by = weight, n = 1, with_ties = FALSE) %>%
+    pull(value)
+})
+
+basins <- st_read(here("vector", "basins_ct.gpkg"))
+#dominant_bm.<- unlist(dominant_bm)
+basins$BIOME <- dominant_bm
+# Step 4: Map back to country name
+lyrng <- st_drop_geometry(basins)
+
+basins <- st_read()
+basins <- left_join(basins,lyr %>% st_drop_geometry(), by ="BIOME")
+
+basins <- basins %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+lyr <- lyr %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+
+basins <- left_join(basins, lyr  %>% st_drop_geometry(), by = "HYBAS_ID")
+st_write(basins, here("vector", "basins_bm.gpkg"), append=FALSE)
+
+basins <- left_join(basins, wwf_biome %>% st_drop_geometry(), by = "id")
+st_write(basins, here("vector", "basins_ct.gpkg"))
 
 ```
 
