@@ -7,48 +7,61 @@ output: html_notebook
 1. Organize output Dataframes (make sure that they are complete and correclty named)
 
 
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(tidytext)
+library(rlang)
+# source the helper functions
+source(here::here("R", "utils_lcc_metrics.R"))
+source(here("R","utils_pct_change.R"))
+```
+
 
 ```{r load polygons, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 # Read spatial polygon dataset
 
+inpath <- '/Users/sputnik/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector'
 inpath <- here("vector")
 sets <- file.path(inpath, list.files(inpath, pattern= 'gpkg$'))
 
 #cols <- c("id", "continent", "income_grp", "region_wb", "WWF_biome", "HYBAS_ID", "HYBAS_ID")
 #sets <- cbind(sets, cols)
 # Set an index to select the desired dataset
-t <- 5
+t <- 10
 # Select the target dataset from the list 
 set <- sets[t]
 # # load polygons
-poly <- st_read(set, layer = "lcc_change_metrics") 
+lyr <- st_layers(set)
+poly <- st_read(set)
 
-#get the name of the column withthe unique ids of the input vector
+#get the name of the column with the unique ids of the input vector
 col <- colnames(poly[1])[1]
-
-# Convert to data frame for nicer display
-sets_df <- as.data.frame(basename(sets))
-# Print nicely
-kable(sets_df, format = "html", caption = "Geopackage Layers") %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
-
 ```
 
 
-```{r load and reshape processed geometries}
+```{r load and reshape processed geometries, eval=FALSE, include=FALSE}
 
 # get pct as standalone data to add to the table
-poly <- st_transform(poly, crs = 5880)
-
+poly <- st_read(here("vector", "hydrosheds_lv6_synth.gpkg"))
+poly <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/hydrosheds_lv6_synth.gpkg')
 
 plt <- st_drop_geometry(poly)
 
 plt <- as_tibble(plt)
 #filter all thins smaller than 150.000 ha (takes away the 54 smallest features) 
 
-
-service <- c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination", "Pot_Sed_ret")
-color <- c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#A57C00", "#dd1c77", "#8C510A")
+#this needs to be updated. 
+service <- c("Coastal_Protection", "N_export", "Sed_export", "Usle", "Pollination", "Sed_Ret_R")
+color <- c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#dd1c77", "#8C510A")
 cd <- as_tibble(cbind(service,color))
 
 ################## THIS IS VERY IMPPORTAnt. Instead of struggling  with the multiple dataframes, it is easier to load the vector file swith all the column and pivot longer as necessary. Easier to manage, adjust on the fly!
@@ -59,15 +72,226 @@ plt <- as_tibble(plt %>%
     values_to = "pct_ch"         # New column to store the percentage change values
   ))
 
+plt <- plt[-c(2:6,8:10,12,13,23:34)]
+
+# Adjust Dataframe and labels
 plt <- plt %>%
   mutate(service = str_remove(service, "_pct_ch$"))
+
+plt <- plt %>% mutate(service = case_when(
+  service == "n_export" ~ "N_export",
+  service == "sed_export" ~ "Sed_export",
+  service == "Sed_retention_ratio" ~ "Sed_Ret_R",
+  TRUE ~ service
+  ))
+
+
 plt <- left_join(plt,cd)
+#Remove invalid records
 plt <- plt%>% filter(!is.na(pct_ch))
+# Remove Inf values
+plt <- plt %>%  plt %>% filter(pct_ch != Inf).  ## Double check here. Why is Inf here? No problem. Service in period 0 was o, so $ of chng from 0 to any value is inf
 
-
+write.csv(plt, file= here('output_data', "metrics_change_hb_lev_6.csv"))
 ```
 
 
+
+```{r box whikers, fig.height=8, fig.width=14}
+
+plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
+plt[1] <- NULL 
+# apply filter (5 or 2%) # Remove the smalles basins. That help. Also, it seems that some biomes are more prone to artifacts than others!!!
+area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
+# Filter the dataset
+df <- df1 %>% filter(SUB_AREA > area_threshold)
+
+
+t_5 <- ggplot(df, aes(x = service, y = pct_ch, fill = color)) +
+  geom_boxplot() +  # or geom_violin()
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(
+    title = "Distribution of % Change by Service (Excl. Smallest 5% of Basins)",
+    x = NULL,
+    y = "Percentage Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+
+library(ggplot2)
+library(dplyr)
+
+# Custom pseudo-log transformation
+pseudo_log <- function(x) sign(x) * log1p(abs(x))
+
+# Apply to the filtered dataframe
+df <- df %>% 
+  mutate(pct_ch_trans = pseudo_log(pct_ch))
+
+# Plot with transformed values
+p <- ggplot(df, aes(x = service, y = pct_ch_trans, fill = color)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+p
+```
+## 5. Here, add plots with the differences 
+
+```{r plot chg 8, fig.height=8, fig.width=14}
+
+plot_es_changes <- function(data, label_col = col, 
+                            filter_type = "top_bottom", filter_val = 10) {
+  label_sym <- sym(label_col)
+  
+  # Step 2: Apply filtering based on the chosen type
+  if (filter_type == "top_bottom") {
+    # Top/bottom n observations per service
+    top_bottom <- data %>%
+      group_by(service) %>%
+      slice_max(pct_ch, n = filter_val, with_ties = FALSE) %>%
+      bind_rows(
+        data %>%
+          group_by(service) %>%
+          slice_min(pct_ch, n = filter_val, with_ties = FALSE)
+      ) %>%
+      ungroup()
+    
+  } else if (filter_type == "quantile") {
+    # Top/bottom quantile per service (e.g., top/bottom 10%)
+    top_bottom <- data %>%
+      group_by(service) %>%
+      filter(pct_ch >= quantile(pct_ch, 1 - filter_val, na.rm = TRUE) |
+             pct_ch <= quantile(pct_ch, filter_val, na.rm = TRUE)) %>%
+      ungroup()
+    
+  } else if (filter_type == "all") {
+    top_bottom <- data
+  } else {
+    stop("Invalid `filter_type`. Use 'top_bottom', 'quantile', or 'all'.")
+  }
+  
+  # Step 3: Reorder labels per service
+  top_bottom <- top_bottom %>%
+    mutate(temp_label = reorder_within(!!label_sym, -pct_ch, service))
+  
+  # Step 4: Plot
+  ggplot(top_bottom, aes(x = temp_label, y = pct_ch, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    scale_x_reordered() +
+    facet_wrap(~ service, scales = "free", ncol = 3) +
+    labs(
+      #title = paste("% Change 1992–2020 By", cols, sep= " "),
+      x = NULL,
+      y = "% Change"
+    ) +
+    theme_bw() +
+    theme(
+      strip.text = element_text(face = "bold", size = 10),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 8)
+    )
+}
+
+# Top/bottom 10 countries per service
+plot_es_changes(df, label_col = col, filter_type = "top_bottom", filter_val = 10)
+
+# Top/bottom 5% per service
+#plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.1)
+
+# Show all values
+#plot_es_changes(plt, filter_type = "all")
+```
+
+
+## Scatterplots
+
+```{r scatterplots LC change}
+
+
+# List of LC metrics to analyze
+lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+
+# Loop over each LC metric and generate a faceted scatterplot
+for (metric in lc_metrics) {
+  p <- plt %>%
+    ggplot(aes_string(x = metric, y = "pct_ch", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("Relationship Between", metric, "and ES % Change"),
+      x = metric,
+      y = "% Change in Ecosystem Service"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+  
+  print(p)
+}
+```
+
+
+# Scatterplots change 2
+
+```{r scatterplots LC change2, fig.height=8, fig.width=14  }
+library(dplyr)
+library(ggplot2)
+
+# LC metrics of interest
+lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+
+# Step 1: Remove top 2% outliers for each service
+filtered_plt <- plt %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch, 0.98, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch <= threshold)
+
+# Step 2: Apply pseudo-log transformation
+filtered_plt <- filtered_plt %>%
+  mutate(pct_ch_log = sign(pct_ch) * log1p(abs(pct_ch)))
+
+# Step 3: Loop through each LC metric and create faceted plots
+for (metric in lc_metrics) {
+  p <- ggplot(filtered_plt, aes_string(x = metric, y = "pct_ch_log", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("Log-Transformed % Change vs", metric),
+      x = metric,
+      y = "Log(% Change in ES)"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+  
+  print(p)
+}
+```
 
 
 # Get Sankey Diagrams
@@ -149,85 +373,6 @@ plt <- plt %>%
 ```
 
 
-
-## 5. Here, add plots with the differences 
-
-```{r plot chg 8, fig.height=8, fig.width=14}
-library(dplyr)
-library(ggplot2)
-library(tidytext)
-library(rlang)
-
-#For biomes
-#col <- "biome_short"
-
-plot_es_changes <- function(data, label_col = col, 
-                            filter_type = "top_bottom", filter_val = 10) {
-  
-  label_sym <- sym(label_col)
-  
-  # Step 1: Filter problematic service and NAs
-  filtered_data <- data %>%
-    filter(service != "Nature_Access", !is.na(pct_ch))
-  
-  # Step 2: Apply filtering based on the chosen type
-  if (filter_type == "top_bottom") {
-    # Top/bottom n observations per service
-    top_bottom <- filtered_data %>%
-      group_by(service) %>%
-      slice_max(pct_ch, n = filter_val, with_ties = FALSE) %>%
-      bind_rows(
-        filtered_data %>%
-          group_by(service) %>%
-          slice_min(pct_ch, n = filter_val, with_ties = FALSE)
-      ) %>%
-      ungroup()
-    
-  } else if (filter_type == "quantile") {
-    # Top/bottom quantile per service (e.g., top/bottom 10%)
-    top_bottom <- filtered_data %>%
-      group_by(service) %>%
-      filter(pct_ch >= quantile(pct_ch, 1 - filter_val, na.rm = TRUE) |
-             pct_ch <= quantile(pct_ch, filter_val, na.rm = TRUE)) %>%
-      ungroup()
-    
-  } else if (filter_type == "all") {
-    top_bottom <- filtered_data
-  } else {
-    stop("Invalid `filter_type`. Use 'top_bottom', 'quantile', or 'all'.")
-  }
-  
-  # Step 3: Reorder labels per service
-  top_bottom <- top_bottom %>%
-    mutate(temp_label = reorder_within(!!label_sym, -pct_ch, service))
-  
-  # Step 4: Plot
-  ggplot(top_bottom, aes(x = temp_label, y = pct_ch, fill = color)) +
-    geom_bar(stat = "identity", show.legend = FALSE) +
-    scale_fill_identity() +
-    scale_x_reordered() +
-    facet_wrap(~ service, scales = "free", ncol = 3) +
-    labs(
-      title = paste("% Change 1992–2020 By", cols, sep= " "),
-      x = NULL,
-      y = "% Change"
-    ) +
-    theme_bw() +
-    theme(
-      strip.text = element_text(face = "bold", size = 10),
-      axis.text.x = element_text(angle = 45, hjust = 1, size = 8)
-    )
-}
-
-# Top/bottom 10 countries per service
-plot_es_changes(plt, label_col = col, filter_type = "top_bottom", filter_val = 5)
-
-# Top/bottom 5% per service
-plot_es_changes(plt, label_col = col, filter_type = "quantile", filter_val = 0.05)
-
-# Show all values
-plot_es_changes(plt, filter_type = "all")
-```
 
 
 
@@ -546,7 +691,7 @@ ggplot(top_bottom, aes(x = name_long, y = pct_ch, fill = color)) +
 
 # Get Sankey Diagrams
 
-```{r Sankey Diagram}
+```{r Sankey 2 Diagram}
 classes <- c("Cultivated", "Forests", "Grasses/shrubs", "Sparse", "Mangroves", "Urban", "Bare", "Water")
 groupColor <- c("#dcf064","#00b809","#8ca000","#ffebaf",'#009678', "#c31400", "#fff5d7", "#0046c8")
 
