@@ -55,7 +55,6 @@ poly <- st_read(here("vector", "hydrosheds_lv6_synth.gpkg"))
 poly <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/hydrosheds_lv6_synth.gpkg')
 
 plt <- st_drop_geometry(poly)
-
 plt <- as_tibble(plt)
 #filter all thins smaller than 150.000 ha (takes away the 54 smallest features) 
 
@@ -96,6 +95,13 @@ write.csv(plt, file= here('output_data', "metrics_change_hb_lev_6.csv"))
 ```
 
 
+```{r load_data}
+
+plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
+plt[1] <- NULL 
+head(plt)
+# apply filter (5
+```
 
 ```{r box whikers, fig.height=8, fig.width=14}
 
@@ -294,9 +300,244 @@ for (metric in lc_metrics) {
 ```
 
 
+```{r box whikers, fig.height=8, fig.width=14}
+
+plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
+plt[1] <- NULL 
+# apply filter (5 or 2%) # Remove the smalles basins. That help. Also, it seems that some biomes are more prone to artifacts than others!!!
+area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
+# Filter the dataset
+df <- df1 %>% filter(SUB_AREA > area_threshold)
+
+
+t_5 <- ggplot(df, aes(x = service, y = pct_ch, fill = color)) +
+  geom_boxplot() +  # or geom_violin()
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(
+    title = "Distribution of % Change by Service (Excl. Smallest 5% of Basins)",
+    x = NULL,
+    y = "Percentage Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+
+library(ggplot2)
+library(dplyr)
+
+# Custom pseudo-log transformation
+pseudo_log <- function(x) sign(x) * log1p(abs(x))
+
+# Apply to the filtered dataframe
+df <- df %>% 
+  mutate(pct_ch_trans = pseudo_log(pct_ch))
+
+# Plot with transformed values
+p <- ggplot(df, aes(x = service, y = pct_ch_trans, fill = color)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+p
+```
+## 5. Here, add plots with the differences 
+
+```{r plot chg 8, fig.height=8, fig.width=14}
+
+plot_es_changes <- function(data, label_col = col, 
+                            filter_type = "top_bottom", filter_val = 10) {
+  label_sym <- sym(label_col)
+  
+  # Step 2: Apply filtering based on the chosen type
+  if (filter_type == "top_bottom") {
+    # Top/bottom n observations per service
+    top_bottom <- data %>%
+      group_by(service) %>%
+      slice_max(pct_ch, n = filter_val, with_ties = FALSE) %>%
+      bind_rows(
+        data %>%
+          group_by(service) %>%
+          slice_min(pct_ch, n = filter_val, with_ties = FALSE)
+      ) %>%
+      ungroup()
+    
+  } else if (filter_type == "quantile") {
+    # Top/bottom quantile per service (e.g., top/bottom 10%)
+    top_bottom <- data %>%
+      group_by(service) %>%
+      filter(pct_ch >= quantile(pct_ch, 1 - filter_val, na.rm = TRUE) |
+             pct_ch <= quantile(pct_ch, filter_val, na.rm = TRUE)) %>%
+      ungroup()
+    
+  } else if (filter_type == "all") {
+    top_bottom <- data
+  } else {
+    stop("Invalid `filter_type`. Use 'top_bottom', 'quantile', or 'all'.")
+  }
+  
+  # Step 3: Reorder labels per service
+  top_bottom <- top_bottom %>%
+    mutate(temp_label = reorder_within(!!label_sym, -pct_ch, service))
+  
+  # Step 4: Plot
+  ggplot(top_bottom, aes(x = temp_label, y = pct_ch, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    scale_x_reordered() +
+    facet_wrap(~ service, scales = "free", ncol = 3) +
+    labs(
+      #title = paste("% Change 1992–2020 By", cols, sep= " "),
+      x = NULL,
+      y = "% Change"
+    ) +
+    theme_bw() +
+    theme(
+      strip.text = element_text(face = "bold", size = 10),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 8)
+    )
+}
+
+# Top/bottom 10 countries per service
+plot_es_changes(df, label_col = col, filter_type = "top_bottom", filter_val = 10)
+
+# Top/bottom 5% per service
+#plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.1)
+
+# Show all values
+#plot_es_changes(plt, filter_type = "all")
+```
+
+
+## Scatterplots
+
+```{r scatterplots LC change}
+
+
+# List of LC metrics to analyze
+lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+
+# Loop over each LC metric and generate a faceted scatterplot
+for (metric in lc_metrics) {
+  p <- plt %>%
+    ggplot(aes_string(x = metric, y = "pct_ch", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("Relationship Between", metric, "and ES % Change"),
+      x = metric,
+      y = "% Change in Ecosystem Service"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+  
+  print(p)
+}
+```
+
+
+# Scatterplots change 2
+
+```{r scatterplots LC change2, fig.height=8, fig.width=14  }
+library(dplyr)
+library(ggplot2)
+
+# LC metrics of interest
+lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+
+# Step 1: Remove top 2% outliers for each service
+filtered_plt <- plt %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch, 0.98, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch <= threshold)
+
+# # Step 2: Apply pseudo-log transformation
+# filtered_plt <- filtered_plt %>%
+#   mutate(pct_ch_log = sign(pct_ch) * log1p(abs(pct_ch)))
+
+# Step 3: Loop through each LC metric and create faceted plots
+for (metric in lc_metrics) {
+  p <- ggplot(filtered_plt, aes_string(x = metric, y = "pct_ch", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("Log-Transformed % Change vs", metric),
+      x = metric,
+      y = "Log(% Change in ES)"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+  
+  print(p)
+}
+```
+
+```{r scatterplots LC change2, fig.height=8, fig.width=14  }
+library(dplyr)
+library(ggplot2)
+
+# LC metrics of interest
+lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+
+# Step 1: Remove top 2% outliers for each service
+filtered_plt <- plt %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch, 0.98, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch <= threshold)
+
+# # Step 2: Apply pseudo-log transformation
+# filtered_plt <- filtered_plt %>%
+#   mutate(pct_ch_log = sign(pct_ch) * log1p(abs(pct_ch)))
+
+# Step 3: Loop through each LC metric and create faceted plots
+for (metric in lc_metrics) {
+  p <- ggplot(filtered_plt, aes_string(x = metric, y = "pct_ch", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("Log-Transformed % Change vs", metric),
+      x = metric,
+      y = "Log(% Change in ES)"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+  
+  print(p)
+}
+```
 # Get Sankey Diagrams
 
-```{r Sankey Diagram}
+```{r Sankey Diagram, eval=FALSE, include=FALSE}
 classes <- c("Cultivated", "Forests", "Grasses/shrubs", "Sparse", "Mangroves", "Urban", "Bare", "Water")
 groupColor <- c("#dcf064","#00b809","#8ca000","#ffebaf",'#009678', "#c31400", "#fff5d7", "#0046c8")
 
@@ -376,8 +617,10 @@ plt <- plt %>%
 
 
 
-```{r ggplot 2020, echo=FALSE, fig.height=8, fig.width=14}
-#
+
+
+```{r ggplot 2020, eval=FALSE, fig.height=8, fig.width=14, include=FALSE}
+
 
 plot_ecosystem_services <- function(data, var, col) {
   col_sym <- sym(col)  # Convert column name to symbol for dplyr
@@ -450,7 +693,7 @@ print(p_2020)
 
 
 
-```{r timeseries plot}
+```{r timeseries plot, eval=FALSE, include=FALSE}
 
 
 inpath <- here('output_data')
@@ -481,7 +724,7 @@ ggplot(zonal_df, aes(x = year, y = mean, color = biome_short, group = biome_shor
   theme(legend.position = "right")  # Adjust legend position
 ```
 
-```{r faceted plot stdev, fig.height=18, fig.width=18}
+```{r faceted plot stdev, eval=FALSE, fig.height=18, fig.width=18, include=FALSE}
 
 zonal_df <- zonal_df %>% filter(Sub_Region!="Antarctica")
 
@@ -507,7 +750,7 @@ ggplot(zonal_df, aes(x = year, y = stdev, group = Sub_Region)) +
 
 ```
 
-```{r chartTS country filter}
+```{r chartTS country filter, eval=FALSE, include=FALSE}
 
 # Filter to exclude NA values and "Lakes"
 
@@ -538,7 +781,7 @@ ggplot(top_bottom_df, aes(x = year, y = mean, color = name_long, group = name_lo
 ```
 
 
-```{r faceted plot count, fig.height=18, fig.width=18}
+```{r faceted plot count, eval=FALSE, fig.height=18, fig.width=18, include=FALSE}
 
 
 # 1. Filter valid records
@@ -592,7 +835,7 @@ ggplot(plot_data, aes(x = year, y = mean, group = name_long, color = name_long))
 
 ```
 
-```{r ttt}
+```{r ttt, eval=FALSE, include=FALSE}
 library(dplyr)
 library(ggplot2)
 
@@ -646,7 +889,7 @@ ggplot(zonal_top_bottom, aes(x = year, y = mean, group = name_long)) +
 
 ```
 
-```{r plot chg2, fig.height=8, fig.width=14}
+```{r plot chg2, eval=FALSE, fig.height=8, fig.width=14, include=FALSE}
 
 # 1. Filter out "Nature_Access"
 filtered_plt <- plt %>%
@@ -691,7 +934,9 @@ ggplot(top_bottom, aes(x = name_long, y = pct_ch, fill = color)) +
 
 # Get Sankey Diagrams
 
-```{r Sankey 2 Diagram}
+
+```{r Sankey 2 Diagram, eval=FALSE, include=FALSE}
+
 classes <- c("Cultivated", "Forests", "Grasses/shrubs", "Sparse", "Mangroves", "Urban", "Bare", "Water")
 groupColor <- c("#dcf064","#00b809","#8ca000","#ffebaf",'#009678', "#c31400", "#fff5d7", "#0046c8")
 
@@ -741,27 +986,6 @@ sankeyNetwork(Links = linkInfo, Nodes = nodeInfo,
 ```
 
 
-write.csv(plt, here('output_data', paste0('pct_chg_',cols, '.csv')))
-
-
-
-
-Percentage of Change. This is the key. I almot have it for everything! 
-
-
-Variables: 
-
-Pot. Sediment Retention for Each Grouping (Initial/ Final)
-
-######################################################################
-
-Time Series!!!
-
-% percentage of change in the charts.... amount.
-
-
-
-
 
 
 I extract change stats (stdev + mean) for 
@@ -805,19 +1029,13 @@ Get metrics for Retention, export and the calcualtion (in short repeat the whole
 
 Re run the export part
 
-```{r create list of columns}
+```{r create list of columns, eval=FALSE, include=FALSE}
 
 poly <- st_read('/Users/rodriguez/Global_ES_TS/global_NCP/vector/vector_f/Continent.gpkg')
 
 serv <- names(poly)
 serv <- serv[-c(1,30)]
 serv
-
-
 #Get filenames (add paths to stored data)
-
-
-
-
 
 ```
