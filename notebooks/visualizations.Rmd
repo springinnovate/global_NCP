@@ -1,5 +1,5 @@
 ---
-title: "Clean Mapping Data"
+title: "Current Status"
 output: html_notebook
 ---
 
@@ -110,7 +110,7 @@ plt[1] <- NULL
 # apply filter (5 or 2%) # Remove the smalles basins. That help. Also, it seems that some biomes are more prone to artifacts than others!!!
 area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
 # Filter the dataset
-df <- df1 %>% filter(SUB_AREA > area_threshold)
+df <- plt %>% filter(SUB_AREA > area_threshold)
 
 
 t_5 <- ggplot(df, aes(x = service, y = pct_ch, fill = color)) +
@@ -160,6 +160,7 @@ p
 ## 5. Here, add plots with the differences 
 
 ```{r, fig.height=8, fig.width=14}
+col <- "HYBAS_ID"
 
 plot_es_changes <- function(data, label_col = col, 
                             filter_type = "top_bottom", filter_val = 10) {
@@ -323,7 +324,7 @@ for (metric in lc_metrics) {
     labs(
       title = paste(" % Change vs", metric),
       x = metric,
-      y = "Log(% Change in ES)"
+      y = "% Change in ES"
     ) +
     theme_minimal() +
     theme(
