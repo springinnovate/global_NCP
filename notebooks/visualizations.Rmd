@@ -103,58 +103,58 @@ source(here("R","utils_pct_change.R"))
 ```
 
 ```{r chunk_3, fig.height=8, fig.width=14}
-# 
-# plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
-# plt[1] <- NULL 
-# # apply filter (5 or 2%) # Remove the smalles basins. That help. Also, it seems that some biomes are more prone to artifacts than others!!!
-# area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
-# # Filter the dataset
-# df <- plt %>% filter(SUB_AREA > area_threshold)
-# 
-# 
-# t_5 <- ggplot(df, aes(x = service, y = pct_ch, fill = color)) +
-#   geom_boxplot() +  # or geom_violin()
-#   scale_fill_identity() +
-#   facet_wrap(~ service, scales = "free_y") +
-#   labs(
-#     title = "Distribution of % Change by Service (Excl. Smallest 5% of Basins)",
-#     x = NULL,
-#     y = "Percentage Change"
-#   ) +
-#   theme_minimal() +
-#   theme(
-#     axis.text.x = element_blank(),
-#     strip.text = element_text(face = "bold"),
-#     legend.position = "none"
-#   )
-# 
-# library(ggplot2)
-# library(dplyr)
-# 
-# # Custom pseudo-log transformation
-# pseudo_log <- function(x) sign(x) * log1p(abs(x))
-# 
-# # Apply to the filtered dataframe
-# df <- plt %>% 
-#   mutate(pct_ch_trans = pseudo_log(pct_ch))
-# 
-# # Plot with transformed values
-# p <- ggplot(df, aes(x = service, y = pct_ch_trans, fill = color)) +
-#   geom_violin(trim = FALSE, scale = "width") +
-#   scale_fill_identity() +
-#   facet_wrap(~ service, scales = "free_y") +
-#   labs(
-#     title = "Pseudo-log Scaled % Change by Service",
-#     x = NULL,
-#     y = "Transformed % Change"
-#   ) +
-#   theme_minimal() +
-#   theme(
-#     axis.text.x = element_blank(),
-#     strip.text = element_text(face = "bold"),
-#     legend.position = "none"
-#   )
-# p
+
+plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
+plt[1] <- NULL
+# apply filter (5 or 2%) # Remove the smalles basins. That help. Also, it seems that some biomes are more prone to artifacts than others!!!
+area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
+# Filter the dataset
+df <- plt %>% filter(SUB_AREA > area_threshold)
+
+
+t_5 <- ggplot(df, aes(x = service, y = pct_ch, fill = color)) +
+  geom_boxplot() +  # or geom_violin()
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(
+    title = "Distribution of % Change by Service (Excl. Smallest 5% of Basins)",
+    x = NULL,
+    y = "Percentage Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+
+library(ggplot2)
+library(dplyr)
+
+# Custom pseudo-log transformation
+pseudo_log <- function(x) sign(x) * log1p(abs(x))
+
+# Apply to the filtered dataframe
+df <- plt %>%
+  mutate(pct_ch_trans = pseudo_log(pct_ch))
+
+# Plot with transformed values
+p <- ggplot(df, aes(x = service, y = pct_ch_trans, fill = color)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+p
 ```
 ## 5. Here, add plots with the differences 
 
