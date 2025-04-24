@@ -27,6 +27,12 @@ source(here("R","utils_pct_change.R"))
 
 #  1 Organize output Dataframes (make sure that they are complete and correclty named)
 
+Right now, 24/04/2025 the problem is on the way the dataframe with the class colors and names is built. The process is still too manual (writing the table) and is easy to get it wrong when it should not be big deal. 
+Also, the order of the factors needs to be set, and new classes have to be added. Again, i don't how to do it easily. I mean, it is easy, but annoying to do and easy to get wrong.
+
+
+#######################################################
+Here, i need to clean the directory form a loto of old versions. Only the groupings. If pct not there, it is fine, that is easy to calculate now. 
 ```{r load polygons, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 # # Read spatial polygon dataset
 # 
@@ -49,23 +55,35 @@ source(here("R","utils_pct_change.R"))
  
 ```
 
+# Load and pivot 
+
+Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. 
+Add to the documentation , environment or however that's called the vectors to select and order the columns. 
+This should actually be done as a database structure. The columns live somehere and are summoned upon need from a set of options (list_dir). 
+  EVERYTHING IS DASTABASE MANAGEMENT #####. ###### THAT'S WHAT I AHVE BEEN DOING ALL THESE YEARS!!!!! 
+  
+  And all of this without knowing SQL !!!!!!!!!
 
 ```{r chunk1, eval=FALSE, include=FALSE}
 # 
 #  get pct as standalone data to add to the table
-# poly <- st_read(here("vector", "hydrosheds_lv6_synth.gpkg"))
- poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/hydrosheds_lv6_synth.gpkg')
+# Most recent version of synthesis data:
+ 
+poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/hydrosheds_lv6_synth.gpkg')
 # 
  plt <- st_drop_geometry(poly)
  plt <- plt %>%
   dplyr::select(
-    1:15,
+    1:15, # This is hardcoded for the basins, but has to be adjusted for specific cases/desired columns.
     22,
     contains("pct_ch")
   )
  
+ # Edit/Adjust column names 
  names(plt) <- stringr::str_replace_all(names(plt), "_2020_1992", "")
  
+ 
+ ############# PIVOT TABLE ##############################
  plt <- plt %>%
   pivot_longer(
     cols = matches("pct_ch"),  # matches anything containing pct_ch
@@ -75,12 +93,11 @@ source(here("R","utils_pct_change.R"))
   ) %>%
   mutate(service = str_replace(service, "_pct_ch.*", "")) %>%
   as_tibble()
- 
 #
- # Adjust Dataframe and labels
+ # Adjust Dataframe and labels (yes again. The "_pct_ch" part was necessary until now)
  plt <- plt %>%
-   mutate(service = str_remove(service, "_pct_ch"))# %>% mutate(service = str_remove(service, "_2020_1992"))
-# 
+   mutate(service = str_remove(service, "_pct_ch"))#
+# #This is annoying and should be improved. Made easier. Here i am asjusting/homologuing variable names to a same standard. Because some of the data has been extracted at different moments there is some, ahem, *inconsistency* in the "service" naming structure that I fixed here. 
  plt <- plt %>% mutate(service = case_when(
    service == "n_export" ~ "N_export",
    service == "sed_export" ~ "Sed_export",
@@ -89,32 +106,27 @@ source(here("R","utils_pct_change.R"))
    TRUE ~ service
    ))
 # 
- 
-# cd <- as_tibble(cbind(service,color))
-#Remove invalid records
-plt <- plt%>% filter(!is.na(pct_ch))
-# # Remove Inf values
-# plt <- plt %>% filter(pct_ch != Inf)  ## Double check here. Why is Inf here? No problem. Service in period 0 was o, so $ of chng from 0 to any value is inf
-# 
+#Drop Usle and N_export old 
+plt <- plt %>% filter(service!="Usle") %>% filter(service!="N_export") # I am keeping the data in the attribute table because it *might* be necessary at some point, but removing from the reformated table. 
+# cd <- as_tibble(cbind(service,color)) # I don't know why this is here. 
+#Remove invalid / Inf records
+plt <- plt%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)  
+#. Have a method to name versions or something (maybe?)
 write.csv(plt, file= here('output_data', "metrics_change_hb_lev_6_2.csv"))
 
-#Remove Usle and N_export old 
+#Drop Usle and N_export old 
 plt <- plt %>% filter(service!="Usle") %>% filter(service!="N_export")
 ```
 
+# Prepare Filter Database
 
+ This could be a dialogue box!!!
 ```{r load-plt}
 # plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
 # plt[1] <- NULL 
 # head(plt)
 # # apply filter (5
-```
-
-```{r chunk_3, fig.height=8, fig.width=14}
-
-#plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
-#plt[1] <- NULL
-# apply filter (5 or 2%) # Remove the smalles basins. That help. Also, it seems that some biomes are more prone to artifacts than others!!!
+# apply filter (5% or 2%) # Remove the smallest basins. 
 area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
 # Filter the dataset
 df <- plt %>% filter(SUB_AREA > area_threshold)
@@ -129,17 +141,17 @@ df_filt <- df %>%
   filter(id %in% top_bottom_10k$id)
 ```
 
-
+Here, another dialogue to input the variable names, plot colors and set the factor order.
 ```{r, fig.height=8, fig.width=14  }
 service <- unique(plt$service)
 service <- c("Coastal_Protection","Pollination","N_Export_2", "Sed_export", "Sed_Ret_R", "N_Ret_Ratio", "Pop_sqkm","GDP" )
  color <- c("#9e9ac8", "#dd1c77","#2c944c", "#08306b", "#17c0ff",  "#8C510A", "#8C510A","#08306b", "#17c0ff")
+ service_levels <- service
  cd <- as_tibble(cbind(service,color))
 ```
 
 ```{r fig.height=8, fig.width=14, warning=FALSE}
 # 1. Define desired facet order
-service_levels <- c("Coastal_Protection","Pollination","N_Export_2","Usle", "Sed_export", "Sed_Ret_R", "N_Ret_Ratio", "Pop_sqkm","GDP")
 df <- plt %>% filter(SUB_AREA > area_threshold)
 df <- df %>%
   filter(id %in% top_bottom_10k$id)
