@@ -103,8 +103,8 @@ sub-basins.
 
 <div style="display: flex; gap: 10px;">
 
-<img src="output_maps/OriginalServices_92.png" width="45%" />
-<img src="output_maps/OriginalServices_2020.png" width="45%" />
+<img src="output_maps/OriginalServices_92.png" width="45%"/>
+<img src="output_maps/OriginalServices_2020.png" width="45%"/>
 
 </div>
 
@@ -154,7 +154,7 @@ rasters**.
 
 <div style="display: flex; gap: 10px;">
 
-<img src="output_maps/OriginalServices_chg_1992_2020.png" width="60%" />
+<img src="output_maps/OriginalServices_chg_1992_2020.png" width="60%"/>
 
 </div>
 
@@ -175,14 +175,19 @@ Calculate by temporal % of change *This needs to be expanded/refined*
 
 The % of change in NDR at the hydroshed level for 5 different time
 points (1992,1995,1998,2001 and 2004) are mapped here: *All values*:
+
 <p div style="display: flex; gap: 10px;">
+
 <img src="output_maps/Hydrosheds_2_1.png" style="margin-right: 10px;"/>
+
 </div>
 
 *Top/bottom values*
 
 <p div style="display: flex; gap: 10px;">
+
 <img src="output_maps/Hydrosheds_2.png" style="margin-right: 10px;"/>
+
 </div>
 
 ## 6. Land Cover Change Detection
@@ -231,6 +236,13 @@ Overall). Here’s an example of the output before pivoting:
 | 1        | 0.004 | 0.441       | 0.000 | 0.004    | 0.000    | 0.000 | 1070000010 | 1995_1992 |
 | 2        | 0.000 | 99.555      | 0.004 | 0.004    | 0.000    | 0.000 | 1070000010 | 1995_1992 |
 | Overall  | 0.004 | 99.996      | 0.004 | 0.004    | 0.000    | 0.000 | 1070000010 | 1995_1992 |
+
+### Issues
+
+Some complicated polygons can cause processing errors when extracting
+the LC-metrics (happened at the country but not at the basin level). I
+am almost sure that is because the multipolygons, some of them being too
+complex to handle by `sf`. Not sure what to do about this.
 
 ### Pivot and Append
 
@@ -306,10 +318,10 @@ Additional interpretation tools include:
 
 |  |
 |----|
-| \# Notes on Scalability |
-| \- All processing steps can be parallelized using `mclapply()` (Unix-based systems only). - Designed for batch-processing thousands of polygon units (e.g., HydroBASINS level 6 and 7). |
-| \# Future Directions |
-| \- Add more refined LC classes and extend beyond binary classification - Integrate InVEST model output pipelines for continuous updates - Automate report generation with `rmarkdown::render()` - Integrate a Shiny dashboard or QGIS-compatible plugin |
+| \# Scalability |
+| \- All processing steps can be parallelized using `mclapply()` (Unix-based systems only). - Designed for batch-processing over multiple polygon objects (e.g., HydroBASINS level 6 and 7). |
+| \# Future Development |
+| \- Add more refined LC classes and extend beyond binary classification - Integrate InVEST model output pipelines for continuous updates - Integrate a Shiny dashboard or QGIS-compatible plugin |
 
 # License
 
