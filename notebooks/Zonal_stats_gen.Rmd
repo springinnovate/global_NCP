@@ -64,24 +64,9 @@ tiffes1 <- file.path(inpath, list.files(paste0(inpath),pattern= 'export'))
 tiffes2 <- file.path(inpath, list.files(paste0(inpath),pattern= 'retention'))
 rast_list1 <- lapply(tiffes1, rast)
 rast_list2 <- lapply(tiffes2, rast)
-# rcl <- matrix(c(
-#   -Inf, 0, NA,           
-#   10000, Inf, NA      
-# ), ncol = 3, byrow = TRUE)
-# rast_list1<-lapply(rast_list1, function(r){
-#   r <- classify(r,rcl)
-# })#, mc.cores=4)
-# writeRaster(rast_list1[[1]], paste0(here('input_ES', 'mod_n_ret'), '/', "global_n_export_2020_compressed_rec.tif"))
-# rast_list2<-lapply(rast_list2, function(r){
-#   r <- classify(r,rcl)
-# })#, mc.cores=4)
-# writeRaster(rast_list2[[1]], paste0(here('input_ES', 'mod_n_ret'), '/', "global_n_retention_2020_compressed_rec.tif"))
-### There is an isse here. It doesn ot work fast enough. 
 
-#This iterates over a pair of lists. Doe not seem to be woprking correclty. Also check Sediment Again! oohh no. Sediment is correct because it was with the USLE, and the formula is differenty/ 
-# serq <- mclapply(seq_along(rast_list2),function(i){
-#   rast_list2[[i]]/(rast_list2[[i]]+rast_list1[[i]])}, mc.cores=2)
-# 
+
+
 # 
 year <- c(1992, 2020) #1995,1998,2001,2004)
 pot_s_loss <- Map(function(r1,r2) r2/(r2+r1), rast_list1, rast_list2)

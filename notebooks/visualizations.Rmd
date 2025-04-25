@@ -27,12 +27,13 @@ source(here("R","utils_pct_change.R"))
 
 #  1 Organize output Dataframes (make sure that they are complete and correclty named)
 
-Right now, 24/04/2025 the problem is on the way the dataframe with the class colors and names is built. The process is still too manual (writing the table) and is easy to get it wrong when it should not be big deal. 
+Right now, 24/04/2025 the problem is on the way the dataframe with the class colors and names is built. The process is still too manual (writing the table) and is easy to get it wrong when it should not be big deal. Ideally, there shoudl be a dialogue box to fill this instead. This should take care of the class names, values and colors neatl
 Also, the order of the factors needs to be set, and new classes have to be added. Again, i don't how to do it easily. I mean, it is easy, but annoying to do and easy to get wrong.
 
 
 #######################################################
-Here, i need to clean the directory form a loto of old versions. Only the groupings. If pct not there, it is fine, that is easy to calculate now. 
+Here, i need to clean the directory form a lot of old versions. Only the groupings. If pct not there, it is fine, that is easy to calculate now. 
+
 ```{r load polygons, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 # # Read spatial polygon dataset
 # 
@@ -59,29 +60,32 @@ Here, i need to clean the directory form a loto of old versions. Only the groupi
 
 Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. 
 Add to the documentation , environment or however that's called the vectors to select and order the columns. 
-This should actually be done as a database structure. The columns live somehere and are summoned upon need from a set of options (list_dir). 
-  EVERYTHING IS DASTABASE MANAGEMENT #####. ###### THAT'S WHAT I AHVE BEEN DOING ALL THESE YEARS!!!!! 
+This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir). 
   
-  And all of this without knowing SQL !!!!!!!!!
-
 ```{r chunk1, eval=FALSE, include=FALSE}
 # 
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
  
 poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/hydrosheds_lv6_synth.gpkg')
-# 
+
+# add areas 
+poly <- poly %>% mutate(area_sqkm = as.numeric(st_area(geom)) / 10^6)
+
  plt <- st_drop_geometry(poly)
  plt <- plt %>%
   dplyr::select(
     1:15, # This is hardcoded for the basins, but has to be adjusted for specific cases/desired columns.
     22,
-    contains("pct_ch")
+    contains("pct_ch"), 
+    contains("area_sqkm")
   )
- 
  # Edit/Adjust column names 
  names(plt) <- stringr::str_replace_all(names(plt), "_2020_1992", "")
+ # remove old N calculation, use the current one made by me
+ plt$n_export_pct_ch <- NULL
  
+ or_attributes <- plt
  
  ############# PIVOT TABLE ##############################
  plt <- plt %>%
@@ -91,70 +95,88 @@ poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFun
     names_transform = list(service = as.character),
     values_to = "pct_ch"
   ) %>%
-  mutate(service = str_replace(service, "_pct_ch.*", "")) %>%
+  mutate(service = str_replace(service, "_pct_ch.*", "")) %>% 
   as_tibble()
-#
- # Adjust Dataframe and labels (yes again. The "_pct_ch" part was necessary until now)
- plt <- plt %>%
-   mutate(service = str_remove(service, "_pct_ch"))#
-# #This is annoying and should be improved. Made easier. Here i am asjusting/homologuing variable names to a same standard. Because some of the data has been extracted at different moments there is some, ahem, *inconsistency* in the "service" naming structure that I fixed here. 
+# #This is annoying and should be improved. Made easier. Here i am adjusting/homologuing variable names to a same standard. Because some of the data has been extracted at different moments there is some, ahem, *inconsistency* in the "service" naming structure that I fixed here.
+ 
  plt <- plt %>% mutate(service = case_when(
-   service == "n_export" ~ "N_export",
+   #service == "n_export" ~ "N_export",
    service == "sed_export" ~ "Sed_export",
-   service == "Sed_retention_ratio" ~ "Sed_Ret_R",
-   service == "N_export_sqkm" ~ "N_Export_2",
+   service == "Sed_retention_ratio" ~ "Sed_Ret_Ratio",
+    service == "Pop" ~ "Pop_sqkm",
+   #service == "N_export_sqkm" ~ "N_Export_2",
    TRUE ~ service
    ))
 # 
 #Drop Usle and N_export old 
-plt <- plt %>% filter(service!="Usle") %>% filter(service!="N_export") # I am keeping the data in the attribute table because it *might* be necessary at some point, but removing from the reformated table. 
+plt <- plt %>% filter(service!="Usle") # I am keeping the data in the attribute table because it *might* be necessary at some point, but removing from the reformated table. 
 # cd <- as_tibble(cbind(service,color)) # I don't know why this is here. 
 #Remove invalid / Inf records
 plt <- plt%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)  
-#. Have a method to name versions or something (maybe?)
-write.csv(plt, file= here('output_data', "metrics_change_hb_lev_6_2.csv"))
 
-#Drop Usle and N_export old 
-plt <- plt %>% filter(service!="Usle") %>% filter(service!="N_export")
+ct <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg')
+
+ct <- ct %>% mutate(area_sqkm_country = as.numeric(st_area(geom)) / 10^6)
+ct <- st_drop_geometry(ct)
+ct <- ct[c(1,37)]
+plt <- left_join(plt, ct)
+#. Have a method to name versions or something (maybe?)
+write.csv(plt, file= here('output_data', "metrics_change_hb_lev_6.csv"))
 ```
 
-# Prepare Filter Database
+# set class names and colors for plotting 
+
+Here, another dialogue to input the variable names, plot colors and set the factor order.
+```{r, fig.height=8, fig.width=14  }
+plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
+# plt[1] <- NULL 
+service <- unique(plt$service)
+service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_export", "Sed_Ret_Ratio", "Pop_sqkm","GDP")
+ color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b", "#d4ac0d", "#85929e")
+ service_levels <- service
+ cd <- as_tibble(cbind(service,color))
+ 
+ 
+ plt <- left_join(plt, cd)
+```
+
+# Filter Database to specific needs
+
 
  This could be a dialogue box!!!
 ```{r load-plt}
-# plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
-# plt[1] <- NULL 
-# head(plt)
-# # apply filter (5
-# apply filter (5% or 2%) # Remove the smallest basins. 
-area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
-# Filter the dataset
-df <- plt %>% filter(SUB_AREA > area_threshold)
+# Calculate pseudo_log val for display purposes. 
 plt <- plt %>%
   mutate(
     service = factor(service, levels = service_levels),
     pct_ch_trans = pseudo_log(pct_ch)
   )
-# get the filtered lcoations
 
-df_filt <- df %>%
-  filter(id %in% top_bottom_10k$id)
+# apply filter (5% or 2%) # Remove the smallest basins. 
+area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
+# Filter the dataset
+df <- plt %>% filter(SUB_AREA > area_threshold)
+# get the filtered locations
+
+# optional. Remove countries by area. 
+df <- df %>%
+  filter(area_sqkm_country >= 10000)
+# Step 3: Select top and bottom 5 by dir_ch_2
+top_bottom_lc <- df %>%
+  slice_max(dir_ch_2, n = 5, with_ties = FALSE) %>%
+  bind_rows(
+    bas_lc_filtered %>%
+      slice_min(dir_ch_2, n = 5, with_ties = FALSE)
+  )
 ```
 
-Here, another dialogue to input the variable names, plot colors and set the factor order.
-```{r, fig.height=8, fig.width=14  }
-service <- unique(plt$service)
-service <- c("Coastal_Protection","Pollination","N_Export_2", "Sed_export", "Sed_Ret_R", "N_Ret_Ratio", "Pop_sqkm","GDP" )
- color <- c("#9e9ac8", "#dd1c77","#2c944c", "#08306b", "#17c0ff",  "#8C510A", "#8C510A","#08306b", "#17c0ff")
- service_levels <- service
- cd <- as_tibble(cbind(service,color))
-```
 
-```{r fig.height=8, fig.width=14, warning=FALSE}
+
+```{r fig.height=8, fig.width=10, warning=FALSE}
 # 1. Define desired facet order
 df <- plt %>% filter(SUB_AREA > area_threshold)
-df <- df %>%
-  filter(id %in% top_bottom_10k$id)
+# df <- df %>%
+#   filter(id %in% top_bottom_10k$id)
 # 2. Apply pseudo-log transformation
 pseudo_log <- function(x) sign(x) * log1p(abs(x))
 
@@ -167,9 +189,9 @@ df <- df %>%
 # 3. Reorder countries based on dir_ch_2 (descending)
 df <- df %>%
   mutate(ee_r264_name = reorder(ee_r264_name, -dir_ch_2))
-
+df. <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
 # 4. Create plot
-p <- ggplot(df, aes(x = ee_r264_name, y = pct_ch_trans, fill = ee_r264_name)) +
+p <- ggplot(df., aes(x = ee_r264_name, y = pct_ch_trans, fill = ee_r264_name)) +
   geom_violin(trim = FALSE, scale = "width") +
   facet_wrap(~ service, scales = "free_y") +
   scale_fill_viridis_d(option = "D") +
@@ -190,7 +212,7 @@ p2 <- ggplot(df, aes(x = ee_r264_name, y = pct_ch, fill = ee_r264_name)) +
   facet_wrap(~ service, scales = "free_y") +
   scale_fill_viridis_d(option = "D") +
   labs(
-    title = "Pseudo-log Scaled % Change by Service ",
+    title = "% Change by Service ",
     x = NULL,
     y = "Transformed % Change"
   ) +
@@ -202,6 +224,66 @@ p2 <- ggplot(df, aes(x = ee_r264_name, y = pct_ch, fill = ee_r264_name)) +
   )
 p
 p2
+
+```
+
+```{r fig.height=8, fig.width=10, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(forcats)
+
+# 1. Filter the dataframe for top and bottom 10 by dir_ch_2
+df_top_bottom <- df %>%
+  arrange(desc(dir_ch_2)) %>%
+  slice_head(n = 10) %>%
+  bind_rows(
+    df %>%
+      arrange(dir_ch_2) %>%
+      slice_head(n = 10)
+  )
+
+# 2. Reorder countries inside the filtered data
+df_top_bottom <- df_top_bottom %>%
+  mutate(ee_r264_name = fct_reorder(ee_r264_name, -dir_ch_2))
+df_top_bottom <- df_top_bottom %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+
+# 3. Create plot (pseudo-log scale)
+p <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch_trans, fill = service)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service (Top and Bottom 10 Countries)",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+# 4. (Optional) Plot regular % change
+p2 <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch, fill = service)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "% Change by Service (Top and Bottom 10 Countries)",
+    x = NULL,
+    y = "% Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+# 5. Print
+p
+# p2  # if you also want the regular % plot
 
 ```
 
@@ -270,24 +352,28 @@ plot_es_changes <- function(data, label_col,
 plot_es_changes(df, label_col = col, filter_type = "top_bottom", filter_val = 10)
 
 # Top/bottom 5% per service
-plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.1)
-
-# Show all values
-#plot_es_changes(plt, filter_type = "all")
+# plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.1)
+# 
+# # Show all values
+# plot_es_changes(plt, filter_type = "all")
 ```
 
 
 ## Scatterplots
 
-```{r sctp}
+```{r sctp, fig.height=9, fig.width=7, warning=FALSE}
 
 
 # List of LC metrics to analyze
-lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+lc_metrics <- c("dir_ch_2")
+
+df_1 <- df %>% filter(service != "GDP") %>% (service != "Pop_sqkm")
+
+df_1 <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
 
 # Loop over each LC metric and generate a faceted scatterplot
 for (metric in lc_metrics) {
-  p <- df %>%
+  p <- df_1 %>%
     ggplot(aes_string(x = metric, y = "pct_ch_trans", color = "color")) +
     geom_point(alpha = 0.5, size = 1.2) +
     facet_wrap(~ service, scales = "free") +
@@ -308,12 +394,62 @@ for (metric in lc_metrics) {
 }
 ```
 
+```{r oterh plot, fig.height=9, fig.width=7, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(forcats)
 
-```{r sctp}
+# 1. Filter to top/bottom 10% based on pct_ch
+df_top_bottom <- df %>%
+  group_by(service) %>%  # Do it separately for each service (optional, if needed)
+  filter(pct_ch >= quantile(dir_ch_2, 0.90, na.rm = TRUE) | 
+         pct_ch <= quantile(dir_ch_2, 0.10, na.rm = TRUE)) %>%
+  ungroup()
+
+# 2. Optional: relevel services if you want
+service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_export", "Sed_Ret_Ratio", "Pop_sqkm","GDP")
+ color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b", "#d4ac0d", "#85929e")
+ service_levels <- service
+df_top_bottom <- df_top_bottom %>%
+  mutate(
+    service = factor(service, levels = service_levels),
+    pct_ch_trans = pseudo_log(pct_ch)  # Apply pseudo-log transformation
+  )
+
+# 3. List of LC metrics to analyze
+lc_metrics <- c("dir_ch_2")
+df_top_bottom <- df_top_bottom %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+# 4. Create the scatterplots
+for (metric in lc_metrics) {
+  p <- df_top_bottom %>%
+    ggplot(aes_string(x = metric, y = "pct_ch_trans", color = "color")) +
+    geom_point(alpha = 0.6, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("Top and Bottom 10% Basins -", metric, "vs. Transformed % Change"),
+      x = metric,
+      y = "Transformed % Change in ES"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p)
+}
+
+```
+
+
+```{r , fig.height=9, fig.width=7, warning=FALSE}
 
 df <- plt %>% filter(SUB_AREA > area_threshold)
+#df <- plt %>% filter(id %in% top_bottom_10k$id)
 # List of LC metrics to analyze
-lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+lc_metrics <- c("dir_ch_2")
 pseudo_log <- function(x) sign(x) * log1p(abs(x))
 
 df <- df %>%
@@ -348,10 +484,10 @@ for (metric in lc_metrics) {
 
 # Scatterplots change 2
 
-```{r unnamedchunk, fig.height=10, fig.width=14}
+```{r unnamedchunk, fig.height=9, fig.width=7, warning=FALSE}
 
 # LC metrics of interest
-lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+lc_metrics <- c("dir_ch_2")
 
 # Step 1: Remove top 2% outliers for each service
 filtered_plt <- plt %>%
@@ -386,11 +522,11 @@ for (metric in lc_metrics) {
 }
 ```
 
-```{r eval=FALSE, fig.height=8, fig.width=14, include=FALSE}
+```{r eval=FALSE, fig.height=9, fig.width=7, warning=FALSE}
 
 
 # LC metrics of interest
-lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+lc_metrics <- c("dir_ch_2")
 
 # Step 1: Remove top 2% outliers for each service
 filtered_plt <- plt %>%
@@ -398,7 +534,6 @@ filtered_plt <- plt %>%
   mutate(threshold = quantile(pct_ch, 0.98, na.rm = TRUE)) %>%
   ungroup() %>%
   filter(pct_ch <= threshold)
-
 
 # Step 3: Loop through each LC metric and create faceted plots
 for (metric in lc_metrics) {
@@ -473,6 +608,12 @@ p <- ggplot(df, aes(x = service, y = pct_ch_trans, fill = color)) +
   )
 p
 ```
+
+
+
+
+#######################
+
 ## 5. Here, add plots with the differences 
 
 ```{r eval=FALSE, fig.height=8, fig.width=14, include=FALSE}
