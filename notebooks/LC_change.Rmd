@@ -100,67 +100,104 @@ landcover_files <- list.files(
   full.names = TRUE
 )
 
+landcover_files <- landcover_files[c(1,9)]
+
 # Name rasters by year
 names(landcover_files) <- stringr::str_extract(basename(landcover_files), "\\d{4}")
 landcover_rasters <- lapply(landcover_files, terra::rast)
 
 # Load polygon spatial units (e.g., HydroBASINS level 6)
-'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/basins_bm.gpkg'
-basins <- st_read(here("vector", "hydrosheds_lv6_synth.gpkg"))
 
-#if only the basic hydroshed columns.
-basins <- basins[c(1:13)]
+basins <- st_read(here("vector", "Biome.gpkg"))
+basins <- basins[c(1,2)]
+col <- "BIOME"
+
+
+#############################3
+
+ids_failed <- miss1$id  # these are character values; convert to numeric if needed
+basins <- basins %>% filter(id %in% ids_failed)
+
+ids_failed2 <- c(15,115,)
+
+
+basins <- basins %>% mutate(id_2=row_number())
+# basins <- st_read(here("vector", "hydrosheds_lv6_synth.gpkg"))
+# #inly the basic hydroshed columns.
+# basins <- basins[c(1:13)]
+
+basins <- st_read(here("vector", "countries_lc2.gpkg"), layer= "1992_2020_lcc_change_metrics_3") 
 ```
 
 ## Run Land Cover Change Metric Extraction
 
 ```{r run-extraction}
 
-# iterate over multiple periods (>2)
 
-lcc_metrics_df <- iterate_lcc_metrics(
-  raster_list = landcover_rasters,
-  polygons = basins,
-  id_col = "HYBAS_ID",
-  percent = TRUE,
-  verbose = TRUE,
-  mc = TRUE,
-  ncores = 12,
-  digits = 4
-)
+basins1 <- basins %>% filter(name_long=="India")
+#### iterate over multiple periods (>2)
 
-lcc_metrics_wide <- lcc_metrics_df %>%
-  tidyr::pivot_wider(
-    id_cols = c(cols[1]),
-    names_from = c(Category, year_step),
-    values_from = c(Gain, Persistence, Loss, Quantity, Exchange, Shift),
-    names_glue = "{.value}_{Category}_{year_step}"
-  )
-
+# lcc_metrics_df <- iterate_lcc_metrics(
+#   raster_list = landcover_rasters,
+#   polygons = basins,
+#   id_col = col,
+#   percent = TRUE,
+#   verbose = TRUE,
+#   mc = TRUE,
+#   ncores = 12,
+#   digits = 4
+# )
+# 
+# lcc_metrics_wide <- lcc_metrics_df %>%
+#   tidyr::pivot_wider(
+#     id_cols = c(col),
+#     names_from = c(Category, year_step),
+#     values_from = c(Gain, Persistence, Loss, Quantity, Exchange, Shift),
+#     names_glue = "{.value}_{Category}_{year_step}"
+#   )
 ##################################################
-# Run the function with only two dates 
-lcc_m2 <- extract_lcc_metrics(landcover_rasters[[1]], landcover_rasters[[2]], basins, "HYBAS_ID", percent=TRUE, mc = TRUE, ncores = 10, digits = 4)
+# Run the function with only two dates # Multicore is giving us trouble for some reason
+lcc_m2 <- extract_lcc_metrics(landcover_rasters[[1]], landcover_rasters[[2]], basins, col, percent=TRUE, mc = FALSE, ncores = 6, digits = 3)
 # get qunatiy in terms of gain loss (the function does not provide the direction of the change, only the absolute value. 
 lcc_m2 <- lcc_m2 %>%
-  mutate(dir_ch = round(Gain - Loss, digits = 4)) # we set the number of dits to 4 to make te file more manageable
+  filter(!grepl("^Error", Category))
+
+lcc_m <- lcc_m2 %>%
+  mutate(
+    Gain = as.numeric(Gain),
+    Loss = as.numeric(Loss),
+    dir_ch = round(Gain - Loss, digits = 4)
+  )
 
 
-lcc_metrics_wide <- lcc_m2 %>%
+lcc_metrics_wide <- lcc_m %>%
   tidyr::pivot_wider(
-    id_cols = c(cols[1]),
+    id_cols = col,
     names_from = c(Category),
     values_from = c(Gain, Persistence, Loss, Quantity, Exchange, dir_ch),
     names_glue = "{.value}_{Category}" #_{year_step}"
   )
 
+lcc_metrics_wide <- lcc_metrics_wide %>% 
+  mutate(
+    id = as.double(id)
+  )
+
 # Convert both to character, just to be safe
-basins <- basins %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
-lcc_metrics_wide <- lcc_metrics_wide %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+#basins <- basins %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+#lcc_metrics_wide <- lcc_metrics_wide %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
 
 basins <- left_join(basins, lcc_metrics_wide)
 
-sf::st_write(basins,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer = "1992_2020_lcc_change_metrics", append = FALSE)
-sf::st_write(basins, here("vector", "hydrosheds_lv6.gpkg"), layer = "1992_2020_lcc_change_metrics", append = FALSE)
+
+sf::st_write(basins, here("vector", "countries_lc2.gpkg"), layer = "1992_2020_lcc_change_metrics_3", append = FALSE)
+# 
+# miss1 <- basins %>% filter(is.na(Persistence_1))
+# 
+# miss2 <- miss1 %>% filter(is.na(Persistence_2))
+                        
+# sf::st_write(basins,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer = "1992_2020_lcc_change_metrics", append = FALSE)
+# sf::st_write(basins, here("vector", "hydrosheds_lv6.gpkg"), layer = "1992_2020_lcc_change_metrics", append = FALSE)
 ```
 
 ## Inspect Results
