@@ -367,44 +367,64 @@ plot_es_changes(df, label_col = col, filter_type = "top_bottom", filter_val = 10
 # List of LC metrics to analyze
 lc_metrics <- c("dir_ch_2")
 
-df_1 <- df %>% filter(service != "GDP") %>% (service != "Pop_sqkm")
-
 df_1 <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
 
-# Loop over each LC metric and generate a faceted scatterplot
-for (metric in lc_metrics) {
-  p <- df_1 %>%
-    ggplot(aes_string(x = metric, y = "pct_ch_trans", color = "color")) +
-    geom_point(alpha = 0.5, size = 1.2) +
-    facet_wrap(~ service, scales = "free") +
-    scale_color_identity() +
+
+
+ for (metric in lc_metrics) {
+  p1 <- df_1 %>%
+    ggplot(aes_string(x = metric, y = "pct_ch_trans")) +
+    geom_hex(bins = 60) +  # Hexbin layer
+    scale_fill_viridis_c(option = "D", direction = -1) +  # Use viridis scale
+    facet_wrap(~ service, scales = "free",ncol=2) +
     labs(
-      title = paste("Relationship Between", metric, "and ES % Change"),
+      title = paste("Density of", metric, "vs. ES % Change"),
       x = metric,
-      y = "% Change in Ecosystem Service"
+      y = "% Change in Ecosystem Service",
+      fill = "Bin Count"
     ) +
-    theme_minimal() +
     theme(
       strip.text = element_text(face = "bold"),
       plot.title = element_text(hjust = 0.5),
       axis.text = element_text(size = 9)
     )
 
-  print(p)
+  print(p1)
 }
+ 
+df_split <- split(df_1, df_1$service)
+
+
 ```
 
-```{r oterh plot, fig.height=9, fig.width=7, warning=FALSE}
+```{r oterh plot, fig.height=7, fig.width=7, warning=FALSE}
 library(dplyr)
 library(ggplot2)
 library(forcats)
 
 # 1. Filter to top/bottom 10% based on pct_ch
+# df_top_bottom <- df %>%
+#   group_by(service) %>%  # Do it separately for each service (optional, if needed)
+#   filter(pct_ch >= quantile(dir_ch_2, 0.90, na.rm = TRUE) | 
+#          pct_ch <= quantile(dir_ch_2, 0.10, na.rm = TRUE)) %>%
+#   ungroup()
+n <- floor(nrow(df) * 0.1)  # 10% of total rows
+
 df_top_bottom <- df %>%
-  group_by(service) %>%  # Do it separately for each service (optional, if needed)
-  filter(pct_ch >= quantile(dir_ch_2, 0.90, na.rm = TRUE) | 
-         pct_ch <= quantile(dir_ch_2, 0.10, na.rm = TRUE)) %>%
+  slice_max(dir_ch_2, n = n, with_ties = FALSE) %>%
+  bind_rows(
+    df %>% slice_min(dir_ch_2, n = n, with_ties = FALSE)
+  )
+
+df_top_bottom <- df %>%
+  group_by(service) %>%
+  group_modify(~ bind_rows(
+    slice_max(.x, dir_ch_2, n = floor(0.1 * nrow(.x)), with_ties = FALSE),
+    slice_min(.x, dir_ch_2, n = floor(0.1 * nrow(.x)), with_ties = FALSE)
+  )) %>%
   ungroup()
+
+
 
 # 2. Optional: relevel services if you want
 service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_export", "Sed_Ret_Ratio", "Pop_sqkm","GDP")
@@ -419,26 +439,27 @@ df_top_bottom <- df_top_bottom %>%
 # 3. List of LC metrics to analyze
 lc_metrics <- c("dir_ch_2")
 df_top_bottom <- df_top_bottom %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+df_top_bottom <- filter(df_top_bottom, dir_ch_2 != 0)
 # 4. Create the scatterplots
 for (metric in lc_metrics) {
-  p <- df_top_bottom %>%
-    ggplot(aes_string(x = metric, y = "pct_ch_trans", color = "color")) +
-    geom_point(alpha = 0.6, size = 1.2) +
-    facet_wrap(~ service, scales = "free") +
-    scale_color_identity() +
+  p1 <- df_top_bottom %>%
+    ggplot(aes_string(x = metric, y = "pct_ch_trans")) +
+    geom_hex(bins = 60) +  # Hexbin layer
+    scale_fill_viridis_c(option = "D", direction = -1) +  # Use viridis scale
+    facet_wrap(~ service, scales = "free",ncol=2) +
     labs(
-      title = paste("Top and Bottom 10% Basins -", metric, "vs. Transformed % Change"),
+      title = paste("Density of", metric, "vs. ES % Change"),
       x = metric,
-      y = "Transformed % Change in ES"
+      y = "% Change in Ecosystem Service",
+      fill = "Bin Count"
     ) +
-    theme_minimal() +
     theme(
       strip.text = element_text(face = "bold"),
       plot.title = element_text(hjust = 0.5),
       axis.text = element_text(size = 9)
     )
 
-  print(p)
+  print(p1)
 }
 
 ```
