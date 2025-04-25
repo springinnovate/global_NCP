@@ -22,7 +22,9 @@ lyr <- st_layers(set)
 # # load polygons
 print(lyr)
 ```
+# Organize columns
 
+I had to do this to make sense of the different runs i have done and the data that i need. From individual yearly stats (which ones?) ["raw" data rasters and derived raster algebra products] bi-temporal relative change, key attributes from the input data among others. Need to come out with am ore efficient   
 
 ```{r refine columns}
 basin <- st_read(set, layer= "hydrosheds_lev6") 
@@ -230,6 +232,48 @@ write.csv(bas1, file= here("vector", "synth_table.csv"))
 
 
 ```{r get amounts of lc chnage}
+ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/countries_lc2.gpkg')
+bas_lc <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/countries_lc2.gpkg', layer = "lcc_countries")
+bs <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth-lilling-safeBackup-0001.gpkg')
+
+
+bas_lc <- bas_lc[c(1,2,19)]
+
+
+
+# Step 1: Make sure your geometry column exists and is valid
+# If you already have an area column (e.g., `SUB_AREA`), skip the next line
+bas_lc <- bas_lc %>% mutate(area_sqkm = as.numeric(st_area(geom)) / 10^6)
+
+# Step 2: Filter out the smallest 2% by area
+area_threshold <- quantile(bas_lc$area_sqkm, probs = 0.05, na.rm = TRUE)
+
+bas_lc_filtered <- bas_lc %>% 
+  filter(area_sqkm > area_threshold)
+
+bas_lc_filtered <- bas_lc %>%
+  filter(area_sqkm > 10000)
+
+## Also test for the "large" countries 
+bas_lc_filtered <- bas_lc_filtered %>% filter(name_long!="Vanuatu")# %>% filter()
+# Step 3: Select top and bottom 5 by dir_ch_2
+top_bottom_10k <- bas_lc_filtered %>%
+  slice_max(dir_ch_2, n = 10, with_ties = FALSE) %>%
+  bind_rows(
+    bas_lc_filtered %>%
+      slice_min(dir_ch_2, n = 10, with_ties = FALSE)
+  )
+
+top_bottom_10k <- st_drop_geometry(top_bottom_10k)
+# some issue Small countries invariable have larger shbares. This needs to be normalized or something 
+
+
+bas_lc <- st_drop_geometry(bas_lc)
+
+top_bottom_lc <- bas_lc %>% slice_max(dir_ch_2, n = 5, with_ties = FALSE) %>% bind_rows(
+    bas_lc %>%
+      slice_min(dir_ch_2, n = 5, with_ties = FALSE)
+  )
 ```
 
 
