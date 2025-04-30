@@ -9,19 +9,21 @@ output:
 ---
 
 # Overview
-We are building a structured approach to extract and analyze zonal statistics for ecosystem services (ES) at global scale using polygon datasets such as countries, income groups, biomes, and hydrological basins. The primary aim is to calculate and visualize changes in ES provision over time, towards allowing cross-regional comparisons and spatial trend analysis. While the workflow is a woprk in progress and can be further optimized and generalized, priorities are transparency, reproducibility, and documentation of the analytical logic behind each step. 
+Structured approach to extract and analyze zonal statistics for global modeled ecosystem services (ES) for differnet spatial units  (e.g countries, income groups, biomes, ecoregions and hydrological basins). 
 
-This document is intended to serve as a reference for collaborators working on ecosystem service modeling and spatial analysis, including potential integration into larger NCP assessments.
+- Outcomes: calculate and visualize changes in ES provision over time
+- Allow cross-regional comparisons and spatial trend analysis. 
 
 # 1. Objectives
-1. Extract zonal statistics from ES global raster datasets using the `exactextractr` package. 
-2. Integrate extracted statistics as attributes to spatial polygon datasets.
-3. Generate visualizations (bar plots, maps) for spatial representation of results.
+1. Systematically extract zonal statistics from ES global raster datasets using the `exactextractr` package. 
+2. Append extracted statistics as attributes to spatial polygon datasets.
+3. Generate visualizations for representation of results.
 
 **Important Considerations:**
-- Dependencies and overlapping regions. pose some challenges that need special handling.
+- Some complex polygon datasets are more prone to errors. Make sure to use an unique identifier to iterate over the polygons.
 - Small island nations and some unique geographic cases require additional checks, and case specific decisions at the individual territory level.
-- So far the most promising subdivision runs have been by Basin and sub-basin obtained from [**Hydrosheds.org**](https://www.hydrosheds.org/products/hydrobasins). 
+- Basins (lev 6 ^ 7)  obtained from [**Hydrosheds.org**](https://www.hydrosheds.org/products/hydrobasins) execute without issues.
+
 
 ```{r setupl load libraries, include=FALSE}
 library(sf)             # Spatial vector operations
@@ -73,7 +75,7 @@ sets <- file.path(inpath, list.files(inpath, pattern= 'gpkg$'))
 #cols <- c("id", "continent", "income_grp", "region_wb", "WWF_biome", "HYBAS_ID", "HYBAS_ID")
 #sets <- cbind(sets, cols)
 # Set an index to select the desired dataset
-t <- 6
+t <- 12
 # Select the target dataset from the list 
 set <- sets[t]
 # # load polygons
@@ -84,10 +86,10 @@ col <- colnames(poly[1])
 cols <- col[1]
 
 # Convert to data frame for nicer display
-sets_df <- as.data.frame(basename(sets))
-# Print nicely
-kable(sets_df, format = "html", caption = "Geopackage Layers") %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+# sets_df <- as.data.frame(basename(sets))
+# # Print nicely
+# kable(sets_df, format = "html", caption = "Geopackage Layers") %>%
+#   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 
 ```
 
@@ -119,7 +121,7 @@ For the 1992-2020 comparison, we included these modeled Services
 ```{r load raster es, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 library(kableExtra)
 
-inpath <- here('input_ES')
+inpath <- here('input_rasters', 'Data_spring')
 # Override inpath manually if needed
 #inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES"
 
@@ -128,7 +130,7 @@ tiffes <- file.path(inpath, list.files(inpath, pattern = 'tif$'))
 filename <- basename(tiffes)
 raster_name <- gsub(".tif$", "", filename)
 
-# Assign services and years
+# Assign services and years # IMOROVE INPUT MANAGEMENT HERE  #########
 service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination"), each = 2)
 year <- rep(c(1992, 2020), 6)
 
@@ -155,7 +157,7 @@ User-defined functions can be incorporated (to explore).
 
 We calculated the mean value for each input raster within each spatial unit assessed (basins) for 1992 and 2020. 
 
-Earlier, i had produced difference rasters for each pair, and loaded them here and extracted the means. I also calculated new columns with the % change between the dates. I need to think further and review sources, but intuitively i think that even if they are not the strictly the same and that using the difference raster is more robust, i also think that at this scale the difference is negligible and one saves an additional step. 
+Earlier, i had produced difference rasters for each pair of rasters (one per year), and loaded them here and extracted the means. I also calculated new columns with the % change between the dates. I need to think further and review sources, but intuitively i think that even if they are not the strictly the same and that using the difference raster is more robust, i also think that at this scale the difference is negligible and one saves an additional step. 
 The potential sediment retention is calculated as:
 
 $$
@@ -166,7 +168,7 @@ $$
 
 ```{r compute stats for each year, eval=FALSE, message=TRUE, include=FALSE}
 # Set the target metrics to extract. Most Standard R summary metrics are available, for more information run ?exactextractr 
-target_stats <- c("mean", "stdev")
+target_stats <- c("mean", "stdev") # We can calcualte any metric we want, but of course this means more columns and that eventually gets complicated
 
 rasters_list <- lapply(tiffes, rast)
 # Set the number of cores to run on parallel. This approach only works on Unix-based systems (Linux & MacOS). I still have to find the alternative for parallelzing on Windows. 
@@ -202,17 +204,17 @@ poly <- left_join(poly, zonal_wide, by= cols)
 st_write(poly, set, layer = "xxxxxx", append = FALSE)# 
 ```
 
-### 3.4 Potential Retention and Export
+### 3.4 Extraction Data not from SPRING
 
 HERE, I CALCUALTED THIS VAriable that is not in thje do0wnloaded rasters. i extractyed the difference raster, and here is how that we can process the differnet years and the differneces togethr, but i don't reallyu think is necessary. There was also something very annoying with the filenames that made me waste time. 
-```{r extract pot sed Retenion, eval=FALSE, include=FALSE}
+```{r extract pot sed Retention, eval=FALSE, include=FALSE}
 
 # set the path and load the rasters with the differences that we calcualted in step 3
 #build paths to files
 inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES/Pot_Sed_retention'
-inpath <- here("input_ES", "Pot_sed_retention")
+inpath <- here('input_rasters', 'final_extraction_92_2020')
 # load the rasters with the calculated differences 
-tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif'))
 filename<- basename(tiffes)
 
 rasters_list <- lapply(tiffes, rast)
@@ -221,10 +223,10 @@ rasters_list <- Map(function(r,new_name){
   return(r)
   }, rasters_list, filename)
 
-#diff<- c("diff", 2020,1992)
-# create a table with the content to fill the table
-color <- c("#08606b", "#08606b")#, "#68606b")
-cd <- as_tibble(cbind(filename, color,year))
+# #diff<- c("diff", 2020,1992)
+# # create a table with the content to fill the table
+# color <- c("#08606b", "#08606b")#, "#68606b")
+# cd <- as_tibble(cbind(filename, color,year))
 
 target_stats <- "mean"
 
@@ -255,13 +257,15 @@ Although it’s technically possible to process all datasets in a single run, in
 
 There are two main processing scenarios: one involves handling multiple sets of layers (e.g., one per year), and the other uses a single set (such as difference layers). I need to take care of this. 
 Ideally, the entire pipeline would be processed at once, but there are inconsistencies in the naming structure across years datasets and it messes the whole thing. 
-Sure, streamline and automatize this further, but thgere are still too many special cases.
+Sure, streamline and automatize this further, but there are still too many special cases.
 
 **ATTENTION** Not run, I think it is not worth the hassle, but keep it at hand in case necessary.
+
+
 ```{r compute stats diff, eval=FALSE, message=TRUE, include=FALSE}
 
 # set the path and load the rasters with the calcualted 1992-2020 differences 
-inpath <- paste0(inpath, "/", 'change_calc')
+inpath <- here("input_rasters", "change_calc")
 #inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES/change_calc'
 # load the rasters with the calculated differences 
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
@@ -298,7 +302,7 @@ zonal_df_diff <- do.call(rbind, results_list)
 
 #Adjust column so we can assemble the whole thing (yearly and difference values) in the same dataframe. Waht we are doing here is just creating a primary key to perform a join, what we need ios just the name of the "Service".
 
-cd <- cd %>% mutate(year='diff')_df
+cd <- cd %>% mutate(year='diff')
 
 zonal_df_diff <- left_join(zonal_df_diff,cd)
 
@@ -331,17 +335,17 @@ The next step calculates the percentage change in ecosystem service provision be
 # Function to compute percentage change for all relevant variables in an sf object
 # There is plenty of room for optimization here.
 # 1. Extract year columns only (excluding the ID column)
-value_cols <- names(zonal_wide)[-1]  # assuming first column is the ID
+value_cols <- names(plt)[-1]  # assuming first column is the ID
 years <- str_extract(value_cols, "\\d{4}") |> as.numeric()
 years <- sort(years)
 # Calculate % of change 
-# Here we set the variable(s) from whic we are going to extrsact the difference. 
-sr <- c("Sed_retention_ratio")
+# Here we set the variable(s) from which we are going to extract the difference. 
+#sr <- c("Sed_retention_ratio")
 
 # i don't remember. surely to prepare some dataframe.
 year <- list(year[-1])
 # this is the mpost recent approach, we rounded the outputs to limit sixe of the file. 
-zonal_wide <- compute_pct_change(zonal_wide, year_pairs=year, sr, round_digits = 4)
+zonal_wide <- compute_pct_change(plt, year_pairs=years, round_digits = 4)
 poly <- compute_pct_change(poly, year_pairs=year, round_digits = 4)
 
 
