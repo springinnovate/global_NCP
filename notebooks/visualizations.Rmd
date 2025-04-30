@@ -108,7 +108,7 @@ poly <- poly %>% mutate(area_sqkm = as.numeric(st_area(geom)) / 10^6)
    TRUE ~ service
    ))
 # 
-#Drop Usle and N_export old 
+#Drop Usle 
 plt <- plt %>% filter(service!="Usle") # I am keeping the data in the attribute table because it *might* be necessary at some point, but removing from the reformated table. 
 # cd <- as_tibble(cbind(service,color)) # I don't know why this is here. 
 #Remove invalid / Inf records
@@ -128,7 +128,7 @@ write.csv(plt, file= here('output_data', "metrics_change_hb_lev_6.csv"))
 
 Here, another dialogue to input the variable names, plot colors and set the factor order.
 ```{r, fig.height=8, fig.width=14  }
-plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
+#plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
 # plt[1] <- NULL 
 service <- unique(plt$service)
 service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_export", "Sed_Ret_Ratio", "Pop_sqkm","GDP")
@@ -169,121 +169,6 @@ top_bottom_lc <- df %>%
 ```
 
 
-
-```{r fig.height=8, fig.width=10, warning=FALSE}
-# 1. Define desired facet order
-df <- plt %>% filter(SUB_AREA > area_threshold)
-# df <- df %>%
-#   filter(id %in% top_bottom_10k$id)
-# 2. Apply pseudo-log transformation
-pseudo_log <- function(x) sign(x) * log1p(abs(x))
-
-df <- df %>%
-  mutate(
-    service = factor(service, levels = service_levels),
-    pct_ch_trans = pseudo_log(pct_ch)
-  )
-
-# 3. Reorder countries based on dir_ch_2 (descending)
-df <- df %>%
-  mutate(ee_r264_name = reorder(ee_r264_name, -dir_ch_2))
-df. <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
-# 4. Create plot
-p <- ggplot(df., aes(x = ee_r264_name, y = pct_ch_trans, fill = ee_r264_name)) +
-  geom_violin(trim = FALSE, scale = "width") +
-  facet_wrap(~ service, scales = "free_y") +
-  scale_fill_viridis_d(option = "D") +
-  labs(
-    title = "Pseudo-log Scaled % Change by Service ",
-    x = NULL,
-    y = "Transformed % Change"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    strip.text = element_text(face = "bold"),
-    legend.position = "none"
-  )
-# 4. Create plot
-p2 <- ggplot(df, aes(x = ee_r264_name, y = pct_ch, fill = ee_r264_name)) +
-  geom_violin(trim = FALSE, scale = "width") +
-  facet_wrap(~ service, scales = "free_y") +
-  scale_fill_viridis_d(option = "D") +
-  labs(
-    title = "% Change by Service ",
-    x = NULL,
-    y = "Transformed % Change"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    strip.text = element_text(face = "bold"),
-    legend.position = "none"
-  )
-p
-p2
-
-```
-
-```{r fig.height=8, fig.width=10, warning=FALSE}
-library(dplyr)
-library(ggplot2)
-library(forcats)
-
-# 1. Filter the dataframe for top and bottom 10 by dir_ch_2
-df_top_bottom <- df %>%
-  arrange(desc(dir_ch_2)) %>%
-  slice_head(n = 10) %>%
-  bind_rows(
-    df %>%
-      arrange(dir_ch_2) %>%
-      slice_head(n = 10)
-  )
-
-# 2. Reorder countries inside the filtered data
-df_top_bottom <- df_top_bottom %>%
-  mutate(ee_r264_name = fct_reorder(ee_r264_name, -dir_ch_2))
-df_top_bottom <- df_top_bottom %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
-
-# 3. Create plot (pseudo-log scale)
-p <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch_trans, fill = service)) +
-  geom_violin(trim = FALSE, scale = "width") +
-  facet_wrap(~ service, scales = "free_y") +
-  scale_fill_viridis_d(option = "D") +
-  labs(
-    title = "Pseudo-log Scaled % Change by Service (Top and Bottom 10 Countries)",
-    x = NULL,
-    y = "Transformed % Change"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    strip.text = element_text(face = "bold"),
-    legend.position = "right"
-  )
-
-# 4. (Optional) Plot regular % change
-p2 <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch, fill = service)) +
-  geom_violin(trim = FALSE, scale = "width") +
-  facet_wrap(~ service, scales = "free_y") +
-  scale_fill_viridis_d(option = "D") +
-  labs(
-    title = "% Change by Service (Top and Bottom 10 Countries)",
-    x = NULL,
-    y = "% Change"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    strip.text = element_text(face = "bold"),
-    legend.position = "right"
-  )
-
-# 5. Print
-p
-# p2  # if you also want the regular % plot
-
-```
 
 ## 5. Here, add plots with the differences 
 
@@ -350,7 +235,7 @@ plot_es_changes <- function(data, label_col,
 plot_es_changes(df, label_col = col, filter_type = "top_bottom", filter_val = 10)
 
 # Top/bottom 5% per service
-# plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.1)
+#plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.5)
 # 
 # # Show all values
 # plot_es_changes(plt, filter_type = "all")
@@ -359,41 +244,7 @@ plot_es_changes(df, label_col = col, filter_type = "top_bottom", filter_val = 10
 
 ## Scatterplots
 
-```{r sctp, fig.height=9, fig.width=7, warning=FALSE}
 
-
-# List of LC metrics to analyze
-lc_metrics <- c("dir_ch_2")
-
-df_1 <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
-
-
-
- for (metric in lc_metrics) {
-  p1 <- df_1 %>%
-    ggplot(aes_string(x = metric, y = "pct_ch_trans")) +
-    geom_hex(bins = 60) +  # Hexbin layer
-    scale_fill_viridis_c(option = "D", direction = -1) +  # Use viridis scale
-    facet_wrap(~ service, scales = "free",ncol=2) +
-    labs(
-      title = paste("Density of", metric, "vs. ES % Change"),
-      x = metric,
-      y = "% Change in Ecosystem Service",
-      fill = "Bin Count"
-    ) +
-    theme(
-      strip.text = element_text(face = "bold"),
-      plot.title = element_text(hjust = 0.5),
-      axis.text = element_text(size = 9)
-    )
-
-  print(p1)
-}
- 
-df_split <- split(df_1, df_1$service)
-
-
-```
 
 ```{r oterh plot, fig.height=7, fig.width=7, warning=FALSE}
 library(dplyr)
@@ -498,7 +349,41 @@ for (metric in lc_metrics) {
   print(p)
 }
 ```
-# get the filtered lcoations
+```{r sctp, fig.height=9, fig.width=7, warning=FALSE}
+
+
+# List of LC metrics to analyze
+lc_metrics <- c("dir_ch_2")
+
+df_1 <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+
+
+
+ for (metric in lc_metrics) {
+  p1 <- df_1 %>%
+    ggplot(aes_string(x = metric, y = "pct_ch_trans")) +
+    geom_hex(bins = 60) +  # Hexbin layer
+    scale_fill_viridis_c(option = "D", direction = -1) +  # Use viridis scale
+    facet_wrap(~ service, scales = "free",ncol=2) +
+    labs(
+      title = paste("Density of", metric, "vs. ES % Change"),
+      x = metric,
+      y = "% Change in Ecosystem Service",
+      fill = "Bin Count"
+    ) +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p1)
+}
+ 
+df_split <- split(df_1, df_1$service)
+
+
+```
 
 
 # Scatterplots change 2
@@ -840,3 +725,118 @@ for (metric in lc_metrics) {
 
 
 
+
+```{r fig.height=8, fig.width=10, warning=FALSE}
+# 1. Define desired facet order
+df <- plt %>% filter(SUB_AREA > area_threshold)
+# df <- df %>%
+#   filter(id %in% top_bottom_10k$id)
+# 2. Apply pseudo-log transformation
+pseudo_log <- function(x) sign(x) * log1p(abs(x))
+
+df <- df %>%
+  mutate(
+    service = factor(service, levels = service_levels),
+    pct_ch_trans = pseudo_log(pct_ch)
+  )
+
+# 3. Reorder countries based on dir_ch_2 (descending)
+df <- df %>%
+  mutate(ee_r264_name = reorder(ee_r264_name, -dir_ch_2))
+df. <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+# 4. Create plot
+p <- ggplot(df., aes(x = ee_r264_name, y = pct_ch_trans, fill = ee_r264_name)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service ",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+# 4. Create plot
+p2 <- ggplot(df, aes(x = ee_r264_name, y = pct_ch, fill = ee_r264_name)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "% Change by Service ",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+p
+p2
+
+```
+
+```{r fig.height=8, fig.width=10, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(forcats)
+
+# 1. Filter the dataframe for top and bottom 10 by dir_ch_2
+df_top_bottom <- df %>%
+  arrange(desc(dir_ch_2)) %>%
+  slice_head(n = 10) %>%
+  bind_rows(
+    df %>%
+      arrange(dir_ch_2) %>%
+      slice_head(n = 10)
+  )
+
+# 2. Reorder countries inside the filtered data
+df_top_bottom <- df_top_bottom %>%
+  mutate(ee_r264_name = fct_reorder(ee_r264_name, -dir_ch_2))
+df_top_bottom <- df_top_bottom %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+
+# 3. Create plot (pseudo-log scale)
+p <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch_trans, fill = service)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service (Top and Bottom 10 Countries)",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+# 4. (Optional) Plot regular % change
+p2 <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch, fill = service)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "% Change by Service (Top and Bottom 10 Countries)",
+    x = NULL,
+    y = "% Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+# 5. Print
+p
+# p2  # if you also want the regular % plot
+
+```
