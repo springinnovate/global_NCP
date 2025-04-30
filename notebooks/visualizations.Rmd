@@ -443,13 +443,13 @@ for (metric in lc_metrics) {
   p1 <- df_top_bottom %>%
     ggplot(aes_string(x = metric, y = "pct_ch_trans")) +
     geom_hex(bins = 60) +  # Hexbin layer
-    scale_fill_viridis_c(option = "D", direction = -1) +  # Use viridis scale
+    scale_fill_viridis_c(option = "D", direction = 1) +  # Use viridis scale
     facet_wrap(~ service, scales = "free",ncol=2) +
     labs(
-      title = paste("Density of", metric, "vs. ES % Change"),
+      title = paste("% Change Natural Cover ", "vs. ES % Change"),
       x = metric,
       y = "% Change in Ecosystem Service",
-      fill = "Bin Count"
+      fill = "Density"
     ) +
     theme(
       strip.text = element_text(face = "bold"),
@@ -556,7 +556,7 @@ filtered_plt <- plt %>%
 
 # Step 3: Loop through each LC metric and create faceted plots
 for (metric in lc_metrics) {
-  p <- ggplot(filtered_plt, aes_string(x = metric, y = "pct_ch", color = "color")) +
+  p3 <- ggplot(filtered_plt, aes_string(x = metric, y = "pct_ch", color = "color")) +
     geom_point(alpha = 0.5, size = 1.2) +
     facet_wrap(~ service, scales = "free") +
     scale_color_identity() +
@@ -572,9 +572,11 @@ for (metric in lc_metrics) {
       axis.text = element_text(size = 9)
     )
 
-  print(p)
+  print(p3)
 }
 ```
+
+
 ```{r eval=FALSE, fig.height=8, fig.width=14, include=FALSE}
 
 # apply filter (5 or 2%) # Remove the smalles basins. That help. Also, it seems that some biomes are more prone to artifacts than others!!!
