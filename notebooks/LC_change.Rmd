@@ -118,9 +118,6 @@ col <- "BIOME"
 ids_failed <- miss1$id  # these are character values; convert to numeric if needed
 basins <- basins %>% filter(id %in% ids_failed)
 
-ids_failed2 <- c(15,115,)
-
-
 basins <- basins %>% mutate(id_2=row_number())
 # basins <- st_read(here("vector", "hydrosheds_lv6_synth.gpkg"))
 # #inly the basic hydroshed columns.
@@ -131,34 +128,13 @@ basins <- st_read(here("vector", "countries_lc2.gpkg"), layer= "1992_2020_lcc_ch
 
 ## Run Land Cover Change Metric Extraction
 
-```{r run-extraction}
+```{r run LCC-extraction}
 
 
-basins1 <- basins %>% filter(name_long=="India")
-#### iterate over multiple periods (>2)
-
-# lcc_metrics_df <- iterate_lcc_metrics(
-#   raster_list = landcover_rasters,
-#   polygons = basins,
-#   id_col = col,
-#   percent = TRUE,
-#   verbose = TRUE,
-#   mc = TRUE,
-#   ncores = 12,
-#   digits = 4
-# )
-# 
-# lcc_metrics_wide <- lcc_metrics_df %>%
-#   tidyr::pivot_wider(
-#     id_cols = c(col),
-#     names_from = c(Category, year_step),
-#     values_from = c(Gain, Persistence, Loss, Quantity, Exchange, Shift),
-#     names_glue = "{.value}_{Category}_{year_step}"
-#   )
 ##################################################
 # Run the function with only two dates # Multicore is giving us trouble for some reason
 lcc_m2 <- extract_lcc_metrics(landcover_rasters[[1]], landcover_rasters[[2]], basins, col, percent=TRUE, mc = FALSE, ncores = 6, digits = 3)
-# get qunatiy in terms of gain loss (the function does not provide the direction of the change, only the absolute value. 
+# get quantity in terms of gain  - loss (the function does not provide the direction of the change, only the absolute value. 
 lcc_m2 <- lcc_m2 %>%
   filter(!grepl("^Error", Category))
 
@@ -169,33 +145,28 @@ lcc_m <- lcc_m2 %>%
     dir_ch = round(Gain - Loss, digits = 4)
   )
 
-
 lcc_metrics_wide <- lcc_m %>%
   tidyr::pivot_wider(
     id_cols = col,
     names_from = c(Category),
     values_from = c(Gain, Persistence, Loss, Quantity, Exchange, dir_ch),
-    names_glue = "{.value}_{Category}" #_{year_step}"
+    names_glue = "{.value}_{Category}" #_{year_step}" # this is commented because there are only two periods, but it can iterate over multiple time steps. 
   )
-
+# Adjust column type because of course. 
 lcc_metrics_wide <- lcc_metrics_wide %>% 
   mutate(
     id = as.double(id)
   )
 
-# Convert both to character, just to be safe
+# Convert primary kay in both dataframes to character, just to be safe
 #basins <- basins %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
 #lcc_metrics_wide <- lcc_metrics_wide %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
 
 basins <- left_join(basins, lcc_metrics_wide)
 
-
+# i made a mess here. ended up with mopre layers that needed and still need to clean this.
 sf::st_write(basins, here("vector", "countries_lc2.gpkg"), layer = "1992_2020_lcc_change_metrics_3", append = FALSE)
-# 
-# miss1 <- basins %>% filter(is.na(Persistence_1))
-# 
-# miss2 <- miss1 %>% filter(is.na(Persistence_2))
-                        
+
 # sf::st_write(basins,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer = "1992_2020_lcc_change_metrics", append = FALSE)
 # sf::st_write(basins, here("vector", "hydrosheds_lv6.gpkg"), layer = "1992_2020_lcc_change_metrics", append = FALSE)
 ```
@@ -237,8 +208,6 @@ ref_df <- tibble(
 
 # Optional: arrange for readability
 ref_df <- ref_df %>% select(column_name, description)
-
-
 
 ```
 ## Plot Change Metrics Over Time

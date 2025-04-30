@@ -93,12 +93,15 @@ st_write(basin, paste0('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWild
 
 ```
 
-## Add broader infor spatial units 
-Here, we will add the names of the broadrr sptial units:
+## Add broader info spatial units 
+Here, we will add the names of the broader spatial units:
 
 country
 WWF biome
 Ecoregion
+
+
+This part is a mess and kind of embarrassing, i need to clean it a bit. 
 
 ```{r join spatial unit names}
 
@@ -109,24 +112,20 @@ basins <- st_read(paste0(inpath, "/", "hydrosheds_lv6_cp.gpkg"))
 # Drop unnecessary columns (optional)
 basins <- basins[c(1:13)]
 
-#This might not be necessary, the bug was somewhere else  
-#basins <- st_make_valid(basins)
-#st_write(basins, here('vector', 'hydrosheds_lv_6_tmp.gpkg'), append=FALSE)
-
 
 # load vector with the countries
 cnt <- st_read(here('vector', 'cartographic_ee_ee_r264_correspondence.gpkg'))
 # drop unnecesary columns
 cnt <- cnt[c(1,12,22)]
 
-# Reproject both layers to an eqiual area crs (to make sure the we are correctly calculating the areas withing the polygons)
+# Reproject both layers to an equal area crs (to make sure the we are correctly calculating the areas withing the polygons)
 cnt <- st_transform(cnt, crs = "EPSG:6933")
 bas_eq <- st_transform(basins, crs = "EPSG:6933")
 
 # Create a template to rasterize the vector data
 template <- terra::rast(bas_eq, resolution = 300)
 
-# Rasterize the spatial uit polygons
+# Rasterize the spatial unit polygons
 r_country <- terra::rasterize(vect(cnt), template, field = "id")
 
 # Step 2: Extract coverage fraction for each basin
@@ -148,7 +147,7 @@ basins <- left_join(basins, cnt %>% st_drop_geometry(), by = "id")
 st_write(basins, here("vector", "basins_ct.gpkg"))
 #######################################
 
-# Here i used this clipped layer, because of an error that i thought was due to the extet of bioems being slightly differnet to basins. I clpiied to remove the unmatteches portions but that was not the cause anyway. I don't thin this is necessary,  but i am not repeating this
+# Here i used this clipped layer, because of an error that i thought was due to the extent of biemes being slightly different to basins. I clipped to remove the unmatteched portions but that was not the cause anyway. I don't thin this is necessary,  but i am not repeating this.
 
 basins <- st_read(paste0(inpath, "/", "hydrosheds_lv_tmp.gpkg"), layer = 'clipped')
 bas_eq <- st_transform(basins, crs = "EPSG:6933")
@@ -209,13 +208,10 @@ dominant_bm <- map_dbl(er_weight, function(tbl) {
 
 basins$ecoregion <- dominant_bm
 
-
 st_write(basins, here("vector", "basins_bm.gpkg"), append=FALSE)
 
 
-
 bas1 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/basins_bm.gpkg')
-
 
 bas_lyr <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synthesis.gpkg')
 bas_lyr <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synthesis.gpkg', layer = "hydrosheds_lv6_synthesis")
@@ -232,14 +228,22 @@ write.csv(bas1, file= here("vector", "synth_table.csv"))
 
 
 ```{r get amounts of lc chnage}
+# check which alyers are inside
 ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/countries_lc2.gpkg')
+#load data into the environment
+
 bas_lc <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/countries_lc2.gpkg', layer = "lcc_countries")
-bs <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth-lilling-safeBackup-0001.gpkg')
+
+bas_lc <- st_read(here("vector", "countries_lc2.gpkg"), layer = "lcc_countries")
 
 
+# Cumaribo
+bs <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg')
+# Lilling
+bs <- st_read(here('vector', 'hydrosheds_lv6_synth.gpkg'))
+
+# Keep only relevant columns (id, name, direction of change)
 bas_lc <- bas_lc[c(1,2,19)]
-
-
 
 # Step 1: Make sure your geometry column exists and is valid
 # If you already have an area column (e.g., `SUB_AREA`), skip the next line
@@ -251,6 +255,7 @@ area_threshold <- quantile(bas_lc$area_sqkm, probs = 0.05, na.rm = TRUE)
 bas_lc_filtered <- bas_lc %>% 
   filter(area_sqkm > area_threshold)
 
+# Remove units below 10.000 
 bas_lc_filtered <- bas_lc %>%
   filter(area_sqkm > 10000)
 
@@ -278,27 +283,7 @@ top_bottom_lc <- bas_lc %>% slice_max(dir_ch_2, n = 5, with_ties = FALSE) %>% bi
 
 
 
-```{r biomes short}
-biome_labels <- c(
-  "Temperate Grasslands, Savannas & Shrublands" = "Temperate Grasslands",
-  "Tropical & Subtropical Moist Broadleaf Forests" = "Moist Broadleaf Forests",
-  "Temperate Conifer Forests" = "Temperate Conifers",
-  "Tropical & Subtropical Coniferous Forests" = "Tropical Conifers",
-  "Rock & Ice" = "Rock & Ice",
-  "Boreal Forests/Taiga" = "Boreal Forests",
-  "Montane Grasslands & Shrublands" = "Montane Grasslands",
-  "Lakes" = "Lakes",
-  "Flooded Grasslands & Savannas" = "Flooded Grasslands",
-  "Mediterranean Forests, Woodlands & Scrub" = "Mediterranean Forests",
-  "Tropical & Subtropical Dry Broadleaf Forests" = "Dry Broadleaf Forests",
-  "Temperate Broadleaf & Mixed Forests" = "Temperate Broadleaf",
-  "Tundra" = "Tundra",
-  "Tropical & Subtropical Grasslands, Savannas & Shrublands" = "Tropical Grasslands",
-  "Mangroves" = "Mangroves"
-)
-```
-
-```{r get amounts of lc change}
+```{r get amounts of lc change2}
 
 
 # get pct as standalone data to add to the table
@@ -726,85 +711,22 @@ ggplot(top_bottom, aes(x = name_long, y = pct_ch, fill = color)) +
 ```
 
 
-
-
-write.csv(plt, here('output_data', paste0('pct_chg_',cols, '.csv')))
-
-
-
-
-Percentage of Change. This is the key. I almot have it for everything! 
-
-
-Variables: 
-
-Pot. Sediment Retention for Each Grouping (Initial/ Final)
-
-######################################################################
-
-Time Series!!!
-
-% percentage of change in the charts.... amount.
-
-
-
-
-
-
-I extract change stats (stdev + mean) for 
-
-- Subregions (repeat for stdev)
-- Biome (running right now, lost connection to the internet, but just adusting to add the new columns to the vector file)
-- Country. Here to ee those with the most change (%) It's the same, its a ratio, so we don't need to put too much effort normalizing or stuff
-- Income
- 
- 
-Get all the differentials and include % change in service and in export (so retention and export)....make sure i know which inputs am i using.
-
-Paper: Review question to make sure that i
-
-I extract change stats (stdev + mean) for 
-
- 
-Get all the differentials and include % change in service and in export (so retention and export)....make sure i know which inputs am i using.
-
-
-
-
-Pending:
-
-Incorporate the Fertilier EASA database to improve Fertilizer (N) mode.
-
-M<ake sure i m using the right dstasert and olumn! Wrtite tomorrow to justin!!!
-
-Make sure i m using the right dstasert and olumn! Wrtite tomorrow to justin!!!
-
-
-Connecting LC analysis -> is it possible to identify s relationship betwe them?
-
-How do the amoung of change between nwture tono nature relatw with the amount of change in the provision. This is zero banal
-
-
-Get emtrics for Retention, export and the calcualtion (in short repeat the whole thing. again)
-
-Get metrics for Retention, export and the calcualtion (in short repeat the whole thing. again)
-
-
-Re run the export part
-
-```{r create list of columns}
-
-poly <- st_read('/Users/rodriguez/Global_ES_TS/global_NCP/vector/vector_f/Continent.gpkg')
-
-serv <- names(poly)
-serv <- serv[-c(1,30)]
-serv
-
-
-#Get filenames (add paths to stored data)
-
-
-
-
-
+```{r biomes short}
+biome_labels <- c(
+  "Temperate Grasslands, Savannas & Shrublands" = "Temperate Grasslands",
+  "Tropical & Subtropical Moist Broadleaf Forests" = "Moist Broadleaf Forests",
+  "Temperate Conifer Forests" = "Temperate Conifers",
+  "Tropical & Subtropical Coniferous Forests" = "Tropical Conifers",
+  "Rock & Ice" = "Rock & Ice",
+  "Boreal Forests/Taiga" = "Boreal Forests",
+  "Montane Grasslands & Shrublands" = "Montane Grasslands",
+  "Lakes" = "Lakes",
+  "Flooded Grasslands & Savannas" = "Flooded Grasslands",
+  "Mediterranean Forests, Woodlands & Scrub" = "Mediterranean Forests",
+  "Tropical & Subtropical Dry Broadleaf Forests" = "Dry Broadleaf Forests",
+  "Temperate Broadleaf & Mixed Forests" = "Temperate Broadleaf",
+  "Tundra" = "Tundra",
+  "Tropical & Subtropical Grasslands, Savannas & Shrublands" = "Tropical Grasslands",
+  "Mangroves" = "Mangroves"
+)
 ```
