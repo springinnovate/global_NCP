@@ -1,7 +1,7 @@
 ---
 title: "Summary ES Analysis"
 author: "Jeronimo Rodriguez-Escobar"
-date: "2025-04-29"
+date: "2025-04-02"
 output:
   html_document: default
   pdf_document: default
@@ -9,20 +9,19 @@ output:
 ---
 
 # Overview
-Structured approach to extract and analyze zonal statistics for global modeled ecosystem services (ES) for differnet spatial units  (e.g countries, income groups, biomes, ecoregions and hydrological basins). 
+We are building a structured approach to extract and analyze zonal statistics for ecosystem services (ES) at global scale using polygon datasets such as countries, income groups, biomes, and hydrological basins. The primary aim is to calculate and visualize changes in ES provision over time, towards allowing cross-regional comparisons and spatial trend analysis. While the workflow is a woprk in progress and can be further optimized and generalized, priorities are transparency, reproducibility, and documentation of the analytical logic behind each step. 
 
-- Outcomes: calculate and visualize changes in ES provision over time
-- Allow cross-regional comparisons and spatial trend analysis. 
+This document is intended to serve as a reference for collaborators working on ecosystem service modeling and spatial analysis, including potential integration into larger NCP assessments.
 
 # 1. Objectives
-1. Systematically extract zonal statistics from ES global raster datasets using the `exactextractr` package. 
-2. Append extracted statistics as attributes to spatial polygon datasets.
-3. Generate visualizations for representation of results.
+1. Extract zonal statistics from ES global raster datasets using the `exactextractr` package. 
+2. Integrate extracted statistics as attributes to spatial polygon datasets.
+3. Generate visualizations (bar plots, maps) for spatial representation of results.
 
 **Important Considerations:**
-- Some complex polygon datasets are more prone to errors. Make sure to use an unique identifier to iterate over the polygons.
+- Dependencies and overlapping regions. pose some challenges that need special handling.
 - Small island nations and some unique geographic cases require additional checks, and case specific decisions at the individual territory level.
-- Basins (lev 6 ^ 7)  obtained from [**Hydrosheds.org**](https://www.hydrosheds.org/products/hydrobasins) execute without issues.
+- So far the most promising subdivision runs have been by Basin and sub-basin obtained from [**Hydrosheds.org**](https://www.hydrosheds.org/products/hydrobasins). 
 
 ```{r setupl load libraries, include=FALSE}
 library(sf)             # Spatial vector operations
@@ -40,24 +39,9 @@ library(purrr)
 library(stringr)
 library(knitr)
 library(kableExtra)
-source(here::here("R", "utils_lcc_metrics.R"))
-source(here("R","utils_pct_change.R"))
 ```
 
-
-# Create Symbology
-
-```{r create_symbology}
-
-# Assign services and years
-service <- rep(c("Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination"), each = 2)
-year <- rep(c(1992, 2020), 6)
-
-# Create color mapping
-color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#A57C00", "#dd1c77"), each = 2)
-
-service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination"), each = 2)
-```
+# 2. Prepare Input data
 
 ## 2.1. Load Polygon Data
 
@@ -86,13 +70,25 @@ Other sources
 inpath <- here("vector")
 sets <- file.path(inpath, list.files(inpath, pattern= 'gpkg$'))
 
-t <- 10
+#cols <- c("id", "continent", "income_grp", "region_wb", "WWF_biome", "HYBAS_ID", "HYBAS_ID")
+#sets <- cbind(sets, cols)
+# Set an index to select the desired dataset
+t <- 6
 # Select the target dataset from the list 
 set <- sets[t]
 # # load polygons
 poly <- st_read(set) 
-#get the name of the column with the unique ids of the input vector
-col <- colnames(poly[1])[1]
+
+#get the name of the column withthe unique ids of the input vector
+col <- colnames(poly[1])
+cols <- col[1]
+
+# Convert to data frame for nicer display
+sets_df <- as.data.frame(basename(sets))
+# Print nicely
+kable(sets_df, format = "html", caption = "Geopackage Layers") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
 ```
 
 ## 2.2 Load Global ES as Raster Data**
@@ -103,22 +99,24 @@ maybe it is easier process datatypes (wht units) independently, not try to feed 
 For the 1992-2020 comparison, we included these modeled Services
 
 
-1.  Nitrogen Export. Medeled using geosharding !!!! [**InVEST Nutrient Delivery Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
+1.  Nitrogen Export. [**InVEST Nutrient Delivery Ratio**](http://data.naturalcapitalproject.org/invest-releases/3.5.0/userguide/ndr.html).
     Expressed in kg/pixel/year
 
 2.  Sediment Retention.[**InVEST SDR: Sediment Delivery Ratio**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html).
     Values in ton/pixel/year
 
+3. Soil Erosion derived using the *Revised Universal Soil Loss Equation-USLE* 
 
-# 5. EXTRACT METRICS FOR THE MODELED NITROGEN LAYERS
-Multi temporal analysis. 
-Initially for 4 years. 
-This script gets the job done, but needs a lot of improvement. 
-I improved it somewhere else. I qam still not working correclty and keep too many parallel versions of the smae thing.  
+4.  Pollination.  [**InVEST SDR: Pollinator Abundance Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/croppollination.html).
+    Units represent Polllination Change in people fed on HABitat. More information in
+  
+5.  Coastal Protection. Unitless measure, refers to a derived vulnerability index. [**InVEST Coastal Vulnerability Model**](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/coastal_vulnerability.html)
 
+6.  Nature Access represented as [**the number of people within 1 hour travel of natural and semi-natural lands**](https://github.com/springinnovate/distance-to-hab-with-friction) (Chaplin-Kramer et al,
+    2022).
+    
 
-
-```{r load_raster_es, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+```{r load raster es, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 library(kableExtra)
 
 inpath <- here('input_ES')

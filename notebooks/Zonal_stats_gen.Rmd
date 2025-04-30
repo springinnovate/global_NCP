@@ -8,20 +8,22 @@ output:
   word_document: default
 ---
 
-# Overview
-We are building a structured approach to extract and analyze zonal statistics for ecosystem services (ES) at global scale using polygon datasets such as countries, income groups, biomes, and hydrological basins. The primary aim is to calculate and visualize changes in ES provision over time, towards allowing cross-regional comparisons and spatial trend analysis. While the workflow is a woprk in progress and can be further optimized and generalized, priorities are transparency, reproducibility, and documentation of the analytical logic behind each step. 
 
-This document is intended to serve as a reference for collaborators working on ecosystem service modeling and spatial analysis, including potential integration into larger NCP assessments.
+# Overview
+Structured approach to extract and analyze zonal statistics for global modeled ecosystem services (ES) for differnet spatial units  (e.g countries, income groups, biomes, ecoregions and hydrological basins). 
+
+- Outcomes: calculate and visualize changes in ES provision over time
+- Allow cross-regional comparisons and spatial trend analysis. 
 
 # 1. Objectives
-1. Extract zonal statistics from ES global raster datasets using the `exactextractr` package. 
-2. Integrate extracted statistics as attributes to spatial polygon datasets.
-3. Generate visualizations (bar plots, maps) for spatial representation of results.
+1. Systematically extract zonal statistics from ES global raster datasets using the `exactextractr` package. 
+2. Append extracted statistics as attributes to spatial polygon datasets.
+3. Generate visualizations for representation of results.
 
 **Important Considerations:**
-- Dependencies and overlapping regions. pose some challenges that need special handling.
+- Some complex polygon datasets are more prone to errors. Make sure to use an unique identifier to iterate over the polygons.
 - Small island nations and some unique geographic cases require additional checks, and case specific decisions at the individual territory level.
-- So far the most promising subdivision runs have been by Basin and sub-basin obtained from [**Hydrosheds.org**](https://www.hydrosheds.org/products/hydrobasins). 
+- Basins (lev 6 ^ 7)  obtained from [**Hydrosheds.org**](https://www.hydrosheds.org/products/hydrobasins) execute without issues.
 
 ```{r setupl load libraries, include=FALSE}
 library(sf)             # Spatial vector operations
@@ -52,7 +54,7 @@ Here is what we need to reframe.
  - point to the data location
  - set a way/rule to select the data that will be processed.
  - Set a way to add the "metadata" - labeling data: variable name (string), display color (or leave empty/use available colloramps)
- - Add the primary key to join the metadata. Normally is the raster name (issue: raster algebra output maps get the name of one of the input products by default, and that can become a problem later, so one shouldthink on a way to add a menaingful name from here). 
+ - Add the primary key to join the metadata. Normally is the raster name (issue: raster algebra output maps get the name of one of the input products by default, and that is a problem donw the line , so I should think hoe to take care of that). 
 
 ```{r get retention potential per year}
 
