@@ -133,6 +133,9 @@ def zonal_stats(raster_path, vector_path):
         include_cols=["fid"],
         output="pandas",
         strategy="raster-sequential",
+        # i found a *2 and *4 to make a nearly twofold improvment, but didn't
+        # see gains at *8
+        max_cells_in_memory=30000000 * 4,
         progress=create_progress_logger(REPORTING_INTERVAL, stem),
     )
     return stats_df
