@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from datetime import datetime
+from datetime import timedelta
 import time
 import logging
 import os
@@ -91,9 +92,13 @@ def create_progress_logger(update_rate, task_id):
     def _process_logger(fraction, message):
         nonlocal last_time
         if time.time() - last_time > update_rate:
+            elapsed_time = time.time() - start_time
+            estimated_time_remaining = elapsed_time / fraction - elapsed_time
+            elapsed_str = str(timedelta(seconds=int(elapsed_time)))
+            etc_str = str(timedelta(seconds=int(estimated_time_remaining)))
             LOGGER.info(
                 f"{task_id} is {100*fraction:.2f}% complete running for "
-                f"{time.time()-start_time:.2f}s"
+                f"{elapsed_str}, estimate {etc_str} remaining"
             )
             last_time = time.time()
 
