@@ -5,6 +5,7 @@ import os
 import sys
 from datetime import datetime
 
+import psutil
 from ecoshard.geoprocessing import zonal_statistics
 from ecoshard import taskgraph
 from tqdm import tqdm
@@ -70,8 +71,9 @@ os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
 def main():
     """Entry point."""
+    physical_cores = psutil.cpu_count(logical=False)
     task_graph = taskgraph.TaskGraph(
-        WORKSPACE_DIR, n_workers=-1, reporting_interval=15.0
+        WORKSPACE_DIR, n_workers=physical_cores, reporting_interval=15.0
     )
     zonal_stats_task_list = []
     for (description, year), raster_path in ANALYSIS_DATA.items():
