@@ -24,7 +24,7 @@ print(lyr)
 ```
 # Organize columns
 
-I had to do this to make sense of the different runs i have done and the data that i need. From individual yearly stats (which ones?) ["raw" data rasters and derived raster algebra products] bi-temporal relative change, key attributes from the input data among others. Need to come out with am ore efficient   
+I had to do this to make sense of the different runs i have done and the data that i need. From individual yearly stats (which ones?) ["raw" data rasters and derived raster algebra products] bi-temporal relative change, key attributes from the input data among others. Need to come out with a better way to do this, and eventually keep a final gpkg correctly organized, but it is always better to have the workflow take care of the whole thing on its own. Have to spend less time here , can repeat the process easier and with fewer errors.
 
 ```{r refine columns}
 basin <- st_read(set, layer= "hydrosheds_lev6") 
@@ -101,7 +101,7 @@ WWF biome
 Ecoregion
 
 
-This part is a mess and kind of embarrassing, i need to clean it a bit. 
+This part is a mess and kind of embarrassing, i need to clean it a bit. But this is a great piece of thinking. I get for each basin the country for whcihb the larger share belongs and assing it to the country, s i get the attribes (id of coutnries, biomnes ,ecoregions and can jopin it to the hydrosheds as additional attributes. We are going to sue this soon, but again, there is some cleaning to do here. I just don't have time now. 
 
 ```{r join spatial unit names}
 
@@ -225,7 +225,7 @@ bas1 <- st_drop_geometry(bas1)
 write.csv(bas1, file= here("vector", "synth_table.csv"))
 ```
 
-
+Here, we are loading the data with the LCchange calucalted to join with the basins. We jsut want to know each basinb to whci country mayorly blongs (horrible writing, work on that later)
 
 ```{r get amounts of lc chnage}
 # check which alyers are inside
@@ -289,18 +289,11 @@ top_bottom_lc <- bas_lc %>% slice_max(dir_ch_2, n = 5, with_ties = FALSE) %>% bi
 # get pct as standalone data to add to the table
 poly <- st_transform(poly, crs = 5880)
 poly$area_ha <- as.numeric(st_area(poly))/10000
-
-plt <- st_drop_geometry(poly)
-
-
-plt <- as_tibble(plt)
+plt <- as_tibble(st_drop_geometry(poly))
 #filter all thins smaller than 150.000 ha (takes away the 54 smallest features) 
 plt  <- plt %>% select(1,2, area_ha,contains("pct"))%>% filter(area_ha>400000)
 
 
-service <- c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination", "Pot_Sed_ret")
-color <- c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#A57C00", "#dd1c77", "#8C510A")
-cd <- as_tibble(cbind(service,color))
 
 ################## THIS IS VERY IMPPORTAnt. Instead of struggling  with the multiple dataframes, it is easier to load the vector file swith all the column and pivot longer as necessary. Easier to manage, adjust on the fly!
 plt <- as_tibble(plt %>%
@@ -312,168 +305,16 @@ plt <- as_tibble(plt %>%
 
 plt <- plt %>%
   mutate(service = str_remove(service, "_pct_ch$"))
-plt <- left_join(plt,cd)
+plt <- left_join(plt,cd) # this will return an error because maybe the cd dataframe is not there. It is the one thatdefiens the class names and colors 
 plt <- plt%>% filter(!is.na(pct_ch))
-
-# Only for biomes, t make names shorter
-# plt <- plt %>%
-#   mutate(biome_short = recode(WWF_biome, !!!biome_labels))
- 
 ```
 
-```{r ggplot 2020, echo=FALSE, fig.height=8, fig.width=14}
-#
-
-plot_ecosystem_services <- function(data, var, col) {
-  col_sym <- sym(col)  # Convert column name to symbol for dplyr
-  
-  # Step 1: Prepare Data (Remove NA values and zero mean values, then reorder names)
-  data_prepped <- data %>%
-    filter(!is.na(mean) & mean > 0 & year == !!year) %>%  # Exclude cases where mean is 0 and filter year
-    mutate(temp_col = reorder_within(!!col_sym, -mean, service))  
-
-  # Step 2: Compute min/max values for selected column
-  service_range <- data_prepped %>%
-    group_by(service) %>%
-    summarize(
-      min_val = min(pct_chg, na.rm = TRUE),
-      max_val = max(pct_chg, na.rm = TRUE),
-      .groups = "drop"
-    )
-
-  # Step 3: Create "invisible" data for min/max range
-  range_data <- service_range %>%
-    pivot_longer(cols = c(min_val, max_val), names_to = "range_type", values_to = "mean") %>%
-    mutate(year = !!year, temp_col = "dummy")
-
-  # Step 4: Extract top 10 and bottom 10 per selected column
-  top_10 <- data_prepped %>%
-    group_by(service) %>%
-    slice_max(order_by = mean, n = 10, with_ties = TRUE) 
-
-  bottom_10 <- data_prepped %>%
-    group_by(service) %>%
-    slice_min(order_by = mean, n = 10, with_ties = TRUE)
-
-  # Step 5: Combine only top 10 and bottom 10
-  filtered_data <- bind_rows(top_10, bottom_10) %>%
-    arrange(service, desc(mean))
-
-  # Step 6: Reorder selected column to appear correctly
-  filtered_data <- filtered_data %>%
-    mutate(temp_col = reorder_within(!!col_sym, -mean, service))
-
-  # Step 7: Plot the filtered data
-  p <- ggplot(filtered_data, aes(x = temp_col, y = mean, fill = color)) +
-    geom_bar(stat = "identity", show.legend = FALSE) +
-    scale_fill_identity() +
-    facet_wrap(~ service, scales = "free") +
-    scale_x_reordered() +  
-    labs(
-      title = paste("Mean Ecosystem Service Values,", year),
-      x = col,
-      y = "Mean Value"
-    ) +
-    theme_bw() +
-    theme(
-      strip.text = element_text(face = "bold", size = 12),
-      axis.text.x = element_text(angle = 45, hjust = 1, size = 5)
-    )
-  
-  return(p)
-}
-
-# Generate plots for different years using a specified column
-p_1992 <- plot_ecosystem_services(zonal_df, 1992, col)
-p_2020 <- plot_ecosystem_services(zonal_df, 2020, col)
-
-# Display the plots
-print(p_1992)
-print(p_2020)
 
 
-```
+We are not using  this. This os from an older verion by country. 
+We could actually get all the metrics for all the classes for all the years for all the basins and feed the whole thing into some well designed ML model. It might tell us something, or be useful in some measure. and then add a temporal component and animate the scatterplots or something. Group them by country. By income level. by biome. All that would be possible, Need to think with wome calm about this.
+Add some charts/amimatiosn that shows the lc dinamics over time. This could be group in multiple ways. I can't think whcih would be the best way to start, but we have everytting we need.
 
-## 5. Here, add plots with the differences 
-
-```{r plot chg 8, fig.height=8, fig.width=14}
-library(dplyr)
-library(ggplot2)
-library(tidytext)
-library(rlang)
-
-#For biomes
-#col <- "biome_short"
-
-plot_es_changes <- function(data, label_col = col, 
-                            filter_type = "top_bottom", filter_val = 10) {
-  
-  label_sym <- sym(label_col)
-  
-  # Step 1: Filter problematic service and NAs
-  filtered_data <- data %>%
-    filter(service != "Nature_Access", !is.na(pct_ch))
-  
-  # Step 2: Apply filtering based on the chosen type
-  if (filter_type == "top_bottom") {
-    # Top/bottom n observations per service
-    top_bottom <- filtered_data %>%
-      group_by(service) %>%
-      slice_max(pct_ch, n = filter_val, with_ties = FALSE) %>%
-      bind_rows(
-        filtered_data %>%
-          group_by(service) %>%
-          slice_min(pct_ch, n = filter_val, with_ties = FALSE)
-      ) %>%
-      ungroup()
-    
-  } else if (filter_type == "quantile") {
-    # Top/bottom quantile per service (e.g., top/bottom 10%)
-    top_bottom <- filtered_data %>%
-      group_by(service) %>%
-      filter(pct_ch >= quantile(pct_ch, 1 - filter_val, na.rm = TRUE) |
-             pct_ch <= quantile(pct_ch, filter_val, na.rm = TRUE)) %>%
-      ungroup()
-    
-  } else if (filter_type == "all") {
-    top_bottom <- filtered_data
-  } else {
-    stop("Invalid `filter_type`. Use 'top_bottom', 'quantile', or 'all'.")
-  }
-  
-  # Step 3: Reorder labels per service
-  top_bottom <- top_bottom %>%
-    mutate(temp_label = reorder_within(!!label_sym, -pct_ch, service))
-  
-  # Step 4: Plot
-  ggplot(top_bottom, aes(x = temp_label, y = pct_ch, fill = color)) +
-    geom_bar(stat = "identity", show.legend = FALSE) +
-    scale_fill_identity() +
-    scale_x_reordered() +
-    facet_wrap(~ service, scales = "free", ncol = 3) +
-    labs(
-      title = paste("% Change 1992–2020 By", cols, sep= " "),
-      x = NULL,
-      y = "% Change"
-    ) +
-    theme_bw() +
-    theme(
-      strip.text = element_text(face = "bold", size = 10),
-      axis.text.x = element_text(angle = 45, hjust = 1, size = 8)
-    )
-}
-
-# Top/bottom 10 countries per service
-#plot_es_changes(plt, label_col = "name_long", filter_type = "top_bottom", filter_val = 10)
-
-# Top/bottom 5% per service
-#plot_es_changes(plt, label_col = "iso3", filter_type = "quantile", filter_val = 0.05)
-
-# Show all values
-plot_es_changes(plt, filter_type = "all")
-
-
-```
 
 ```{r timeseries plot}
 
@@ -504,210 +345,6 @@ ggplot(zonal_df, aes(x = year, y = mean, color = biome_short, group = biome_shor
   ) +
   theme_minimal() +
   theme(legend.position = "right")  # Adjust legend position
-```
-
-```{r faceted plot stdev, fig.height=18, fig.width=18}
-
-zonal_df <- zonal_df %>% filter(Sub_Region!="Antarctica")
-
-ggplot(zonal_df, aes(x = year, y = stdev, group = Sub_Region)) +
-  geom_line(size = 1, color = "blue") +
-  geom_point(size = 2, color = "red") +
-  facet_wrap(~ Sub_Region, scales = "free_y", ncol = 3) +
-  labs(
-    title = paste("NDR - st_dev", col, sep= ", "),
-    x = "Year",
-    y = "Mean Value"
-  ) +
-  theme(
-    legend.position = "right",
-    text = element_text(size = 14),  # Reduce overall text size
-    axis.text.x = element_text(size = 10, angle = 45, hjust = 1),  # Adjust x-axis labels
-    axis.text.y = element_text(size = 10),  # Adjust y-axis labels
-    legend.text = element_text(size = 8),  # Reduce legend font size
-    legend.title = element_text(size = 0.1),  # Adjust legend title size
-    strip.text = element_text(size = 12)  # Adjust facet labels (if using facets)
-  )
-
-
-```
-
-```{r chartTS country filter}
-
-# Filter to exclude NA values and "Lakes"
-
-# Filter top 5 and bottom 5 per service
-top_bottom_df <- zonal_df %>%
-  group_by(service, year) %>%
-  slice_max(mean, n = 5, with_ties = FALSE) %>%
-  bind_rows(
-    zonal_df %>%
-      group_by(service, year) %>%
-      slice_min(mean, n = 5, with_ties = FALSE)
-  ) %>%
-  ungroup()
-
-ggplot(top_bottom_df, aes(x = year, y = mean, color = name_long, group = name_long)) +
-  geom_line(size = 1) +
-  geom_point(size = 2) +
-  labs(
-    title = paste("Ecosystem Service Trends by ", col, sep = ""),
-    x = "Year",
-    y = "Mean Value"
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = "right",
-    legend.text = element_text(size = 8)
-  )
-```
-
-
-```{r faceted plot count, fig.height=18, fig.width=18}
-
-
-# 1. Filter valid records
-filtered <- zonal_df %>%
-  filter(!is.na(mean), !is.na(name_long))
-
-# 2. Compute average change per country (across years) per service
-ranked <- filtered %>%
-  group_by(service, name_long) %>%
-  summarize(avg_mean = mean(mean, na.rm = TRUE), .groups = "drop")
-
-# 3. Extract top and bottom 5 countries per service
-top_bottom <- ranked %>%
-  group_by(service) %>%
-  slice_max(avg_mean, n = 5, with_ties = FALSE) %>%
-  bind_rows(
-    ranked %>% 
-      group_by(service) %>% 
-      slice_min(avg_mean, n = 5, with_ties = FALSE)
-  ) %>%
-  ungroup()
-
-# 4. Filter original data to only those countries and prepare labels
-plot_data <- filtered %>%
-  filter(name_long %in% top_bottom$name_long) %>%
-  mutate(label = reorder_within(name_long, -mean, service))  # reorder per facet
-
-# 5. Plot
-ggplot(plot_data, aes(x = year, y = mean, group = name_long, color = name_long)) +
-  geom_line(size = 1) +
-  geom_point(size = 2) +
-  facet_wrap(~ service, scales = "free_y") +
-  scale_color_viridis_d(option = "C", begin = 0.2, end = 0.9) +
-  scale_x_continuous(breaks = unique(zonal_df$year)) +
-  scale_y_continuous() +
-  labs(
-    title = "Top and Bottom 5 Country Values per Ecosystem Service",
-    x = "Year",
-    y = "Mean Value"
-  ) +
-  scale_color_discrete(guide = guide_legend(title = "Country")) +
-  theme_bw() +
-  theme(
-    strip.text = element_text(face = "bold", size = 10),
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    axis.text.y = element_text(size = 8),
-    legend.position = "bottom",
-    legend.title = element_text(size = 10),
-    legend.text = element_text(size = 8)
-  )
-
-```
-
-```{r ttt}
-library(dplyr)
-library(ggplot2)
-
-# Step 1: Filter valid rows
-filtered <- zonal_df %>%
-  filter(!is.na(mean), !is.na(name_long))
-
-# Step 2: Calculate average mean per country across all years, by service
-ranked <- filtered %>%
-  group_by(service, name_long) %>%
-  summarize(avg_mean = mean(mean, na.rm = TRUE), .groups = "drop")
-
-# Step 3: Select top 5 and bottom 5 countries per service
-top_bottom <- ranked %>%
-  group_by(service) %>%
-  slice_max(avg_mean, n = 10, with_ties = FALSE) %>%
-  bind_rows(
-    ranked %>%
-      group_by(service) %>%
-      slice_min(avg_mean, n = 0, with_ties = FALSE)
-  ) %>%
-  ungroup()
-
-# Step 4: Filter zonal_df to keep only those countries
-zonal_top_bottom <- filtered %>%
-  filter(name_long %in% top_bottom$name_long)
-
-# Optional: Add a shortened country label if needed
-zonal_top_bottom <- zonal_top_bottom %>%
-  mutate(country_short = name_long)  # you can shorten names if needed
-
-# Step 5: Plot (same structure as your original one, just updated to use countries)
-ggplot(zonal_top_bottom, aes(x = year, y = mean, group = name_long)) +
-  geom_line(size = 1, color = "blue") +
-  geom_point(size = 2, color = "red") +
-  facet_wrap(~ name_long, scales = "free_y", ncol = 4) +
-  labs(
-    title = paste("NDR - Means,", "Top 10 Countries", sep= ", "),
-    x = "Year",
-    y = "Mean Value"
-  ) +
-  theme(
-    legend.position = "right",
-    text = element_text(size = 14),
-    axis.text.x = element_text(size = 8, angle = 45, hjust = 1),
-    axis.text.y = element_text(size = 8),
-    legend.text = element_text(size = 8),
-    legend.title = element_text(size = 8),
-    strip.text = element_text(size = 10)
-  )
-
-```
-
-```{r plot chg2, fig.height=8, fig.width=14}
-
-# 1. Filter out "Nature_Access"
-filtered_plt <- plt %>%
-  filter(service != "Nature_Access" & !is.na(pct_ch))
-
-# 2. Get top 10 and bottom 10 by service
-top_bottom <- filtered_plt %>%
-  group_by(service) %>%
-  slice_max(pct_ch, n = 10, with_ties = FALSE) %>%
-  bind_rows(
-    filtered_plt %>%
-      group_by(service) %>%
-      slice_min(pct_ch, n = 10, with_ties = FALSE)
-  ) %>%
-  ungroup()
-
-# 3. Reorder country names *within each service*
-top_bottom <- top_bottom %>%
-  mutate(name_long = reorder_within(name_long, -pct_ch, service))  # descending order
-
-
-ggplot(top_bottom, aes(x = name_long, y = pct_ch, fill = color)) +
-  geom_bar(stat = "identity", show.legend = FALSE) +
-  scale_fill_identity() +
-  scale_x_reordered() +  # <<-- THIS enables correct facet ordering
-  facet_wrap(~ service, scales = "free", ncol = 3) +
-  labs(
-    title = "% Change 1992-2020 By Income Group
-    x = NULL,
-    y = "% Change"
-  ) +
-  theme_bw() +
-  theme(
-    strip.text = element_text(face = "bold", size = 10),
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 7)
-  )
 ```
 
 
