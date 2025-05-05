@@ -25,6 +25,7 @@ library(purrr)
 library(diffeR)
 library(here)
 library(stringr)
+library(parallel)
 # source the helper functions
 source(here::here("R", "utils_lcc_metrics.R"))
 source(here("R","utils_pct_change.R"))
@@ -38,12 +39,20 @@ b) Binary transformed/natural LC maps.
 
 
 ```{r load LC maps, eval=FALSE, include=FALSE}
-inpath <-  '/home/jeronimo/global_ES_modeling/esos-c/data/ndr'
-tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'landcover'))
-filename<- basename(tiffes)
 
-raster_list <- lapply(tiffes,rast)
-num.cores <- length(raster_list)
+# prepare missing ESA LC Maps
+raster_list <- rast('/home/jeronimo/global_ES_modeling/esos-c/data/ndr/ESA_LC/ESACCI-LC-L4-LCCS-Map-300m-P1Y-1992_2015-v2.0.7.tif')
+raster_list <- raster_list[[c(9,14,19,24)]]
+
+
+
+inpath <- here("input_rasters", "LandCovers")
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'landcover'))
+tiffes <- tiffes[c(4,7,11)]
+ filename<- basename(tiffes)
+
+# raster_list <- lapply(tiffes,rast)
+num.cores <- nlyr(raster_list)
 
 # Define the reclassification rules in one operation
 reclass_table <- data.frame(
@@ -61,60 +70,79 @@ reclass_table <- data.frame(
          9)   # Ice
 )
 
+# If a multiband SpatRaster:
+raster_list <- subst(raster_list, from = reclass_table$from, to= reclass_table$to)
+
+# If a list of single band Rasters. For some reason mclapply does not work well here. 
 raster_list <- lapply(raster_list, function(r) {
   subst(r, from = reclass_table$from, to = reclass_table$to)
 })#,mc.cores = num.cores)
 
+#year <- c(2000,2005,2015)
+
 #save rasters 
-lapply(1:length(raster_list), function(x) writeRaster(raster_list[[x]], paste0(here("input_ES", "LandCovers"),'/', filename[x])))
+lapply(1:nlyr(raster_list), function(x) writeRaster(raster_list[[x]], paste0(here("input_rasters", "LandCovers"),'/', "landcover_gl_", year[x], ".tif"), overwrite=TRUE))
 
-inpath <- here("input_ES", "LandCovers")
-
-tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'landcover'))
-filename<- basename(tiffes)
-
-raster_list <- lapply(tiffes,rast)
 
 reclass_table <- data.frame(
   from = c(3,4,5,6,7,8,9),
   to = c(2,2,2,1,2,2,2)
 )
 
+# Load the bands together (the output could be saved as a multiband raster, but let us keep it like that for now). For some reason that I have never figured out (nor that I have thought about that until now, exporting SpatRaster objects as geotiffs can be really slow. It does not depend on the absolute file size, but on something else that i don't know what it is, but some supposedly easy operatins become slow to compute. 
+
+
 raster_list <- lapply(raster_list, function(r) {
-  subst(r, from = reclass_table$from, to = reclass_table$to)
-})#,mc.cores = num.cores)
+  subst(r, from = reclass_table$from, to = reclass_table$to)-
+})#,mc.cores = num.cores). This only makes sense if we are working on a list of rasters, not for a multiband raster. I should check which way is faster. It should be obvious but i am not sure. 
+
 
 #save rasters 
-lapply(1:length(raster_list), function(x) writeRaster(raster_list[[x]], paste0(here("input_ES", "LandCovers"),'/', "rec_", filename[x])))
+lapply(1:nlyr(raster_list), function(x) writeRaster(raster_list[[x]], paste0(inpath,"/", "rec_", filename[x])))
 # second reclassifciation Natural-not natural 
+
+# Got the 12 eclassified maps that i currently have, masked, all the oceans look horrible. This took forever to run, luckily i did not had to do anything, just let it run. But annoying anyway.
+ 
+
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'rec'))
+filename<- basename(tiffes)
+
+rec_s <- rast(tiffes)
+poy <- st_read(here("vector","hydrosheds_lv6_synth.gpkg")) # use this as mask to remove the oceans. 
+poy <- poy[c(1:13)]
+rec_s <- mask(rec_s, poy)
+
+# save as sinbgle band layers. It could be a single multiband raster. I am not sure anymore which way is it better to sabe this. I have used bouth and still can't decide. I feel a multiband geotiff is better, and looks better organizes, but the file becomes larger. We usually want to keep them together and only read the ones we want. 
+lapply(1:nlyr(rec_s), function(x) writeRaster(rec_s[[x]], paste0(inpath,"/", "rec_", filename[x])))
 ```
 
 ## Load Inputs
 
 ```{r load-data}
 # Example file paths (replace with actual paths)
-inpath <- here(here("input_ES","LandCovers"))
+inpath <- here("input_rasters", "LandCovers")
 landcover_files <- list.files(
   inpath,
   pattern = "rec.*\\.tif$", 
   full.names = TRUE
 )
-
-landcover_files <- landcover_files[c(1,9)]
+# Select the ESA Classifications to process. In this case 1992 (first available), 1995, 2000, 2005, 2010, 2015, 2020) 
+# I am using these yearsd because the other global datasets I am evaluating (gridded HDI, gridded GDP, )
+landcover_files <- landcover_files[c(1,2,4,7,9,11,12)]
 
 # Name rasters by year
 names(landcover_files) <- stringr::str_extract(basename(landcover_files), "\\d{4}")
+# Load rasters as a list. (I think app() allows to iterate over the layers, but the output is a single synhesis band, not a dataframe, as we need here )
 landcover_rasters <- lapply(landcover_files, terra::rast)
 
 # Load polygon spatial units (e.g., HydroBASINS level 6)
-
-basins <- st_read(here("vector", "Biome.gpkg"))
-basins <- basins[c(1,2)]
-col <- "BIOME"
+# basins <- st_read(here("vector", "Biome.gpkg"))
+# basins <- basins[c(1,2)]
+# col <- "BIOME"
 
 
 #############################3
-
+# This is for the biomes/country level extraction. For some reason, county level gave a lot of work (i have not been able to get it to run properly for the US)
 ids_failed <- miss1$id  # these are character values; convert to numeric if needed
 basins <- basins %>% filter(id %in% ids_failed)
 
@@ -123,59 +151,73 @@ basins <- basins %>% mutate(id_2=row_number())
 # #inly the basic hydroshed columns.
 # basins <- basins[c(1:13)]
 
-basins <- st_read(here("vector", "countries_lc2.gpkg"), layer= "1992_2020_lcc_change_metrics_3") 
+poly <- st_read(here("vector", "countries_lc2.gpkg"), layer= "1992_2020_lcc_change_metrics_3") # this is one of the annoying things. I don't remember why i ended with this absurd object structure here. I should not call this basins, but poly 
+#
+col <- names(poly[1])[1]
 ```
 
 ## Run Land Cover Change Metric Extraction
 
 ```{r run LCC-extraction}
 
+ # Iteate over multiple years
+
+lcc_m <- iterate_lcc_metrics(landcover_rasters, basins, id_col = "HYBAS_ID", percent = TRUE, verbose = TRUE, mc= TRUE, ncores=8, digits=4)
 
 ##################################################
-# Run the function with only two dates # Multicore is giving us trouble for some reason
-lcc_m2 <- extract_lcc_metrics(landcover_rasters[[1]], landcover_rasters[[2]], basins, col, percent=TRUE, mc = FALSE, ncores = 6, digits = 3)
+# Run the function with only two dates # Multicore is giving us trouble for some reason. This happens when perfroming this operation at the country eve, but the hydrobasins work like a charm. 
+#lcc_m <- extract_lcc_metrics(landcover_rasters[[1]], landcover_rasters[[2]], basins, col, percent=TRUE, mc = FALSE, ncores = 6, digits = 3)
 # get quantity in terms of gain  - loss (the function does not provide the direction of the change, only the absolute value. 
-lcc_m2 <- lcc_m2 %>%
-  filter(!grepl("^Error", Category))
 
-lcc_m <- lcc_m2 %>%
+# lcc_m2 <- lcc_m2 %>%
+#   filter(!grepl("^Error", Category)). This was necessary because of the error when running this a the country level. I was running thatin parallel, but then one core failed and from that each iteration continued to fail. I ran the process several times, each round remving some errors and creating the reight datasert, until the only country still failing to calculate was the US. I stopped there, as i needed to advance and I would say that the USD is not any among the most changing countries in LCC in any direction, so I decided to leave it that way for naw and eventually come back here if necessary, run by hand or get this Geosharding thing to do it. 
+
+# I don't remember why i did this, but there was some probmen with the data type in the column that was preventing me from getting the final dir of change in a single column()
+lcc_m <- lcc_m %>%
   mutate(
     Gain = as.numeric(Gain),
     Loss = as.numeric(Loss),
     dir_ch = round(Gain - Loss, digits = 4)
   )
 
+# Here we are only keeping net gain per class  and Overall (which in our 2 class map is change between "Transformed" (1) and "Natural" (2), This categorization can be improved of course, but let us keep it like that for the moment.) I thinjk the "Overall Gain" could be removed as well, we are not using it right now, but it might become useful, as it refers to the sm of gains on both classe. (offset by the losses). These different components of change are challenging to get right (brain still hurts a bit thinking about this), but for the moment we are jsut using the net mount of change in the natural Land cover (in our case class 2), independently  of the total amount of change in the class.
+# Now, imagine more classes, that means more possible combinations (Number combinations = Num_classes^2). The function is totally capable of taking care of that, the problem is that the user (me) has issues making sense of the meaning of these cases
 lcc_metrics_wide <- lcc_m %>%
   tidyr::pivot_wider(
     id_cols = col,
-    names_from = c(Category),
+    names_from = c(Category, year_step),
     values_from = c(Gain, Persistence, Loss, Quantity, Exchange, dir_ch),
-    names_glue = "{.value}_{Category}" #_{year_step}" # this is commented because there are only two periods, but it can iterate over multiple time steps. 
+    names_glue = "{.value}_{Category}_{year_step}" # 
   )
 # Adjust column type because of course. 
 lcc_metrics_wide <- lcc_metrics_wide %>% 
   mutate(
-    id = as.double(id)
+    col = as.double(col)
   )
 
-# Convert primary kay in both dataframes to character, just to be safe
-#basins <- basins %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
-#lcc_metrics_wide <- lcc_metrics_wide %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
 
-basins <- left_join(basins, lcc_metrics_wide)
+
+basins <- left_join(basins, lcc_metrics_wide) # now we have a lot of columns which is what we don't need now. We can totally store that, but this many number of columns overwhelms me. Just keep the ones we want (dir_ch_2_time_step, an drop everything else (or just don't append to the input plygon data))
+
+
+basins <- basins %>%
+  select(1:13, contains("dir_ch_2"))
+
+
+
 
 # i made a mess here. ended up with mopre layers that needed and still need to clean this.
-sf::st_write(basins, here("vector", "countries_lc2.gpkg"), layer = "1992_2020_lcc_change_metrics_3", append = FALSE)
+sf::st_write(basins, here("vector", "hydrosheds_6_lcc.gpkg"), append = FALSE)
 
 # sf::st_write(basins,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg", layer = "1992_2020_lcc_change_metrics", append = FALSE)
-# sf::st_write(basins, here("vector", "hydrosheds_lv6.gpkg"), layer = "1992_2020_lcc_change_metrics", append = FALSE)
+ sf::st_write(basins, here("vector", "hydrosheds_lv6.gpkg"), layer = "1992_2020_7_period_lcc_change_metrics", append = FALSE)
 ```
 
 ## Inspect Results
 
 ```{r summarize-results}
 # Summarize by year and metric
-summary_df <- lcc_metrics_df %>%
+summary_df <- lcc_m %>%
   group_by(year_step, Category) %>%
   summarize(across(c(Gain, Persistence, Loss, Quantity, Exchange, Shift), 
                    mean, na.rm = TRUE), .groups = "drop")
@@ -186,7 +228,7 @@ head(summary_df)
 
 
 ```{r produce reference for the attributes}
-
+# This produces an actual table tha just explains i nwords what is happening in each column. it is kind of hard to get rigth at the beginning, but this makes it asclear as possible.
 # Extract column names (excluding ID column)
 col_names <- names(lcc_metrics_wide)[!names(lcc_metrics_wide) %in% c("HYBAS_ID")]
 
