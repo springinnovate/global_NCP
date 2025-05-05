@@ -1,15 +1,19 @@
 """Summarize reference data across dynamic data."""
 
+from pathlib import Path
+from datetime import datetime
+import time
 import logging
 import os
 import sys
-from datetime import datetime
 
+from geopandas import gpd
+from exactextract import exact_extract
 import psutil
-from ecoshard.geoprocessing import zonal_statistics
 from ecoshard import taskgraph
 from tqdm import tqdm
 import pandas as pd
+import subprocess
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -20,14 +24,10 @@ logging.basicConfig(
     ),
 )
 
+LOGGER = logging.getLogger(__name__)
+logging.getLogger("ecoshard.taskgraph").setLevel(logging.INFO)
 REFERENCE_SUMMARY_VECTOR_PATHS = {
     "hydrosheds_lv6_synth": "./data/reference/hydrosheds_lv6_synth.gpkg"
-}
-
-# Tag format is a tuple ([description], [YYYY])
-REFERNCE_LANDCOVER_RASTER_PATHS = {
-    "landcover_gl_1995": "./data/reference/landcover_gl_1995.tif",
-    "landcover_gl_1992": "./data/reference/landcover_gl_1992.tif",
 }
 
 # Tag format is a tuple ([description], [YYYY])
@@ -35,90 +35,132 @@ ANALYSIS_DATA = {
     (
         "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0",
         2020,
-    ): "./data/analysis/GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0.tif",
+    ): "./data/analysis/GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_clip.tif",
     (
         "GHS_BUILT_S_E1990_GLOBE_R2023A_4326_3ss_V1_0",
         1990,
-    ): "./data/analysis/GHS_BUILT_S_E1990_GLOBE_R2023A_4326_3ss_V1_0.tif",
+    ): "./data/analysis/GHS_BUILT_S_E1990_GLOBE_R2023A_4326_3ss_V1_0_clip.tif",
     (
         "GHS_BUILT_S_E1995_GLOBE_R2023A_4326_3ss_V1_0",
         1995,
-    ): "./data/analysis/GHS_BUILT_S_E1995_GLOBE_R2023A_4326_3ss_V1_0.tif",
+    ): "./data/analysis/GHS_BUILT_S_E1995_GLOBE_R2023A_4326_3ss_V1_0_clip.tif",
     (
         "GHS_BUILT_S_E2000_GLOBE_R2023A_4326_3ss_V1_0",
         2000,
-    ): "./data/analysis/GHS_BUILT_S_E2000_GLOBE_R2023A_4326_3ss_V1_0.tif",
+    ): "./data/analysis/GHS_BUILT_S_E2000_GLOBE_R2023A_4326_3ss_V1_0_clip.tif",
     (
         "GHS_BUILT_S_E2005_GLOBE_R2023A_4326_3ss_V1_0",
         2005,
-    ): "./data/analysis/GHS_BUILT_S_E2005_GLOBE_R2023A_4326_3ss_V1_0.tif",
+    ): "./data/analysis/GHS_BUILT_S_E2005_GLOBE_R2023A_4326_3ss_V1_0_clip.tif",
     (
         "GHS_BUILT_S_E2010_GLOBE_R2023A_4326_3ss_V1_0",
         2010,
-    ): "./data/analysis/GHS_BUILT_S_E2010_GLOBE_R2023A_4326_3ss_V1_0.tif",
+    ): "./data/analysis/GHS_BUILT_S_E2010_GLOBE_R2023A_4326_3ss_V1_0_clip.tif",
     (
         "GHS_BUILT_S_E2015_GLOBE_R2023A_4326_3ss_V1_0",
         2015,
-    ): "./data/analysis/GHS_BUILT_S_E2015_GLOBE_R2023A_4326_3ss_V1_0.tif",
+    ): "./data/analysis/GHS_BUILT_S_E2015_GLOBE_R2023A_4326_3ss_V1_0_clip.tif",
 }
 
-# percent change of any ecosystem service
-# don't look at landcover change
+bbox = [-86, 31, -80, 34]  # minx, miny, maxx, maxy in lon/lat
+
+# for key, in_path in ANALYSIS_DATA.items():
+#     in_path = Path(in_path)
+#     out_path = in_path.with_name(f"{in_path.stem}_clip.tif")
+#     subprocess.run(
+#         [
+#             "gdalwarp",
+#             "-te",
+#             *map(str, bbox),
+#             "-overwrite",
+#             "-co",
+#             "TILED=YES",
+#             "-co",
+#             "COMPRESS=DEFLATE",
+#             str(in_path),
+#             str(out_path),
+#         ],
+#         check=True,
+#     )
+#     ANALYSIS_DATA[key] = str(out_path)
+#     print(f"clipped {out_path}")
+# sys.exit()
 
 WORKSPACE_DIR = "./summary_pipeline_workspace"
 os.makedirs(WORKSPACE_DIR, exist_ok=True)
+REPORTING_INTERVAL = 10.0
+ZONAL_OPS = ["mean", "max", "min"]
+
+
+def create_progress_logger(UPDATE_RATE, task_id):
+    start_time = time.time()
+    last_time = start_time
+
+    def _process_logger(fraction, message):
+        nonlocal last_time
+        if time.time() - last_time > UPDATE_RATE:
+            LOGGER.info(
+                f"{task_id} is {100*fraction:.2f}% complete running for "
+                f"{time.time()-start_time:.2f}s"
+            )
+            last_time = time.time()
+
+    return _process_logger
+
+
+def zonal_stats(raster_path, vector_path):
+    gdf = gpd.read_file(vector_path)
+
+    # need to get the FID column in there so we can join results
+    gdf = gdf[["geometry"]].copy()
+    gdf["fid"] = gdf.index.astype("int32")
+
+    stem = Path(raster_path).stem
+    stats_df = exact_extract(
+        rast=raster_path,
+        vec=gdf,
+        ops=ZONAL_OPS,
+        include_cols=["fid"],
+        output="pandas",
+        strategy="raster-sequential",
+        # max_cells_in_memory=30000000 * 4,
+        progress=create_progress_logger(REPORTING_INTERVAL, stem),
+    )
+    return stats_df
 
 
 def main():
     """Entry point."""
     physical_cores = psutil.cpu_count(logical=False)
     task_graph = taskgraph.TaskGraph(
-        WORKSPACE_DIR, n_workers=physical_cores, reporting_interval=15.0
+        WORKSPACE_DIR,
+        n_workers=min(len(ANALYSIS_DATA), physical_cores),
+        reporting_interval=REPORTING_INTERVAL,
     )
     zonal_stats_task_list = []
-    for (description, year), raster_path in ANALYSIS_DATA.items():
-        zonal_stats_task = task_graph.add_task(
-            func=zonal_statistics,
-            args=(
-                (raster_path, 1),
-                REFERENCE_SUMMARY_VECTOR_PATHS["hydrosheds_lv6_synth"],
-            ),
-            kwargs={
-                "polygons_might_overlap": False,
-                "working_dir": WORKSPACE_DIR,
-            },
-            store_result=True,
-            task_name=f"stats for {description}",
-        )
-        zonal_stats_task_list.append((description, year, zonal_stats_task))
-    task_graph.join()
-    row_list = []
-    for description, year, zonal_task in tqdm(zonal_stats_task_list):
-        zonal_stats = zonal_task.get()
-        for fid, stats in zonal_stats.items():
-            # mean approximated by dividing by number of valid pixels
-            mean_value = (
-                stats["sum"] / stats["count"] if stats["count"] > 0 else None
-            )
 
-            row_list.append(
-                {
-                    "raster id": description,
-                    "year": year,
-                    "fid": fid,
-                    "min": stats["min"],
-                    "max": stats["max"],
-                    "sum": stats["sum"],
-                    "count": stats["count"],
-                    "nodata_count": stats["nodata_count"],
-                    "mean": mean_value,
-                }
+    for vector_id, vector_path in REFERENCE_SUMMARY_VECTOR_PATHS.items():
+        for (raster_id, year), raster_path in ANALYSIS_DATA.items():
+            stats_task = task_graph.add_task(
+                func=zonal_stats,
+                args=(raster_path, vector_path),
+                store_result=True,
+                task_name=f"zonal stats for {raster_id} on {vector_id}",
             )
-
-    df = pd.DataFrame(row_list)
-    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    filename = f"zonal_stats_{timestamp}.csv"
-    df.to_csv(filename, index=False)
+            zonal_stats_task_list.append((raster_id, stats_task))
+        gdf = gpd.read_file(vector_path)
+        # need to get the FID column in there so we can join results
+        gdf = gdf[["geometry"]].copy()
+        gdf["fid"] = gdf.index.astype("int32")
+        for raster_id, stats_task in zonal_stats_task_list:
+            stats_df = stats_task.get()
+            rename_map = {op: f"{raster_id}_{op}" for op in ZONAL_OPS}
+            stats_df.rename(columns=rename_map, inplace=True)
+            gdf = gdf.merge(stats_task.get(), on="fid")
+        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        out_vector_path = f"{vector_id}_synth_zonal_{timestamp}.gpkg"
+        gdf.to_file(out_vector_path, driver="GPKG")
+        print(f"output written to {out_vector_path}")
 
 
 if __name__ == "__main__":
