@@ -140,6 +140,7 @@ def zonal_stats(raster_path, vector_path):
 
 def main():
     """Entry point."""
+    start_time = time.time()
     physical_cores = psutil.cpu_count(logical=False)
     task_graph = taskgraph.TaskGraph(
         WORKSPACE_DIR,
@@ -174,7 +175,7 @@ def main():
             WORKSPACE_DIR, f"{vector_id}_synth_zonal_{timestamp}.gpkg"
         )
         gdf.to_file(out_vector_path, driver="GPKG")
-        print(f"output written to {out_vector_path}")
+        print(f"done in {start_time:.2f}s, output written to {out_vector_path}")
 
 
 if __name__ == "__main__":
