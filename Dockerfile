@@ -10,9 +10,6 @@ COPY environment.yml /tmp/environment.yml
 RUN micromamba create -n geopy311 -f /tmp/environment.yml --yes && \
     micromamba clean --all --yes
 
-ARG WORKDIR=/usr/local/esos_c_models
-ENV WORKDIR=${WORKDIR}
-
 RUN micromamba shell init -s bash -p /opt/conda
 
 # If needed, ensure the file exists and append your activation line
@@ -47,5 +44,5 @@ RUN echo 'if [ -f "/usr/local/ecoshard.gitversion" ]; then' >> /home/mambauser/.
     echo 'fi' >> /home/mambauser/.bashrc
 
 USER mambauser
-WORKDIR ${WORKDIR}
+WORKDIR /workspace
 CMD ["/bin/bash"]
