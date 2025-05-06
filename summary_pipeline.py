@@ -32,33 +32,9 @@ REFERENCE_SUMMARY_VECTOR_PATHS = {
 # Tag format is a tuple ([description], [YYYY])
 ANALYSIS_DATA = {
     (
-        "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0",
-        2020,
-    ): "./data/analysis/GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E1990_GLOBE_R2023A_4326_3ss_V1_0",
-        1990,
-    ): "./data/analysis/GHS_BUILT_S_E1990_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E1995_GLOBE_R2023A_4326_3ss_V1_0",
-        1995,
-    ): "./data/analysis/GHS_BUILT_S_E1995_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E2000_GLOBE_R2023A_4326_3ss_V1_0",
-        2000,
-    ): "./data/analysis/GHS_BUILT_S_E2000_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E2005_GLOBE_R2023A_4326_3ss_V1_0",
-        2005,
-    ): "./data/analysis/GHS_BUILT_S_E2005_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E2010_GLOBE_R2023A_4326_3ss_V1_0",
-        2010,
-    ): "./data/analysis/GHS_BUILT_S_E2010_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E2015_GLOBE_R2023A_4326_3ss_V1_0",
-        2015,
-    ): "./data/analysis/GHS_BUILT_S_E2015_GLOBE_R2023A_4326_3ss_V1_0.tif",
+        "GlobPOP_Count_30arc_2020_I32",
+       2020
+    ): "./data/analysis/GlobPOP/GlobPOP_Count_30arc_2020_I32.tiff",
 }
 ZONAL_OPS = ["mean", "max", "min"]
 
