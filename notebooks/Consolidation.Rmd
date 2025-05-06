@@ -5,7 +5,7 @@ output: html_notebook
 
  (Next Steps: extract top bottom values for all changes (%))
 
-# LOAD TTHE DATA
+# LOAD THE DATA
 
 
 ```{r load input polygon data}
@@ -101,7 +101,7 @@ WWF biome
 Ecoregion
 
 
-This part is a mess and kind of embarrassing, i need to clean it a bit. But this is a great piece of thinking. I get for each basin the country for whcihb the larger share belongs and assing it to the country, s i get the attribes (id of coutnries, biomnes ,ecoregions and can jopin it to the hydrosheds as additional attributes. We are going to sue this soon, but again, there is some cleaning to do here. I just don't have time now. 
+This part is a mess and kind of embarrassing, i need to clean it a bit. But this is a great piece of thinking. I get for each basin the country for which the larger share belongs and assign it to that country, s i get the attribes (id of coutnries, biomnes ,ecoregions and can jopin it to the hydrosheds as additional attributes. We are going to sue this soon, but again, there is some cleaning to do here. I just don't have time now. 
 
 ```{r join spatial unit names}
 
@@ -309,7 +309,7 @@ plt <- left_join(plt,cd) # this will return an error because maybe the cd datafr
 plt <- plt%>% filter(!is.na(pct_ch))
 ```
 
-
+I remember here. plt is used as input in the visualizations.Rmd notebook. That might not be the smartest way to do this, but anyway, what we need to have is a final datafrasme that we are going to process. The dataframe is the despatialzied basins object pivoted long, so we can use ggplot2 and dplyr tools to extract insights. The next point from here, 04/05/2025 is to extract the summary metrics for the additional rasters,  contact the techniocal group, share the updated data and update the documentation (i already updated main`)
 
 We are not using  this. This os from an older verion by country. 
 We could actually get all the metrics for all the classes for all the years for all the basins and feed the whole thing into some well designed ML model. It might tell us something, or be useful in some measure. and then add a temporal component and animate the scatterplots or something. Group them by country. By income level. by biome. All that would be possible, Need to think with wome calm about this.

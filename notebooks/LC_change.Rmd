@@ -170,7 +170,7 @@ lcc_m <- iterate_lcc_metrics(landcover_rasters, basins, id_col = "HYBAS_ID", per
 # get quantity in terms of gain  - loss (the function does not provide the direction of the change, only the absolute value. 
 
 # lcc_m2 <- lcc_m2 %>%
-#   filter(!grepl("^Error", Category)). This was necessary because of the error when running this a the country level. I was running thatin parallel, but then one core failed and from that each iteration continued to fail. I ran the process several times, each round remving some errors and creating the reight datasert, until the only country still failing to calculate was the US. I stopped there, as i needed to advance and I would say that the USD is not any among the most changing countries in LCC in any direction, so I decided to leave it that way for naw and eventually come back here if necessary, run by hand or get this Geosharding thing to do it. 
+#   filter(!grepl("^Error", Category)). This was necessary because of the error when running this a the country level. I was running thatin parallel, but then one core failed and from that each iteration continued to fail. I ran the process several times, each round remving some errors and creating the reight datasert, until the only country still failing to calculate was the US. I stopped there, as i needed to advance and I would say that the USD is not any among the most changing countries in LCC in any direction, so I decided to leave it that way for now and eventually come back here if necessary, run by hand or get this Geosharding thing to do it. 
 
 # I don't remember why i did this, but there was some probmen with the data type in the column that was preventing me from getting the final dir of change in a single column()
 lcc_m <- lcc_m %>%
@@ -195,16 +195,10 @@ lcc_metrics_wide <- lcc_metrics_wide %>%
     col = as.double(col)
   )
 
-
-
 basins <- left_join(basins, lcc_metrics_wide) # now we have a lot of columns which is what we don't need now. We can totally store that, but this many number of columns overwhelms me. Just keep the ones we want (dir_ch_2_time_step, an drop everything else (or just don't append to the input plygon data))
-
 
 basins <- basins %>%
   select(1:13, contains("dir_ch_2"))
-
-
-
 
 # i made a mess here. ended up with mopre layers that needed and still need to clean this.
 sf::st_write(basins, here("vector", "hydrosheds_6_lcc.gpkg"), append = FALSE)
