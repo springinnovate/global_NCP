@@ -60,12 +60,12 @@ ANALYSIS_DATA = {
         2015,
     ): "./data/analysis/GHS_BUILT_S_E2015_GLOBE_R2023A_4326_3ss_V1_0.tif",
 }
+ZONAL_OPS = ["mean", "max", "min"]
 
 
 WORKSPACE_DIR = "./summary_pipeline_workspace"
 os.makedirs(WORKSPACE_DIR, exist_ok=True)
 REPORTING_INTERVAL = 10.0
-ZONAL_OPS = ["mean", "max", "min"]
 
 
 def create_progress_logger(update_rate, task_id):
@@ -105,7 +105,7 @@ def create_progress_logger(update_rate, task_id):
     return _process_logger
 
 
-def zonal_stats(raster_path, vector_path):
+def zonal_stats(raster_path, zonal_ops, vector_path):
     """Calculate zonal statistics for vector file over a given raster.
 
     This function reads polygon geometries from a vector file, assigns a
@@ -134,7 +134,7 @@ def zonal_stats(raster_path, vector_path):
     stats_df = exact_extract(
         rast=raster_path,
         vec=gdf,
-        ops=ZONAL_OPS,
+        ops=zonal_ops,
         include_cols=["fid"],
         output="pandas",
         strategy="raster-sequential",
@@ -161,7 +161,7 @@ def main():
         for (raster_id, year), raster_path in ANALYSIS_DATA.items():
             stats_task = task_graph.add_task(
                 func=zonal_stats,
-                args=(raster_path, vector_path),
+                args=(raster_path, ZONAL_OPS, vector_path),
                 store_result=True,
                 task_name=f"zonal stats for {raster_id} on {vector_id}",
             )
@@ -183,7 +183,9 @@ def main():
             WORKSPACE_DIR, f"{vector_id}_synth_zonal_{timestamp}.gpkg"
         )
         gdf.to_file(out_vector_path, driver="GPKG")
-        print(f"done in {start_time:.2f}s, output written to {out_vector_path}")
+        print(
+            f"done in {time.time()-start_time:.2f}s, output written to {out_vector_path}"
+        )
 
 
 if __name__ == "__main__":

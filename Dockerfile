@@ -1,18 +1,12 @@
 FROM mambaorg/micromamba:1.4.2-bullseye
 
-# We want all RUN commands to use Bash.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
-# Copy over your environment file
 COPY environment.yml /tmp/environment.yml
 
-# Create the environment
 RUN micromamba create -n geopy311 -f /tmp/environment.yml --yes && \
     micromamba clean --all --yes
-
 RUN micromamba shell init -s bash -p /opt/conda
 
-# If needed, ensure the file exists and append your activation line
 RUN touch /home/mambauser/.bashrc
 RUN echo 'micromamba activate geopy311' >> /home/mambauser/.bashrc
 
