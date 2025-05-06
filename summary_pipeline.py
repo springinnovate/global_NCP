@@ -10,6 +10,7 @@ import sys
 
 from geopandas import gpd
 from exactextract import exact_extract
+from exactextract.raster import GDALRasterSource
 import psutil
 from ecoshard import taskgraph
 
@@ -29,37 +30,39 @@ REFERENCE_SUMMARY_VECTOR_PATHS = {
     "hydrosheds_lv6_synth": "./data/reference/hydrosheds_lv6_synth.gpkg"
 }
 
-# Tag format is a tuple ([description], [YYYY])
+# Tag format is a tuple ([description], [YYYY]) key
+# with a "path" -> str and "band" -> int dictionary value
 ANALYSIS_DATA = {
-    (
-        "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0",
-        2020,
-    ): "./data/analysis/GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E1990_GLOBE_R2023A_4326_3ss_V1_0",
-        1990,
-    ): "./data/analysis/GHS_BUILT_S_E1990_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E1995_GLOBE_R2023A_4326_3ss_V1_0",
-        1995,
-    ): "./data/analysis/GHS_BUILT_S_E1995_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E2000_GLOBE_R2023A_4326_3ss_V1_0",
-        2000,
-    ): "./data/analysis/GHS_BUILT_S_E2000_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E2005_GLOBE_R2023A_4326_3ss_V1_0",
-        2005,
-    ): "./data/analysis/GHS_BUILT_S_E2005_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E2010_GLOBE_R2023A_4326_3ss_V1_0",
-        2010,
-    ): "./data/analysis/GHS_BUILT_S_E2010_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    (
-        "GHS_BUILT_S_E2015_GLOBE_R2023A_4326_3ss_V1_0",
-        2015,
-    ): "./data/analysis/GHS_BUILT_S_E2015_GLOBE_R2023A_4326_3ss_V1_0.tif",
+    ("rast_gdpTot_1990_2020_30arcsec", 1990): {
+        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
+        "band": 1,
+    },
+    ("rast_gdpTot_1990_2020_30arcsec", 1995): {
+        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
+        "band": 2,
+    },
+    ("rast_gdpTot_1990_2020_30arcsec", 2000): {
+        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
+        "band": 3,
+    },
+    ("rast_gdpTot_1990_2020_30arcsec", 2005): {
+        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
+        "band": 4,
+    },
+    ("rast_gdpTot_1990_2020_30arcsec", 2010): {
+        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
+        "band": 5,
+    },
+    ("rast_gdpTot_1990_2020_30arcsec", 2015): {
+        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
+        "band": 6,
+    },
+    ("rast_gdpTot_1990_2020_30arcsec", 2020): {
+        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
+        "band": 7,
+    },
 }
+
 ZONAL_OPS = ["mean", "max", "min"]
 
 
@@ -105,7 +108,7 @@ def create_progress_logger(update_rate, task_id):
     return _process_logger
 
 
-def zonal_stats(raster_path, zonal_ops, vector_path):
+def zonal_stats(raster_path_band_dict, zonal_ops, vector_path):
     """Calculate zonal statistics for vector file over a given raster.
 
     This function reads polygon geometries from a vector file, assigns a
@@ -115,7 +118,8 @@ def zonal_stats(raster_path, zonal_ops, vector_path):
     ensuring accuracy particularly at polygon boundaries.
 
     Args:
-        raster_path (str): Path to the input raster file.
+        raster_path_band_dict (dict): dictionary containing 'path' and 'band'
+            for the raster to process.
         vector_path (str): Path to the vector file containing polygon
             geometries.
 
@@ -130,9 +134,12 @@ def zonal_stats(raster_path, zonal_ops, vector_path):
     gdf = gdf[["geometry"]].copy()
     gdf["fid"] = gdf.index.astype("int32")
 
-    stem = Path(raster_path).stem
+    stem = Path(raster_path_band_dict["path"]).stem
     stats_df = exact_extract(
-        rast=raster_path,
+        rast=GDALRasterSource(
+            raster_path_band_dict["path"],
+            band_idx=raster_path_band_dict["band"],
+        ),
         vec=gdf,
         ops=zonal_ops,
         include_cols=["fid"],
@@ -158,14 +165,19 @@ def main():
     zonal_stats_task_list = []
 
     for vector_id, vector_path in REFERENCE_SUMMARY_VECTOR_PATHS.items():
-        for (raster_id, year), raster_path in ANALYSIS_DATA.items():
+        for (raster_id, year), raster_path_band_dict in ANALYSIS_DATA.items():
             stats_task = task_graph.add_task(
                 func=zonal_stats,
-                args=(raster_path, ZONAL_OPS, vector_path),
+                args=(raster_path_band_dict, ZONAL_OPS, vector_path),
                 store_result=True,
-                task_name=f"zonal stats for {raster_id} on {vector_id}",
+                task_name=(
+                    f"zonal stats for {raster_id}:"
+                    f"{raster_path_band_dict['band']} on {vector_id}"
+                ),
             )
-            zonal_stats_task_list.append((raster_id, stats_task))
+            zonal_stats_task_list.append(
+                (raster_id, raster_path_band_dict["band"], stats_task)
+            )
 
         # process zonal results
         gdf = gpd.read_file(vector_path)
@@ -173,9 +185,11 @@ def main():
         # need to get the FID column in there so we can join results
         gdf = gdf[["geometry"]].copy()
         gdf["fid"] = gdf.index.astype("int32")
-        for raster_id, stats_task in zonal_stats_task_list:
+        for raster_id, band_idx, stats_task in zonal_stats_task_list:
             stats_df = stats_task.get()
-            rename_map = {op: f"{raster_id}_{op}" for op in ZONAL_OPS}
+            rename_map = {
+                op: f"{raster_id}:{band_idx}_{op}" for op in ZONAL_OPS
+            }
             stats_df.rename(columns=rename_map, inplace=True)
             gdf = gdf.merge(stats_task.get(), on="fid")
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
