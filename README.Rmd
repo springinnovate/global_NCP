@@ -6,16 +6,11 @@ output: github_document
 
 # Overview
 
-Working version of a structured workflow for extracting, analyzing, and visualizing **zonal summary statistics** from global **ecosystem service (ES)** and **land cover (LC)** raster datasets. The analysis focuses on detecting spatial and temporal change using multiple modeling outputs and spatial aggregation levels (e.g., countries, income groups, basins).
+Working version of a structured workflow for extracting, analyzing, and visualizing **zonal summary statistics** from global rastger datasets including **ecosystem service (ES)**, **land cover (LC)**, and socioeconomic (beneficiaries) raster datasets. The analysis focuses on detecting spatial and temporal change by syntethizing multiple modeling outputs at multiple spatial aggregation levels (e.g., countries, income groups, basins).
 
-The core of this workflow is built around the R package [`exactextractr`](https://github.com/isciences/exactextractr), which allows for efficient zonal statistics operations between raster and vector data. More recent additions to the workflow include:
+The core of this workflow is built around the [`exactextractr`](https://github.com/isciences/exactextractr),  availbe both for R and Python which allows for efficient zonal statistics operations between raster and vector data. More recent additions to the workflow include:
 
--   Temporal analysis of **Nitrogen Delivery Ratio (NDR)** using modeled global outputs from 1992–2004.
--   Systematic **land cover change analysis** using square contingency matrices and change components from the [`diffeR`](https://cran.r-project.org/package=diffeR) package, following the approach proposed by Pontius and Santacruz.
--   Use of reclassified global land cover maps (ESA 300m) into **natural** and **transformed** classes.
--   Modular, parallelized processing over large vector datasets (e.g., 16,000+ basins at HydroBASINS level 6).
-
-These tools and methods are designed to enable rapid and reproducible summaries of change in ES provision and land cover composition across any defined spatial units — from countries and continents to basins and sub-basins.
+These tools and methods are designed to enable rapid and reproducible summaries of change in ES provision and land cover composition across any defined spatial units — from countries and continents to basins and sub-basins and explore relationships between these changes and the beneficiaries. 
 
 ### Key Capabilities
 
@@ -71,7 +66,16 @@ These tools and methods are designed to enable rapid and reproducible summaries 
 :::
 
 ------------------------------------------------------------------------
+Usage:
 
+look at summary_pipeline.py and note the ANALYSIS_DATA and REFERENCE_SUMMARY_VECTOR_PATHS, and ZONAL_OPS data structures at the top of summary_pipeline.py. These define the reference vectors, analysis rasters, and summary operations respectively. If this was a real-world pipeline we'd abstract those to a .yaml or CSV I think, but this works too.
+To execute, you must have the most recent ecosharding and other libraries mentioned in environment.yml installed. I've built this into a docker container described by Dockerfile that is already built and pushed to dockerhub. You can run it yourself with this command: docker pull therealspring/global_ncp-computational-environment:latest && docker run -it --rm -v pwd:/workspace therealspring/global_ncp-computational-environment:latest /bin/bash. (for Windows run like this docker pull therealspring/global_ncp-computational-environment:latest && docker run -it --rm -v %CD%:/workspace therealspring/global_ncp-computational-environment:latest /bin/bash.)
+Running the above will drop you into the docker container shell at /workspace which mirrors the current working directory of which you ran the container. If you ran it in the root of this repository you can directly run python summary_pipeline.py and let it rip.
+Approach
+
+This pipeline uses taskgraph to execute in parallel zonal statistics on any combination of vectors or rasters; one worker per vector/raster combination. It also caches the results of previous vector/raster runs, so repeated calls to this pipeline will return immediate results. In practice it will spin up as many workers of either the minimum of the number of raster/vector pairs to process or the physical cores on the workstation.
+Each call uses the exactextract library to do high performance zonal stats with the summary functions defined in ZONAL_OPS. The available operations can be found here: https://isciences.github.io/exactextract/operations.html
+Each call calculates these summary statistics for an entire vector over the raster and they are all aggregated to create one output vector geopackage per REFERENCE_SUMMARY_VECTOR_PATHS item.
 ## Land Cover Layers
 
 Global land cover maps are based on ESA 300m layers. These are reclassified into:
@@ -262,8 +266,10 @@ Additional interpretation tools include:
 
 MIT License
 
-# Developer
+# Developers
 
-**Jeronimo Rodriguez-Escobar**
+Jeronimo Rodriguez-Escobar
+Richard P. Sharp
+
 
 For questions or contributions, please [open an issue](https://github.com/springinnovate/global_NCP/issues) or submit a pull request.
