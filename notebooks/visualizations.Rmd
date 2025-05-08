@@ -35,25 +35,9 @@ Also, the order of the factors needs to be set, and new classes have to be added
 Here, i need to clean the directory form a lot of old versions. Only the groupings. If pct not there, it is fine, that is easy to calculate now. 
 
 ```{r load polygons, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
-# # Read spatial polygon dataset
-# 
-# inpath <- '/Users/sputnik/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector'
-# inpath <- here("vector")
-# sets <- file.path(inpath, list.files(inpath, pattern= 'gpkg$'))
-# 
-# #cols <- c("id", "continent", "income_grp", "region_wb", "WWF_biome", "HYBAS_ID", "HYBAS_ID")
-# #sets <- cbind(sets, cols)
-# # Set an index to select the desired dataset
-# t <- 10
-# # Select the target dataset from the list 
-# set <- sets[t]
-# # # load polygons
-# lyr <- st_layers(set)
-# poly <- st_read(set)
-# 
-# #get the name of the column with the unique ids of the input vector
-# col <- colnames(poly[1])[1]
- 
+
+poly <- st_read(here('vector', "hydrosheds_lv6_synth.gpkg"), layer = "benef_analysis"))
+poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/globalglobal_ES_TimeSeries/vector/hydrosheds_lv6_synth.gpkg')
 ```
 
 # Load and pivot 
@@ -67,7 +51,7 @@ This should actually be done as a database structure. The columns live somewhere
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
  
-poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/hydrosheds_lv6_synth.gpkg')
+
 
 # add areas 
 poly <- poly %>% mutate(area_sqkm = as.numeric(st_area(geom)) / 10^6)
