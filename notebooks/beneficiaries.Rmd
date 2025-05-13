@@ -3,6 +3,28 @@ title: "Beneficiary consolidation
 output: html_notebook
 ---
 # Zonal Stat Exctraction and exploratory analysis 
+
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(tidytext)
+library(rlang)
+library(tidyr)
+library(forcats)
+# source the helper functions
+source(here("R", "utils_lcc_metrics.R"))
+source(here("R","utils_pct_change.R"))
+```
+
+
 We extract Zonal statistics for a set of gridded for beneficiaThese are so far the input data 
 # GDP (Kummu)
 ANALYSIS_DATA = {
@@ -260,12 +282,13 @@ tt2 <-st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,
 
 Here, another dialogue to input the variable names, plot colors and set the factor order.
 ```{r, fig.height=8, fig.width=14  }
-#plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
+plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
 # plt[1] <- NULL Update this with the names of the variables being assessed. There should be a less annoying way to do this.
 
 service <- unique(plt$service)
+# Actually, GDP and pop density are not services here, we can in theory dorp them
 service <- c("GHS_BUILT","GDP","GHS_POP","HDI", "Farm_size", "GlobPOP")
- color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b", "#d4ac0d", "#85929e")
+ color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b",)# "#d4ac0d", "#85929e")
  service_levels <- service
  cd <- as_tibble(cbind(service,color))
  
