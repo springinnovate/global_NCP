@@ -25,209 +25,6 @@ source(here("R","utils_pct_change.R"))
 ```
 
 
-We extract Zonal statistics for a set of gridded for beneficiaThese are so far the input data 
-# GDP (Kummu)
-ANALYSIS_DATA = {
-  ("rast_gdpTot_1990_2020_30arcsec", 1990): {
-    "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-    "band": 1,
-  },
-  ("rast_gdpTot_1990_2020_30arcsec", 1995): {
-    "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-    "band": 2,
-  },
-  ("rast_gdpTot_1990_2020_30arcsec", 2000): {
-    "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-    "band": 3,
-  },
-  ("rast_gdpTot_1990_2020_30arcsec", 2005): {
-    "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-    "band": 4,
-  },
-  ("rast_gdpTot_1990_2020_30arcsec", 2010): {
-    "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-    "band": 5,
-  },
-  ("rast_gdpTot_1990_2020_30arcsec", 2015): {
-    "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-    "band": 6,
-  },
-  ("rast_gdpTot_1990_2020_30arcsec", 2020): {
-    "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-    "band": 7,
-  },
-}
-
-
-# GHS_POP
-ANALYSIS_DATA = {
-  ("GHS_POP_E1990_GLOBE_R2023A_54009_100_V1_0", 1990): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E1990_GLOBE_R2023A_54009_100_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E1995_GLOBE_R2023A_54009_100_V1_0", 1995): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E1995_GLOBE_R2023A_54009_100_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E2000_GLOBE_R2023A_54009_100_V1_0", 2000): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E2000_GLOBE_R2023A_54009_100_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E2005_GLOBE_R2023A_54009_100_V1_0", 2005): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E2005_GLOBE_R2023A_54009_100_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E2010_GLOBE_R2023A_54009_100_V1_0", 2010): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E2010_GLOBE_R2023A_54009_100_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E2015_GLOBE_R2023A_54009_100_V1_0", 2015): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E2015_GLOBE_R2023A_54009_100_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E2020_GLOBE_R2023A_54009_100_V1_0", 2020): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E2020_GLOBE_R2023A_54009_100_V1_0.tif",
-    "band": 1,
-  },
-}
-
-
-# GHS_POP 3 SS
-ANALYSIS_DATA = {
-  ("GHS_POP_E1990_GLOBE_R2023A_4326_3ss_V1_0", 1990): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E1990_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E1995_GLOBE_R2023A_4326_3ss_V1_0", 1995): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E1995_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E2000_GLOBE_R2023A_4326_3ss_V1_0", 2000): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E2000_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E2005_GLOBE_R2023A_4326_3ss_V1_0", 2005): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E2005_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E2010_GLOBE_R2023A_4326_3ss_V1_0", 2010): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E2010_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E2015_GLOBE_R2023A_4326_3ss_V1_0", 2015): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E2015_GLOBE_R2023A_54009_100_V1_0.tif",
-    "band": 1,
-  },
-  ("GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0", 2020): {
-    "path": "./data/analysis/GHS_POP/GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.tif",
-    "band": 1,
-  },
-}
-
-
-
-
-# GlobPOP
-ANALYSIS_DATA = {
-  ("GlobPOP_Count_30arc_1990_I32", 1990): {
-    "path": "./data/analysis/GlobPOP/GlobPOP_Count_30arc_1990_I32.tif",
-    "band": 1,
-  },
-  ("GlobPOP_Count_30arc_1995_I32", 1995): {
-    "path": "./data/analysis/GlobPOP/GlobPOP_Count_30arc_1995_I32.tif",
-    "band": 1,
-  },
-  ("GlobPOP_Count_30arc_2000_I32", 2000): {
-    "path": "./data/analysis/GlobPOP/GlobPOP_Count_30arc_2000_I32.tif",
-    "band": 1,
-  },
-  ("GlobPOP_Count_30arc_2005_I32", 2005): {
-    "path": "./data/analysis/GlobPOP/GlobPOP_Count_30arc_2005_I32.tif",
-    "band": 1,
-  },
-  ("GlobPOP_Count_30arc_2010_I32", 2010): {
-    "path": "./data/analysis/GlobPOP/GlobPOP_Count_30arc_2010_I32.tif",
-    "band": 1,
-  },
-  ("GlobPOP_Count_30arc_2015_I32", 2015): {
-    "path": "./data/analysis/GlobPOP/GlobPOP_Count_30arc_2015_I32.tif",
-    "band": 1,
-  },
-  ("GlobPOP_Count_30arc_2020_I32", 2020): {
-    "path": "./data/analysis/GlobPOP/GlobPOP_Count_30arc_2020_I32.tif",
-    "band": 1,
-  },
-}
-
-# GGRidded HDI
-
-ANALYSIS_DATA = {
-  ("hdi_raster_predictions_2012", 2012): {
-    "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2012.tif",
-    "band": 1,
-  },
-  ("hdi_raster_predictions_2013", 2013): {
-    "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2013.tif",
-    "band": 1,
-  },
-    ("hdi_raster_predictions_2013", 2013): {
-      "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2013.tif",
-      "band": 1,
-    },
-      ("hdi_raster_predictions_2014", 2014): {
-        "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2014.tif",
-        "band": 1,
-      },
-      ("hdi_raster_predictions_2015", 2015): {
-        "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2015.tif",
-        "band": 1,
-      },
-    ("hdi_raster_predictions_2016", 2016): {
-      "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2016.tif",
-      "band": 1,
-    },
-      ("hdi_raster_predictions_2017", 2017): {
-        "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2017.tif",
-        "band": 1,
-      },
-        ("hdi_raster_predictions_2018", 2018): {
-          "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2018.tif",
-          "band": 1,
-        },
-          ("hdi_raster_predictions_2019", 2019): {
-            "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2019.tif",
-            "band": 1,
-          },
-    ("hdi_raster_predictions_2020", 2020): {
-      "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2020.tif",
-      "band": 1,
-    },
-      ("hdi_raster_predictions_2021", 2021): {
-        "path": "./data/analysis/Gridded_HDI/hdi_raster_predictions_2021.tif",
-        "band": 1,
-      },
-}
-
-```{r setup, message=FALSE, warning=FALSE}
-library(terra)
-library(sf)
-library(dplyr)
-library(ggplot2)
-library(glue)
-library(tidyr)
-library(purrr)
-library(diffeR)
-library(here)
-library(stringr)
-library(tidytext)
-library(rlang)
-library(tidyr)
-library(forcats)
-# source the helper functions
-source(here("R", "utils_lcc_metrics.R"))
-source(here("R","utils_pct_change.R"))
-```
-
 THis cleans the data/consolidates columns that are going to be analyzed keep at hands, the rest is sent to a storage. there should be a database structure here. 
 ```{r load procesed data and build final gpkgs}
 
@@ -294,66 +91,50 @@ service <- c("GHS_BUILT","GDP","GHS_POP","HDI", "Farm_size", "GlobPOP")
  
  #check and join. Think about a more intuitive/relatable) variable order to plot. 
  plt <- left_join(plt, cd)
+
+ly <- st_layers('/Users/sputnik/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg')
+synth_ES <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg', layer = "benef_analysis")
+spring_ES <- st_read('/Users/sputnik/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg', layer = "hydrosheds_lv6_synth")
 ```
 
 ```{r chunk1, eval=FALSE, include=FALSE}
+# Get the columns that we need (can;t believe i have been struggling with this for more than 2 months)
 # 
+spring_ES <- spring_ES[c(1:17,36:40,44, 45)]
+synth_ES <- synth_ES[c(1,7,21,22,23,24,25,26)]
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
  
- plt <- st_drop_geometry(synth_ES) # if necessary when i load 
- 
-
  # calculate POP Density
- plt <- plt %>% mutate(GlobPOP_sqkm = GlobPOP_Count_30arc_2020_I32.1_sum/SUB_AREA)
- 
- or_attributes <- plt
- 
- ############# PIVOT TABLE ##############################
- 
- # Define the socioeconomic variables
-socio_vars <- c(
-  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",
-  "rast_gdpTot_1990_2020_30arcsec.7_mean", # This should be SUM (GDP, as we want it per sq_km)
-  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean",
-  #"GlobPOP_Count_30arc_2020_I32.1_sum", # this is done, las column. So i am only missung gdp tot sum. check if already exists. 
-  "hdi_raster_predictions_2020.1_mean",
-  "farmsize_mehrabi.1_mean",
-  "GlobPOP_sqkm"
-)
+synth_ES <- synth_ES %>%
+  mutate(GlobPOP_sqkm = GlobPOP_Count_30arc_2020_I32.1_sum / SUB_AREA)
 
-# Pivot all columns that contain pct_ch, keeping other relevant vars
-plt_long <- plt %>%
-  pivot_longer(
-    cols = matches("pct_ch"),
-    names_to = "service",
-    values_to = "pct_ch"
-  ) %>%
-  select(HYBAS_ID, service, pct_ch, SUB_AREA,all_of(socio_vars)) %>% 
-   mutate(service = str_replace(service, "_pct_ch.*", ""))
-  
+ plt_spring <- st_drop_geometry(spring_ES) # if necessary when i load 
+ plt_synth <- st_drop_geometry(synth_ES) # if necessary when i load 
 
- # Edit/Adjust column names # not yet ## Why?
-names(plt) <- stringr::str_replace_all(names(plt), "_2020_1992", "")
-plt_long <- plt_long%>% filter(service != "Pop") 
-# #This is annoying and should be improved. Made easier. Here i am adjusting/homologuing variable names to a same standard. Because some of the data has been extracted at different moments there is some, ahem, *inconsistency* in the "service" naming structure that I fixed here.
 ```
 
+```{r join tables}
 
+plt_synth$HYBAS_ID <- as.numeric(plt_synth$HYBAS_ID)
+plt <- left_join(plt, plt_synth) 
+```
 
  This could be a dialogue box!!!
 ```{r remove lowestvalues to reduce artifacts}
 # Calculate pseudo_log val for display purposes. 
-# plt_long <- plt_long %>%
-#   mutate(
-#     service = factor(service, levels = service_levels),
-#     pct_ch_trans = pseudo_log(pct_ch)
-#   )
+plt <- plt %>%
+  mutate(
+    service = factor(service, levels = service_levels),
+    pct_ch_trans = pseudo_log(pct_ch)
+  )
 
 # apply filter (5% or 2%) # Remove the smallest basins. 
-area_threshold <- quantile(plt_long$SUB_AREA, probs = 0.05, na.rm = TRUE)
+area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
 # Filter the dataset
-df <- plt_long %>% filter(SUB_AREA > area_threshold)
+df <- plt %>% filter(SUB_AREA > area_threshold)
+
+write.csv(plt, here("output_data", "serv_benef_synth_01.csv"))
 # get the filtered locations
 ```
 
@@ -361,15 +142,13 @@ df <- plt_long %>% filter(SUB_AREA > area_threshold)
 
 ## 5. add plots with the differences 
 
-Convert into function
+Convert into function. We don't need this right now!!!
 ```{r, fig.height=8, fig.width=14}
 col <- "HYBAS_ID"
-
 # create thew function. THIS is what i need to get righ (save as a function)
 plot_es_changes <- function(data, label_col, #labelr col has the column with the ind IDs.
                             filter_type = "top_bottom", filter_val = 10) {
   label_sym <- sym(label_col)
-
   # Step 2: Apply filtering based on the chosen type
   if (filter_type == "top_bottom") {
     # Top/bottom n observations per service
@@ -433,36 +212,39 @@ plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.5)
 
 ## Scatterplots
 
-```{r oterh plot, fig.height=7, fig.width=7, warning=FALSE}
+```{r other plot, fig.height=7, fig.width=7, warning=FALSE}
 
-# 1. Filter to top/bottom 10% based on pct_ch
-# df_top_bottom <- df %>%
-#   group_by(service) %>%  # Do it separately for each service (optional, if needed)
-#   filter(pct_ch >= quantile(dir_ch_2, 0.90, na.rm = TRUE) | 
-#          pct_ch <= quantile(dir_ch_2, 0.10, na.rm = TRUE)) %>%
-#   ungroup()
-n <- floor(nrow(df) * 0.1)  # 10% of total rows
-######
-###### HERE IS OUR ISSEU. WE JUST NEED TO KNOW WHICH COLUMN NAME COMES HERE INSTEAD IF DIR CH (FROM LAND COVER ANALYSIS TO DO BENEFICIARIES ANALYSISI)
+# 1. Filter to top/bottom 10% based on pct_ch # per service not anymore change
 df_top_bottom <- df %>%
-  slice_max(dir_ch_2, n = n, with_ties = FALSE) %>% # BY SERVICE AND GROUPED, NOT AROUND LAND COVER.
-  bind_rows(
-    df %>% slice_min(dir_ch_2, n = n, with_ties = FALSE)
-  )
-
-df_top_bottom <- df %>%
-  group_by(service) %>%
-  group_modify(~ bind_rows(
-    slice_max(.x, dir_ch_2, n = floor(0.1 * nrow(.x)), with_ties = FALSE),
-    slice_min(.x, dir_ch_2, n = floor(0.1 * nrow(.x)), with_ties = FALSE)
-  )) %>%
+  group_by(service) %>%  # Do it separately for each service (optional, if needed)
+  filter(pct_ch >= quantile(pct_ch, 0.90, na.rm = TRUE) |
+         pct_ch <= quantile(pct_ch, 0.10, na.rm = TRUE)) %>%
   ungroup()
+#n <- floor(nrow(df) * 0.1)  # 10% of total rows
+######
+
+
+
+###### HERE IS OUR ISSEU. WE JUST NEED TO KNOW WHICH COLUMN NAME COMES HERE INSTEAD IF DIR CH (FROM LAND COVER ANALYSIS TO DO BENEFICIARIES ANALYSISI)
+# df_top_bottom <- df %>%
+#   slice_max(dir_ch_2, n = n, with_ties = FALSE) %>% # BY SERVICE AND GROUPED, NOT AROUND LAND COVER.
+#   bind_rows(
+#     df %>% slice_min(dir_ch_2, n = n, with_ties = FALSE)
+#   )
+# 
+# df_top_bottom <- df %>%
+#   group_by(service) %>%
+#   group_modify(~ bind_rows(
+#     slice_max(.x, dir_ch_2, n = floor(0.1 * nrow(.x)), with_ties = FALSE),
+#     slice_min(.x, dir_ch_2, n = floor(0.1 * nrow(.x)), with_ties = FALSE)
+#   )) %>%
+#   ungroup()
 
 
 
 # 2. Optional: relevel services if you want
-service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_export", "Sed_Ret_Ratio", "Pop_sqkm","GDP")
- color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b", "#d4ac0d", "#85929e")
+service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_export", "Sed_Ret_Ratio")
+ color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
  service_levels <- service
 df_top_bottom <- df_top_bottom %>%
   mutate(
@@ -470,10 +252,11 @@ df_top_bottom <- df_top_bottom %>%
     pct_ch_trans = pseudo_log(pct_ch)  # Apply pseudo-log transformation
   )
 
-# 3. List of LC metrics to analyze
-lc_metrics <- c("dir_ch_2")
-df_top_bottom <- df_top_bottom %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
-df_top_bottom <- filter(df_top_bottom, dir_ch_2 != 0)
+# 3. List of Benef data to analyze
+lc_metrics <- c("rast_gdpTot_1990_2020_30arcsec.7_mean","GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean","GlobPOP_Count_30arc_2020_I32.1_sum","hdi_raster_predictions_2020.1_mean","farmsize_mehrabi.1_mean","GlobPOP_sqkm", "dir_ch_2")
+
+Benef
+#df_top_bottom <- filter(df_top_bottom, dir_ch_2 != 0)
 # 4. Create the scatterplots
 for (metric in lc_metrics) {
   p1 <- df_top_bottom %>%
@@ -482,9 +265,9 @@ for (metric in lc_metrics) {
     scale_fill_viridis_c(option = "D", direction = 1) +  # Use viridis scale
     facet_wrap(~ service, scales = "free",ncol=2) +
     labs(
-      title = paste("% Change Natural Cover ", "vs. ES % Change"),
+      title = paste("Benef ", "vs. ES % Change"),
       x = metric,
-      y = "% Change in Ecosystem Service",
+      y ="% Change in Ecosystem Service Provision, 1992-2020",
       fill = "Density"
     ) +
     theme(
@@ -497,6 +280,123 @@ for (metric in lc_metrics) {
 }
 
 ```
+
+```{r scatt_ ver 2, fig.height=9, fig.width = 12}
+
+#df_top_bottom <- filter(df_top_bottom, dir_ch_2 != 0)
+# 4. Create the scatterplots
+for (metric in lc_metrics) {
+  p2 <- df_top_bottom %>%
+    ggplot(aes_string(x = "pct_ch_trans", y = metric)) +
+    geom_hex(bins = 60) +  # Hexbin layer
+    scale_fill_viridis_c(option = "D", direction = 1) +  # Use viridis scale
+    facet_wrap(~ service, scales = "free",ncol=2) +
+    labs(
+      title = paste("Benef ", "vs. ES % Change"),
+      x = "% Change in Ecosystem Service Provision, 1992-2020",
+      y = metric,
+      fill = "Density"
+    ) +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p2)
+}
+```
+```{r export_scatterplots, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(viridis)
+
+# Set PDF output: landscape (width > height), e.g., A4 landscape is ~11.7 x 8.3 inches
+pdf(here("output_charts", "scatterplots_by_service5.pdf"), width = 8,3, height = 11.7)
+
+# Loop through each LC metric and generate a faceted plot
+for (metric in lc_metrics) {
+  p <- df %>%
+    ggplot(aes_string(x = "pct_ch", y = metric)) +
+    geom_hex(bins = 50) +  # density shading
+    scale_fill_viridis_c(option = "D", direction = 1) +
+    facet_wrap(~ service, scales = "free", ncol = 2) +
+    labs(
+      title = paste("Benef", "vs. ES % Change"),
+      x = "% Change in Ecosystem Service Provision, 1992–2020",
+      y = metric,
+      fill = "Density"
+    ) +
+   # theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p)
+}
+
+# Close the PDF device
+dev.off()
+```
+
+
+
+```{r fig.height=8, fig.width=10, warning=FALSE}
+# 1. Define desired facet order
+df <- plt %>% filter(SUB_AREA > area_threshold)
+# df <- df %>%
+#   filter(id %in% top_bottom_10k$id)
+# 2. Apply pseudo-log transformation
+pseudo_log <- function(x) sign(x) * log1p(abs(x))
+
+df <- df %>%
+  mutate(
+    service = factor(service, levels = service_levels),
+    pct_ch_trans = pseudo_log(pct_ch)
+  )
+
+# 3. Reorder countries based on dir_ch_2 (descending)
+df <- df %>%
+  mutate(ee_r264_name = reorder(ee_r264_name, -dir_ch_2))
+# 4. Create plot
+p <- ggplot(df, aes(x = ee_r264_name, y = pct_ch_trans, fill = ee_r264_name)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service ",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  #theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+# 4. Create plot
+p2 <- ggplot(df, aes(x = ee_r264_name, y = pct_ch, fill = ee_r264_name)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "% Change by Service ",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+p
+p2
+
+```
+######################################################################################
+######################################################################################
+
 
 
 ```{r , fig.height=9, fig.width=7, warning=FALSE}
@@ -911,62 +811,6 @@ for (metric in lc_metrics) {
 
 
 
-
-
-```{r fig.height=8, fig.width=10, warning=FALSE}
-# 1. Define desired facet order
-df <- plt %>% filter(SUB_AREA > area_threshold)
-# df <- df %>%
-#   filter(id %in% top_bottom_10k$id)
-# 2. Apply pseudo-log transformation
-pseudo_log <- function(x) sign(x) * log1p(abs(x))
-
-df <- df %>%
-  mutate(
-    service = factor(service, levels = service_levels),
-    pct_ch_trans = pseudo_log(pct_ch)
-  )
-
-# 3. Reorder countries based on dir_ch_2 (descending)
-df <- df %>%
-  mutate(ee_r264_name = reorder(ee_r264_name, -dir_ch_2))
-df. <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
-# 4. Create plot
-p <- ggplot(df., aes(x = ee_r264_name, y = pct_ch_trans, fill = ee_r264_name)) +
-  geom_violin(trim = FALSE, scale = "width") +
-  facet_wrap(~ service, scales = "free_y") +
-  scale_fill_viridis_d(option = "D") +
-  labs(
-    title = "Pseudo-log Scaled % Change by Service ",
-    x = NULL,
-    y = "Transformed % Change"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    strip.text = element_text(face = "bold"),
-    legend.position = "none"
-  )
-# 4. Create plot
-p2 <- ggplot(df, aes(x = ee_r264_name, y = pct_ch, fill = ee_r264_name)) +
-  geom_violin(trim = FALSE, scale = "width") +
-  facet_wrap(~ service, scales = "free_y") +
-  scale_fill_viridis_d(option = "D") +
-  labs(
-    title = "% Change by Service ",
-    x = NULL,
-    y = "Transformed % Change"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    strip.text = element_text(face = "bold"),
-    legend.position = "none"
-  )
-p
-p2
-
-```
 
 ```{r fig.height=8, fig.width=10, warning=FALSE}
 library(dplyr)
