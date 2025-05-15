@@ -182,15 +182,17 @@ nam <- as_tibble(cbind(lc_metrics,names))
 ```{r scatt_ ver 2, fig.height=9, fig.width = 12}
 
 # Set PDF output: landscape (width > height), e.g., A4 landscape is ~11.7 x 8.3 inches
-pdf(here("output_charts", "scatterplots_by_service_bottom.pdf"), width = 11.7, height = 8)
+pdf(here("output_charts", "scatterplots_by_service.pdf"), width = 11.7, height = 8)
+#for (metric in lc_metrics) {
 for (metric in lc_metrics) {
+
   # Get label from lookup table
   y_label <- nam %>%
     filter(lc_metrics == metric) %>%
     pull(names)
 
   # Create plot
-  p2 <- df_f %>%
+  p2 <- df %>%select(c())
     ggplot(aes_string(x = "pct_ch", y = metric)) +
     geom_hex(bins = 60) +
     scale_fill_viridis_c(
@@ -218,40 +220,40 @@ for (metric in lc_metrics) {
 dev.off()
 ```
 
-```{r export_scatterplots, echo=FALSE, message=FALSE, warning=FALSE}
-library(ggplot2)
-library(viridis)
+```{r standalone plot}
+lc_metrics <- c("rast_gdpTot_1990_2020_30arcsec.7_mean","GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean","GlobPOP_Count_30arc_2020_I32.1_sum","hdi_raster_predictions_2020.1_mean","farmsize_mehrabi.1_mean","GlobPOP_sqkm","dir_ch_2")
+names <- c("Mean GDP 2020", "Mean GHS Population Mean 2020", "GlobPop Sum 2020", "Mean HDI 2020", "Farmsize 2017", "GlobPop/kmˆ2", "LCover Change")
+nam <- as_tibble(cbind(lc_metrics,names))
+ y_label <- nam %>%
+    filter(lc_metrics == metric) %>%
+    pull(names)
 
-# Set PDF output: landscape (width > height), e.g., A4 landscape is ~11.7 x 8.3 inches
-pdf(here("output_charts", "scatterplots_by_service5.pdf"), width = 8,3, height = 11.7)
-
-# Loop through each LC metric and generate a faceted plot
-for (metric in lc_metrics) {
-  p <- df %>%
-    ggplot(aes_string(x = "pct_ch", y = metric)) +
-    geom_hex(bins = 50) +  # density shading
-    scale_fill_viridis_c(option = "D", direction = 1) +
-    facet_wrap(~ service, scales = "free", ncol = 2) +
+p2 <- ggplot(df %>% filter(service== "Sed_ret_Ratio"), aes_string(x = "pct_ch", y = "farmsize_mehrabi.1_mean")) +
+    geom_hex(bins = 60) +
+    scale_fill_viridis_c(
+        option = "D", 
+        direction = 1,
+        oob = scales::squish,  # Squishes out-of-bounds values to min/max
+        limits = quantile(df$pct_ch, c(0.02, 0.98), na.rm = TRUE),  # Or use `..count..` if needed
+        name = "Density"
+      ) +
+    facet_wrap(~ service, scales = "free", ncol = 1) +
     labs(
-      title = paste("Benef", "vs. ES % Change"),
+      title = paste(y_label, "vs. ES % Change"),
       x = "% Change in Ecosystem Service Provision, 1992–2020",
-      y = metric,
+      y = y_label,
       fill = "Density"
     ) +
-   # theme_minimal() +
     theme(
       strip.text = element_text(face = "bold"),
       plot.title = element_text(hjust = 0.5),
       axis.text = element_text(size = 9)
     )
 
-  print(p)
-}
+  print(p2)
 
-# Close the PDF device
-dev.off()
 ```
-
+###########################################################
 ## 5. add plots with the differences 
 
 Convert into function. We don't need this right now!!!
