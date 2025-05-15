@@ -19,6 +19,7 @@ library(tidytext)
 library(rlang)
 library(tidyr)
 library(forcats)
+library(scales)
 # source the helper functions
 source(here("R", "utils_lcc_metrics.R"))
 source(here("R","utils_pct_change.R"))
@@ -140,6 +141,117 @@ write.csv(plt, here("output_data", "serv_benef_synth_01.csv"))
 
 
 
+
+
+## Scatterplots
+
+```{r other plot, fig.height=7, fig.width=7, warning=FALSE}
+
+plt <- read.csv(here("output_data", "serv_benef_synth_01.csv"))
+# get the filtered locations
+area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
+# Filter the dataset
+df <- plt %>% filter(SUB_AREA > area_threshold)
+# Set the levesl. This seemsbana; but is important because iut defines how the layer facets will be rendered. Is also annoying because i can't think about a way to do it which is not by hand and thinking, and each time the classes change or one wants a different layour, iyt has to be done here...
+# 2 Columns, 3 Rows:
+service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_export", "Sed_Ret_Ratio")
+ color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
+ service_levels <- service
+
+# 3 Columns, 2 Rows:
+service <- c("Coastal_Protection","N_export","Sed_export","Pollination","N_Ret_Ratio","Sed_Ret_Ratio")
+ color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
+ service_levels <- service
+
+df <- df %>%
+  mutate(
+    service = factor(service, levels = service_levels),
+  )
+
+# 1. Filter to top/bottom 10% based on pct_ch # per service not anymore change
+df_f <- filter_by_percentile(df, var = "pct_ch", group_var = "service",
+                                 filter_type = c("bottom"),percentile = 0.10) 
+
+# 3. List of Benef data to analyze. We can profit and set the names here. I am thinking about the best sat to get (sum/mean. Is not as evident as it seems at first) 
+lc_metrics <- c("rast_gdpTot_1990_2020_30arcsec.7_mean","GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean","GlobPOP_Count_30arc_2020_I32.1_sum","hdi_raster_predictions_2020.1_mean","farmsize_mehrabi.1_mean","GlobPOP_sqkm","dir_ch_2")
+names <- c("Mean GDP 2020", "Mean GHS Population Mean 2020", "GlobPop Sum 2020", "Mean HDI 2020", "Farmsize 2017", "GlobPop/kmˆ2", "LCover Change")
+nam <- as_tibble(cbind(lc_metrics,names))
+#df_top_bottom <- filter(df_top_bottom, dir_ch_2 != 0)
+```
+
+```{r scatt_ ver 2, fig.height=9, fig.width = 12}
+
+# Set PDF output: landscape (width > height), e.g., A4 landscape is ~11.7 x 8.3 inches
+pdf(here("output_charts", "scatterplots_by_service_bottom.pdf"), width = 11.7, height = 8)
+for (metric in lc_metrics) {
+  # Get label from lookup table
+  y_label <- nam %>%
+    filter(lc_metrics == metric) %>%
+    pull(names)
+
+  # Create plot
+  p2 <- df_f %>%
+    ggplot(aes_string(x = "pct_ch", y = metric)) +
+    geom_hex(bins = 60) +
+    scale_fill_viridis_c(
+        option = "D", 
+        direction = 1,
+        oob = scales::squish,  # Squishes out-of-bounds values to min/max
+        limits = quantile(df$pct_ch, c(0.02, 0.98), na.rm = TRUE),  # Or use `..count..` if needed
+        name = "Density"
+      ) +
+    facet_wrap(~ service, scales = "free", ncol = 3) +
+    labs(
+      title = paste(y_label, "vs. ES % Change"),
+      x = "% Change in Ecosystem Service Provision, 1992–2020",
+      y = y_label,
+      fill = "Density"
+    ) +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p2)
+}
+dev.off()
+```
+
+```{r export_scatterplots, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(viridis)
+
+# Set PDF output: landscape (width > height), e.g., A4 landscape is ~11.7 x 8.3 inches
+pdf(here("output_charts", "scatterplots_by_service5.pdf"), width = 8,3, height = 11.7)
+
+# Loop through each LC metric and generate a faceted plot
+for (metric in lc_metrics) {
+  p <- df %>%
+    ggplot(aes_string(x = "pct_ch", y = metric)) +
+    geom_hex(bins = 50) +  # density shading
+    scale_fill_viridis_c(option = "D", direction = 1) +
+    facet_wrap(~ service, scales = "free", ncol = 2) +
+    labs(
+      title = paste("Benef", "vs. ES % Change"),
+      x = "% Change in Ecosystem Service Provision, 1992–2020",
+      y = metric,
+      fill = "Density"
+    ) +
+   # theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p)
+}
+
+# Close the PDF device
+dev.off()
+```
+
 ## 5. add plots with the differences 
 
 Convert into function. We don't need this right now!!!
@@ -208,138 +320,6 @@ plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.5)
 # # Show all values
 # plot_es_changes(plt, filter_type = "all")
 ```
-
-
-## Scatterplots
-
-```{r other plot, fig.height=7, fig.width=7, warning=FALSE}
-
-# 1. Filter to top/bottom 10% based on pct_ch # per service not anymore change
-df_top_bottom <- df %>%
-  group_by(service) %>%  # Do it separately for each service (optional, if needed)
-  filter(pct_ch >= quantile(pct_ch, 0.90, na.rm = TRUE) |
-         pct_ch <= quantile(pct_ch, 0.10, na.rm = TRUE)) %>%
-  ungroup()
-#n <- floor(nrow(df) * 0.1)  # 10% of total rows
-######
-
-
-
-###### HERE IS OUR ISSEU. WE JUST NEED TO KNOW WHICH COLUMN NAME COMES HERE INSTEAD IF DIR CH (FROM LAND COVER ANALYSIS TO DO BENEFICIARIES ANALYSISI)
-# df_top_bottom <- df %>%
-#   slice_max(dir_ch_2, n = n, with_ties = FALSE) %>% # BY SERVICE AND GROUPED, NOT AROUND LAND COVER.
-#   bind_rows(
-#     df %>% slice_min(dir_ch_2, n = n, with_ties = FALSE)
-#   )
-# 
-# df_top_bottom <- df %>%
-#   group_by(service) %>%
-#   group_modify(~ bind_rows(
-#     slice_max(.x, dir_ch_2, n = floor(0.1 * nrow(.x)), with_ties = FALSE),
-#     slice_min(.x, dir_ch_2, n = floor(0.1 * nrow(.x)), with_ties = FALSE)
-#   )) %>%
-#   ungroup()
-
-
-
-# 2. Optional: relevel services if you want
-service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_export", "Sed_Ret_Ratio")
- color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
- service_levels <- service
-df_top_bottom <- df_top_bottom %>%
-  mutate(
-    service = factor(service, levels = service_levels),
-    pct_ch_trans = pseudo_log(pct_ch)  # Apply pseudo-log transformation
-  )
-
-# 3. List of Benef data to analyze
-lc_metrics <- c("rast_gdpTot_1990_2020_30arcsec.7_mean","GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean","GlobPOP_Count_30arc_2020_I32.1_sum","hdi_raster_predictions_2020.1_mean","farmsize_mehrabi.1_mean","GlobPOP_sqkm", "dir_ch_2")
-
-Benef
-#df_top_bottom <- filter(df_top_bottom, dir_ch_2 != 0)
-# 4. Create the scatterplots
-for (metric in lc_metrics) {
-  p1 <- df_top_bottom %>%
-    ggplot(aes_string(x = metric, y = "pct_ch_trans")) +
-    geom_hex(bins = 60) +  # Hexbin layer
-    scale_fill_viridis_c(option = "D", direction = 1) +  # Use viridis scale
-    facet_wrap(~ service, scales = "free",ncol=2) +
-    labs(
-      title = paste("Benef ", "vs. ES % Change"),
-      x = metric,
-      y ="% Change in Ecosystem Service Provision, 1992-2020",
-      fill = "Density"
-    ) +
-    theme(
-      strip.text = element_text(face = "bold"),
-      plot.title = element_text(hjust = 0.5),
-      axis.text = element_text(size = 9)
-    )
-
-  print(p1)
-}
-
-```
-
-```{r scatt_ ver 2, fig.height=9, fig.width = 12}
-
-#df_top_bottom <- filter(df_top_bottom, dir_ch_2 != 0)
-# 4. Create the scatterplots
-for (metric in lc_metrics) {
-  p2 <- df_top_bottom %>%
-    ggplot(aes_string(x = "pct_ch_trans", y = metric)) +
-    geom_hex(bins = 60) +  # Hexbin layer
-    scale_fill_viridis_c(option = "D", direction = 1) +  # Use viridis scale
-    facet_wrap(~ service, scales = "free",ncol=2) +
-    labs(
-      title = paste("Benef ", "vs. ES % Change"),
-      x = "% Change in Ecosystem Service Provision, 1992-2020",
-      y = metric,
-      fill = "Density"
-    ) +
-    theme(
-      strip.text = element_text(face = "bold"),
-      plot.title = element_text(hjust = 0.5),
-      axis.text = element_text(size = 9)
-    )
-
-  print(p2)
-}
-```
-```{r export_scatterplots, echo=FALSE, message=FALSE, warning=FALSE}
-library(ggplot2)
-library(viridis)
-
-# Set PDF output: landscape (width > height), e.g., A4 landscape is ~11.7 x 8.3 inches
-pdf(here("output_charts", "scatterplots_by_service5.pdf"), width = 8,3, height = 11.7)
-
-# Loop through each LC metric and generate a faceted plot
-for (metric in lc_metrics) {
-  p <- df %>%
-    ggplot(aes_string(x = "pct_ch", y = metric)) +
-    geom_hex(bins = 50) +  # density shading
-    scale_fill_viridis_c(option = "D", direction = 1) +
-    facet_wrap(~ service, scales = "free", ncol = 2) +
-    labs(
-      title = paste("Benef", "vs. ES % Change"),
-      x = "% Change in Ecosystem Service Provision, 1992–2020",
-      y = metric,
-      fill = "Density"
-    ) +
-   # theme_minimal() +
-    theme(
-      strip.text = element_text(face = "bold"),
-      plot.title = element_text(hjust = 0.5),
-      axis.text = element_text(size = 9)
-    )
-
-  print(p)
-}
-
-# Close the PDF device
-dev.off()
-```
-
 
 
 ```{r fig.height=8, fig.width=10, warning=FALSE}
