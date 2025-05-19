@@ -69,14 +69,6 @@ ANALYSIS_DATA = {
     },
 }
 
-"""
-The format for the zonal ops is as below:
-<stat>                         # plain
-<stat>@<alias>                 # same as plain, but give it a name
-<stat>/<vector_alias>.<field>  # divide by a vector field
-<stat>*<vector_alias>.<field>  # multiply by a vector field
-<expr>@<alias>                 # any Python expr using ${stat} + row
-"""
 ZONAL_OPS = ["mean", "max", "min"]
 
 
