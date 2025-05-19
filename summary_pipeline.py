@@ -1,18 +1,22 @@
 """Summarize analysis raster data across reference vector data."""
 
-from pathlib import Path
 from datetime import datetime
 from datetime import timedelta
-import time
+from pathlib import Path
 import logging
 import os
+import re
 import sys
+import time
+from dataclasses import dataclass
+from typing import Callable
 
-from geopandas import gpd
+from ecoshard import taskgraph
 from exactextract import exact_extract
 from exactextract.raster import GDALRasterSource
+from geopandas import gpd
+import pandas as pd
 import psutil
-from ecoshard import taskgraph
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -63,12 +67,84 @@ ANALYSIS_DATA = {
     },
 }
 
+"""
+The format for the zonal ops is as below:
+<stat>                         # plain
+<stat>@<alias>                 # same as plain, but give it a name
+<stat>/<vector_alias>.<field>  # divide by a vector field
+<stat>*<vector_alias>.<field>  # multiply by a vector field
+<expr>@<alias>                 # any Python expr using ${stat} + row
+"""
 ZONAL_OPS = ["mean", "max", "min"]
 
 
 WORKSPACE_DIR = "./summary_pipeline_workspace"
 os.makedirs(WORKSPACE_DIR, exist_ok=True)
 REPORTING_INTERVAL = 10.0
+
+
+# Define the regular expressions to extract out the metrics and the ops
+METRIC_RE = re.compile(
+    r"""
+    (?P<body>[^@]+?)           # stat or expr
+    (?:@(?P<alias>\w+))?       # optional alias
+    $""",
+    re.VERBOSE,
+)
+
+OP_RE = re.compile(
+    r"^(?P<stat>\w+)(?:(?P<op>[*/])(?P<v_alias>\w+)\.(?P<v_field>\w+))?$"
+)
+
+
+@dataclass
+class ZonalMetric:
+    name: str
+    func: Callable[[pd.Series], float]  # row → value
+
+
+def build_metrics(metric_specs):
+    metrics = []
+
+    for spec in metric_specs:
+        m = METRIC_RE.match(spec)
+        if not m:
+            raise ValueError(f"bad metric spec: {spec}")
+        body, alias = m.group("body", "alias")
+
+        # plain op or op with */field
+        mo = OP_RE.match(body)
+        if mo:
+            stat = mo.group("stat")
+            op, v_alias, v_field = mo.group("op", "v_alias", "v_field")
+            name = (
+                alias or f'{v_alias or "hydro6"}_{stat}'
+                if not op
+                else (
+                    alias or f'{stat}_{v_field}_{ "div" if op=="/" else "mul"}'
+                )
+            )
+
+            def _make(stat, op, v_alias, v_field):
+                return lambda row: (
+                    (
+                        row[stat] / row[f"{v_alias}.{v_field}"]
+                        if op == "/"
+                        else row[stat] * row[f"{v_alias}.{v_field}"]
+                    )
+                    if op
+                    else row[stat]
+                )
+
+            metrics.append(
+                ZonalMetric(name, _make(stat, op, v_alias or "hydro6", v_field))
+            )
+        else:
+            # arbitrary python expression (use ${stat} placeholders)
+            expr = body.replace("${", 'row["').replace("}", '"]')
+            name = alias or "expr_" + str(abs(hash(expr)))[:6]
+            metrics.append(ZonalMetric(name, lambda row, e=expr: eval(e)))
+    return metrics
 
 
 def create_progress_logger(update_rate, task_id):
