@@ -219,6 +219,7 @@ def main():
     zonal_stats_task_list = []
 
     vector_zones = pipeline_config["vector_zones"]
+    output_vector_list = []
     for vector_id, vector_config in vector_zones.items():
         vector_path = vector_config["path"]
         for raster_id, raster_path_band_dict in raster_layers.items():
@@ -251,11 +252,14 @@ def main():
         out_vector_path = os.path.join(
             workspace_dir, f"{vector_id}_synth_zonal_{timestamp}.gpkg"
         )
+        output_vector_list.append(out_vector_path)
         gdf.to_file(out_vector_path, driver="GPKG")
-        print(
-            f"done in {time.time()-start_time:.2f}s, output written to "
-            f"{out_vector_path}"
-        )
+    task_graph.join()
+    task_graph.close()
+    print(
+        f"done in {time.time()-start_time:.2f}s, output(s) written to "
+        + ",".join(output_vector_list)
+    )
 
 
 if __name__ == "__main__":
