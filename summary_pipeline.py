@@ -120,7 +120,7 @@ def create_progress_logger(update_rate, task_id):
     return _process_logger
 
 
-def zonal_stats(raster_path_band_dict, zonal_ops, vector_path):
+def zonal_stats(raster_path_band_dict, op_stats, vector_path):
     """Calculate zonal statistics for vector file over a given raster.
 
     This function reads polygon geometries from a vector file, assigns a
@@ -132,7 +132,7 @@ def zonal_stats(raster_path_band_dict, zonal_ops, vector_path):
     Args:
         raster_path_band_dict (dict): dictionary containing 'path' and 'band'
             for the raster to process.
-        zonal_ops (list): list of zonal ops that can be passed to
+        op_stats (list): list of zonal ops that can be passed to
             exact_extract defined here:
             https://isciences.github.io/exactextract/operations.html
         vector_path (str): Path to the vector file containing polygon
@@ -141,7 +141,7 @@ def zonal_stats(raster_path_band_dict, zonal_ops, vector_path):
     Returns:
         pandas.DataFrame: DataFrame containing zonal statistics with one row
         per polygon, identified by 'fid' and columns for each calculated
-        statistic named from `ZONAL_OPS`.
+        statistic named from `op_stats`.
     """
     gdf = gpd.read_file(vector_path)
 
@@ -162,7 +162,7 @@ def zonal_stats(raster_path_band_dict, zonal_ops, vector_path):
             band_idx=raster_path_band_dict["band"],
         ),
         vec=gdf,
-        ops=zonal_ops,
+        ops=op_stats,
         include_cols=["fid"],
         output="pandas",
         strategy="raster-sequential",
@@ -228,10 +228,10 @@ def main():
             f'Missing fields {", ".join(sorted(missing))} in {args.config_yaml_path}'
         )
 
-    workspace_dir = pipeline_config["workspace_dir"]
-    os.makedirs(workspace_dir, exists_ok=True)
+    workspace_dir = pipeline_config["workspace_dir"]["path"]
+    os.makedirs(workspace_dir, exist_ok=True)
 
-    zonal_ops = pipeline_config["zonal_ops"]
+    op_stats = pipeline_config["op_stats"]
 
     start_time = time.time()
     raster_layers = pipeline_config["raster_layers"]
@@ -246,10 +246,10 @@ def main():
     vector_zones = pipeline_config["vector_zones"]
     for vector_id, vector_config in vector_zones.items():
         vector_path = vector_config["path"]
-        for (raster_id, year), raster_path_band_dict in raster_layers.items():
+        for raster_id, raster_path_band_dict in raster_layers.items():
             stats_task = task_graph.add_task(
                 func=zonal_stats,
-                args=(raster_path_band_dict, zonal_ops, vector_path),
+                args=(raster_path_band_dict, op_stats, vector_path),
                 store_result=True,
                 task_name=(
                     f"zonal stats for {raster_id}:"
@@ -269,7 +269,7 @@ def main():
             # renames the stat to be the raster id provided in the
             # config file with a _operation at the end so we can
             # differentiate the operation applied to that raster
-            rename_map = {op: f"{raster_id}_{op}" for op in zonal_ops}
+            rename_map = {op: f"{raster_id}_{op}" for op in op_stats}
             stats_df.rename(columns=rename_map, inplace=True)
             gdf = gdf.merge(stats_task.get(), on="fid")
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
