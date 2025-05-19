@@ -149,17 +149,47 @@ def zonal_stats(raster_path_band_dict, zonal_ops, vector_path):
     return stats_df
 
 
+def load_config(config_path):
+    """Load a YAML configuration and resolve relative data paths.
+
+    The function parses the YAML file, then rewrites each
+    ``vector_zones.*.path`` and ``raster_layers.*.path`` entry so that
+    any relative path (starting with ``.`` or lacking a drive/root) is
+    interpreted relative to the directory containing the YAML file.
+    The resulting paths are returned as absolute, expanded
+    ``pathlib.Path`` objects.
+
+    Args:
+        config_path (Path): Path to the YAML configuration file.
+
+    Returns:
+        dict: Parsed configuration dictionary with all data-path values
+        converted to absolute ``Path`` objects.
+    """
+    with config_path.open("r") as f:
+        cfg = yaml.safe_load(f)
+
+    base = config_path.parent
+
+    for v in cfg["vector_zones"].values():
+        v["path"] = (base / v["path"]).expanduser().resolve()
+
+    for r in cfg["raster_layers"].values():
+        r["path"] = (base / r["path"]).expanduser().resolve()
+
+    return cfg
+
+
 def main():
     """Entry point."""
     parser = argparse.ArgumentParser(description="Zonal stats pipeline.")
     parser.add_argument(
-        "config_yaml",
+        "config_yaml_path",
         type=Path,
         help="Path to YAML configuration example:\n\n" + YAML_EXAMPLE,
     )
     args = parser.parse_args()
-    with args.config_yaml.open("r") as f:
-        config = yaml.safe_load(f)
+    pipeline_config = load_config(args.config_yaml_path)
 
     required_fields = {
         "workspace_dir",
@@ -167,19 +197,19 @@ def main():
         "raster_layers",
         "op_stats",
     }
-    missing = required_fields - config.keys()
+    missing = required_fields - pipeline_config.keys()
     if missing:
         raise ValueError(
-            f'Missing fields {", ".join(sorted(missing))} in {args.config_yaml}'
+            f'Missing fields {", ".join(sorted(missing))} in {args.config_yaml_path}'
         )
 
-    workspace_dir = config["workspace_dir"]
+    workspace_dir = pipeline_config["workspace_dir"]
     os.makedirs(workspace_dir, exists_ok=True)
 
-    zonal_ops = config["zonal_ops"]
+    zonal_ops = pipeline_config["zonal_ops"]
 
     start_time = time.time()
-    raster_layers = config["raster_layers"]
+    raster_layers = pipeline_config["raster_layers"]
     physical_cores = psutil.cpu_count(logical=False)
     task_graph = taskgraph.TaskGraph(
         workspace_dir,
@@ -188,7 +218,7 @@ def main():
     )
     zonal_stats_task_list = []
 
-    vector_zones = config["vector_zones"]
+    vector_zones = pipeline_config["vector_zones"]
     for vector_id, vector_config in vector_zones.items():
         vector_path = vector_config["path"]
         for (raster_id, year), raster_path_band_dict in raster_layers.items():
