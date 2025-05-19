@@ -20,109 +20,42 @@ library(rlang)
 library(tidyr)
 library(forcats)
 library(scales)
+library(RColorBrewer)
+library(htmltools)
+library(leaflet)
 # source the helper functions
+source(here("R", "hotSpotR.R"))
+source(here("R","scattR.R"))
+source(here("R","utils_pct_change.R"))
 source(here("R", "utils_lcc_metrics.R"))
 source(here("R","utils_pct_change.R"))
-```
+source(here("R", "perc_filteR.R"))
 
+```
+ I moved some chunks from here to the end of **Consolidation.Rmd**. They kept distracting me and making me waste even more time each time i had to make sens of this, and the worst , wasting time. I will move wha was here away to avoidgetting confused (again), but kep record where i put in csase i ever need to review this. If at some point that is nto neceesary anymore, i will move that to old_notebook, but for the love of Bochica, keep our working spaces clean !!
 THis cleans the data/consolidates columns that are going to be analyzed keep at hands, the rest is sent to a storage. there should be a database structure here. 
-```{r load procesed data and build final gpkgs}
 
-inpath <- here("summary_pipeline_workspace")
-
-gp <- list.files(inpath, pattern = ".gpkg")
-
-gp <- file.path(inpath, gp)
-
-synth <- lapply(gp, st_read)
-synth <- lapply(synth, function(s){
-  s <- s %>% mutate(fid=row_number()-1)
-})
-
-synth <- lapply(synth, function(s){
-  s <- st_drop_geometry(s)
-})
-
-synth[[1]] <- select(synth[[1]], fid, GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean)
-synth[[2]] <- select(synth[[2]], fid, rast_gdpTot_1990_2020_30arcsec.7_mean)
-synth[[3]] <- select(synth[[3]], fid, GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean)
-synth[[4]] <- select(synth[[4]], fid, GlobPOP_Count_30arc_2020_I32.1_sum)
-synth[[5]] <- select(synth[[5]], fid, hdi_raster_predictions_2020.1_mean)
-synth[[6]] <- select(synth[[6]], fid,farmsize_mehrabi.1_mean)
-
-
-synth <- reduce(synth, left_join, by= "fid")
-# Load the polygons with the calcualted ES change variables
-synth_ES <- st_read(here('vector',"hydrosheds_lv6_synth.gpkg"))
-# Keep the columns of interest (original hydrosheds and pct_ch in this case)
-synth_ES <- dplyr::select(synth_ES, 1:13, contains("pct_ch"))
-
-synth_ES <- synth_ES %>% mutate(fid = row_number()-1)
-
-
-synth_ES <- left_join(synth_ES, synth, by = 'fid')
-synth_ES$fid <- NULL
-############# CURRENT OUTPUT WITH THE FINAL BANDS TO ANALYZE (SCATTERPLOTS, VIOLINS)
-st_write(synth_ES, here('vector', "hydrosheds_lv6_synth.gpkg"), layer = "benef_analysis", append = TRUE)
-```
-
-WHY is this here? I think is mee trying (again) to get straight what i have already processed and see if sme day it doesn to take me days to retake the work when o finally extract the data i need. 
-```{r pivot and preprare to plot the data}
-
-tt <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg')
-t2 <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv_tmp.gpkg')
-t3 <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv_6_tmp.gpkg')
-t <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg', layer = "ch_92_2020")
-tt2 <-st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv_tmp.gpkg', layer = "clipped") 
-
-```
 
 Here, another dialogue to input the variable names, plot colors and set the factor order.
+Find out why i did this!!!
+Load the input ecosystem service data for the final priortized Ecosysye Service Change Data */output_data/metrics_change_hb_lev_6.csv* 
+By 19/05/2025 it contains. change values for following ES datalayers synthetzed at the Basin_lv6: 
+
+"Sed_export"         "Sed_Ret_Ratio"      "Coastal_Protection" "Pollination"        "N_export"           "Pop_sqkm"           "GDP"                "N_Ret_Ratio"
+
 ```{r, fig.height=8, fig.width=14  }
-plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
-# plt[1] <- NULL Update this with the names of the variables being assessed. There should be a less annoying way to do this.
+#Load chnage data in long format/ 
+plt <- read.csv(here("output_data", "metrics_change_hb_lev_6.csv"))
+# plt[1] <- NULL Update this with the names of the variables being assessed. There should be a less annoying way to do this. Thaty;s why noting works. These names are not for the object i just loaded!!!!
 service <- unique(plt$service)
-# Actually, GDP and pop density are not services here, we can in theory dorp them
 service <- c("GHS_BUILT","GDP","GHS_POP","HDI", "Farm_size", "GlobPOP")
- color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b",)# "#d4ac0d", "#85929e")
+ color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
  service_levels <- service
  cd <- as_tibble(cbind(service,color))
- #check and join. Think about a more intuitive/relatable) variable order to plot. 
+ #check and join. 
  plt <- left_join(plt, cd)
 ```
 
-```{r chunk1, eval=FALSE, include=FALSE}
-# Get the columns that we need (can;t believe i have been struggling with this for more than 2 months)
-# 
-
-ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg')
-synth_ES <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg', layer = "benef_analysis")
-spring_ES <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg', layer = "hydrosheds_lv6_synth")
-
-spring_ES <- spring_ES[c(1:17,36:40,44, 45)]
-synth_ES <- synth_ES[c(1,7,21,22,23,24,25,26)]
-#  get pct as standalone data to add to the table
-# Most recent version of synthesis data:
- 
- # calculate POP Density
-synth_ES <- synth_ES %>%
-  mutate(GlobPOP_sqkm = GlobPOP_Count_30arc_2020_I32.1_sum / SUB_AREA)
-
-
-
- plt_spring <- st_drop_geometry(spring_ES) # if necessary when i load 
-
-
- plt_synth <- st_drop_geometry(synth_ES) # if necessary when i load 
-spring_ES <- left_join(spring_ES,plt_synth)
-
-```
-
-```{r join tables}
-
-plt_synth$HYBAS_ID <- as.numeric(plt_synth$HYBAS_ID)
-plt <- left_join(plt, plt_synth) 
-```
 
  This could be a dialogue box!!!
 ```{r remove lowestvalues to reduce artifacts}
@@ -151,18 +84,14 @@ Start HERE!!!!
 ## Scatterplots
  Ready the data (load and adjust symbols
 ```{r other plot}
+#load the ecosysytem service dsata in long format
+plt <- as_tibble(read.csv(here("output_data", "serv_benef_synth_01.csv")))
 
-plt <- read.csv(here("output_data", "serv_benef_synth_01.csv"))
 # get the filtered locations
 area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
-# Filter the dataset
+# Filter the dataset. Remove smallest 5% of the basins
 df <- plt %>% filter(SUB_AREA > area_threshold)
-# Set the levesl. This seemsbana; but is important because iut defines how the layer facets will be rendered. Is also annoying because i can't think about a way to do it which is not by hand and thinking, and each time the classes change or one wants a different layour, iyt has to be done here...
-# 2 Columns, 3 Rows:
-# service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_export", "Sed_Ret_Ratio")
-#  color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
-#  service_levels <- service
-
+# Set the levesl. This seems banal; but is important because iut defines how the layer facets will be rendered. Is also annoying because i can't think about a way to do it which is 
 # 3 Columns, 2 Rows:
 service <- c("Coastal_Protection","N_export","Sed_export","Pollination","N_Ret_Ratio","Sed_Ret_Ratio")
  color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
@@ -173,15 +102,12 @@ df <- df %>%
     service = factor(service, levels = service_levels),
   )
 
-# 1. Filter to top/bottom 10% based on pct_ch # per service not anymore change
-df_f <- filter_by_percentile(df, var = "pct_ch", group_var = "service",
-                                 filter_type = c("bottom"),percentile = 0.10) 
+
 
 # 3. List of Benef data to analyze. We can profit and set the names here. I am thinking about the best sat to get (sum/mean. Is not as evident as it seems at first) 
 lc_metrics <- c("rast_gdpTot_1990_2020_30arcsec.7_mean","GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean","GlobPOP_Count_30arc_2020_I32.1_sum","hdi_raster_predictions_2020.1_mean","farmsize_mehrabi.1_mean","GlobPOP_sqkm","dir_ch_2")
 names <- c("Mean GDP 2020", "Mean GHS Population Mean 2020", "GlobPop Sum 2020", "Mean HDI 2020", "Farmsize 2017", "GlobPop/kmˆ2", "LCover Change")
 nam <- as_tibble(cbind(lc_metrics,names))
-#df_top_bottom <- filter(df_top_bottom, dir_ch_2 != 0)
 ```
 
 
@@ -200,7 +126,7 @@ df_f <- df %>%
 
 
 
-plot_es_lc_scatter(df_f, lc_metrics, nam=nam)
+plot_es_lc_scatter(df, lc_metrics, nam=nam)
 
 
 plot_es_lc_scatter(df, lc_metrics = "farmsize_mehrabi.1_mean", nam=nam, geom_type = "point")
@@ -222,8 +148,8 @@ library(dplyr)
 df_hotspots <- df %>%
   group_by(service) %>%
   mutate(
-    upper_threshold = quantile(pct_ch, 0.9, na.rm = TRUE),
-    lower_threshold = quantile(pct_ch, 0.1, na.rm = TRUE),
+    upper_threshold = quantile(pct_ch, 0.999, na.rm = TRUE),
+    lower_threshold = quantile(pct_ch, 0.001, na.rm = TRUE),
     hotspot_flag = case_when(
       pct_ch >= upper_threshold ~ "high",
       pct_ch <= lower_threshold ~ "low",
@@ -250,12 +176,189 @@ spring_ES <- spring_ES %>%
 
 spring_ES <- left_join(spring_ES, hotspot_summary, by = "HYBAS_ID")
 
-st_write(spring_ES, here('vector', "hydrosheds_lv_6_hotspots.gpkg"))
+#st_write(spring_ES, here('vector', "hydrosheds_lv_6_hotspots.gpkg"))
+```
 
-# 3. Join back with spatial data (if needed)
-# df_sf <- left_join(your_spatial_sf_object, hotspot_summary, by = "HYBAS_ID")
+# Create maps
+```{r create_maps}
+# Load libraries
+library(sf)
+library(dplyr)
+library(tidyr)
+library(leaflet)
+library(RColorBrewer)
+library(htmltools)
+
+spring_ES <- st_read(here('vector', "hydrosheds_lv_6_hotspots.gpkg"))
+
+# ---------------------------------------------
+# Step 1. Define services to include in the map
+# ---------------------------------------------
+services <- c(
+  "sed_export_pct_ch", "Usle_pct_ch", "Sed_retention_ratio_pct_ch",
+  "Coastal_Protection_pct_ch", "Pollination_pct_ch", "N_export_pct_ch_2020_1992_sqkm"
+)
+
+# ---------------------------------------------
+# Step 2. Prepare data: pivot and clean
+# ---------------------------------------------
+spring_hotspots_long <- spring_ES %>%
+  select(HYBAS_ID, geom, all_of(services)) %>%
+  pivot_longer(
+    cols = all_of(services),
+    names_to = "service",
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value) & is.finite(value)) %>%
+  mutate(
+    label = paste("HYBAS:", HYBAS_ID,
+                  "<br>Service:", service,
+                  "<br>Change:", round(value, 2))
+  ) %>%
+  st_as_sf() %>%
+  st_make_valid() %>%
+  st_transform(4326)
+
+# ---------------------------------------------
+# Step 3. Define color palette (diverging red-blue)
+# ---------------------------------------------
+pal <- colorNumeric(
+  palette = "RdBu",
+  domain = spring_hotspots_long$value,
+  reverse = TRUE
+)
+
+# ---------------------------------------------
+# Step 4. Initialize leaflet map with base layers
+# ---------------------------------------------
+m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles("OpenStreetMap.Mapnik", group = "OSM") %>%
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addProviderTiles("Esri.WorldImagery", group = "Satellite")
+
+# ---------------------------------------------
+# Step 5. Add a service-specific overlay per layer
+# ---------------------------------------------
+for (svc in unique(spring_hotspots_long$service)) {
+  layer_data <- filter(spring_hotspots_long, service == svc)
+  m <- m %>% addPolygons(
+    data = layer_data,
+    fillColor = ~pal(value),
+    fillOpacity = 0.7,
+    color = "black", weight = 0.3,
+    label = ~lapply(label, HTML),
+    group = svc
+  )
+}
+
+# ---------------------------------------------
+# Step 6. Add layer control and legend
+# ---------------------------------------------
+m <- m %>%
+  addLayersControl(
+    baseGroups = c("OSM", "Positron", "Satellite"),
+    overlayGroups = unique(spring_hotspots_long$service),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = spring_hotspots_long$value,
+    title = "% Change"
+  )
+
+# ---------------------------------------------
+# Step 7. Render the map
+# ---------------------------------------------
+m
+
+
+```
+
+# light version
+
+```{r light version}
+
+# Load libraries (if not already loaded)
+library(sf)
+library(dplyr)
+library(tidyr)
+library(leaflet)
+library(RColorBrewer)
+library(htmltools)
+
+# ---------------------------------------------
+# Step 1. Define services to include in the map
+# ---------------------------------------------
+services <- c(
+  "sed_export_pct_ch", "Usle_pct_ch", "Sed_retention_ratio_pct_ch",
+  "Coastal_Protection_pct_ch", "Pollination_pct_ch", "N_export_pct_ch_2020_1992_sqkm"
+)
+
+# ---------------------------------------------
+# Step 2. Pivot data and filter only one service + sample
+# ---------------------------------------------
+# Choose service to visualize (change as needed)
+target_service <- "Sed_retention_ratio_pct_ch"
+
+spring_hotspots_sample <- spring_ES %>%
+  select(HYBAS_ID, geom, all_of(target_service)) %>%
+  rename(value = !!target_service) %>%
+  filter(!is.na(value) & is.finite(value)) %>%
+  slice_sample(n = 5000) %>%
+  mutate(
+    service = target_service,
+    label = paste("HYBAS:", HYBAS_ID,
+                  "<br>Service:", service,
+                  "<br>Change:", round(value, 2))
+  ) %>%
+  st_as_sf() %>%
+  st_make_valid() %>%
+  st_transform(4326)
+
+# ---------------------------------------------
+# Step 3. Define color palette (diverging red-blue)
+# ---------------------------------------------
+pal <- colorNumeric(
+  palette = "RdBu",
+  domain = spring_hotspots_sample$value,
+  reverse = FALSE
+)
+
+# ---------------------------------------------
+# Step 4. Build fast interactive map
+# ---------------------------------------------
+m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addPolygons(
+    data = spring_hotspots_sample,
+    fillColor = ~pal(value),
+    fillOpacity = 0.7,
+    color = "black", weight = 0.3,
+    label = ~lapply(label, HTML),
+    group = target_service
+  ) %>%
+  addLayersControl(
+    baseGroups = c("Positron"),
+    overlayGroups = c(target_service),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = spring_hotspots_sample$value,
+    title = "% Change"
+  )
+
+# ---------------------------------------------
+# Step 5. Show the map
+# ---------------------------------------------
+m
+
+```
 
 # 3. Reorder countries based on dir_ch_2 (descending)
+```{r }
 df <- df %>%
   mutate(ee_r264_name = reorder(ee_r264_name, -dir_ch_2))
 # 4. Create plot
@@ -566,9 +669,276 @@ for (metric in lc_metrics) {
 # p
 ```
 
+```{r leaflet 2}
 
+# Load libraries
+# Load libraries
+library(sf)
+library(dplyr)
+library(tidyr)
+library(leaflet)
+library(RColorBrewer)
+library(htmltools)
 
+# Create separate boolean columns for each service being a hotspot
+for (svc in services) {
+  spring_ES[[paste0("is_", svc, "_hotspot")]] <- grepl(svc, spring_ES$hotspot_services)
+}
+# ---------------------------------------------
+# Step 1. Define services to include in the map
+# ---------------------------------------------
+services <- c(
+  "sed_export_pct_ch", "Usle_pct_ch", "Sed_retention_ratio_pct_ch",
+  "Coastal_Protection_pct_ch", "Pollination_pct_ch", "N_export_pct_ch_2020_1992_sqkm"
+)
 
+# ---------------------------------------------
+# Step 2. Fix malformed hotspot_services column
+# ---------------------------------------------
+# Final safe parser for all cases
+parse_hotspot_services <- function(x) {
+  if (is.null(x) || all(is.na(x))) return(NA_character_)
+  if (is.character(x) && length(x) > 1) return(x)
+  cleaned <- gsub("^c\\(|\\)$", "", x)                # remove c(...) wrapper
+  cleaned <- gsub('[\\"\\\']', "", cleaned)           # remove quotes
+  cleaned <- trimws(cleaned)
+  strsplit(cleaned, ",\\s*")[[1]]
+}
+
+spring_ES_fixed <- spring_ES %>%
+  mutate(hotspot_services = lapply(hotspot_services, parse_hotspot_services))
+
+# ---------------------------------------------
+# Step 3. Pivot to long format and filter to real hotspots
+# ---------------------------------------------
+spring_hotspots_long <- spring_ES_fixed %>%
+  select(HYBAS_ID, geom, all_of(services), hotspot_services) %>%
+  pivot_longer(cols = all_of(services), names_to = "service", values_to = "value") %>%
+  mutate(
+    is_hotspot = mapply(function(svc, hs) {
+      if (is.null(hs) || all(is.na(hs))) return(FALSE)
+      svc %in% hs
+    }, service, hotspot_services),
+    label = paste("HYBAS:", HYBAS_ID, "<br>Service:", service, "<br>Change:", round(value, 2))
+  ) %>%
+  filter(is_hotspot & !is.na(value)) %>%
+  st_as_sf() %>%
+  st_make_valid() %>%
+  st_transform(4326)
+
+# ---------------------------------------------
+# Step 4. Define color palette (diverging red-blue)
+# ---------------------------------------------
+pal <- colorNumeric(
+  palette = "RdBu",
+  domain = spring_hotspots_long$value,
+  reverse = TRUE
+)
+
+# ---------------------------------------------
+# Step 5. Initialize leaflet map with base layers
+# ---------------------------------------------
+m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles("OpenStreetMap.Mapnik", group = "OSM") %>%
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addProviderTiles("Esri.WorldImagery", group = "Satellite")
+
+# ---------------------------------------------
+# Step 6. Add a service-specific overlay per layer
+# ---------------------------------------------
+for (svc in unique(spring_hotspots_long$service)) {
+  layer_data <- filter(spring_hotspots_long, service == svc)
+  m <- m %>% addPolygons(
+    data = layer_data,
+    fillColor = ~pal(value),
+    fillOpacity = 0.7,
+    color = "black", weight = 0.3,
+    label = ~lapply(label, HTML),
+    group = svc
+  )
+}
+
+# ---------------------------------------------
+# Step 7. Add layer control and legend
+# ---------------------------------------------
+m <- m %>%
+  addLayersControl(
+    baseGroups = c("OSM", "Positron", "Satellite"),
+    overlayGroups = unique(spring_hotspots_long$service),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = spring_hotspots_long$value,
+    title = "% Change"
+  )
+
+# ---------------------------------------------
+# Step 8. Render the map
+# ---------------------------------------------
+m
+
+```
+
+```{r leaflet 2}
+
+# Load libraries
+# Load libraries
+library(sf)
+library(dplyr)
+library(tidyr)
+library(leaflet)
+library(RColorBrewer)
+library(htmltools)
+
+# Create separate boolean columns for each service being a hotspot
+for (svc in services) {
+  spring_ES[[paste0("is_", svc, "_hotspot")]] <- grepl(svc, spring_ES$hotspot_services)
+}
+# ---------------------------------------------
+# Step 1. Define services to include in the map
+# ---------------------------------------------
+services <- c(
+  "sed_export_pct_ch", "Usle_pct_ch", "Sed_retention_ratio_pct_ch",
+  "Coastal_Protection_pct_ch", "Pollination_pct_ch", "N_export_pct_ch_2020_1992_sqkm"
+)
+
+# ---------------------------------------------
+# Step 2. Fix malformed hotspot_services column
+# ---------------------------------------------
+# Final safe parser for all cases
+parse_hotspot_services <- function(x) {
+  if (is.null(x) || all(is.na(x))) return(NA_character_)
+  if (is.character(x) && length(x) > 1) return(x)
+  cleaned <- gsub("^c\\(|\\)$", "", x)                # remove c(...) wrapper
+  cleaned <- gsub('[\\"\\\']', "", cleaned)           # remove quotes
+  cleaned <- trimws(cleaned)
+  strsplit(cleaned, ",\\s*")[[1]]
+}
+
+spring_ES_fixed <- spring_ES %>%
+  mutate(hotspot_services = lapply(hotspot_services, parse_hotspot_services))
+
+# ---------------------------------------------
+# Step 3. Pivot to long format and filter to real hotspots
+# ---------------------------------------------
+spring_hotspots_long <- spring_ES %>%
+  select(HYBAS_ID, geom, all_of(services)) %>%
+  pivot_longer(cols = all_of(services), names_to = "service", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  mutate(
+    label = paste("HYBAS:", HYBAS_ID, "<br>Service:", service, "<br>Change:", round(value, 2))
+  ) %>%
+  st_as_sf() %>%
+  st_make_valid() %>%
+  st_transform(4326)
+
+# ---------------------------------------------
+# Step 4. Define color palette (diverging red-blue)
+# ---------------------------------------------
+pal <- colorNumeric(
+  palette = "RdBu",
+  domain = spring_hotspots_long$value,
+  reverse = TRUE
+)
+
+m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles("OpenStreetMap.Mapnik", group = "OSM") %>%
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addProviderTiles("Esri.WorldImagery", group = "Satellite")
+
+for (svc in unique(spring_hotspots_long$service)) {
+  layer_data <- filter(spring_hotspots_long, service == svc)
+  m <- m %>% addPolygons(
+    data = layer_data,
+    fillColor = ~pal(value),
+    fillOpacity = 0.7,
+    color = "black", weight = 0.3,
+    label = ~lapply(label, HTML),
+    group = svc
+  )
+}
+
+m <- m %>%
+  addLayersControl(
+    baseGroups = c("OSM", "Positron", "Satellite"),
+    overlayGroups = unique(spring_hotspots_long$service),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = spring_hotspots_long$value,
+    title = "% Change"
+  )
+
+m
+
+```
+
+```{r leaflet 3}
+# Create separate boolean columns for each service being a hotspot
+for (svc in services) {
+  spring_ES[[paste0("is_", svc, "_hotspot")]] <- grepl(svc, spring_ES$hotspot_services)
+}
+spring_hotspots_long <- spring_ES %>%
+  select(HYBAS_ID, geom, all_of(services), starts_with("is_")) %>%
+  pivot_longer(cols = all_of(services), names_to = "service", values_to = "value") %>%
+  mutate(
+    hotspot_flag = case_when(
+      service == "sed_export_pct_ch" ~ is_sed_export_pct_ch_hotspot,
+      service == "Usle_pct_ch" ~ is_Usle_pct_ch_hotspot,
+      service == "Sed_retention_ratio_pct_ch" ~ is_Sed_retention_ratio_pct_ch_hotspot,
+      service == "Coastal_Protection_pct_ch" ~ is_Coastal_Protection_pct_ch_hotspot,
+      service == "Pollination_pct_ch" ~ is_Pollination_pct_ch_hotspot,
+      service == "N_export_pct_ch_2020_1992_sqkm" ~ is_N_export_pct_ch_2020_1992_sqkm_hotspot,
+      TRUE ~ FALSE
+    ),
+    label = paste("HYBAS:", HYBAS_ID, "<br>Service:", service, "<br>Change:", round(value, 2))
+  ) %>%
+  filter(hotspot_flag & !is.na(value)) %>%
+  st_as_sf() %>%
+  st_make_valid() %>%
+  st_transform(4326)
+pal <- colorNumeric(
+  palette = "RdBu",
+  domain = spring_hotspots_long$value,
+  reverse = TRUE
+)
+
+m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles("OpenStreetMap.Mapnik", group = "OSM") %>%
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addProviderTiles("Esri.WorldImagery", group = "Satellite")
+
+for (svc in unique(spring_hotspots_long$service)) {
+  layer_data <- filter(spring_hotspots_long, service == svc)
+  m <- m %>% addPolygons(
+    data = layer_data,
+    fillColor = ~pal(value),
+    fillOpacity = 0.7,
+    color = "black", weight = 0.3,
+    label = ~lapply(label, HTML),
+    group = svc
+  )
+}
+
+m <- m %>%
+  addLayersControl(
+    baseGroups = c("OSM", "Positron", "Satellite"),
+    overlayGroups = unique(spring_hotspots_long$service),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = spring_hotspots_long$value,
+    title = "% Change"
+  )
+
+m
+```
 
 ```{r fig.height=8, fig.width=10, warning=FALSE}
 library(dplyr)
