@@ -1,15 +1,15 @@
 """Summarize analysis raster data across reference vector data."""
 
+from dataclasses import dataclass
 from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
+from typing import Callable
 import logging
 import os
 import re
 import sys
 import time
-from dataclasses import dataclass
-from typing import Callable
 
 from ecoshard import taskgraph
 from exactextract import exact_extract
@@ -17,6 +17,7 @@ from exactextract.raster import GDALRasterSource
 from geopandas import gpd
 import pandas as pd
 import psutil
+import rasterio
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -29,6 +30,7 @@ logging.basicConfig(
 
 LOGGER = logging.getLogger(__name__)
 logging.getLogger("ecoshard.taskgraph").setLevel(logging.INFO)
+logging.getLogger("rasterio").setLevel(logging.INFO)
 
 REFERENCE_SUMMARY_VECTOR_PATHS = {
     "hydrosheds_lv6_synth": "./data/reference/hydrosheds_lv6_synth.gpkg"
@@ -205,6 +207,12 @@ def zonal_stats(raster_path_band_dict, zonal_ops, vector_path):
         statistic named from `ZONAL_OPS`.
     """
     gdf = gpd.read_file(vector_path)
+
+    # reproject if necessary
+    with rasterio.open(raster_path_band_dict["path"]) as src:
+        raster_crs = src.crs
+    if gdf.crs != raster_crs:
+        gdf = gdf.to_crs(raster_crs)
 
     # need to get the FID column in there so we can join results
     gdf = gdf[["geometry"]].copy()
