@@ -51,30 +51,101 @@ source(here("R","utils_pct_change.R"))
 ## Calculte Sed Retention export potential
 
 Here is what we need to reframe. 
- - point to the data location
+ - point to the data location.
  - set a way/rule to select the data that will be processed.
  - Set a way to add the "metadata" - labeling data: variable name (string), display color (or leave empty/use available colloramps)
  - Add the primary key to join the metadata. Normally is the raster name (issue: raster algebra output maps get the name of one of the input products by default, and that is a problem donw the line , so I should think hoe to take care of that). 
 
 ```{r get retention potential per year}
 
-inpath <- here('input_ES', 'Nitrogen_2')
-num_cores <- 5
+inpath <- here('data', "input_rasters","Data_spring")
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/Data_spring'
+#um_cores <- 5
 
 #load the rasters with the calculated differences 
 tiffes1 <- file.path(inpath, list.files(paste0(inpath),pattern= 'export'))
 tiffes2 <- file.path(inpath, list.files(paste0(inpath),pattern= 'retention'))
+tiffes1 <- tiffes1[-1]
+tiffes2 <- tiffes2[-3]
 rast_list1 <- lapply(tiffes1, rast)
 rast_list2 <- lapply(tiffes2, rast)
 
-# 
-year <- c(1992, 2020) #1995,1998,2001,2004)
-pot_s_loss <- Map(function(r1,r2) r2/(r2+r1), rast_list1, rast_list2)
-map(1:length(pot_s_loss), function(x) writeRaster(pot_s_loss[[x]], paste0(inpath, '/', 'N_ret_ratio_', year[x],'.tif')))
+# round extent. This is soooo annoying!!!!
+round_extent <- function(r, digits = 3) {
+  e <- ext(r)
+  e_rounded <- ext(
+    round(e[1], digits),  # xmin
+    round(e[2], digits),  # xmax
+    round(e[3], digits),  # ymin
+    round(e[4], digits)   # ymax
+  )
+  ext(r) <- e_rounded
+  r
+}
+rast_list1 <- lapply(rast_list1, round_extent)
+rast_list2 <- lapply(rast_list2, round_extent)
+
+# Loop through and crop everyting to the same extent
+rast_list1 <- Map(function(r1, r2) {
+  r1 <- crop(r1, ext(r2))
+  r1
+}, rast_list1, rast_list2)
+
+rast_list2 <- Map(function(r1, r2) {
+  r1 <- crop(r1, ext(r2))
+  r1
+}, rast_list2, rast_list1)
+
+#Create mask 
+mask1 <- as.numeric(!is.na(rast_list1[[1]]))
+
+# Apply the mask 
+
+rast_list2 <- lapply(rast_list2, function(r){
+  r <- mask(r, mask1, maskvalue=0)
+  })
+                                          
+
+year <- c(1992, 2020) 
+pot_n_loss <- Map(function(r1,r2) r2/(r2+r1), rast_list1, rast_list2)
+map(1:length(pot_s_loss), function(x) writeRaster(pot_n_loss[[x]], paste0(inpath, '/', 'N_ret_ratio_', year[x],'.tif')))
 
 ```
 
 Get Nitrogen Retention potential Pending to fix. Preprocess Nitrogen Data 
+
+# Resample Coasal for Display
+```{r exagerate coastal}
+
+# cp <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/change_calc/Coastal_Protection_diff.tif')
+# cpd <- resamp_disp(cp, factor = 200, fun = "mean")
+# writeRaster(cpd, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/change_calc/Coastal_Protection_diff_disp_200.tif', overwrite=TRUE)
+# cp <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/change_calc/Pollination_diff.tif')
+# cpd <- resamp_disp(cp, factor = 20, fun = "mean")
+# # writeRaster(cpd, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/change_calc/Pollination_diff_disp_2o.tif', overwrite=TRUE)
+# 
+# # cp <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/change_calc/Nitrogen_Export_diff.tif')
+# # cpd <- resamp_disp(cp, factor = 10, fun = "mean")
+# # writeRaster(cpd, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/change_calc/Nitrogen_Export_diff_disp_10.tif', overwrite=TRUE)
+# 
+# cp <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/change_calc/Sediment_Export_diff.tif')
+# cpd <- resamp_disp(cp, factor = 10, fun = "mean")
+# writeRaster(cpd, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/change_calc/Sediment_Export_diff_disp_10.tif', overwrite=TRUE)
+# 
+cp <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/change_calc/pot_Sed_r_diff.tif')
+cpd <- resamp_disp(cp, factor = 10, fun = "mean")
+writeRaster(cpd, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/change_calc/pot_Sed_r_diff_disp_10.tif', overwrite=TRUE)
+
+
+
+gdp <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif')
+gdp <- gdp[[7]]
+writeRaster(gdp,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/Benef_symplified/GDP_2020.tif')
+
+```
+
+
+
 ```{r get modeled N retention potential, eval=FALSE, include=FALSE}
 #navigate to the directory with the input data (modeled N export and retention layers)
 inpath <- here('input_ES', 'mod_n_ret')

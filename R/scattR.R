@@ -46,10 +46,9 @@ plot_es_lc_scatter <- function(df, lc_metrics, nam,
     if (remove_outliers) {
       qx <- quantile(plot_data$pct_ch, probs = c(0.001, 0.999), na.rm = TRUE)
       qy <- quantile(plot_data[[metric]], probs = c(0.001, 0.999), na.rm = TRUE)
-      plot_data <- plot_data %>% filter(
-        pct_ch >= qx[1], pct_ch <= qx[2],
-        .data[[metric]] >= qy[1], .data[[metric]] <= qy[2]
-      )
+      plot_data <- plot_data %>%
+        filter(pct_ch >= qx[1], pct_ch <= qx[2],
+               .data[[metric]] >= qy[1], .data[[metric]] <= qy[2])
     }
     
     aes_base <- if (reverse_axes) {
@@ -57,7 +56,6 @@ plot_es_lc_scatter <- function(df, lc_metrics, nam,
     } else {
       aes(x = pct_ch, y = .data[[metric]])
     }
-    
     fill_scale <- scale_fill_viridis_c(
       option = "D",
       direction = 1,
@@ -71,7 +69,6 @@ plot_es_lc_scatter <- function(df, lc_metrics, nam,
     } else {
       scale_y_continuous(labels = scales::label_number(scale_cut = scales::cut_short_scale()))
     }
-    
     p <- ggplot(plot_data, aes_base) + {
       if (geom_type == "hex") {
         geom_hex(bins = bins)
@@ -85,6 +82,13 @@ plot_es_lc_scatter <- function(df, lc_metrics, nam,
     } +
       fill_scale +
       axis_scale +
+      scale_fill_viridis_c(
+        option = "D",
+        direction = 1,
+        oob = scales::squish,
+        trans = "log10",
+        name = "Count"
+      ) +
       facet_wrap(~ service, scales = "free", ncol = 3) +
       labs(
         title = if (reverse_axes) {
@@ -93,6 +97,9 @@ plot_es_lc_scatter <- function(df, lc_metrics, nam,
           paste(y_label, "vs. % Change in ES")
         },
         subtitle = if (!is.null(filter_note) && filter_note != "No basin size filtering applied") filter_note else NULL,
+        subtitle = filter_note,
+
+        subtitle = if (!is.null(filter_note) && grepl("No basin size filtering", filter_note)) NULL else filter_note,
         x = if (reverse_axes) y_label else "% Change in Ecosystem Service Provision, 1992–2020",
         y = if (reverse_axes) "% Change in Ecosystem Service Provision, 1992–2020" else y_label,
         fill = "Count"
@@ -108,11 +115,9 @@ plot_es_lc_scatter <- function(df, lc_metrics, nam,
       suffix <- if (!is.null(filter_note)) paste0("_", gsub("[^a-zA-Z0-9]", "_", filter_note)) else ""
       filename <- paste0(short_label, "_scatterplot", suffix, ".", image_format)
       filepath <- file.path(export_dir, filename)
-      ggsave(filepath, plot = p, device = image_format, dpi = dpi,
-             width = width, height = height)
+      ggsave(filepath, plot = p, device = image_format, dpi = dpi, width = width, height = height)
     } else {
       print(p)
     }
   }
 }
-
