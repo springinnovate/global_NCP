@@ -29,10 +29,6 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 logging.getLogger("ecoshard.taskgraph").setLevel(logging.INFO)
 
-REFERENCE_SUMMARY_VECTOR_PATHS = {
-    "hydrosheds_lv6_synth": "./data/reference/hydrosheds_lv6_synth.gpkg"
-}
-
 YAML_EXAMPLE = textwrap.dedent(
     """\
     Example YAML format:
@@ -180,7 +176,6 @@ def main():
     workspace_dir = config["workspace_dir"]
     os.makedirs(workspace_dir, exists_ok=True)
 
-    analysis_data = config["analysis_data"]
     zonal_ops = config["zonal_ops"]
 
     start_time = time.time()
@@ -193,7 +188,9 @@ def main():
     )
     zonal_stats_task_list = []
 
-    for vector_id, vector_path in REFERENCE_SUMMARY_VECTOR_PATHS.items():
+    vector_zones = config["vector_zones"]
+    for vector_id, vector_config in vector_zones.items():
+        vector_path = vector_config["path"]
         for (raster_id, year), raster_path_band_dict in raster_layers.items():
             stats_task = task_graph.add_task(
                 func=zonal_stats,
@@ -208,14 +205,15 @@ def main():
                 (raster_id, raster_path_band_dict["band"], stats_task)
             )
 
-        # process zonal results
+        # copy original vector and join to zonal stats via 'fid'
         gdf = gpd.read_file(vector_path)
-
-        # need to get the FID column in there so we can join results
         gdf = gdf[["geometry"]].copy()
         gdf["fid"] = gdf.index.astype("int32")
         for raster_id, band_idx, stats_task in zonal_stats_task_list:
             stats_df = stats_task.get()
+            # renames the stat to be the raster id provided in the
+            # config file with a _operation at the end so we can
+            # differentiate the operation applied to that raster
             rename_map = {op: f"{raster_id}_{op}" for op in zonal_ops}
             stats_df.rename(columns=rename_map, inplace=True)
             gdf = gdf.merge(stats_task.get(), on="fid")
@@ -225,7 +223,8 @@ def main():
         )
         gdf.to_file(out_vector_path, driver="GPKG")
         print(
-            f"done in {time.time()-start_time:.2f}s, output written to {out_vector_path}"
+            f"done in {time.time()-start_time:.2f}s, output written to "
+            f"{out_vector_path}"
         )
 
 
