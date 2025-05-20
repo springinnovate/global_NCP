@@ -7,17 +7,30 @@
 #' @param export_path Optional path to a PDF file to export plots. If NULL, plots are shown interactively.
 #'
 #' @return Plots are printed to screen or saved to file if `export_path` is provided.
-plot_es_lc_scatter <- function(df, lc_metrics, nam, geom_type = "hex", bins = 60, service_filter = NULL) {
+plot_es_lc_scatter <- function(df, lc_metrics, nam,
+                               geom_type = "hex", bins = 60,
+                               service_filter = NULL,
+                               export_dir = here::here("output_charts"),
+                               image_format = "jpg",
+                               dpi = 300, width = 10, height = 8,
+                               filter_note = NULL) {
   # Optional service filter
   if (!is.null(service_filter)) {
     df <- df %>% filter(service %in% service_filter)
   }
   
   for (metric in lc_metrics) {
-    y_label <- nam %>%
-      filter(lc_metrics == metric) %>%
-      pull(names)
+    # Get y-axis label and short name
+    label_row <- nam %>% filter(lc_metrics == metric)
+    if (nrow(label_row) == 0) {
+      warning(paste("Label for", metric, "not found in `nam`. Skipping."))
+      next
+    }
     
+    short_label <- gsub("[^a-zA-Z0-9]", "_", label_row$lc_metrics)
+    y_label <- label_row$names
+    
+    # Build plot
     p <- ggplot(df, aes(x = pct_ch, y = .data[[metric]])) +
       {
         if (geom_type == "hex") {
@@ -39,17 +52,35 @@ plot_es_lc_scatter <- function(df, lc_metrics, nam, geom_type = "hex", bins = 60
       ) +
       facet_wrap(~ service, scales = "free", ncol = 3) +
       labs(
-        title = paste(y_label, "vs. ES % Change"),
+        title = paste(y_label, "vs. % Change in ES"),
+        subtitle = filter_note,
         x = "% Change in Ecosystem Service Provision, 1992–2020",
         y = y_label,
         fill = "Density"
       ) +
       theme(
         strip.text = element_text(face = "bold"),
-        plot.title = element_text(hjust = 0.5),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5, face = "italic", size = 10),
         axis.text = element_text(size = 9)
       )
     
-    print(p)
+    # Export one image per plot
+    if (!is.null(export_dir)) {
+      # Sanitize filter_note for filename if provided
+      filter_suffix <- if (!is.null(filter_note)) {
+        paste0("_", gsub("[^a-zA-Z0-9]", "_", filter_note))
+      } else {
+        ""
+      }
+      
+      filename <- paste0(short_label, "_scatterplot", filter_suffix, ".", image_format)
+      filepath <- file.path(export_dir, filename)
+      
+      ggsave(filepath, plot = p, device = image_format, dpi = dpi,
+             width = width, height = height)
+    } else {
+      print(p)
+    }
   }
 }

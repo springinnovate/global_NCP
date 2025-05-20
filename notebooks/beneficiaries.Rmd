@@ -43,43 +43,125 @@ By 19/05/2025 it contains. change values for following ES datalayers synthetzed 
 
 "Sed_export"         "Sed_Ret_Ratio"      "Coastal_Protection" "Pollination"        "N_export"           "Pop_sqkm"           "GDP"                "N_Ret_Ratio"
 
-```{r, fig.height=8, fig.width=14  }
-#Load chnage data in long format/ 
-plt <- read.csv(here("output_data", "metrics_change_hb_lev_6.csv"))
-# plt[1] <- NULL Update this with the names of the variables being assessed. There should be a less annoying way to do this. Thaty;s why noting works. These names are not for the object i just loaded!!!!
-service <- unique(plt$service)
-service <- c("GHS_BUILT","GDP","GHS_POP","HDI", "Farm_size", "GlobPOP")
- color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
- service_levels <- service
- cd <- as_tibble(cbind(service,color))
- #check and join. 
- plt <- left_join(plt, cd)
-```
-
-
- This could be a dialogue box!!!
-```{r remove lowestvalues to reduce artifacts}
-# Calculate pseudo_log val for display purposes. 
-plt <- plt %>%
-  mutate(
-    service = factor(service, levels = service_levels),
-    pct_ch_trans = pseudo_log(pct_ch)
-  )
-
-# apply filter (5% or 2%) # Remove the smallest basins. 
-area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
-# Filter the dataset
-df <- plt %>% filter(SUB_AREA > area_threshold)
-
-write.csv(plt, here("output_data", "serv_benef_synth_01.csv"))
-# get the filtered locations
-```
-
 
 #####################################
 
 Start HERE!!!!
 
+```{r setup}
+# ---------------------------------------------------------
+# SETUP: Load Ecosystem Service - Beneficiary Data
+# ---------------------------------------------------------
+
+library(dplyr)
+library(readr)
+library(tibble)
+library(here)
+
+# Load long-format ES data (one row per basin-service-metric)
+df_raw <- read_csv(here("output_data", "serv_benef_synth_01.csv"))
+
+# ---------------------------------------------------------
+# STEP 1: Filter out small basins by SUB_AREA
+# ---------------------------------------------------------
+
+# ---- USER OPTIONS ----
+filter_type <- "quantile"   # Options: "quantile", "percent", "absolute"
+filter_cutoff <- 0.05       # 5% cutoff if using quantile or percent
+filter_direction <- "bottom"  # Options: "bottom", "top", "both", "none"
+# -----------------------
+
+# Compute threshold based on filter type
+if (filter_type == "quantile") {
+  area_threshold <- quantile(df_raw$SUB_AREA, probs = filter_cutoff, na.rm = TRUE)
+} else if (filter_type == "percent") {
+  n_threshold <- ceiling(nrow(df_raw) * filter_cutoff)
+  area_threshold <- df_raw %>%
+    arrange(SUB_AREA) %>%
+    pull(SUB_AREA) %>%
+    {.[n_threshold]}
+} else if (filter_type == "absolute") {
+  area_threshold <- filter_cutoff
+} else {
+  stop("Invalid filter_type: must be 'quantile', 'percent', or 'absolute'")
+}
+
+# Apply filtering logic
+df <- df_raw
+if (filter_direction == "bottom") {
+  df <- df %>% filter(SUB_AREA > area_threshold)
+  filter_note <- paste0("Filtered: Smallest ", round(100 * filter_cutoff), "% basins removed")
+} else if (filter_direction == "top") {
+  df <- df %>% filter(SUB_AREA < area_threshold)
+  filter_note <- paste0("Filtered: Largest ", round(100 * filter_cutoff), "% basins removed")
+} else if (filter_direction == "both") {
+  q_low <- quantile(df_raw$SUB_AREA, probs = filter_cutoff / 2, na.rm = TRUE)
+  q_high <- quantile(df_raw$SUB_AREA, probs = 1 - filter_cutoff / 2, na.rm = TRUE)
+  df <- df %>% filter(SUB_AREA > q_low & SUB_AREA < q_high)
+  filter_note <- paste0("Filtered: Smallest and largest ", round(100 * (filter_cutoff / 2)), "% basins removed")
+} else {
+  filter_note <- "No basin size filtering applied"
+}
+
+# ---------------------------------------------------------
+# STEP 2: Set Service Order and Color
+# ---------------------------------------------------------
+
+service_levels <- c("Coastal_Protection", "N_export", "Sed_export",
+                    "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
+
+service_colors <- c("#9e9ac8", "#dd1c77", "#2c944c",
+                    "#2c711c", "#08306b", "#02606b")
+
+df <- df %>%
+  mutate(service = factor(service, levels = service_levels))
+
+# ---------------------------------------------------------
+# STEP 3: Define LC Metric Labels (for scatterplots)
+# ---------------------------------------------------------
+
+lc_metrics <- c(
+  "rast_gdpTot_1990_2020_30arcsec.7_mean",
+  "GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean",
+  "GlobPOP_Count_30arc_2020_I32.1_sum",
+  "hdi_raster_predictions_2020.1_mean",
+  "farmsize_mehrabi.1_mean",
+  "GlobPOP_sqkm",
+  "dir_ch_2"
+)
+
+lc_labels <- c(
+  "Mean GDP 2020",
+  "GHS Population Mean 2020",
+  "GlobPop Sum 2020",
+  "Mean HDI 2020",
+  "Farmsize 2017",
+  "GlobPop/km²",
+  "Land Cover Change"
+)
+
+nam <- tibble(lc_metrics = lc_metrics, names = lc_labels)
+
+# ---------------------------------------------------------
+# ✅ READY: `df` is your filtered dataset
+#         `nam` is your label lookup
+#         `filter_note` is your subtitle / filename tag
+# ---------------------------------------------------------
+
+
+```
+
+# run it 
+
+```{r run_scatter}
+plot_es_lc_scatter(
+  df = df,
+  lc_metrics = lc_metrics,
+  nam = nam,
+  export_dir = here::here("output_charts"),
+  filter_note = filter_note
+)
+```
 
 ## Scatterplots
  Ready the data (load and adjust symbols
@@ -106,7 +188,7 @@ df <- df %>%
 
 # 3. List of Benef data to analyze. We can profit and set the names here. I am thinking about the best sat to get (sum/mean. Is not as evident as it seems at first) 
 lc_metrics <- c("rast_gdpTot_1990_2020_30arcsec.7_mean","GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean","GlobPOP_Count_30arc_2020_I32.1_sum","hdi_raster_predictions_2020.1_mean","farmsize_mehrabi.1_mean","GlobPOP_sqkm","dir_ch_2")
-names <- c("Mean GDP 2020", "Mean GHS Population Mean 2020", "GlobPop Sum 2020", "Mean HDI 2020", "Farmsize 2017", "GlobPop/kmˆ2", "LCover Change")
+names <- c("Mean GDP 2020", "GHS Population Mean 2020", "GlobPop Sum 2020", "Mean HDI 2020", "Farmsize 2017", "GlobPop/kmˆ2", "LCover Change")
 nam <- as_tibble(cbind(lc_metrics,names))
 ```
 
@@ -114,8 +196,13 @@ nam <- as_tibble(cbind(lc_metrics,names))
 
 ```{r scatterplots 2, fig.height=9, fig.width = 12}
 
-# Set PDF output: landscape (width > height), e.g., A4 landscape is ~11.7 x 8.3 inches
-pdf(here("output_charts", "scatterplots_by_service.pdf"), width = 11.7, height = 8)
+plot_es_lc_scatter(
+  df = df,
+  lc_metrics = nam$lc_metrics,
+  nam = nam,
+  export_dir = here::here("output_charts")
+)
+
 
 
 df_f <- df %>%
@@ -125,15 +212,14 @@ df_f <- df %>%
   filter(pct_ch <= threshold)
 
 
+plot_es_lc_scatter(
+  df = df_f,
+  lc_metrics = nam$lc_metrics,
+  nam = nam,
+  export_dir = here::here("output_charts"),
+  filter_note = "Filtered: Top 95% of observations"
+)
 
-plot_es_lc_scatter(df, lc_metrics, nam=nam)
-
-
-plot_es_lc_scatter(df, lc_metrics = "farmsize_mehrabi.1_mean", nam=nam, geom_type = "point")
-
-plot_es_lc_scatter(df,
-                   lc_metrics = "farmsize_mehrabi.1_mean",
-                   service_filter = "N_export", nam=nam, geom_type = "point")
 
 ```
 
