@@ -1,23 +1,39 @@
 """Summarize analysis raster data across reference vector data."""
 
+<<<<<<< HEAD
 from dataclasses import dataclass
 from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 from typing import Callable
+=======
+from datetime import datetime
+from datetime import timedelta
+from pathlib import Path
+import argparse
+>>>>>>> 9fd4fd6 (re #6 impelementing a YAML config file)
 import logging
 import os
 import re
 import sys
 import time
+<<<<<<< HEAD
+=======
+import textwrap
+import yaml
+>>>>>>> 9fd4fd6 (re #6 impelementing a YAML config file)
 
 from ecoshard import taskgraph
 from exactextract import exact_extract
 from exactextract.raster import GDALRasterSource
 from geopandas import gpd
+<<<<<<< HEAD
 import pandas as pd
 import psutil
 import rasterio
+=======
+import psutil
+>>>>>>> 9fd4fd6 (re #6 impelementing a YAML config file)
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -36,44 +52,38 @@ REFERENCE_SUMMARY_VECTOR_PATHS = {
     "hydrosheds_lv6_synth": "./data/reference/hydrosheds_lv6_synth.gpkg"
 }
 
-# Tag format is a tuple ([description], [YYYY]) key
-# with a "path" -> str and "band" -> int dictionary value
-ANALYSIS_DATA = {
-    ("rast_gdpTot_1990_2020_30arcsec", 1990): {
-        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-        "band": 1,
-    },
-    ("rast_gdpTot_1990_2020_30arcsec", 1995): {
-        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-        "band": 2,
-    },
-    ("rast_gdpTot_1990_2020_30arcsec", 2000): {
-        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-        "band": 3,
-    },
-    ("rast_gdpTot_1990_2020_30arcsec", 2005): {
-        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-        "band": 4,
-    },
-    ("rast_gdpTot_1990_2020_30arcsec", 2010): {
-        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-        "band": 5,
-    },
-    ("rast_gdpTot_1990_2020_30arcsec", 2015): {
-        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-        "band": 6,
-    },
-    ("rast_gdpTot_1990_2020_30arcsec", 2020): {
-        "path": "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif",
-        "band": 7,
-    },
-}
+YAML_EXAMPLE = textwrap.dedent(
+    """\
+    Example YAML format:
 
-ZONAL_OPS = ["mean", "max", "min"]
+    workspace:
+        path: "summary_pipeline_workspace"
+
+    vector_zones:
+      hydrosheds_lv6_synth:
+        path: "./data/reference/hydrosheds_lv6_synth.gpkg"
+
+    raster_layers:
+      rast_gdpTot_1990_2020_30arcsec_1990:
+        path: "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif"
+        band: 1
+
+      rast_gdpTot_1990_2020_30arcsec_1995:
+        path: "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif"
+        band: 2
+
+      rast_gdpTot_1990_2020_30arcsec_2000:
+        path: "./data/analysis/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif"
+        band: 3
+
+    ops_stats:
+      - mean
+      - max
+      - min
+    """
+)
 
 
-WORKSPACE_DIR = "./summary_pipeline_workspace"
-os.makedirs(WORKSPACE_DIR, exist_ok=True)
 REPORTING_INTERVAL = 10.0
 
 
@@ -126,6 +136,9 @@ def zonal_stats(raster_path_band_dict, zonal_ops, vector_path):
     Args:
         raster_path_band_dict (dict): dictionary containing 'path' and 'band'
             for the raster to process.
+        zonal_ops (list): list of zonal ops that can be passed to
+            exact_extract defined here:
+            https://isciences.github.io/exactextract/operations.html
         vector_path (str): Path to the vector file containing polygon
             geometries.
 
@@ -167,20 +180,49 @@ def zonal_stats(raster_path_band_dict, zonal_ops, vector_path):
 
 def main():
     """Entry point."""
+    parser = argparse.ArgumentParser(description="Zonal stats pipeline.")
+    parser.add_argument(
+        "config_yaml",
+        type=Path,
+        help="Path to YAML configuration example:\n\n" + YAML_EXAMPLE,
+    )
+    args = parser.parse_args()
+    with args.config_yaml.open("r") as f:
+        config = yaml.safe_load(f)
+
+    required_fields = {
+        "workspace_dir",
+        "vector_zones",
+        "raster_layers",
+        "op_stats",
+    }
+    missing = required_fields - config.keys()
+    if missing:
+        raise ValueError(
+            f'Missing fields {", ".join(sorted(missing))} in {args.config_yaml}'
+        )
+
+    workspace_dir = config["workspace_dir"]
+    os.makedirs(workspace_dir, exists_ok=True)
+
+    analysis_data = config["analysis_data"]
+    zonal_ops = config["zonal_ops"]
+
     start_time = time.time()
+    raster_layers = config["raster_layers"]
     physical_cores = psutil.cpu_count(logical=False)
     task_graph = taskgraph.TaskGraph(
-        WORKSPACE_DIR,
-        n_workers=min(len(ANALYSIS_DATA), physical_cores),
+        workspace_dir,
+        n_workers=min(len(raster_layers), physical_cores),
         reporting_interval=REPORTING_INTERVAL,
     )
     zonal_stats_task_list = []
 
     for vector_id, vector_path in REFERENCE_SUMMARY_VECTOR_PATHS.items():
-        for (raster_id, year), raster_path_band_dict in ANALYSIS_DATA.items():
+        for (raster_id, year), raster_path_band_dict in raster_layers.items():
             stats_task = task_graph.add_task(
                 func=zonal_stats,
-                args=(raster_path_band_dict, ZONAL_OPS, vector_path),
+                args=(raster_path_band_dict, zonal_ops, vector_path),
                 store_result=True,
                 task_name=(
                     f"zonal stats for {raster_id}:"
@@ -199,14 +241,12 @@ def main():
         gdf["fid"] = gdf.index.astype("int32")
         for raster_id, band_idx, stats_task in zonal_stats_task_list:
             stats_df = stats_task.get()
-            rename_map = {
-                op: f"{raster_id}:{band_idx}_{op}" for op in ZONAL_OPS
-            }
+            rename_map = {op: f"{raster_id}_{op}" for op in zonal_ops}
             stats_df.rename(columns=rename_map, inplace=True)
             gdf = gdf.merge(stats_task.get(), on="fid")
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         out_vector_path = os.path.join(
-            WORKSPACE_DIR, f"{vector_id}_synth_zonal_{timestamp}.gpkg"
+            workspace_dir, f"{vector_id}_synth_zonal_{timestamp}.gpkg"
         )
         gdf.to_file(out_vector_path, driver="GPKG")
         print(
