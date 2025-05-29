@@ -32,7 +32,8 @@ source(here("R","utils_pct_change.R"))
 source(here("R", "perc_filteR.R"))
 
 ```
- I moved some chunks from here to the end of **Consolidation.Rmd**. They kept distracting me and making me waste even more time each time i had to make sens of this, and the worst , wasting time. I will move wha was here away to avoidgetting confused (again), but kep record where i put in csase i ever need to review this. If at some point that is nto neceesary anymore, i will move that to old_notebook, but for the love of Bochica, keep our working spaces clean !!
+
+I moved some chunks from here to the end of **Consolidation.Rmd**. They kept distracting me and making me waste even more time each time i had to make sense of this, and the worst , wasting time. I will move what was here away to avoid getting confused (again), but keep record where i put in case i ever need to review this. If at some point that is not necessary anymore, i will move that to old_notebook, but for the love of Bochica, keep our working spaces clean !!
 THis cleans the data/consolidates columns that are going to be analyzed keep at hands, the rest is sent to a storage. there should be a database structure here. 
 
 
@@ -184,8 +185,6 @@ df <- df %>%
     service = factor(service, levels = service_levels),
   )
 
-
-
 # 3. List of Benef data to analyze. We can profit and set the names here. I am thinking about the best sat to get (sum/mean. Is not as evident as it seems at first) 
 lc_metrics <- c("rast_gdpTot_1990_2020_30arcsec.7_mean","GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean","GlobPOP_Count_30arc_2020_I32.1_sum","hdi_raster_predictions_2020.1_mean","farmsize_mehrabi.1_mean","GlobPOP_sqkm","dir_ch_2")
 names <- c("Mean GDP 2020", "GHS Population Mean 2020", "GlobPop Sum 2020", "Mean HDI 2020", "Farmsize 2017", "GlobPop/kmˆ2", "LCover Change")
@@ -194,15 +193,65 @@ nam <- as_tibble(cbind(lc_metrics,names))
 
 
 
-```{r scatterplots 2, fig.height=9, fig.width = 12}
+```{r scatterplots 2, fig.height=8, fig.width = 11}
 
 plot_es_lc_scatter(
   df = df,
   lc_metrics = nam$lc_metrics,
   nam = nam,
-  export_dir = here::here("output_charts")
+reverse_axes = TRUE,
+  #export_dir = here::here("output_charts")
 )
 
+
+
+```
+
+```{r filtered, fig.height=8, fig.width = 11}
+
+# Define services where we want the largest losses (negative change is bad)
+loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
+
+# Define services where we want the largest gains (positive change is bad, e.g. sediment/nutrient export)
+gain_services <- c("Sed_export", "N_export")
+
+# Create a new column where we flip the sign only for gain services
+df <- df %>%
+  mutate(
+    pct_ch_focus = case_when(
+      service %in% gain_services ~ pct_ch,         # positive values are bad → keep as-is
+      service %in% loss_services ~ -pct_ch,        # negative values are bad → flip sign
+      TRUE ~ pct_ch                                 # fallback
+    )
+  )
+
+# Now get the top 5% of "problematic" changes
+df_hotspots <- df %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch_focus, 0.95, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch_focus >= threshold)
+
+
+
+# df_f <- df %>%
+#   group_by(service) %>%
+#   mutate(threshold = quantile(pct_ch, 0.05, na.rm = TRUE)) %>%
+#   ungroup() %>%
+#   filter(pct_ch <= threshold)
+# 
+
+plot_es_lc_scatter(
+  df = df_hotspots,
+  lc_metrics = nam$lc_metrics,
+  nam = nam,
+  #xport_dir = here::here("output_charts"),
+reverse_axes = FALSE,
+  filter_note = "top % change per service"
+)
+```
+
+```{r filtered, fig.height=9, fig.width = 12}
 
 
 df_f <- df %>%
@@ -216,13 +265,10 @@ plot_es_lc_scatter(
   df = df_f,
   lc_metrics = nam$lc_metrics,
   nam = nam,
-  export_dir = here::here("output_charts"),
+  #xport_dir = here::here("output_charts"),
   filter_note = "Filtered: Top 95% of observations"
 )
-
-
 ```
-
 
 ###########################################################
 
