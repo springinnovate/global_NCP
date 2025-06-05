@@ -1,0 +1,430 @@
+---
+title: "Clean Mapping Data"
+output: html_notebook
+---
+
+ (Next Steps: extract top bottom values for all changes (%))
+
+# LOAD THE DATA
+
+
+# Organize columns
+
+I had to do this to make sense of the different runs i have done and the data that i need. From individual yearly stats (which ones?) ["raw" data rasters and derived raster algebra products] bi-temporal relative change, key attributes from the input data among others. Need to come out with a better way to do this, and eventually keep a final gpkg correctly organized, but it is always better to have the workflow take care of the whole thing on its own. Have to spend less time here , can repeat the process easier and with fewer errors.
+
+#####
+
+# Load latest version and inckude usle data 
+
+```{r load input polygon data cumaribo}
+
+#Builds a list of files in the vector directory
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector'
+sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
+# Set and select an index to load the desired dastaset
+t <- 1
+set <- sets[t]
+lyr <- st_layers(set)
+# # load polygons
+print(lyr)
+```
+
+
+
+
+
+```{r  get this sorted}
+bas <- st_read(set)
+
+
+```
+
+## Add broader info spatial units 
+Here, we will add the names of the broader spatial units:
+
+country
+WWF biome
+Ecoregion
+
+
+This part is a mess and kind of embarrassing, i need to clean it a bit. But this is a great piece of thinking. I get for each basin the country for which the larger share belongs and assign it to that country, s i get the attribes (id of coutnries, biomnes ,ecoregions and can jopin it to the hydrosheds as additional attributes. We are going to sue this soon, but again, there is some cleaning to do here. I just don't have time now. 
+
+```{r join spatial unit names}
+
+inpath <- here('vector')
+# Load a the vecor with the basins
+basins <- st_read(paste0(inpath, "/", "hydrosheds_lv6_cp.gpkg"))
+
+# Drop unnecessary columns (optional)
+basins <- basins[c(1:13)]
+
+
+# load vector with the countries
+cnt <- st_read(here('vector', 'cartographic_ee_ee_r264_correspondence.gpkg'))
+# drop unnecesary columns
+cnt <- cnt[c(1,12,22)]
+
+# Reproject both layers to an equal area crs (to make sure the we are correctly calculating the areas withing the polygons)
+cnt <- st_transform(cnt, crs = "EPSG:6933")
+bas_eq <- st_transform(basins, crs = "EPSG:6933")
+
+# Create a template to rasterize the vector data
+template <- terra::rast(bas_eq, resolution = 300)
+
+# Rasterize the spatial unit polygons
+r_country <- terra::rasterize(vect(cnt), template, field = "id")
+
+# Step 2: Extract coverage fraction for each basin
+country_weights <- exactextractr::exact_extract(r_country, basins, weights = "area")
+
+# Step 3: For each basin, find the country with max coverage
+dominant_country <- lapply(country_weights, function(tbl) {
+  tbl <- tbl %>% group_by(value) %>% summarise(weight = sum(weight, na.rm = TRUE))
+  tbl <- tbl %>% slice_max(weight, n = 1)
+  return(tbl$value)
+})
+
+# Step 4: Map back to country name
+dominant_country <- unlist(dominant_country)
+basins$id <- dominant_country
+
+
+basins <- left_join(basins, cnt %>% st_drop_geometry(), by = "id")
+st_write(basins, here("vector", "basins_ct.gpkg"))
+#######################################
+
+# Here i used this clipped layer, because of an error that i thought was due to the extent of biemes being slightly different to basins. I clipped to remove the unmatteched portions but that was not the cause anyway. I don't thin this is necessary,  but i am not repeating this.
+
+basins <- st_read(paste0(inpath, "/", "hydrosheds_lv_tmp.gpkg"), layer = 'clipped')
+bas_eq <- st_transform(basins, crs = "EPSG:6933")
+
+template <- terra::rast(bas_eq, resolution = 300)
+wwf_biome <- st_read(here("vector", "Biomes_WWF", "wwf_terr_ecos.shp"))
+wwf_biome <-  st_transform(wwf_biome, crs = "EPSG:6933")
+
+wwf_biome <- wwf_biome[c(1,4,6)]
+r_bm <- terra::rasterize(vect(wwf_biome), template, field = "BIOME")
+bm_weights <- exactextractr::exact_extract(r_bm, basins, weights = "area")
+
+#  For each basin, find the unit with max coverage
+dominant_bm <- map_dbl(bm_weights, function(tbl) {
+  tbl %>%
+    group_by(value) %>%
+    summarise(weight = sum(weight, na.rm = TRUE), .groups = "drop") %>%
+    slice_max(order_by = weight, n = 1, with_ties = FALSE) %>%
+    pull(value)
+})
+
+basins <- st_read(here("vector", "basins_ct.gpkg"))
+#dominant_bm.<- unlist(dominant_bm)
+basins$BIOME <- dominant_bm
+# Step 4: Map back to country name
+
+basins <- st_read()
+basins <- left_join(basins,lyr %>% st_drop_geometry(), by ="BIOME")
+
+basins <- basins %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+lyr <- lyr %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+
+basins <- left_join(basins, lyr  %>% st_drop_geometry(), by = "HYBAS_ID")
+st_write(basins, here("vector", "basins_bm.gpkg"), append=FALSE)
+
+
+### Add ecoregions
+
+
+basins <- st_read(paste0(here("vector"), "/",  "basins_bm.gpkg"))
+bas_eq <- st_transform(basins, crs = "EPSG:6933")
+
+template <- terra::rast(bas_eq, resolution = 300)
+
+er <- rast(here("input_ES", "Additional_data", "Ecoregions2017_compressed_md5_316061.tif"))
+er <- project(er,  template, threads= 10)
+er <- round(er, digits = 0)
+
+er_weight <- exactextractr::exact_extract(er, bas_eq, weights = "area")
+
+dominant_bm <- map_dbl(er_weight, function(tbl) {
+  tbl %>%
+    group_by(value) %>%
+    summarise(weight = sum(weight, na.rm = TRUE), .groups = "drop") %>%
+    slice_max(order_by = weight, n = 1, with_ties = FALSE) %>%
+    pull(value)
+})
+
+basins$ecoregion <- dominant_bm
+
+st_write(basins, here("vector", "basins_bm.gpkg"), append=FALSE)
+
+
+bas1 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/basins_bm.gpkg')
+
+bas_lyr <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synthesis.gpkg')
+bas_lyr <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synthesis.gpkg', layer = "hydrosheds_lv6_synthesis")
+bas_lyr <- bas_lyr[c(1, 14:36)]
+
+bas1 <- left_join(bas1, bas_lyr %>% st_drop_geometry(), by= "HYBAS_ID")
+
+st_write(bas1, here("vector", "hydrosheds_lv6_synth.gpkg"), append=FALSE)
+
+bas1 <- st_drop_geometry(bas1)
+write.csv(bas1, file= here("vector", "synth_table.csv"))
+```
+
+Here, we are loading the data with the LCchange calucalted to join with the basins. We jsut want to know each basinb to whci country mayorly blongs (horrible writing, work on that later)
+
+```{r get amounts of lc chnage}
+# check which alyers are inside
+ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/countries_lc2.gpkg')
+#load data into the environment
+
+bas_lc <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/countries_lc2.gpkg', layer = "lcc_countries")
+
+bas_lc <- st_read(here("vector", "countries_lc2.gpkg"), layer = "lcc_countries")
+
+
+# Cumaribo
+bs <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg')
+# Lilling
+bs <- st_read(here('vector', 'hydrosheds_lv6_synth.gpkg'))
+
+# Keep only relevant columns (id, name, direction of change)
+bas_lc <- bas_lc[c(1,2,19)]
+
+# Step 1: Make sure your geometry column exists and is valid
+# If you already have an area column (e.g., `SUB_AREA`), skip the next line
+bas_lc <- bas_lc %>% mutate(area_sqkm = as.numeric(st_area(geom)) / 10^6)
+
+# Step 2: Filter out the smallest 2% by area
+area_threshold <- quantile(bas_lc$area_sqkm, probs = 0.05, na.rm = TRUE)
+
+bas_lc_filtered <- bas_lc %>% 
+  filter(area_sqkm > area_threshold)
+
+# Remove units below 10.000 
+bas_lc_filtered <- bas_lc %>%
+  filter(area_sqkm > 10000)
+
+## Also test for the "large" countries 
+bas_lc_filtered <- bas_lc_filtered %>% filter(name_long!="Vanuatu")# %>% filter()
+# Step 3: Select top and bottom 5 by dir_ch_2
+top_bottom_10k <- bas_lc_filtered %>%
+  slice_max(dir_ch_2, n = 10, with_ties = FALSE) %>%
+  bind_rows(
+    bas_lc_filtered %>%
+      slice_min(dir_ch_2, n = 10, with_ties = FALSE)
+  )
+
+top_bottom_10k <- st_drop_geometry(top_bottom_10k)
+# some issue Small countries invariable have larger shbares. This needs to be normalized or something 
+
+
+bas_lc <- st_drop_geometry(bas_lc)
+
+top_bottom_lc <- bas_lc %>% slice_max(dir_ch_2, n = 5, with_ties = FALSE) %>% bind_rows(
+    bas_lc %>%
+      slice_min(dir_ch_2, n = 5, with_ties = FALSE)
+  )
+```
+
+
+
+```{r get amounts of lc change2}
+
+
+# get pct as standalone data to add to the table
+poly <- st_transform(poly, crs = 5880)
+poly$area_ha <- as.numeric(st_area(poly))/10000
+plt <- as_tibble(st_drop_geometry(poly))
+#filter all thins smaller than 150.000 ha (takes away the 54 smallest features) 
+plt  <- plt %>% select(1,2, area_ha,contains("pct"))%>% filter(area_ha>400000)
+
+
+
+################## THIS IS VERY IMPPORTAnt. Instead of struggling  with the multiple dataframes, it is easier to load the vector file swith all the column and pivot longer as necessary. Easier to manage, adjust on the fly!
+plt <- as_tibble(plt %>%
+  pivot_longer(
+    cols = c(ends_with("pct_ch")),  # Select all columns ending with "pct_ch"
+    names_to = "service",        # New column to store the service names
+    values_to = "pct_ch"         # New column to store the percentage change values
+  ))
+
+plt <- plt %>%
+  mutate(service = str_remove(service, "_pct_ch$"))
+plt <- left_join(plt,cd) # this will return an error because maybe the cd dataframe is not there. It is the one thatdefiens the class names and colors 
+plt <- plt%>% filter(!is.na(pct_ch))
+```
+
+I remember here. plt is used as input in the visualizations.Rmd notebook. That might not be the smartest way to do this, but anyway, what we need to have is a final datafrasme that we are going to process. The dataframe is the despatialzied basins object pivoted long, so we can use ggplot2 and dplyr tools to extract insights. The next point from here, 04/05/2025 is to extract the summary metrics for the additional rasters,  contact the techniocal group, share the updated data and update the documentation (i already updated main`)
+
+We are not using  this. This os from an older verion by country. 
+We could actually get all the metrics for all the classes for all the years for all the basins and feed the whole thing into some well designed ML model. It might tell us something, or be useful in some measure. and then add a temporal component and animate the scatterplots or something. Group them by country. By income level. by biome. All that would be possible, Need to think with wome calm about this.
+Add some charts/amimatiosn that shows the lc dinamics over time. This could be group in multiple ways. I can't think whcih would be the best way to start, but we have everytting we need.
+
+
+```{r timeseries plot}
+
+
+inpath <- here('output_data')
+zonal_csv <- file.path(inpath, list.files(paste0(inpath),pattern= 'TS'))
+
+n <- 4
+zonal_df <- as_tibble(read.csv(zonal_csv[n]))
+
+
+# Only for biomes, t make names shorter
+ # zonal_df <- zonal_df %>%
+ #   mutate(biome_short = recode(WWF_biome, !!!biome_labels))
+
+library(ggplot2)
+
+#zonal_df <- zonal_df %>% filter(WWF_biome!="Lakes")
+
+# Create the line plot
+ggplot(zonal_df, aes(x = year, y = mean, color = biome_short, group = biome_short)) +
+  geom_line(size = 1) +          # Add lines for each subregion
+  geom_point(size = 2) +         # Add points for visibility
+  labs(
+    title = paste("Ecosystem Service Trends by ", col, sep= ""),
+    x = "Year",
+    y = "Mean Value"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")  # Adjust legend position
+```
+
+
+```{r biomes short}
+biome_labels <- c(
+  "Temperate Grasslands, Savannas & Shrublands" = "Temperate Grasslands",
+  "Tropical & Subtropical Moist Broadleaf Forests" = "Moist Broadleaf Forests",
+  "Temperate Conifer Forests" = "Temperate Conifers",
+  "Tropical & Subtropical Coniferous Forests" = "Tropical Conifers",
+  "Rock & Ice" = "Rock & Ice",
+  "Boreal Forests/Taiga" = "Boreal Forests",
+  "Montane Grasslands & Shrublands" = "Montane Grasslands",
+  "Lakes" = "Lakes",
+  "Flooded Grasslands & Savannas" = "Flooded Grasslands",
+  "Mediterranean Forests, Woodlands & Scrub" = "Mediterranean Forests",
+  "Tropical & Subtropical Dry Broadleaf Forests" = "Dry Broadleaf Forests",
+  "Temperate Broadleaf & Mixed Forests" = "Temperate Broadleaf",
+  "Tundra" = "Tundra",
+  "Tropical & Subtropical Grasslands, Savannas & Shrublands" = "Tropical Grasslands",
+  "Mangroves" = "Mangroves"
+)
+```
+```{r load procesed data and build final gpkgs}
+
+inpath <- here("summary_pipeline_workspace")
+
+gp <- list.files(inpath, pattern = ".gpkg")
+
+gp <- file.path(inpath, gp)
+
+synth <- lapply(gp, st_read)
+synth <- lapply(synth, function(s){
+  s <- s %>% mutate(fid=row_number()-1)
+})
+
+synth <- lapply(synth, function(s){
+  s <- st_drop_geometry(s)
+})
+
+synth[[1]] <- select(synth[[1]], fid, GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean)
+synth[[2]] <- select(synth[[2]], fid, rast_gdpTot_1990_2020_30arcsec.7_mean)
+synth[[3]] <- select(synth[[3]], fid, GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean)
+synth[[4]] <- select(synth[[4]], fid, GlobPOP_Count_30arc_2020_I32.1_sum)
+synth[[5]] <- select(synth[[5]], fid, hdi_raster_predictions_2020.1_mean)
+synth[[6]] <- select(synth[[6]], fid,farmsize_mehrabi.1_mean)
+
+
+synth <- reduce(synth, left_join, by= "fid")
+# Load the polygons with the calcualted ES change variables
+synth_ES <- st_read(here('vector',"hydrosheds_lv6_synth.gpkg"))
+# Keep the columns of interest (original hydrosheds and pct_ch in this case)
+synth_ES <- dplyr::select(synth_ES, 1:13, contains("pct_ch"))
+
+synth_ES <- synth_ES %>% mutate(fid = row_number()-1)
+
+
+synth_ES <- left_join(synth_ES, synth, by = 'fid')
+synth_ES$fid <- NULL
+############# CURRENT OUTPUT WITH THE FINAL BANDS TO ANALYZE (SCATTERPLOTS, VIOLINS)
+st_write(synth_ES, here('vector', "hydrosheds_lv6_synth.gpkg"), layer = "benef_analysis", append = TRUE)
+```
+
+WHY is this here? I think is mee trying (again) to get straight what i have already processed and see if sme day it doesn to take me days to retake the work when o finally extract the data i need. 
+```{r pivot and preprare to plot the data}
+
+tt <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg')
+t2 <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv_tmp.gpkg')
+t3 <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv_6_tmp.gpkg')
+t <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg', layer = "ch_92_2020")
+tt2 <-st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv_tmp.gpkg', layer = "clipped") 
+
+```
+
+```{r chunk1, eval=FALSE, include=FALSE}
+# Get the columns that we need (can;t believe i have been struggling with this for more than 2 months)
+# correctio. 3 months at this point. I really don't know what the fucking problem is, this should be an easy task, and somehow something absolutely stupid keeps taking the two things  I need the most. My reputation as a worker and my time
+
+ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/hydrosheds_lv6_synth.gpkg')
+synth_ES <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg', layer = "benef_analysis")
+spring_ES <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/hydrosheds_lv6_synth.gpkg', layer = "hydrosheds_lv6_synth")
+
+spring_ES <- st_read('/Users/rodriguez/Global_ES_TS/global_NCP/vector/hydrosheds_lv6_synth.gpkg', layer = "hydrosheds_lv6_synth")
+
+spring_ES <- spring_ES[c(1:17,36:40,44, 45)]
+synth_ES <- synth_ES[c(1,7,21,22,23,24,25,26)]
+#  get pct as standalone data to add to the table
+# Most recent version of synthesis data:
+ 
+ # calculate POP Density
+synth_ES <- synth_ES %>%
+  mutate(GlobPOP_sqkm = GlobPOP_Count_30arc_2020_I32.1_sum / SUB_AREA)
+
+
+
+ plt_spring <- st_drop_geometry(spring_ES) # if necessary when i load 
+
+
+ plt_synth <- st_drop_geometry(synth_ES) # if necessary when i load 
+spring_ES <- left_join(spring_ES,plt_synth)
+
+```
+
+
+
+
+ This could be a dialogue box!!!
+```{r remove lowestvalues to reduce artifacts}
+# Calculate pseudo_log val for display purposes. 
+plt <- plt %>%
+  mutate(
+    service = factor(service, levels = service_levels),
+    pct_ch_trans = pseudo_log(pct_ch)
+  )
+
+# apply filter (5% or 2%) # Remove the smallest basins. 
+area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
+# Filter the dataset
+df <- plt %>% filter(SUB_AREA > area_threshold)
+
+write.csv(plt, here("output_data", "serv_benef_synth_01.csv"))
+# get the filtered locations
+```
+
+
+his alreaDY DONE NOT RUN!!!
+```{r eval=FALSE, fig.height=8, fig.width=14, include=FALSE}
+#Load chnage data in long format/ 
+plt <- read.csv(here("output_data", "metrics_change_hb_lev_6.csv"))
+# plt[1] <- NULL Update this with the names of the variables being assessed. There should be a less annoying way to do this. Thaty;s why noting works. These names are not for the object i just loaded!!!!
+service <- unique(plt$service)
+service <- c("GHS_BUILT","GDP","GHS_POP","HDI", "Farm_size", "GlobPOP")
+ color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
+ service_levels <- service
+ cd <- as_tibble(cbind(service,color))
+ #check and join. 
+ plt <- left_join(plt, cd)
+```

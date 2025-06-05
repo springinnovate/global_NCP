@@ -54,11 +54,6 @@ Start HERE!!!!
 # SETUP: Load Ecosystem Service - Beneficiary Data
 # ---------------------------------------------------------
 
-library(dplyr)
-library(readr)
-library(tibble)
-library(here)
-
 # Load long-format ES data (one row per basin-service-metric)
 df_raw <- read_csv(here("output_data", "serv_benef_synth_01.csv"))
 
@@ -69,7 +64,7 @@ df_raw <- read_csv(here("output_data", "serv_benef_synth_01.csv"))
 # ---- USER OPTIONS ----
 filter_type <- "quantile"   # Options: "quantile", "percent", "absolute"
 filter_cutoff <- 0.05       # 5% cutoff if using quantile or percent
-filter_direction <- "bottom"  # Options: "bottom", "top", "both", "none"
+filter_direction <- "bottom"  # Options: "bottom", "top", "both", "none" Actually here, only bottom makes sense. However, i need to think what i aqm going to do about the long format, and if this actually has some/any effect on the calculation 
 # -----------------------
 
 # Compute threshold based on filter type
@@ -159,7 +154,7 @@ plot_es_lc_scatter(
   df = df,
   lc_metrics = lc_metrics,
   nam = nam,
-  export_dir = here::here("output_charts"),
+  #export_dir = here::here("output_charts"),
   filter_note = filter_note
 )
 ```
@@ -274,7 +269,6 @@ plot_es_lc_scatter(
 
 
 ```{r fig.height=8, fig.width=10, warning=FALSE}
-library(dplyr)
 
 # 1. Identify hotspots by service
 df_hotspots <- df %>%

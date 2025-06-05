@@ -1,499 +1,896 @@
 ---
-title: "Clean Mapping Data"
+title: "Current Status"
 output: html_notebook
 ---
 
- (Next Steps: extract top bottom values for all changes (%))
 
-# LOAD THE DATA
-
-
-```{r load input polygon data}
-
-#Builds a list of files in the vector directory
-inpath <- here("vector")
-sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
-
-# Set and select an index to load the desired dastaset
-t <- 2
-set <- sets[t]
-
-lyr <- st_layers(set)
-# # load polygons
-print(lyr)
-```
-# Organize columns
-
-I had to do this to make sense of the different runs i have done and the data that i need. From individual yearly stats (which ones?) ["raw" data rasters and derived raster algebra products] bi-temporal relative change, key attributes from the input data among others. Need to come out with a better way to do this, and eventually keep a final gpkg correctly organized, but it is always better to have the workflow take care of the whole thing on its own. Have to spend less time here , can repeat the process easier and with fewer errors.
-
-#####
-
-**I Think this is not necessary anymore, these are older versions and i am wasying more time trying to make sense of this than just redoing the whole thing, i just need to find the usle data!!!**
-
-```{r refine columns}
-basin <- st_read(set, layer= "hydrosheds_lev6") 
-basin <- basin[c(1:13)] # just get the originql columns. Does nothing else
-poly <- st_read(set, layer= "layer1") # not necessary aNYMORE, IT UST HAS THE COASTAQP PRTECTION DATA
-bas1 <- st_drop_geometry(poly)
-bas1 <- bas1[c(1,14,15,17)]
-poly <- st_read(set, layer= "1992_2020_lcc_change_metrics") # Not sure here, but will keep for now. 
-bas2 <- st_drop_geometry(poly)
-bas2 <- bas2[c(1,14:15,23,22,17,18,19,20,24)]
-bas2 <- bas2 %>% mutate(HYBAS_ID = as.numeric(HYBAS_ID))
-poly <- st_read(set)
-
-#poly <- st_read(set, layer= "ch_92_2020") 
-#poly
-basin <- left_join(basin, bas1)
-basin <- left_join(basin,bas2)
-basin <- basin[c(1:13,17:20,14,15,21,22,23,25,16,24)]
-#st_write(basin, here('vector', "hydrosheds_lv6_tmp.gpkg"))
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(tidytext)
+library(rlang)
+library(tidyr)
+library(forcats)
+library(scales)
+library(RColorBrewer)
+library(htmltools)
+library(leaflet)
+library(devtools)
+load_all()
+#source the helper functions
+source(here("R", "hotSpotR.R"))
+source(here("R","utils_pct_change.R"))
+source(here("R", "utils_lcc_metrics.R"))
+source(here("R","utils_pct_change.R"))
+source(here("R", "perc_filteR.R"))
 ```
 
-```{r load input polygon data cumaribo}
+
+#  1 Organize output Dataframes (make sure that they are complete and correclty named)
+
+Right now, 24/04/2025 the problem is on the way the dataframe with the class colors and names is built. The process is still too manual (writing the table) and is easy to get it wrong when it should not be big deal. Ideally, there should be a dialogue box to fill this instead. This should take care of the class names, values and colors neatl
+Also, the order of the factors needs to be set, and new classes have to be added. Again, i don't how to do it easily. I mean, it is easy, but annoying to do and easy to get wrong.
+
+
+#######################################################
+Here, i need to clean the directory form a lot of old versions. Only the groupings. If pct not there, it is fine, that is easy to calculate now. 
+**Finally, syntesis data consolidated into a single dataset**
+
+```{r consolidate final outputs}
 
 #Builds a list of files in the vector directory
 inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector'
 sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
-
 # Set and select an index to load the desired dastaset
 t <- 1
 set <- sets[t]
 
-lyr <- st_layers(set)
 # # load polygons
 print(lyr)
+test1 <- st_read(set)
+
+lyr <- st_layers(sets[3])
+poly2 <- st_read(sets[3],layer= "hydrosheds_lv6_synth")
+
+
+# 1. Drop geometry from the one you're joining in
+test1 <-test1 %>% st_drop_geometry()
+
+# 2. Identify overlapping columns (besides ID or join key)
+overlap <- intersect(names(poly2), names(test1))
+
+# Optionally drop duplicates (except for the join key, say "HYBAS_ID")
+join_key <- "HYBAS_ID"
+to_drop <- setdiff(overlap, join_key)
+
+
+# 3. Remove those overlapping columns from b_data
+b_data_unique <- b_data %>% select(-all_of(to_drop))
+
+# 4. Join the cleaned b_data to a (which retains the geometry)
+final <- left_join(a, b_data_unique, by = join_key)
+
+test1 <- test1 %>% select(-all_of(to_drop))
+test1 <- test1 %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+
+poly<- left_join(poly2, test1, by = join_key)
+poly <- poly %>% rename(N_Ret_Ratio_pct_ch = N_Ret_Ratio)
+# adjust name 
+st_write(poly, paste0(inpath, '/', 'hydrosheds_lv6_synth.gpkg'), append=FALSE)
 ```
 
-```{r refine columns cumaribo}
-basin2 <- st_read(set)#, layer= "hydrosheds_lev6") 
-t2 <- st_drop_geometry(basin)
-t2 <- t2[c(1,14:21,24,25,22,23,26)]
-basin <- st_read(set)#, layer= "hydrosheds_lev6") 
-t3 <- st_drop_geometry(basin)
-t3 <- t3[c(1,14:17,20,21,22:25)]
-t3 <- t3[-10]
-
-basin <- st_read(set, layer= "ch_92_2020") 
-t4 <- st_drop_geometry(basin)
-t4 <- t4[-c(2:16)]
-t4 <- t4[-c(2,3,4,5,6,9)]
-
-t2 <- t2 %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
-t3 <- t3 %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
-t2 <- left_join(t2,t3)
-t4 <- t4 %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
-t2 <- left_join(t2,t4)
-t2 <- t2[c(1:9,15,16,17,18,19,20,12,13,21,22,14,23)]
-#poly <- st_read(set, layer= "ch_92_2020") 
-#poly
-basin <- left_join(basinf, t2)
-basin <- left_join(basin,bb2)
-
-names(basin) <- ifelse(
-  endsWith(names(basin), "_2020_1992"),
-  gsub("_2020_1992$", "", names(basin)),
-  names(basin))
-#st_write(basin, paste0('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector', '/', "hydrosheds_lv6_synthesis.gpkg"), append=FALSE)
-
-```
-
-
-
-```{r  get this sorted}
-bas <- st_read(set)
-
-
-
-
-```
-
-## Add broader info spatial units 
-Here, we will add the names of the broader spatial units:
-
-country
-WWF biome
-Ecoregion
-
-
-This part is a mess and kind of embarrassing, i need to clean it a bit. But this is a great piece of thinking. I get for each basin the country for which the larger share belongs and assign it to that country, s i get the attribes (id of coutnries, biomnes ,ecoregions and can jopin it to the hydrosheds as additional attributes. We are going to sue this soon, but again, there is some cleaning to do here. I just don't have time now. 
-
-```{r join spatial unit names}
-
-inpath <- here('vector')
-# Load a the vecor with the basins
-basins <- st_read(paste0(inpath, "/", "hydrosheds_lv6_cp.gpkg"))
-
-# Drop unnecessary columns (optional)
-basins <- basins[c(1:13)]
-
-
-# load vector with the countries
-cnt <- st_read(here('vector', 'cartographic_ee_ee_r264_correspondence.gpkg'))
-# drop unnecesary columns
-cnt <- cnt[c(1,12,22)]
-
-# Reproject both layers to an equal area crs (to make sure the we are correctly calculating the areas withing the polygons)
-cnt <- st_transform(cnt, crs = "EPSG:6933")
-bas_eq <- st_transform(basins, crs = "EPSG:6933")
-
-# Create a template to rasterize the vector data
-template <- terra::rast(bas_eq, resolution = 300)
-
-# Rasterize the spatial unit polygons
-r_country <- terra::rasterize(vect(cnt), template, field = "id")
-
-# Step 2: Extract coverage fraction for each basin
-country_weights <- exactextractr::exact_extract(r_country, basins, weights = "area")
-
-# Step 3: For each basin, find the country with max coverage
-dominant_country <- lapply(country_weights, function(tbl) {
-  tbl <- tbl %>% group_by(value) %>% summarise(weight = sum(weight, na.rm = TRUE))
-  tbl <- tbl %>% slice_max(weight, n = 1)
-  return(tbl$value)
-})
-
-# Step 4: Map back to country name
-dominant_country <- unlist(dominant_country)
-basins$id <- dominant_country
-
-
-basins <- left_join(basins, cnt %>% st_drop_geometry(), by = "id")
-st_write(basins, here("vector", "basins_ct.gpkg"))
-#######################################
-
-# Here i used this clipped layer, because of an error that i thought was due to the extent of biemes being slightly different to basins. I clipped to remove the unmatteched portions but that was not the cause anyway. I don't thin this is necessary,  but i am not repeating this.
-
-basins <- st_read(paste0(inpath, "/", "hydrosheds_lv_tmp.gpkg"), layer = 'clipped')
-bas_eq <- st_transform(basins, crs = "EPSG:6933")
-
-template <- terra::rast(bas_eq, resolution = 300)
-wwf_biome <- st_read(here("vector", "Biomes_WWF", "wwf_terr_ecos.shp"))
-wwf_biome <-  st_transform(wwf_biome, crs = "EPSG:6933")
-
-wwf_biome <- wwf_biome[c(1,4,6)]
-r_bm <- terra::rasterize(vect(wwf_biome), template, field = "BIOME")
-bm_weights <- exactextractr::exact_extract(r_bm, basins, weights = "area")
-
-#  For each basin, find the unit with max coverage
-dominant_bm <- map_dbl(bm_weights, function(tbl) {
-  tbl %>%
-    group_by(value) %>%
-    summarise(weight = sum(weight, na.rm = TRUE), .groups = "drop") %>%
-    slice_max(order_by = weight, n = 1, with_ties = FALSE) %>%
-    pull(value)
-})
-
-basins <- st_read(here("vector", "basins_ct.gpkg"))
-#dominant_bm.<- unlist(dominant_bm)
-basins$BIOME <- dominant_bm
-# Step 4: Map back to country name
-
-basins <- st_read()
-basins <- left_join(basins,lyr %>% st_drop_geometry(), by ="BIOME")
-
-basins <- basins %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
-lyr <- lyr %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
-
-basins <- left_join(basins, lyr  %>% st_drop_geometry(), by = "HYBAS_ID")
-st_write(basins, here("vector", "basins_bm.gpkg"), append=FALSE)
-
-
-### Add ecoregions
-
-
-basins <- st_read(paste0(here("vector"), "/",  "basins_bm.gpkg"))
-bas_eq <- st_transform(basins, crs = "EPSG:6933")
-
-template <- terra::rast(bas_eq, resolution = 300)
-
-er <- rast(here("input_ES", "Additional_data", "Ecoregions2017_compressed_md5_316061.tif"))
-er <- project(er,  template, threads= 10)
-er <- round(er, digits = 0)
-
-er_weight <- exactextractr::exact_extract(er, bas_eq, weights = "area")
-
-dominant_bm <- map_dbl(er_weight, function(tbl) {
-  tbl %>%
-    group_by(value) %>%
-    summarise(weight = sum(weight, na.rm = TRUE), .groups = "drop") %>%
-    slice_max(order_by = weight, n = 1, with_ties = FALSE) %>%
-    pull(value)
-})
-
-basins$ecoregion <- dominant_bm
-
-st_write(basins, here("vector", "basins_bm.gpkg"), append=FALSE)
-
-
-bas1 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/basins_bm.gpkg')
-
-bas_lyr <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synthesis.gpkg')
-bas_lyr <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synthesis.gpkg', layer = "hydrosheds_lv6_synthesis")
-bas_lyr <- bas_lyr[c(1, 14:36)]
-
-bas1 <- left_join(bas1, bas_lyr %>% st_drop_geometry(), by= "HYBAS_ID")
-
-st_write(bas1, here("vector", "hydrosheds_lv6_synth.gpkg"), append=FALSE)
-
-bas1 <- st_drop_geometry(bas1)
-write.csv(bas1, file= here("vector", "synth_table.csv"))
-```
-
-Here, we are loading the data with the LCchange calucalted to join with the basins. We jsut want to know each basinb to whci country mayorly blongs (horrible writing, work on that later)
-
-```{r get amounts of lc chnage}
-# check which alyers are inside
-ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/countries_lc2.gpkg')
-#load data into the environment
-
-bas_lc <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/countries_lc2.gpkg', layer = "lcc_countries")
-
-bas_lc <- st_read(here("vector", "countries_lc2.gpkg"), layer = "lcc_countries")
-
-
-# Cumaribo
-bs <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg')
-# Lilling
-bs <- st_read(here('vector', 'hydrosheds_lv6_synth.gpkg'))
-
-# Keep only relevant columns (id, name, direction of change)
-bas_lc <- bas_lc[c(1,2,19)]
-
-# Step 1: Make sure your geometry column exists and is valid
-# If you already have an area column (e.g., `SUB_AREA`), skip the next line
-bas_lc <- bas_lc %>% mutate(area_sqkm = as.numeric(st_area(geom)) / 10^6)
-
-# Step 2: Filter out the smallest 2% by area
-area_threshold <- quantile(bas_lc$area_sqkm, probs = 0.05, na.rm = TRUE)
-
-bas_lc_filtered <- bas_lc %>% 
-  filter(area_sqkm > area_threshold)
-
-# Remove units below 10.000 
-bas_lc_filtered <- bas_lc %>%
-  filter(area_sqkm > 10000)
-
-## Also test for the "large" countries 
-bas_lc_filtered <- bas_lc_filtered %>% filter(name_long!="Vanuatu")# %>% filter()
-# Step 3: Select top and bottom 5 by dir_ch_2
-top_bottom_10k <- bas_lc_filtered %>%
-  slice_max(dir_ch_2, n = 10, with_ties = FALSE) %>%
-  bind_rows(
-    bas_lc_filtered %>%
-      slice_min(dir_ch_2, n = 10, with_ties = FALSE)
-  )
-
-top_bottom_10k <- st_drop_geometry(top_bottom_10k)
-# some issue Small countries invariable have larger shbares. This needs to be normalized or something 
-
-
-bas_lc <- st_drop_geometry(bas_lc)
-
-top_bottom_lc <- bas_lc %>% slice_max(dir_ch_2, n = 5, with_ties = FALSE) %>% bind_rows(
-    bas_lc %>%
-      slice_min(dir_ch_2, n = 5, with_ties = FALSE)
-  )
-```
-
-
-
-```{r get amounts of lc change2}
-
-
-# get pct as standalone data to add to the table
-poly <- st_transform(poly, crs = 5880)
-poly$area_ha <- as.numeric(st_area(poly))/10000
-plt <- as_tibble(st_drop_geometry(poly))
-#filter all thins smaller than 150.000 ha (takes away the 54 smallest features) 
-plt  <- plt %>% select(1,2, area_ha,contains("pct"))%>% filter(area_ha>400000)
-
-
-
-################## THIS IS VERY IMPPORTAnt. Instead of struggling  with the multiple dataframes, it is easier to load the vector file swith all the column and pivot longer as necessary. Easier to manage, adjust on the fly!
-plt <- as_tibble(plt %>%
-  pivot_longer(
-    cols = c(ends_with("pct_ch")),  # Select all columns ending with "pct_ch"
-    names_to = "service",        # New column to store the service names
-    values_to = "pct_ch"         # New column to store the percentage change values
-  ))
-
-plt <- plt %>%
-  mutate(service = str_remove(service, "_pct_ch$"))
-plt <- left_join(plt,cd) # this will return an error because maybe the cd dataframe is not there. It is the one thatdefiens the class names and colors 
-plt <- plt%>% filter(!is.na(pct_ch))
-```
-
-I remember here. plt is used as input in the visualizations.Rmd notebook. That might not be the smartest way to do this, but anyway, what we need to have is a final datafrasme that we are going to process. The dataframe is the despatialzied basins object pivoted long, so we can use ggplot2 and dplyr tools to extract insights. The next point from here, 04/05/2025 is to extract the summary metrics for the additional rasters,  contact the techniocal group, share the updated data and update the documentation (i already updated main`)
-
-We are not using  this. This os from an older verion by country. 
-We could actually get all the metrics for all the classes for all the years for all the basins and feed the whole thing into some well designed ML model. It might tell us something, or be useful in some measure. and then add a temporal component and animate the scatterplots or something. Group them by country. By income level. by biome. All that would be possible, Need to think with wome calm about this.
-Add some charts/amimatiosn that shows the lc dinamics over time. This could be group in multiple ways. I can't think whcih would be the best way to start, but we have everytting we need.
-
-
-```{r timeseries plot}
-
-
-inpath <- here('output_data')
-zonal_csv <- file.path(inpath, list.files(paste0(inpath),pattern= 'TS'))
-
-n <- 4
-zonal_df <- as_tibble(read.csv(zonal_csv[n]))
-
-
-# Only for biomes, t make names shorter
- # zonal_df <- zonal_df %>%
- #   mutate(biome_short = recode(WWF_biome, !!!biome_labels))
-
-library(ggplot2)
-
-#zonal_df <- zonal_df %>% filter(WWF_biome!="Lakes")
-
-# Create the line plot
-ggplot(zonal_df, aes(x = year, y = mean, color = biome_short, group = biome_short)) +
-  geom_line(size = 1) +          # Add lines for each subregion
-  geom_point(size = 2) +         # Add points for visibility
-  labs(
-    title = paste("Ecosystem Service Trends by ", col, sep= ""),
-    x = "Year",
-    y = "Mean Value"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "right")  # Adjust legend position
-```
-
-
-```{r biomes short}
-biome_labels <- c(
-  "Temperate Grasslands, Savannas & Shrublands" = "Temperate Grasslands",
-  "Tropical & Subtropical Moist Broadleaf Forests" = "Moist Broadleaf Forests",
-  "Temperate Conifer Forests" = "Temperate Conifers",
-  "Tropical & Subtropical Coniferous Forests" = "Tropical Conifers",
-  "Rock & Ice" = "Rock & Ice",
-  "Boreal Forests/Taiga" = "Boreal Forests",
-  "Montane Grasslands & Shrublands" = "Montane Grasslands",
-  "Lakes" = "Lakes",
-  "Flooded Grasslands & Savannas" = "Flooded Grasslands",
-  "Mediterranean Forests, Woodlands & Scrub" = "Mediterranean Forests",
-  "Tropical & Subtropical Dry Broadleaf Forests" = "Dry Broadleaf Forests",
-  "Temperate Broadleaf & Mixed Forests" = "Temperate Broadleaf",
-  "Tundra" = "Tundra",
-  "Tropical & Subtropical Grasslands, Savannas & Shrublands" = "Tropical Grasslands",
-  "Mangroves" = "Mangroves"
-)
-```
-```{r load procesed data and build final gpkgs}
-
-inpath <- here("summary_pipeline_workspace")
-
-gp <- list.files(inpath, pattern = ".gpkg")
-
-gp <- file.path(inpath, gp)
-
-synth <- lapply(gp, st_read)
-synth <- lapply(synth, function(s){
-  s <- s %>% mutate(fid=row_number()-1)
-})
-
-synth <- lapply(synth, function(s){
-  s <- st_drop_geometry(s)
-})
-
-synth[[1]] <- select(synth[[1]], fid, GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean)
-synth[[2]] <- select(synth[[2]], fid, rast_gdpTot_1990_2020_30arcsec.7_mean)
-synth[[3]] <- select(synth[[3]], fid, GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean)
-synth[[4]] <- select(synth[[4]], fid, GlobPOP_Count_30arc_2020_I32.1_sum)
-synth[[5]] <- select(synth[[5]], fid, hdi_raster_predictions_2020.1_mean)
-synth[[6]] <- select(synth[[6]], fid,farmsize_mehrabi.1_mean)
-
-
-synth <- reduce(synth, left_join, by= "fid")
-# Load the polygons with the calcualted ES change variables
-synth_ES <- st_read(here('vector',"hydrosheds_lv6_synth.gpkg"))
-# Keep the columns of interest (original hydrosheds and pct_ch in this case)
-synth_ES <- dplyr::select(synth_ES, 1:13, contains("pct_ch"))
-
-synth_ES <- synth_ES %>% mutate(fid = row_number()-1)
-
-
-synth_ES <- left_join(synth_ES, synth, by = 'fid')
-synth_ES$fid <- NULL
-############# CURRENT OUTPUT WITH THE FINAL BANDS TO ANALYZE (SCATTERPLOTS, VIOLINS)
-st_write(synth_ES, here('vector', "hydrosheds_lv6_synth.gpkg"), layer = "benef_analysis", append = TRUE)
-```
-
-WHY is this here? I think is mee trying (again) to get straight what i have already processed and see if sme day it doesn to take me days to retake the work when o finally extract the data i need. 
-```{r pivot and preprare to plot the data}
-
-tt <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg')
-t2 <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv_tmp.gpkg')
-t3 <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv_6_tmp.gpkg')
-t <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6.gpkg', layer = "ch_92_2020")
-tt2 <-st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv_tmp.gpkg', layer = "clipped") 
-
-```
-
+# Load and pivot 
+
+Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. 
+Add to the documentation , environment or however that's called the vectors to select and order the columns. 
+This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir). 
+  
 ```{r chunk1, eval=FALSE, include=FALSE}
-# Get the columns that we need (can;t believe i have been struggling with this for more than 2 months)
-# correctio. 3 months at this point. I really don't know what the fucking problem is, this should be an easy task, and somehow something absolutely stupid keeps taking the two things  I need the most. My reputation as a worker and my time
-
-ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/hydrosheds_lv6_synth.gpkg')
-synth_ES <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth.gpkg', layer = "benef_analysis")
-spring_ES <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/hydrosheds_lv6_synth.gpkg', layer = "hydrosheds_lv6_synth")
-
-spring_ES <- st_read('/Users/rodriguez/Global_ES_TS/global_NCP/vector/hydrosheds_lv6_synth.gpkg', layer = "hydrosheds_lv6_synth")
-
-spring_ES <- spring_ES[c(1:17,36:40,44, 45)]
-synth_ES <- synth_ES[c(1,7,21,22,23,24,25,26)]
+# 
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
  
- # calculate POP Density
-synth_ES <- synth_ES %>%
-  mutate(GlobPOP_sqkm = GlobPOP_Count_30arc_2020_I32.1_sum / SUB_AREA)
+ plt <- st_drop_geometry(poly)
+ 
+ # Edit/Adjust column names # not yet
+ names(plt) <- stringr::str_replace_all(names(plt), "_2020_1992", "")
+ # cakculate POP Density
+
+ 
+
+ct <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg')
+
+ct <- ct %>% mutate(area_sqkm_country = as.numeric(st_area(geom)) / 10^6)
+ct <- st_drop_geometry(ct)
+ct <- ct[c(1,37)]
+plt <- left_join(plt, ct)
+#. Have a method to name versions or something (maybe?)
+write.csv(plt, file= here('output_data', "metrics_change_hb_lev_6.csv"))
+let us adjust the data as is for the moment.
+############# PIVOT TABLE ##############################
+ 
+ # Define the socioeconomic variables
+socio_vars <- c(
+  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",# this is also a problem!!!
+  "rast_gdpTot_1990_2020_30arcsec.7_mean",
+  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # this is a problem here!!!!
+  #"GlobPOP_Count_30arc_2020_I32.1_sum", we don't need this one anymore, already calc per sq km
+  "hdi_raster_predictions_2020.1_mean",
+  "farmsize_mehrabi.1_mean",
+  "GlobPOP_sqkm"
+)
+###### #### #### Attention, thos will be reviewd for per sq/km and check pollinayion and USLE, but 
+# Pivot all columns that contain pct_ch, keeping other relevant vars
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_ch"),
+    names_to = "service",
+    values_to = "pct_ch"
+  ) %>%
+  select(HYBAS_ID, service, pct_ch, all_of(socio_vars)) %>% 
+   mutate(service = str_replace(service, "_pct_ch.*", ""))
+  
+
+plt_long <- plt_long%>% filter(service != "Pop") %>% filter(service!= "n_export")
+# remove infinite values 
+plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)  
+
+  plt_long <- plt_long %>% mutate(service = case_when(
+   service == "sed_export" ~ "Sed_export",
+   service == "Sed_retention_ratio" ~ "Sed_Ret_Ratio",
+   service == "Usle" ~ "USLE",
+   TRUE ~ service
+   ))
+ 
+```
+# Identify Hotspots 
+
+```{r get_hotspots}
+
+# 1. Identify hotspots by service
+
+# Set your cutoff
+pct_cutoff <- 0.05  # for top/bottom 1%
+
+df_hotspots <- plt_long %>%
+  group_by(service) %>%
+  mutate(
+    n_total = n(),
+    n_cut = ceiling(n_total * pct_cutoff),
+    rank_high = rank(-pct_ch, ties.method = "first"),
+    rank_low = rank(pct_ch, ties.method = "first"),
+    hotspot_flag = case_when(
+      rank_high <= n_cut ~ "high",
+      rank_low <= n_cut ~ "low",
+      TRUE ~ NA_character_
+    ),
+    hotspot_binary = !is.na(hotspot_flag)
+  ) %>%
+  ungroup()
+
+# 2. Count how many times each HYBAS_ID is a hotspot
+hotspot_summary <- df_hotspots %>%
+  filter(hotspot_binary) %>%
+  group_by(HYBAS_ID) %>%
+  summarise(
+    hotspot_count = n(),
+    hotspot_services = list(unique(service))
+  )
+hotspot_summary <- hotspot_summary %>%
+  mutate(hotspot_services = lapply(hotspot_services, \(x) trimws(as.character(x))),
+         hotspot_services = sapply(hotspot_services, \(x) paste(x, collapse = ", ")))
+
+
+# remove unnecesary columns (original 92-2020 values, keep)
+spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
+# reorganize columns
+spring_ES <- spring_ES[c(1:19, 20,22,21,25,34,23,24,26:33)]
 
 
 
- plt_spring <- st_drop_geometry(spring_ES) # if necessary when i load 
+spring_ES <- left_join(spring_ES, hotspot_summary, by = "HYBAS_ID")
+hotspots_change <- spring_ES 
+st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"))
+st_write(hotspots_change, paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"), append=FALSE)
+```
+# set class names and colors for plotting 
+
+Here, another dialogue to input the variable names, plot colors and set the factor order.
+```{r}
+service <- unique(plt_long$service)
+service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio","Sed_export", "Sed_Ret_Ratio", "USLE")#, "Pop_sqkm","GDP")
+ #color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b", "#d4ac0d", "#85929e")
+ service_levels <- service
+ 
+```
 
 
- plt_synth <- st_drop_geometry(synth_ES) # if necessary when i load 
-spring_ES <- left_join(spring_ES,plt_synth)
+#################################################################
 
+ This could be a dialogue box!!!
+```{r load-plt}
+# apply filter (5% or 2%) # Remove the smallest basins. 
+area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
+# Filter the dataset
+df <- plt %>% filter(SUB_AREA > area_threshold)
+# get the filtered locations
+
+```
+
+################################################################
+
+## 5. Plots Change
+
+
+```{r, fig.height=8, fig.width=14}
+col <- "HYBAS_ID"
+#col <- "ee_r264_name"
+
+plot_es_changes <- function(data, label_col,
+                            filter_type = "top_bottom", filter_val = 10) {
+  label_sym <- sym(label_col)
+
+  # Step 2: Apply filtering based on the chosen type
+  if (filter_type == "top_bottom") {
+    # Top/bottom n observations per service
+    top_bottom <- data %>%
+      group_by(service) %>%
+      slice_max(pct_ch, n = filter_val, with_ties = FALSE) %>%
+      bind_rows(
+        data %>%
+          group_by(service) %>%
+          slice_min(pct_ch, n = filter_val, with_ties = FALSE)
+      ) %>%
+      ungroup()
+
+  } else if (filter_type == "quantile") {
+    # Top/bottom quantile per service (e.g., top/bottom 10%)
+    top_bottom <- data %>%
+      group_by(service) %>%
+      filter(pct_ch >= quantile(pct_ch, 1 - filter_val, na.rm = TRUE) |
+             pct_ch <= quantile(pct_ch, filter_val, na.rm = TRUE)) %>%
+      ungroup()
+
+  } else if (filter_type == "all") {
+    top_bottom <- data
+  } else {
+    stop("Invalid `filter_type`. Use 'top_bottom', 'quantile', or 'all'.")
+  }
+
+  # Step 3: Reorder labels per service
+  top_bottom <- top_bottom %>%
+    mutate(temp_label = reorder_within(!!label_sym, -pct_ch, service))
+
+  # Step 4: Plot
+  ggplot(top_bottom, aes(x = temp_label, y = pct_ch, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    scale_x_reordered() +
+    facet_wrap(~ service, scales = "free", ncol = 3) +
+    labs(
+      #title = paste("% Change 1992–2020 By", cols, sep= " "),
+      x = NULL,
+      y = "% Change"
+    ) +
+    theme_bw() +
+    theme(
+      strip.text = element_text(face = "bold", size = 10),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 8)
+    )
+}
+# Top/bottom 10 countries per service
+plot_es_changes(df, label_col = col, filter_type = "top_bottom", filter_val = 10)
+
+# Top/bottom 5% per service
+#plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.5)
+# # Show all values
+# plot_es_changes(plt, filter_type = "all")
+```
+
+
+## Scatterplots
+
+
+
+```{r oterh plot, fig.height=7, fig.width=7, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(forcats)
+
+# 1. Filter to top/bottom 10% based on pct_ch
+# df_top_bottom <- df %>%
+#   group_by(service) %>%  # Do it separately for each service (optional, if needed)
+#   filter(pct_ch >= quantile(dir_ch_2, 0.90, na.rm = TRUE) | 
+#          pct_ch <= quantile(dir_ch_2, 0.10, na.rm = TRUE)) %>%
+#   ungroup()
+n <- floor(nrow(df) * 0.1)  # 10% of total rows
+
+df_top_bottom <- df %>%
+  slice_max(dir_ch_2, n = n, with_ties = FALSE) %>%
+  bind_rows(
+    df %>% slice_min(dir_ch_2, n = n, with_ties = FALSE)
+  )
+
+df_top_bottom <- df %>%
+  group_by(service) %>%
+  group_modify(~ bind_rows(
+    slice_max(.x, dir_ch_2, n = floor(0.1 * nrow(.x)), with_ties = FALSE),
+    slice_min(.x, dir_ch_2, n = floor(0.1 * nrow(.x)), with_ties = FALSE)
+  )) %>%
+  ungroup()
+
+
+
+# 2. Optional: relevel services if you want
+service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_export", "Sed_Ret_Ratio", "Pop_sqkm","GDP")
+ color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b", "#d4ac0d", "#85929e")
+ service_levels <- service
+df_top_bottom <- df_top_bottom %>%
+  mutate(
+    service = factor(service, levels = service_levels),
+    pct_ch_trans = pseudo_log(pct_ch)  # Apply pseudo-log transformation
+  )
+
+# 3. List of LC metrics to analyze
+lc_metrics <- c("dir_ch_2")
+df_top_bottom <- df_top_bottom %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+df_top_bottom <- filter(df_top_bottom, dir_ch_2 != 0)
+# 4. Create the scatterplots
+for (metric in lc_metrics) {
+  p1 <- df_top_bottom %>%
+    ggplot(aes_string(x = metric, y = "pct_ch_trans")) +
+    geom_hex(bins = 60) +  # Hexbin layer
+    scale_fill_viridis_c(option = "D", direction = 1) +  # Use viridis scale
+    facet_wrap(~ service, scales = "free",ncol=2) +
+    labs(
+      title = paste("% Change Natural Cover ", "vs. ES % Change"),
+      x = metric,
+      y = "% Change in Ecosystem Service",
+      fill = "Density"
+    ) +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p1)
+}
+
+```
+
+
+```{r , fig.height=9, fig.width=7, warning=FALSE}
+
+df <- plt %>% filter(SUB_AREA > area_threshold)
+#df <- plt %>% filter(id %in% top_bottom_10k$id)
+# List of LC metrics to analyze
+lc_metrics <- c("dir_ch_2")
+pseudo_log <- function(x) sign(x) * log1p(abs(x))
+
+df <- df %>%
+  mutate(
+    service = factor(service, levels = service_levels),
+    pct_ch_trans = pseudo_log(pct_ch)
+  )
+# Loop over each LC metric and generate a faceted scatterplot
+for (metric in lc_metrics) {
+  p <- df %>%
+    ggplot(aes_string(x = metric, y = "pct_ch_trans", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("Relationship Between", metric, "and ES % Change"),
+      x = metric,
+      y = "% Change in Ecosystem Service"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p)
+}
+```
+```{r sctp, fig.height=9, fig.width=7, warning=FALSE}
+
+
+# List of LC metrics to analyze
+lc_metrics <- c("dir_ch_2")
+
+df_1 <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+
+
+
+ for (metric in lc_metrics) {
+  p1 <- df_1 %>%
+    ggplot(aes_string(x = metric, y = "pct_ch_trans")) +
+    geom_hex(bins = 60) +  # Hexbin layer
+    scale_fill_viridis_c(option = "D", direction = -1) +  # Use viridis scale
+    facet_wrap(~ service, scales = "free",ncol=2) +
+    labs(
+      title = paste("Density of", metric, "vs. ES % Change"),
+      x = metric,
+      y = "% Change in Ecosystem Service",
+      fill = "Bin Count"
+    ) +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p1)
+}
+ 
+df_split <- split(df_1, df_1$service)
+
+
+```
+
+
+# Scatterplots change 2
+
+```{r unnamedchunk, fig.height=9, fig.width=7, warning=FALSE}
+
+# LC metrics of interest
+lc_metrics <- c("dir_ch_2")
+
+# Step 1: Remove top 2% outliers for each service
+filtered_plt <- plt %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch, 0.98, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch <= threshold)
+
+# Step 2: Apply pseudo-log transformation
+filtered_plt <- filtered_plt %>%
+  mutate(pct_ch_log = sign(pct_ch) * log1p(abs(pct_ch)))
+
+# Step 3: Loop through each LC metric and create faceted plots
+for (metric in lc_metrics) {
+  p <- ggplot(filtered_plt, aes_string(x = metric, y = "pct_ch_log", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("% Change vs", metric),
+      x = metric,
+      y = "Log(% Change in ES)"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p)
+}
+```
+
+```{r eval=FALSE, fig.height=9, fig.width=7, warning=FALSE}
+
+
+# LC metrics of interest
+lc_metrics <- c("dir_ch_2")
+
+# Step 1: Remove top 2% outliers for each service
+filtered_plt <- plt %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch, 0.98, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch <= threshold)
+
+# Step 3: Loop through each LC metric and create faceted plots
+for (metric in lc_metrics) {
+  p3 <- ggplot(filtered_plt, aes_string(x = metric, y = "pct_ch", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste(" % Change vs", metric),
+      x = metric,
+      y = "% Change in ES"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p3)
+}
+```
+
+
+```{r eval=FALSE, fig.height=8, fig.width=14, include=FALSE}
+
+# apply filter (5 or 2%) # Remove the smalles basins. That help. Also, it seems that some biomes are more prone to artifacts than others!!!
+area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
+# Filter the dataset
+df <- plt %>% filter(SUB_AREA > area_threshold)
+
+
+t_5 <- ggplot(df, aes(x = service, y = pct_ch, fill = color)) +
+  geom_boxplot() +  # or geom_violin()
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(
+    title = "Distribution of % Change by Service (Excl. Smallest 5% of Basins)",
+    x = NULL,
+    y = "Percentage Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+
+library(ggplot2)
+library(dplyr)
+
+# Custom pseudo-log transformation
+pseudo_log <- function(x) sign(x) * log1p(abs(x))
+
+# Apply  the filtered dataframe
+df <- plt %>%
+  mutate(pct_ch_trans = pseudo_log(pct_ch))
+
+# Plot with transformed values
+p <- ggplot(df, aes(x = service, y = pct_ch_trans, fill = color)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  scale_fill_identity() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank(),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+p
 ```
 
 
 
 
- This could be a dialogue box!!!
-```{r remove lowestvalues to reduce artifacts}
-# Calculate pseudo_log val for display purposes. 
-plt <- plt %>%
+#######################
+
+## 5. Here, add plots with the differences 
+
+```{r eval=FALSE, fig.height=8, fig.width=14, include=FALSE}
+print(col)
+print(names(df))
+stopifnot(col %in% names(df))
+
+plot_es_changes <- function(data, label_col,
+                            filter_type = "top_bottom", filter_val = 10) {
+  label_sym <- sym(label_col)
+
+  # Step 2: Apply filtering based on the chosen type
+  if (filter_type == "top_bottom") {
+    # Top/bottom n observations per service
+    top_bottom <- data %>%
+      group_by(service) %>%
+      slice_max(pct_ch, n = filter_val, with_ties = FALSE) %>%
+      bind_rows(
+        data %>%
+          group_by(service) %>%
+          slice_min(pct_ch, n = filter_val, with_ties = FALSE)
+      ) %>%
+      ungroup()
+
+  } else if (filter_type == "quantile") {
+    # Top/bottom quantile per service (e.g., top/bottom 10%)
+    top_bottom <- data %>%
+      group_by(service) %>%
+      filter(pct_ch >= quantile(pct_ch, 1 - filter_val, na.rm = TRUE) |
+             pct_ch <= quantile(pct_ch, filter_val, na.rm = TRUE)) %>%
+      ungroup()
+
+  } else if (filter_type == "all") {
+    top_bottom <- data
+  } else {
+    stop("Invalid `filter_type`. Use 'top_bottom', 'quantile', or 'all'.")
+  }
+
+  # Step 3: Reorder labels per service
+  top_bottom <- top_bottom %>%
+    mutate(temp_label = reorder_within(!!label_sym, -pct_ch, service))
+
+  # Step 4: Plot
+  ggplot(top_bottom, aes(x = temp_label, y = pct_ch, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    scale_x_reordered() +
+    facet_wrap(~ service, scales = "free", ncol = 3) +
+    labs(
+      #title = paste("% Change 1992–2020 By", cols, sep= " "),
+      x = NULL,
+      y = "% Change"
+    ) +
+    theme_bw() +
+    theme(
+      strip.text = element_text(face = "bold", size = 10),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 8)
+    )
+}
+
+# Top/bottom 10 countries per service
+plot_es_changes(df, label_col = col, filter_type = "top_bottom", filter_val = 10)
+
+# Top/bottom 5% per service
+#plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.1)
+
+# Show all values
+#plot_es_changes(plt, filter_type = "all")
+```
+
+
+## Scatterplots
+
+```{r}
+
+
+# List of LC metrics to analyze
+lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+
+# Loop over each LC metric and generate a faceted scatterplot
+for (metric in lc_metrics) {
+  p <- plt %>%
+    ggplot(aes_string(x = metric, y = "pct_ch", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("Relationship Between", metric, "and ES % Change"),
+      x = metric,
+      y = "% Change in Ecosystem Service"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p)
+}
+```
+
+
+# Scatterplots change 2
+
+```{r, fig.height=8, fig.width=14}
+
+
+# LC metrics of interest
+lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+
+# Step 1: Remove top 2% outliers for each service
+filtered_plt <- plt %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch, 0.98, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch <= threshold)
+
+# # Step 2: Apply pseudo-log transformation
+# filtered_plt <- filtered_plt %>%
+#   mutate(pct_ch_log = sign(pct_ch) * log1p(abs(pct_ch)))
+
+# Step 3: Loop through each LC metric and create faceted plots
+for (metric in lc_metrics) {
+  p <- ggplot(filtered_plt, aes_string(x = metric, y = "pct_ch", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("Log-Transformed % Change vs", metric),
+      x = metric,
+      y = "Log(% Change in ES)"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p)
+}
+```
+
+```{r, fig.height=8, fig.width=14}
+# library(dplyr)
+# library(ggplot2)
+# 
+# plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
+# plt[1] <- NULL 
+# # apply filter (5 or 2%) # Remove the smalles basins. That help. Also, it seems that some biomes are more prone to artifacts than others!!!
+# area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
+# # Filter the dataset
+# df <- plt %>% filter(SUB_AREA > area_threshold)
+# 
+# 
+# t_5 <- ggplot(df, aes(x = service, y = pct_ch, fill = color)) +
+#   geom_boxplot() +  # or geom_violin()
+#   scale_fill_identity() +
+#   facet_wrap(~ service, scales = "free_y") +
+#   labs(
+#     title = "Distribution of % Change by Service (Excl. Smallest 5% of Basins)",
+#     x = NULL,
+#     y = "Percentage Change"
+#   ) +
+#   theme_minimal() +
+#   theme(
+#     axis.text.x = element_blank(),
+#     strip.text = element_text(face = "bold"),
+#     legend.position = "none"
+#   )
+# 
+# library(ggplot2)
+# library(dplyr)
+# 
+# # Custom pseudo-log transformation
+# pseudo_log <- function(x) sign(x) * log1p(abs(x))
+# 
+# # Apply to the filtered dataframe
+# df <- plt %>% 
+#   mutate(pct_ch_trans = pseudo_log(pct_ch))
+# 
+# # Plot with transformed values
+# p <- ggplot(df, aes(x = service, y = pct_ch_trans, fill = color)) +
+#   geom_violin(trim = FALSE, scale = "width") +
+#   scale_fill_identity() +
+#   facet_wrap(~ service, scales = "free_y") +
+#   labs(
+#     title = "Pseudo-log Scaled % Change by Service",
+#     x = NULL,
+#     y = "Transformed % Change"
+#   ) +
+#   theme_minimal() +
+#   theme(
+#     axis.text.x = element_blank(),
+#     strip.text = element_text(face = "bold"),
+#     legend.position = "none"
+#   )
+# p
+```
+
+
+
+
+
+
+```{r fig.height=8, fig.width=10, warning=FALSE}
+# 1. Define desired facet order
+df <- plt %>% filter(SUB_AREA > area_threshold)
+# df <- df %>%
+#   filter(id %in% top_bottom_10k$id)
+# 2. Apply pseudo-log transformation
+pseudo_log <- function(x) sign(x) * log1p(abs(x))
+
+df <- df %>%
   mutate(
     service = factor(service, levels = service_levels),
     pct_ch_trans = pseudo_log(pct_ch)
   )
 
-# apply filter (5% or 2%) # Remove the smallest basins. 
-area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
-# Filter the dataset
-df <- plt %>% filter(SUB_AREA > area_threshold)
+# 3. Reorder countries based on dir_ch_2 (descending)
+df <- df %>%
+  mutate(ee_r264_name = reorder(ee_r264_name, -dir_ch_2))
+df. <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+# 4. Create plot
+p <- ggplot(df., aes(x = ee_r264_name, y = pct_ch_trans, fill = ee_r264_name)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service ",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+# 4. Create plot
+p2 <- ggplot(df, aes(x = ee_r264_name, y = pct_ch, fill = ee_r264_name)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "% Change by Service ",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+p
+p2
 
-write.csv(plt, here("output_data", "serv_benef_synth_01.csv"))
-# get the filtered locations
 ```
 
+```{r fig.height=8, fig.width=10, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(forcats)
 
-his alreaDY DONE NOT RUN!!!
-```{r eval=FALSE, fig.height=8, fig.width=14, include=FALSE}
-#Load chnage data in long format/ 
-plt <- read.csv(here("output_data", "metrics_change_hb_lev_6.csv"))
-# plt[1] <- NULL Update this with the names of the variables being assessed. There should be a less annoying way to do this. Thaty;s why noting works. These names are not for the object i just loaded!!!!
-service <- unique(plt$service)
-service <- c("GHS_BUILT","GDP","GHS_POP","HDI", "Farm_size", "GlobPOP")
- color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
- service_levels <- service
- cd <- as_tibble(cbind(service,color))
- #check and join. 
- plt <- left_join(plt, cd)
+# 1. Filter the dataframe for top and bottom 10 by dir_ch_2
+df_top_bottom <- df %>%
+  arrange(desc(dir_ch_2)) %>%
+  slice_head(n = 10) %>%
+  bind_rows(
+    df %>%
+      arrange(dir_ch_2) %>%
+      slice_head(n = 10)
+  )
+
+# 2. Reorder countries inside the filtered data
+df_top_bottom <- df_top_bottom %>%
+  mutate(ee_r264_name = fct_reorder(ee_r264_name, -dir_ch_2))
+df_top_bottom <- df_top_bottom %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+
+# 3. Create plot (pseudo-log scale)
+p <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch_trans, fill = service)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service (Top and Bottom 10 Countries)",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+# 4. (Optional) Plot regular % change
+p2 <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch, fill = service)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "% Change by Service (Top and Bottom 10 Countries)",
+    x = NULL,
+    y = "% Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+# 5. Print
+p
+# p2  # if you also want the regular % plot
+
 ```
