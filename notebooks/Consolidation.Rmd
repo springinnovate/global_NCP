@@ -15,7 +15,7 @@ inpath <- here("vector")
 sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
 
 # Set and select an index to load the desired dastaset
-t <- 1
+t <- 2
 set <- sets[t]
 
 lyr <- st_layers(set)
@@ -26,15 +26,20 @@ print(lyr)
 
 I had to do this to make sense of the different runs i have done and the data that i need. From individual yearly stats (which ones?) ["raw" data rasters and derived raster algebra products] bi-temporal relative change, key attributes from the input data among others. Need to come out with a better way to do this, and eventually keep a final gpkg correctly organized, but it is always better to have the workflow take care of the whole thing on its own. Have to spend less time here , can repeat the process easier and with fewer errors.
 
+#####
+
+**I Think this is not necessary anymore, these are older versions and i am wasying more time trying to make sense of this than just redoing the whole thing, i just need to find the usle data!!!**
+
 ```{r refine columns}
 basin <- st_read(set, layer= "hydrosheds_lev6") 
-basin <- basin[c(1:13)]
-poly <- st_read(set, layer= "layer1") 
+basin <- basin[c(1:13)] # just get the originql columns. Does nothing else
+poly <- st_read(set, layer= "layer1") # not necessary aNYMORE, IT UST HAS THE COASTAQP PRTECTION DATA
 bas1 <- st_drop_geometry(poly)
 bas1 <- bas1[c(1,14,15,17)]
-poly <- st_read(set, layer= "ch_92_2020") 
+poly <- st_read(set, layer= "1992_2020_lcc_change_metrics") # Not sure here, but will keep for now. 
 bas2 <- st_drop_geometry(poly)
 bas2 <- bas2[c(1,14:15,23,22,17,18,19,20,24)]
+bas2 <- bas2 %>% mutate(HYBAS_ID = as.numeric(HYBAS_ID))
 poly <- st_read(set)
 
 #poly <- st_read(set, layer= "ch_92_2020") 
@@ -42,17 +47,17 @@ poly <- st_read(set)
 basin <- left_join(basin, bas1)
 basin <- left_join(basin,bas2)
 basin <- basin[c(1:13,17:20,14,15,21,22,23,25,16,24)]
-st_write(basin, here('vector', "hydrosheds_lv6_tmp.gpkg"))
+#st_write(basin, here('vector', "hydrosheds_lv6_tmp.gpkg"))
 ```
 
 ```{r load input polygon data cumaribo}
 
 #Builds a list of files in the vector directory
-inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector'
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector'
 sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
 
 # Set and select an index to load the desired dastaset
-t <- 2
+t <- 1
 set <- sets[t]
 
 lyr <- st_layers(set)
@@ -89,7 +94,17 @@ names(basin) <- ifelse(
   endsWith(names(basin), "_2020_1992"),
   gsub("_2020_1992$", "", names(basin)),
   names(basin))
-st_write(basin, paste0('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector', '/', "hydrosheds_lv6_synthesis.gpkg"), append=FALSE)
+#st_write(basin, paste0('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector', '/', "hydrosheds_lv6_synthesis.gpkg"), append=FALSE)
+
+```
+
+
+
+```{r  get this sorted}
+bas <- st_read(set)
+
+
+
 
 ```
 
