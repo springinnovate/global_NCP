@@ -96,7 +96,7 @@ Here, the spatial objects with the additional attributes are loaded and reformat
 Add to the documentation , environment or however that's called the vectors to select and order the columns. 
 This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir). 
   
-```{r chunk1, eval=FALSE, include=FALSE}
+```{r pivot, eval=FALSE, include=FALSE}
 # 
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
@@ -105,9 +105,7 @@ This should actually be done as a database structure. The columns live somewhere
  
  # Edit/Adjust column names # not yet
  names(plt) <- stringr::str_replace_all(names(plt), "_2020_1992", "")
- # cakculate POP Density
-
- 
+ # calculate POP Density
 
 ct <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg')
 
@@ -116,15 +114,15 @@ ct <- st_drop_geometry(ct)
 ct <- ct[c(1,37)]
 plt <- left_join(plt, ct)
 #. Have a method to name versions or something (maybe?)
-write.csv(plt, file= here('output_data', "metrics_change_hb_lev_6.csv"))
+write.csv(plt, file= here('output_data', "full_metrics_wide.csv")) # This maybe not be necessary anymore
 
 ############# PIVOT TABLE ##############################
  
  # Define the socioeconomic variables
 socio_vars <- c(
-  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",# this is also a problem!!!
+  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",# this is also a problem!!!Will have to calculate again, but the sum. not the mean. 
   "rast_gdpTot_1990_2020_30arcsec.7_mean",
-  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # this is a problem here!!!!
+  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # this is a problem here!!!! Will have to calculate again, but the sum. not the mean. 
   #"GlobPOP_Count_30arc_2020_I32.1_sum", we don't need this one anymore, already calc per sq km
   "hdi_raster_predictions_2020.1_mean",
   "farmsize_mehrabi.1_mean",
@@ -152,16 +150,17 @@ plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)
    service == "Usle" ~ "USLE",
    TRUE ~ service
    ))
- 
+ # here, we only have 8 columns, are missing basin and country data, biome, etc etc. , but the services are complete. An intermediary output, that's why i did not export it yet!
 ```
-# Identify Hotspots 
+
+# Get Hotspots 
 
 ```{r get_hotspots}
 
-# 1. Identify hotspots by service
+# 1. Identify hotspots by service. Here i will have to adjust, because in some cases the key hotspots are the gains, and in others are the losses. 
 
-# Set your cutoff
-pct_cutoff <- 0.05  # for top/bottom 1%
+# Set cutoff
+pct_cutoff <- 0.05  # for top/bottom 5%
 
 df_hotspots <- plt_long %>%
   group_by(service) %>%
@@ -198,101 +197,39 @@ spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
 spring_ES <- spring_ES[c(1:19, 20,22,21,25,34,23,24,26:33)]
 
 
-
 spring_ES <- left_join(spring_ES, hotspot_summary, by = "HYBAS_ID")
-hotspots_change <- spring_ES 
+hotspots_change <- spring_ES # rename (i could just clean this but too lazy)
 
-hotspots_change <- left_join(hotspots_change,are)
+hotspots_change <- left_join(hotspots_change,ct)
+# Export aoutputs (this also needs to be adjusted, it makes no sense to kee storing this inb two differnet places)
 st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
 st_write(hotspots_change, paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"), append=FALSE)
 ```
-# set class names and colors for plotting 
+# Append hotspots to the long format data
 
 Here, another dialogue to input the variable names, plot colors and set the factor order.
 ```{r}
 
 hotspots_change <- st_drop_geometry(hotspots_change)
+# Remove unnecesary columns
 hot <- hotspots_change[c(1:19,35:37)]
 
-plt_long. <- left_join(plt_long, hot)
-# export final database long. 
-write.csv(plt_long., here("output_data", "serv_benef_synth_02.csv"))
+# join hotspot data with the small plt_long data (8 columns). Th
+plt_long <- left_join(hot, plt_long)
 
-service <- unique(plt_long$service)
-service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio","Sed_export", "Sed_Ret_Ratio", "USLE")#, "Pop_sqkm","GDP")
- #color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b", "#d4ac0d", "#85929e")
- service_levels <- service
- 
-```
-
-
-```{r final_benef_synth, eval=FALSE, include=FALSE}
-# 
-#  get pct as standalone data to add to the table
-# Most recent version of synthesis data:
- 
- plt <- st_drop_geometry(hotspots_change)
- 
- # Edit/Adjust column names # not yet
- names(plt) <- stringr::str_replace_all(names(plt), "_2020_1992", "")
- # cakculate POP Density
-
- 
-
-ct <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg')
-
-ct <- ct %>% mutate(area_sqkm_country = as.numeric(st_area(geom)) / 10^6)
-ct <- st_drop_geometry(ct)
-ct <- ct[c(1,37)]
-plt <- left_join(plt, ct)
-#. Have a method to name versions or something (maybe?)
-write.csv(plt, file= here('output_data', "metrics_change_hb_lev_6.csv"))
-
-############# PIVOT TABLE ##############################
- 
- # Define the socioeconomic variables
-socio_vars <- c(
-  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",# this is also a problem!!!
-  "rast_gdpTot_1990_2020_30arcsec.7_mean",
-  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # this is a problem here!!!!
-  #"GlobPOP_Count_30arc_2020_I32.1_sum", we don't need this one anymore, already calc per sq km
-  "hdi_raster_predictions_2020.1_mean",
-  "farmsize_mehrabi.1_mean",
-  "GlobPOP_sqkm"
-)
-###### #### #### Attention, thos will be reviewd for per sq/km and check pollinayion and USLE, but 
-# Pivot all columns that contain pct_ch, keeping other relevant vars
-plt_long <- plt %>%
-  pivot_longer(
-    cols = matches("pct_ch"),
-    names_to = "service",
-    values_to = "pct_ch"
-  ) %>%
-  select(HYBAS_ID, service, pct_ch, all_of(socio_vars)) %>% 
-   mutate(service = str_replace(service, "_pct_ch.*", ""))
-  
-
-plt_long <- plt_long%>% filter(service != "Pop") %>% filter(service!= "n_export")
-# remove infinite values 
+# Remove NAs and Inf values
 plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)  
-
+# Adjust service names (optional, just trying to harmonize naming convention)
   plt_long <- plt_long %>% mutate(service = case_when(
    service == "sed_export" ~ "Sed_export",
    service == "Sed_retention_ratio" ~ "Sed_Ret_Ratio",
    service == "Usle" ~ "USLE",
    TRUE ~ service
    ))
- 
+
+# export final database long. 
+
+write.csv(plt_long, here("output_data", "hotspot_data_long.csv")) 
 ```
 
-#################################################################
 
- This could be a dialogue box!!!
-```{r load-plt}
-# apply filter (5% or 2%) # Remove the smallest basins. 
-area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
-# Filter the dataset
-df <- plt %>% filter(SUB_AREA > area_threshold)
-# get the filtered locations
-
-```
