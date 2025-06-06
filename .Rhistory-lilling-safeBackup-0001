@@ -1,0 +1,512 @@
+basins <- st_read(here("vector", "basins_ct.gpkg"))
+basins
+lyr
+basins <- left_join(basins, lyr  %>% st_drop_geometry(), by = "BIOME")
+basins <- left_join(basins, lyr  %>% st_drop_geometry(), by = "HYBAS_ID")
+basins <- basins %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+lyr <- lyr %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+basins <- left_join(basins, lyr  %>% st_drop_geometry(), by = "HYBAS_ID")
+basins
+st_write(basins, here("vector", "basins_ct.gpkg"). append=TRUE)
+st_write(basins, here("vector", "basins_ct.gpkg"), append=TRUE)
+st_write(basins, here("vector", "basins_ct.gpkg"), append=FALSE)
+basins
+st_write(basins, here("vector", "basins_bm.gpkg"), append=FALSE)
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+# source the helper functions
+source(here::here("R", "utils_lcc_metrics.R"))
+source(here("R","utils_pct_change.R"))
+#Builds a list of files in the vector directory
+inpath <- here("vector")
+sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
+sets
+#Builds a list of files in the vector directory
+inpath <- here("vector")
+sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
+# Set and select an index to load the desired dastaset
+t <- 1
+set <- sets[t]
+lyr <- st_layers(set)
+# # load polygons
+print(lyr)
+sets
+list.files(here('vector'))
+basins <- st_read(paste0(here("vector"), "/",  "basins_bm.gpkg"))
+basins
+er <- rast(here("input_ES", "Additional_data", "Ecoregions2017_compressed_md5_316061.tif"))
+er
+bas_eq <- st_transform(basins, crs = "EPSG:6933")
+bas_eq <- st_transform(basins, crs = "EPSG:6933")
+template <- terra::rast(bas_eq, resolution = 300)
+?project
+er <- project(er, st_crs(bas_eq), threads= 10)
+st_crs(bas_eq)
+er <- project(er,  crs = "EPSG:6933", threads= 10)
+er <- project(er,  "EPSG:6933", threads= 10)
+er <- project(er,  template, threads= 10)
+er
+unique(er)
+bas_eq <- round(bas_eq, digits = 0)
+unique(er)
+er_weight <- exactextractr::exact_extract(er, bas_eq, weights = "area")
+er
+plot(er)
+bas_eq
+er <- round(er, digits = 0)
+unique(er)
+er_weight <- exactextractr::exact_extract(er, bas_eq, weights = "area")
+dominant_bm <- map_dbl(er_weight, function(tbl) {
+tbl %>%
+group_by(value) %>%
+summarise(weight = sum(weight, na.rm = TRUE), .groups = "drop") %>%
+slice_max(order_by = weight, n = 1, with_ties = FALSE) %>%
+pull(value)
+})
+dominant_bm
+basins
+basins$ecoregion <- dominant_bm
+basins
+st_write(basins, here("vector", "basins_bm.gpkg"), appen=FALSE)
+st_write(basins, here("vector", "basins_bm.gpkg"), append=FALSE)
+library(sf)             # Spatial vector operations
+library(dplyr)          # Data manipulation
+library(terra)          # Raster processing
+library(exactextractr)  # Zonal statistics
+library(ggplot2)        # Visualization
+library(forcats)        # Factor reordering
+library(tidytext)
+library(here)           # Managing paths
+library(patchwork)      # Combining plots
+library(tidyr)
+library(parallel)       # Parallel computing
+library(purrr)
+library(stringr)
+library(knitr)
+library(kableExtra)
+source(here::here("R", "utils_lcc_metrics.R"))
+source(here("R","utils_pct_change.R"))
+# Assign services and years
+# Assign services and years
+service <- rep(c("GDP", "Pop_ct", "N_ret_ratio"), each = 2)
+year <- rep(c(1992, 2020), 3)
+# Create color mapping
+color <- rep(c("#9e1bc1", "#Ac943c", "#2c944c"), each = 2)
+inpath <- here("vector")
+#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector'
+sets <- file.path(inpath, list.files(inpath, pattern= 'gpkg$'))
+sets
+#cols <- c("id", "continent", "income_grp", "region_wb", "WWF_biome", "HYBAS_ID", "HYBAS_ID")
+#sets <- cbind(sets, cols)
+# Set an index to select the desired dataset
+t <- 12
+# Select the target dataset from the list
+set <- sets[t]
+# # load polygons
+poly <- st_read(set)
+#get the name of the column with the unique ids of the input vector
+col <- colnames(poly[1])[1]
+inpath <- here('input_ES')
+inpath <- here('input_ES', 'final_extraction')
+# List and clean file names
+tiffes <- file.path(inpath, list.files(inpath, pattern = 'tif'))
+tiffes
+tiffes <- tiffes[-c(7,8)] # remove these things because fuck me (ratio n retention)
+tiffes <- tiffes[-c(1,2)]
+filename <- basename(tiffes)
+raster_name <- gsub(".tif$", "", filename)
+tiffes
+# Set the target metrics to extract. Most Standard R summary metrics are available, for more information run ?exactextractr
+target_stats <- c("sum")
+rasters_list <- lapply(tiffes, rast)
+# Set the number of cores to run on parallel. This approach only works on Unix-based systems (Linux & MacOS). I still have to find the alternative for parallelzing on Windows.
+num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  The number of cores to user is also contingent on the amount of RAM available.
+col
+#start extracting the summary statisticss
+results_list <- mclapply(rasters_list, function(r) {
+# Perform exact extraction
+res <- exact_extract(r, poly,
+fun = target_stats,
+append_cols = col)
+r_name <- names(r)
+# Add a column labeling which raster these results are from
+res$raster_name <- r_name
+return(res)},mc.cores = num.cores)
+results_list
+# Combine results from all evaluated rasters into a single data frame
+zonal_df <- do.call(rbind, results_list)
+# add color and service columns
+zonal_df <- left_join(zonal_df,cd)
+raster_name
+color
+service <- rep(c("N_export", "Pop_ct"), each = 2)
+year <- rep(c(1992, 2020), 2)
+# Create color mapping
+color <- rep(c("#2c944c", "#Ac943c"), each = 2)
+cd <- rbind(color, year, service)
+cd
+cd <- cbind(color, year, service)
+cd
+cd <- as_tibble(cbind(color, year, service))
+cd <- as_tibble(cbind(color, year, service, raster_name))
+cd
+# add color and service columns
+zonal_df <- left_join(zonal_df,cd)
+zonal_df
+cols
+# Add the year. this uses the original filenames to extract the year, this works here, but might be too hardcoded for generalization
+# there is a problem here with, what else, Nature Access. Because the filename has a "2019" in both years, the script that extracts the years (for multi year iteration) is dropping the data. Just drop that and deal with it later.
+#zonal_df$year <- str_extract(zonal_df$raster_name, "\\d{4}") # i did not use us here for some reason. but keep close. Issue
+# Pivot wider to have all the attributes in Different columns
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = sum)
+zonal_wide
+zonal_df |>
+dplyr::summarise(n = dplyr::n(), .by = c(HYBAS_ID, service, year)) |>
+dplyr::filter(n > 1L)
+View(zonal_df)
+results_list
+# Combine results from all evaluated rasters into a single data frame
+zonal_df <- do.call(rbind, results_list)
+# add color and service columns
+zonal_df <- left_join(zonal_df,cd)
+# Add the year. this uses the original filenames to extract the year, this works here, but might be too hardcoded for generalization
+# there is a problem here with, what else, Nature Access. Because the filename has a "2019" in both years, the script that extracts the years (for multi year iteration) is dropping the data. Just drop that and deal with it later.
+zonal_df$year <- str_extract(zonal_df$raster_name, "\\d{4}") # i did not use us here for some reason. but keep close. Issue
+zonal_df
+View(zonal_df)
+# Pivot wider to have all the attributes in Different columns
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from =sum)
+zonal_wide
+raster_name
+cd
+# Combine results from all evaluated rasters into a single data frame
+zonal_df <- do.call(rbind, results_list)
+# add color and service columns
+zonal_df <- left_join(zonal_df,cd)
+zonal_df
+View(zonal_df)
+cd
+rasters_list
+zonal_wide
+basin
+poly
+bs <- st_drop_geometry(poly)
+bs <- bs[c(1,7)]
+bs
+zonal_wide <- left_join(zonal_wide,bs)
+zonal_wide
+zonal_wide <- zonal_wide %>%
+mutate(
+across(
+.cols = -c(HYBAS_ID, SUB_AREA),         # all except HYBAS_ID and SUB_AREA
+.fns = ~ .x / SUB_AREA,                 # divide by SUB_AREA
+.names = "{.col}_sqkm"                  # new name = original + "_sqkm"
+)
+)
+zonal_wide
+poly
+zonal_wide <- zonal_wide[-c(2:6)]
+zonal_wide
+zonal_wide <- compute_pct_change(zonal_wide)
+zonal_wide
+zonal_wide <- compute_pct_change(zonal_wide)
+zonal_wide
+zonal_wide <- compute_pct_change(zonal_wide, suffix = "_sqkm", round_digits = 3)
+zonal_wide
+poly
+# Join the extracted data to the polygon files
+poly <- left_join(poly, zonal_wide, by= cols)
+# Join the extracted data to the polygon files
+poly <- left_join(poly, zonal_wide, by= col)
+poly
+names(poly) <- names(poly) %>% stringr::str_replace(("^NA", "Pop"))
+names(poly) <- names(poly) %>% stringr::str_replace("^NA", "Pop")
+poly
+lyr
+st_layers(set)
+# Name layer here. Use more descriptive names.
+st_write(poly, set, layer = "hydrosheds_lv6_synth", append = FALSE)#
+# Set the target metrics to extract. Most Standard R summary metrics are available, for more information run ?exactextractr
+target_stats <- c("mean")
+# List and clean file names
+tiffes <- file.path(inpath, list.files(inpath, pattern = 'tif'))
+tiffes
+tiffes <- tiffes[c(1,2)]
+filename <- basename(tiffes)
+raster_name <- gsub(".tif$", "", filename)
+raster_name
+service <- rep(c("GDP"), each = 2)
+year <- rep(c(1992, 2020), 2)
+# Create color mapping
+color <- rep(c("#2c144c", each = 2)
+cd <- as_tibble(cbind(color, year, service, raster_name))
+# Create color mapping
+color <- rep(c("#2c144c", each = 2))
+cd <- as_tibble(cbind(color, year, service, raster_name))
+cd
+service <- rep(c("GDP"), each = 2)
+year <- rep(c(1992, 2020), 2)
+# Create color mapping
+color <- rep(c("#2c144c", each = 2))
+cd <- as_tibble(cbind(color, year, service, raster_name))
+cd
+service <- rep(c("GDP"), each = 2)
+year <- rep(c(1992, 2020), 1)
+# Create color mapping
+color <- rep(c("#2c144c", each = 1))
+cd <- as_tibble(cbind(color, year, service, raster_name))
+cd
+service <- rep(c("GDP"), each = 2)
+year <- rep(c(1992, 2020), 1)
+# Create color mapping
+color <- rep(c("#2c144c"), each = 1))
+cd <- as_tibble(cbind(color, year, service, raster_name))
+cd
+service <- rep(c("GDP"), each = 2)
+year <- rep(c(1992, 2020), 1)
+# Create color mapping
+color <- rep(c("#2c144c"), each = 1))
+# Create color mapping
+color <- rep(c("#2c144c"), 1))
+# Create color mapping
+color <- rep(c("#2c144c"), each = 1)
+cd <- as_tibble(cbind(color, year, service, raster_name))
+cd
+# Set the target metrics to extract. Most Standard R summary metrics are available, for more information run ?exactextractr
+target_stats <- c("mean")
+rasters_list <- lapply(tiffes, rast)
+num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  The number of cores to user is also contingent on the amount of RAM available.
+#start extracting the summary statisticss
+results_list <- mclapply(rasters_list, function(r) {
+# Perform exact extraction
+res <- exact_extract(r, poly,
+fun = target_stats,
+append_cols = col)
+r_name <- names(r)
+# Add a column labeling which raster these results are from
+res$raster_name <- r_name
+return(res)},mc.cores = num.cores)
+results_list
+# Combine results from all evaluated rasters into a single data frame
+zonal_df <- do.call(rbind, results_list)
+cd
+# add color and service columns
+zonal_df <- left_join(zonal_df,cd)
+zonal_df
+uniqe(zonal_df$year)
+unique(zonal_df$year)
+# Pivot wider to have all the attributes in Different columns
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
+zonal_wide
+zonal_wide. <- compute_pct_change(zonal_wide, suffix = NULL, round_digits = 3)
+zonal_wide.
+poly
+zonal_wide <- compute_pct_change(zonal_wide, suffix = NULL, round_digits = 3)
+# Join the extracted data to the polygon files
+poly <- left_join(poly, zonal_wide, by= col)
+poly
+# Name layer here. Use more descriptive names.
+st_write(poly, set, layer = "hydrosheds_lv6_synth", append = FALSE)#
+inpath <- here('input_ES', 'Nitrogen_2')
+tiffes2 <- file.path(inpath, list.files(paste0(inpath),pattern= 'retention'))
+tiffes2
+inpath <- here('input_ES', 'final_extraction')
+#load the rasters with the calculated differences
+tiffes1 <- file.path(inpath, list.files(paste0(inpath),pattern= 'export'))
+tiffes1
+tiffes2 <- file.path(inpath, list.files(paste0(inpath),pattern= 'retention'))
+rast_list1 <- lapply(tiffes1, rast)
+rast_list2 <- lapply(tiffes2, rast)
+rast_list1
+rast_list2
+rast_list2 <- lapply(tiffes2, rast)
+rast_list2
+inpath <- here('input_ES', 'final_extraction')
+#load the rasters with the calculated differences
+tiffes1 <- file.path(inpath, list.files(paste0(inpath),pattern= 'export'))
+tiffes1
+inpath <- here('input_ES', 'Nitrogen_2')
+tiffes2 <- file.path(inpath, list.files(paste0(inpath),pattern= 'retention'))
+tiffes2
+rast_list2 <- lapply(tiffes2, rast)
+pot_s_loss <- Map(function(r1,r2) r2/(r2+r1), rast_list1, rast_list2)
+pot_s_loss
+pot_s_loss <- Map(function(r1,r2) r2/(r2+r1), rast_list1, rast_list2)
+pot_s_loss
+inpath
+map(1:length(pot_s_loss), function(x) writeRaster(pot_s_loss[[x]], paste0(inpath, '/', 'n_ret_ratio_', year[x],'.tif')))
+plot(pot_s_loss[[1]])
+# Create color mapping
+color <- rep(c("#3d722c"), each = 2)
+cd <- cbind(service, year, color)
+# Set the target metrics to extract. Most Standard R summary metrics are available, for more information run ?exactextractr
+target_stats <- c("mean")
+rasters_list <-  pot_s_loss
+rasters_list
+col
+num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  The number of cores to user is also contingent on the amount of RAM available.
+#start extracting the summary statisticss
+results_list <- mclapply(rasters_list, function(r) {
+# Perform exact extraction
+res <- exact_extract(r, poly,
+fun = target_stats,
+append_cols = col)
+r_name <- names(r)
+# Add a column labeling which raster these results are from
+res$raster_name <- r_name
+return(res)},mc.cores = num.cores)
+results_list <- mclapply(rasters_list, function(r) {
+# Perform exact extraction
+res <- exact_extract(r, poly,
+fun = target_stats,
+append_cols = col)
+r_name <- names(r)
+# Add a column labeling which raster these results are from
+res$raster_name <- r_name
+return(res)},mc.cores = num.cores)
+# Combine results from all evaluated rasters into a single data frame
+zonal_df <- do.call(rbind, results_list)
+# add color and service columns
+zonal_df <- left_join(zonal_df,cd)
+zonal_df
+cd
+# Assign services and years
+service <- rep(c("N_Ret_Ratio"), each = 2)
+year <- rep(c(1992, 2020))
+# Create color mapping
+color <- rep(c("#3d722c"), each = 2)
+cd <- cbind(service, year, color)
+# add color and service columns
+zonal_df <- left_join(zonal_df,cd)
+cd
+# Add the year. this uses the original filenames to extract the year, this works here, but might be too hardcoded for generalization
+# there is a problem here with, what else, Nature Access. Because the filename has a "2019" in both years, the script that extracts the years (for multi year iteration) is dropping the data. Just drop that and deal with it later.
+zonal_df$year <- str_extract(zonal_df$raster_name, "\\d{4}") # i did not use us here for some reason. but keep close. Issue
+zonal_df
+uniqe(zonal_df$year)
+unique(zonal_df$year)
+# Pivot wider to have all the attributes in Different columns
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
+col
+zonal_df
+zonal_df <- zonal_df %>% mutate(service= "N_Ret_Ratio")
+zonal_df
+# Pivot wider to have all the attributes in Different columns
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
+zonal_wide
+zonal_wide <- compute_pct_change(zonal_wide, suffix = NULL, round_digits = 3)
+zonal_wide
+poly
+# Join the extracted data to the polygon files
+poly <- left_join(poly, zonal_wide, by= col)
+poly
+set
+st_write(poly, here('vector', set), append = FALSE)
+set
+st_write(poly, set, append = FALSE)
+library(sf)             # Spatial vector operations
+library(dplyr)          # Data manipulation
+library(terra)          # Raster processing
+library(exactextractr)  # Zonal statistics
+library(ggplot2)        # Visualization
+library(forcats)        # Factor reordering
+library(tidytext)
+library(here)           # Managing paths
+library(patchwork)      # Combining plots
+library(tidyr)
+library(parallel)       # Parallel computing
+library(purrr)
+library(stringr)
+library(knitr)
+library(kableExtra)
+inpath <- here("summary_pipeline_workspace")
+gp <- list.files(inpath, pattern = ".gpkg")
+gp <- file.path(inpath, gp)
+gp
+synth <- lapply(gp, st_read)
+synth <- lapply(gp, st_read)
+synth <- lapply(synth, function(s){
+s <- s %>% mutate(fid=row_number()-1)
+})
+synth <- lapply(synth, function(s){
+s <- st_drop_geometry(s)
+})
+synth[[1]] <- select(synth[[1]], fid, GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean)
+synth[[2]] <- select(synth[[2]], fid, rast_gdpTot_1990_2020_30arcsec.7_mean)
+synth[[3]] <- select(synth[[3]], fid, GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean)
+synth[[4]] <- select(synth[[4]], fid, GlobPOP_Count_30arc_2020_I32.1_sum)
+synth[[5]] <- select(synth[[5]], fid, hdi_raster_predictions_2020.1_mean)
+synth[[6]] <- select(synth[[6]], fid,farmsize_mehrabi.1_mean)
+synth <- reduce(synth, left_join, by= "fid")
+# Load the polygons with the calcualted ES change variables
+synth_ES <- st_read(here('vector',"hydrosheds_lv6_synth.gpkg"))
+synth
+# Load the polygons with the calcualted ES change variables
+synth_ES <- st_read(here('vector',"hydrosheds_lv6_synth.gpkg"))
+# Keep the columns of interest (original hydrosheds and pct_ch in this case)
+synth_ES <- dplyr::select(synth_ES, 1:13, contains("pct_ch"))
+synth_ES <- synth_ES %>% mutate(fid = row_number()-1)
+sf_object <- sf_object %>%
+mutate(fid = row_number() - 1)
+synth_ES <- left_join(synth_ES, synth, by = 'fid')
+synth_ES$fid <- NULL
+st_write(synth_ES, here('vector', "hydrosheds_lv6_synth_1.gpkg"), layer = "benef_analysis", append = TRUE)
+st_write(synth_ES, here('vector', "hydrosheds_lv6_synth.gpkg"), layer = "benef_analysis", append = TRUE)
+poly <- synth_ES
+rm(synth_ES, synth)
+library(devtools)
+build_readme()
+synth2 <- st_read(paste0(inpath, '/', 'hydrosheds_lv6_synth_synth_zonal_2025_05_08_22_23_58.gpkg'))
+synth2 <- st_read(paste0(inpath, '/', 'hydrosheds_lv6_synth_synth_zonal_2025_05_08_22_23_58.gpkg'))
+synth2
+synth2 <- synth2 %>% mutate(fid=row_number()-1)
+synth2
+synth2 <- st_read(paste0(inpath, '/', 'hydrosheds_lv6_synth_synth_zonal_2025_05_08_22_23_58.gpkg'))
+synth2 <- st_read(paste0(inpath, '/', 'hydrosheds_lv6_synth_synth_zonal_2025_05_08_22_23_58.gpkg'))
+synth2 <- st_drop_geometry(synth2 %>% mutate(fid=row_number()-1))
+synth2
+synth2
+synth2 <- select(synth2, fid, GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_sum)
+synth2
+synth2
+synth_ES
+# Load the polygons with the calcualted ES change variables
+synth_ES <- st_read(here('vector',"hydrosheds_lv6_synth.gpkg"),layer = "benef_analysis")
+# Load the polygons with the calcualted ES change variables
+synth_ES <- st_read(here('vector',"hydrosheds_lv6_synth.gpkg"),layer = "benef_analysis")
+synth_ES
+synth_ES <- synth_ES %>% mutate(fid = row_number()-1)
+synth_ES <- left_join(synth_ES, synth2, by = 'fid')
+synth_ES$fid <- NULL
+synth_ES
+st_write(synth_ES, here('vector', "hydrosheds_lv6_synth.gpkg"), layer = "benef_analysis", append = FALSE)
+tt <- rast('./data/input_rasters/final_extraction_92_2020/N_ret_ratio_1992.tif')
+tt
+minmax(tt)
+hist(tt)
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(tidytext)
+library(rlang)
+library(tidyr)
+library(forcats)
+# source the helper functions
+source(here("R", "utils_lcc_metrics.R"))
+source(here("R","utils_pct_change.R"))
+tt <- rast(here('data','analysis','GHS_POP/GHS_POP_E2000_GLOBE_R2023A_54009_100_V1_0.tif'))
+tt

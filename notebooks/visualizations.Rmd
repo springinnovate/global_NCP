@@ -19,6 +19,7 @@ library(stringr)
 library(tidytext)
 library(rlang)
 library(tidyr)
+library(forcats)
 # source the helper functions
 source(here("R", "utils_lcc_metrics.R"))
 source(here("R","utils_pct_change.R"))
@@ -35,25 +36,12 @@ Also, the order of the factors needs to be set, and new classes have to be added
 Here, i need to clean the directory form a lot of old versions. Only the groupings. If pct not there, it is fine, that is easy to calculate now. 
 
 ```{r load polygons, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
-# # Read spatial polygon dataset
-# 
-# inpath <- '/Users/sputnik/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector'
-# inpath <- here("vector")
-# sets <- file.path(inpath, list.files(inpath, pattern= 'gpkg$'))
-# 
-# #cols <- c("id", "continent", "income_grp", "region_wb", "WWF_biome", "HYBAS_ID", "HYBAS_ID")
-# #sets <- cbind(sets, cols)
-# # Set an index to select the desired dataset
-# t <- 10
-# # Select the target dataset from the list 
-# set <- sets[t]
-# # # load polygons
-# lyr <- st_layers(set)
-# poly <- st_read(set)
-# 
-# #get the name of the column with the unique ids of the input vector
-# col <- colnames(poly[1])[1]
- 
+
+poly <- st_read(here('vector', "hydrosheds_lv6_synth.gpkg"), layer = "benef_analysis"))
+poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/vector/hydrosheds_lv6_synth-lilling-safeBackup-0001.gpkg', layer = "benef_analysis")
+st_write(poly, here('vector', "hydrosheds_lv6_synth.gpkg"), layer = "benef_analysis", append = FALSE)
+poly$n_export_pct_ch <- NULL 
+
 ```
 
 # Load and pivot 
@@ -67,44 +55,49 @@ This should actually be done as a database structure. The columns live somewhere
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
  
-poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/hydrosheds_lv6_synth.gpkg')
-
 # add areas 
-poly <- poly %>% mutate(area_sqkm = as.numeric(st_area(geom)) / 10^6)
+#poly <- poly %>% mutate(pop_dens_2020area_sqkm = as.numeric(st_area(geom)) / 10^6) # not necessary for basins, area in sq km already a column 
 
  plt <- st_drop_geometry(poly)
- plt <- plt %>%
-  dplyr::select(
-    1:15, # This is hardcoded for the basins, but has to be adjusted for specific cases/desired columns.
-    22,
-    contains("pct_ch"), 
-    contains("area_sqkm")
-  )
- # Edit/Adjust column names 
+ 
+ # Edit/Adjust column names # not yet
  names(plt) <- stringr::str_replace_all(names(plt), "_2020_1992", "")
- # remove old N calculation, use the current one made by me
- plt$n_export_pct_ch <- NULL
+ # cakculate POP Density
+ plt <- plt %>% mutate(GlobPOP_sqkm = GlobPOP_Count_30arc_2020_I32.1_sum/SUB_AREA)
  
  or_attributes <- plt
  
  ############# PIVOT TABLE ##############################
- plt <- plt %>%
+ 
+ # Define the socioeconomic variables
+socio_vars <- c(
+  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",
+  "rast_gdpTot_1990_2020_30arcsec.7_mean",
+  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean",
+  #"GlobPOP_Count_30arc_2020_I32.1_sum",
+  "hdi_raster_predictions_2020.1_mean",
+  "farmsize_mehrabi.1_mean",
+  "GlobPOP_sqkm"
+)
+
+# Pivot all columns that contain pct_ch, keeping other relevant vars
+plt_long <- plt %>%
   pivot_longer(
-    cols = matches("pct_ch"),  # matches anything containing pct_ch
+    cols = matches("pct_ch"),
     names_to = "service",
-    names_transform = list(service = as.character),
     values_to = "pct_ch"
   ) %>%
-  mutate(service = str_replace(service, "_pct_ch.*", "")) %>% 
-  as_tibble()
+  select(HYBAS_ID, service, pct_ch, all_of(socio_vars)) %>% 
+   mutate(service = str_replace(service, "_pct_ch.*", ""))
+  
+
+plt_long <- plt_long%>% filter(service != "Pop") 
 # #This is annoying and should be improved. Made easier. Here i am adjusting/homologuing variable names to a same standard. Because some of the data has been extracted at different moments there is some, ahem, *inconsistency* in the "service" naming structure that I fixed here.
  
  plt <- plt %>% mutate(service = case_when(
-   #service == "n_export" ~ "N_export",
    service == "sed_export" ~ "Sed_export",
    service == "Sed_retention_ratio" ~ "Sed_Ret_Ratio",
-    service == "Pop" ~ "Pop_sqkm",
-   #service == "N_export_sqkm" ~ "N_Export_2",
+
    TRUE ~ service
    ))
 # 
@@ -127,7 +120,7 @@ write.csv(plt, file= here('output_data', "metrics_change_hb_lev_6.csv"))
 # set class names and colors for plotting 
 
 Here, another dialogue to input the variable names, plot colors and set the factor order.
-```{r, fig.height=8, fig.width=14  }
+```{r}
 #plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
 # plt[1] <- NULL 
 service <- unique(plt$service)
@@ -139,6 +132,8 @@ service <- c("Coastal_Protection","Pollination","N_export","N_Ret_Ratio", "Sed_e
  
  plt <- left_join(plt, cd)
 ```
+
+
 
 
  This could be a dialogue box!!!
@@ -156,27 +151,16 @@ area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
 df <- plt %>% filter(SUB_AREA > area_threshold)
 # get the filtered locations
 
-# optional. Remove countries by area. 
-df <- df %>%
-  filter(area_sqkm_country >= 10000)
-# Step 3: Select top and bottom 5 by dir_ch_2
-top_bottom_lc <- df %>%
-  slice_max(dir_ch_2, n = 5, with_ties = FALSE) %>%
-  bind_rows(
-    bas_lc_filtered %>%
-      slice_min(dir_ch_2, n = 5, with_ties = FALSE)
-  )
 ```
 
 
 
-## 5. Here, add plots with the differences 
+## 5. Plots Change
 
 
 ```{r, fig.height=8, fig.width=14}
 col <- "HYBAS_ID"
-
-col <- "ee_r264_name"
+#col <- "ee_r264_name"
 
 plot_es_changes <- function(data, label_col,
                             filter_type = "top_bottom", filter_val = 10) {
@@ -230,13 +214,11 @@ plot_es_changes <- function(data, label_col,
       axis.text.x = element_text(angle = 45, hjust = 1, size = 8)
     )
 }
-
 # Top/bottom 10 countries per service
 plot_es_changes(df, label_col = col, filter_type = "top_bottom", filter_val = 10)
 
 # Top/bottom 5% per service
 #plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.5)
-# 
 # # Show all values
 # plot_es_changes(plt, filter_type = "all")
 ```
