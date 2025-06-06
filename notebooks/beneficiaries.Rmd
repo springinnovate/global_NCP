@@ -23,19 +23,18 @@ library(scales)
 library(RColorBrewer)
 library(htmltools)
 library(leaflet)
-library(devtools)
-load_all()
-#source the helper functions
+# source the helper functions
 source(here("R", "hotSpotR.R"))
+source(here("R","scattR.R"))
 source(here("R","utils_pct_change.R"))
 source(here("R", "utils_lcc_metrics.R"))
 source(here("R","utils_pct_change.R"))
 source(here("R", "perc_filteR.R"))
+
 ```
 
 I moved some chunks from here to the end of **Consolidation.Rmd**. They kept distracting me and making me waste even more time each time i had to make sense of this, and the worst , wasting time. I will move what was here away to avoid getting confused (again), but keep record where i put in case i ever need to review this. If at some point that is not necessary anymore, i will move that to old_notebook, but for the love of Bochica, keep our working spaces clean !!
-
- I moved some chunks from here to the end of **Consolidation.Rmd**. They kept distracting me and making me waste even more time each time i had to make sens of this, and the worst , wasting time. I will move wha was here away to avoidgetting confused (again), but kep record where i put in csase i ever need to review this. If at some point that is nto neceesary anymore, i will move that to old_notebook, but for the love of Bochica, keep our working spaces clean !!
+THis cleans the data/consolidates columns that are going to be analyzed keep at hands, the rest is sent to a storage. there should be a database structure here. 
 
 
 Here, another dialogue to input the variable names, plot colors and set the factor order.
@@ -44,7 +43,7 @@ Load the input ecosystem service data for the final priortized Ecosysye Service 
 By 19/05/2025 it contains. change values for following ES datalayers synthetzed at the Basin_lv6: 
 
 "Sed_export"         "Sed_Ret_Ratio"      "Coastal_Protection" "Pollination"        "N_export"           "Pop_sqkm"           "GDP"                "N_Ret_Ratio"
- 
+
 
 #####################################
 
@@ -56,8 +55,8 @@ Start HERE!!!!
 # ---------------------------------------------------------
 
 # Load long-format ES data (one row per basin-service-metric)
-df_raw <- read_csv(here("output_data", "serv_benef_synth_01.csv"))
-df_raw <- read.csv('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/serv_benef_synth_01.csv')
+df_raw <- read_csv(here("output_data", "serv_benef_synth_02.csv"))
+
 # ---------------------------------------------------------
 # STEP 1: Filter out small basins by SUB_AREA
 # ---------------------------------------------------------
@@ -65,7 +64,7 @@ df_raw <- read.csv('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlife
 # ---- USER OPTIONS ----
 filter_type <- "quantile"   # Options: "quantile", "percent", "absolute"
 filter_cutoff <- 0.05       # 5% cutoff if using quantile or percent
-filter_direction <- "bottom"  # Options: "bottom", "top", "both", "none"
+filter_direction <- "bottom"  # Options: "bottom", "top", "both", "none" Actually here, only bottom makes sense. However, i need to think what i aqm going to do about the long format, and if this actually has some/any effect on the calculation 
 # -----------------------
 
 # Compute threshold based on filter type
@@ -77,27 +76,14 @@ if (filter_type == "quantile") {
     arrange(SUB_AREA) %>%
     pull(SUB_AREA) %>%
     {.[n_threshold]}
-} else if (filter_type == "absolute"){
-  area_threshold <- filter_cutoff}
-
-
-# Compute thresholds
-if (filter_type == "quantile") {
-  q_val <- quantile(df_raw$SUB_AREA, probs = c(filter_cutoff, 1 - filter_cutoff), na.rm = TRUE)
-} else if (filter_type == "percent") {
-  sorted_areas <- df_raw %>% arrange(SUB_AREA) %>% pull(SUB_AREA)
-  n_total <- length(sorted_areas)
-  n_cut <- ceiling(n_total * filter_cutoff)
-  q_val <- c(sorted_areas[n_cut], sorted_areas[n_total - n_cut])
 } else if (filter_type == "absolute") {
-  q_val <- c(filter_cutoff, max(df_raw$SUB_AREA))
+  area_threshold <- filter_cutoff
 } else {
   stop("Invalid filter_type: must be 'quantile', 'percent', or 'absolute'")
 }
 
 # Apply filtering logic
 df <- df_raw
-
 if (filter_direction == "bottom") {
   df <- df %>% filter(SUB_AREA > area_threshold)
   filter_note <- paste0("Filtered: Smallest ", round(100 * filter_cutoff), "% basins removed")
@@ -109,46 +95,31 @@ if (filter_direction == "bottom") {
   q_high <- quantile(df_raw$SUB_AREA, probs = 1 - filter_cutoff / 2, na.rm = TRUE)
   df <- df %>% filter(SUB_AREA > q_low & SUB_AREA < q_high)
   filter_note <- paste0("Filtered: Smallest and largest ", round(100 * (filter_cutoff / 2)), "% basins removed")
-}
-if (filter_direction == "top") {
-  df <- df %>% filter(SUB_AREA >= q_val[2])
-  filter_note <- paste0("Top ", round(100 * filter_cutoff), "% largest basins")
-} else if (filter_direction == "bottom") {
-  df <- df %>% filter(SUB_AREA <= q_val[1])
-  filter_note <- paste0("Bottom ", round(100 * filter_cutoff), "% smallest basins")
-} else if (filter_direction == "both") {
-  df <- df %>% filter(SUB_AREA <= q_val[1] | SUB_AREA >= q_val[2])
-  filter_note <- paste0("Top & bottom ", round(100 * filter_cutoff), "% basins")
-} else if (filter_direction == "tail") {
-  df <- df %>% filter(SUB_AREA <= q_val[1] | SUB_AREA >= q_val[2])
-  filter_note <- paste0("Filtered: Extreme tails (", round(100 * filter_cutoff), "%)")
-} else if (filter_direction == "middle") {
-  df <- df %>% filter(SUB_AREA > q_val[1] & SUB_AREA < q_val[2])
-  filter_note <- paste0("Filtered: Middle ", round(100 * (1 - 2 * filter_cutoff)), "% of basins")
 } else {
   filter_note <- "No basin size filtering applied"
 }
 
 # ---------------------------------------------------------
-# STEP 2: Set Service Order and Colors
+# STEP 2: Set Service Order and Color
 # ---------------------------------------------------------
+
 service_levels <- c("Coastal_Protection", "N_export", "Sed_export",
-                    "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
+                    "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "USLE")
 
 service_colors <- c("#9e9ac8", "#dd1c77", "#2c944c",
-                    "#2c711c", "#08306b", "#02606b")
-
+                    "#2c711c", "#08306b", "#02606b", )
 
 df <- df %>%
   mutate(service = factor(service, levels = service_levels))
 
 # ---------------------------------------------------------
-# STEP 3: Define LC Metric Labels for Plotting
+# STEP 3: Define LC Metric Labels (for scatterplots)
 # ---------------------------------------------------------
+
 lc_metrics <- c(
   "rast_gdpTot_1990_2020_30arcsec.7_mean",
-  "GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean",
-  "GlobPOP_Count_30arc_2020_I32.1_sum",
+  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean",
+  #"GlobPOP_Count_30arc_2020_I32.1_sum",
   "hdi_raster_predictions_2020.1_mean",
   "farmsize_mehrabi.1_mean",
   "GlobPOP_sqkm",
@@ -157,8 +128,8 @@ lc_metrics <- c(
 
 lc_labels <- c(
   "Mean GDP 2020",
-  "GHS Population Mean 2020",
-  "GlobPop Sum 2020",
+  #"GHS Population Mean 2020", # this needs to be updated
+  #"GlobPop Sum 2020",
   "Mean HDI 2020",
   "Farmsize 2017",
   "GlobPop/km²",
@@ -176,23 +147,34 @@ nam <- tibble(lc_metrics = lc_metrics, names = lc_labels)
 
 ```
 
-# run it 
+# run it All Data ,just removed smallest basins.
 
-```{r run_scatter}
+```{r run_scatter,  fig.height=8, fig.width = 11}
 plot_es_lc_scatter(
   df = df,
   lc_metrics = lc_metrics,
   nam = nam,
-  export_dir = here::here("output_charts"),
+  #export_dir = here::here("output_charts"),
   filter_note = filter_note
 )
+# 
+# 
+# plot_es_lc_scatter <- function(df, lc_metrics, nam,
+#                                geom_type = "hex", bins = 60,
+#                                service_filter = NULL,
+#                                export_dir = NULL,
+#                                image_format = "jpg",
+#                                dpi = 300, width = 10, height = 8,
+#                                filter_note = NULL,
+#                                reverse_axes = FALSE,
+#                                apply_log = FALSE,
+#                                remove_outliers = TRUE) 
 ```
 
-## Scatterplots
- Ready the data (load and adjust symbols
+
 ```{r other plot}
 #load the ecosysytem service dsata in long format
-plt <- as_tibble(read.csv(here("output_data", "serv_benef_synth_01.csv")))
+plt <- as_tibble(read.csv(here("output_data", "serv_benef_synth_02.csv")))
 
 # get the filtered locations
 area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
@@ -200,8 +182,7 @@ area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
 df <- plt %>% filter(SUB_AREA > area_threshold)
 # Set the levesl. This seems banal; but is important because iut defines how the layer facets will be rendered. Is also annoying because i can't think about a way to do it which is 
 # 3 Columns, 2 Rows:
-service <- c("Coastal_Protection","N_export","Sed_export","Pollination","N_Ret_Ratio","Sed_Ret_Ratio")
- color <- c("#9e9ac8", "#dd1c77","#2c944c", "#2c711c","#08306b", "#02606b")
+service <- c("Coastal_Protection","N_export","Sed_export","Pollination","N_Ret_Ratio","Sed_Ret_Ratio", "USLE")
  service_levels <- service
 
 df <- df %>%
@@ -210,13 +191,25 @@ df <- df %>%
   )
 
 # 3. List of Benef data to analyze. We can profit and set the names here. I am thinking about the best sat to get (sum/mean. Is not as evident as it seems at first) 
-lc_metrics <- c("rast_gdpTot_1990_2020_30arcsec.7_mean","GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean","GlobPOP_Count_30arc_2020_I32.1_sum","hdi_raster_predictions_2020.1_mean","farmsize_mehrabi.1_mean","GlobPOP_sqkm","dir_ch_2")
-names <- c("Mean GDP 2020", "GHS Population Mean 2020", "GlobPop Sum 2020", "Mean HDI 2020", "Farmsize 2017", "GlobPop/kmˆ2", "LCover Change")
+lc_metrics <- c("rast_gdpTot_1990_2020_30arcsec.7_mean",
+#"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean",
+#"GlobPOP_Count_30arc_2020_I32.1_sum",
+"hdi_raster_predictions_2020.1_mean",
+"farmsize_mehrabi.1_mean",
+"GlobPOP_sqkm",
+"dir_ch_2")
+names <- c("Mean GDP 2020", 
+#"GHS Population Mean 2020", 
+#"GlobPop Sum 2020", 
+"Mean HDI 2020", 
+"Farmsize 2017", 
+"GlobPop/kmˆ2", 
+"LCover Change")
 nam <- as_tibble(cbind(lc_metrics,names))
 ```
 
 
-
+# Inverted Axes
 ```{r scatterplots 2, fig.height=8, fig.width = 11}
 
 plot_es_lc_scatter(
@@ -237,7 +230,7 @@ reverse_axes = TRUE,
 loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
 
 # Define services where we want the largest gains (positive change is bad, e.g. sediment/nutrient export)
-gain_services <- c("Sed_export", "N_export")
+gain_services <- c("Sed_export", "N_export", "USLE")
 
 # Create a new column where we flip the sign only for gain services
 df <- df %>%
@@ -276,146 +269,6 @@ reverse_axes = FALSE,
 ```
 
 ```{r filtered, fig.height=9, fig.width = 12}
-# ✅ READY: Filtered Data + Labels + Notes
-# ---------------------------------------------------------
-# df          -> the filtered data
-# nam         -> label table for plotting
-# filter_note -> subtitle for plots
-
-# To run the plotting function:
-# plot_es_lc_scatter(df = df, lc_metrics = lc_metrics, nam = nam, filter_note = filter_note)
-
-# ---------------------------------------------------------
-# 👩‍🏫 QUICK CLARIFICATION: Percentile vs. Top X%
-# ---------------------------------------------------------
-# - "95th percentile" means the value **below which 95% of the data falls**.
-#   → You use this **value as a threshold** to keep/remove rows.
-#
-# - "Top 5%" means selecting the **actual top 5% of rows** (usually sorted).
-#   → This is a count-based filter: you select N rows from the top.
-#
-# ✅ They are similar *if the data is continuous and large*, but not identical.
-# ✅ Use `quantile()` for value-based filtering; use `arrange()` + slice/count for count-based.
-# ---------------------------------------------------------
-
-# ---------------------------------------------------------
-# RUN DIFFERENT FILTERING SCENARIOS
-# ---------------------------------------------------------
-prep_none <- filter_and_prepare_df(df_raw, filter_direction = "none", service_levels = service_levels, metric_labels = nam)
-prep_top <- filter_and_prepare_df(df_raw, filter_cutoff = 0.95, filter_direction = "top", service_levels = service_levels, metric_labels = nam)
-
-```
-
-
-
-
-
-```{r scatterplots 2, fig.height=6, fig.width = 9}
-plot_es_lc_scatter(
-  df = prep_top$df,
-  lc_metrics = lc_metrics,
-  nam = prep_none$nam,
-  filter_note = prep_none$filter_note,
-  reverse_axes = FALSE,
-  apply_log = FALSE,
-  remove_outliers = TRUE,
- #export_dir = here("output_charts"))
-
-```
-
-
-```{r scatterplots 3, fig.height=6, fig.width = 9}
-plot_es_lc_scatter(
-  df = prep_top$df,
-  lc_metrics = lc_metrics,
-  nam = prep_none$nam,
-  filter_note = prep_none$filter_note,
-  reverse_axes = TRUE,
-  apply_log = FALSE,
-  remove_outliers = TRUE)
-```
-
-
-```{r get_hotspots, fig.height=6, fig.width = 9}
-get_hotspot_df <- function(df, change_var = "pct_ch", cutoff = 0.05) {
-  df %>%
-    group_by(service) %>%
-    mutate(
-      low_cut = quantile(.data[[change_var]], probs = cutoff / 2, na.rm = TRUE),
-      high_cut = quantile(.data[[change_var]], probs = 1 - cutoff / 2, na.rm = TRUE)
-    ) %>%
-    ungroup() %>%
-    filter(.data[[change_var]] <= low_cut | .data[[change_var]] >= high_cut)
-}
-
-
-df_hotspots <- get_hotspot_df(prep_top$df)
-
-plot_es_lc_scatter(
-  df = df_hotspots,
-  lc_metrics = lc_metrics,
-  nam = prep_top$nam,
-  filter_note = "Hotspots: Top/Bottom 5% Change",
-  remove_outliers = TRUE             # Keeps plot readable
-)
-
-```
-
-
-# ---- USER OPTIONS ----
-filter_type <- "percent"   # Options: "quantile", "percent", "absolute"
-filter_cutoff <-0.05       # 5% cutoff if using quantile or percent
-filter_direction <- "top"  # Options: "bottom", "top", "both", "none"
-# -----------------------
-
-plot_es_lc_scatter(
-  df = df,
-geom_type = "hex", bins = 80,
-  lc_metrics = nam$lc_metrics,
-  nam = nam,
-  export_dir = NULL,
-flip_axes = FALSE#here::here("output_charts")
-)
-
-
-# 
-# df_f <- df %>%
-#   group_by(service) %>%
-#   mutate(threshold = quantile(pct_ch, 0.95, na.rm = TRUE)) %>%
-#   ungroup() %>%
-#   filter(pct_ch <= threshold)
-# 
-# 
-# plot_es_lc_scatter(
-#   df = df_f,
-# geom_type = "hex", bins = 40,
-#   lc_metrics = nam$lc_metrics,
-#   nam = nam,
-#   #export_dir = here::here("output_charts"),
-#   filter_note = "Filtered: Top 95% of observations"
-# )
-# 
-
-```
-
-```{r scatterplots 2, fig.height=9, fig.width = 12}
-
-
-# ---- USER OPTIONS ----
-filter_type <- "percent"   # Options: "quantile", "percent", "absolute"
-filter_cutoff <-0.05       # 5% cutoff if using quantile or percent
-filter_direction <- "both"  # Options: "bottom", "top", "both", "none"
-# -----------------------
-
-plot_es_lc_scatter(
-  df = df,
-geom_type = "hex", bins = 80,
-  lc_metrics = nam$lc_metrics,
-  nam = nam,
-  export_dir = NULL,
-flip_axes = FALSE#here::here("output_charts")
-)
-
 
 
 df_f <- df %>%
@@ -427,63 +280,16 @@ df_f <- df %>%
 
 plot_es_lc_scatter(
   df = df_f,
-
   lc_metrics = nam$lc_metrics,
   nam = nam,
   #xport_dir = here::here("output_charts"),
   filter_note = "Filtered: Top 95% of observations"
 )
-
-geom_type = "hex", bins = 40,
-  lc_metrics = nam$lc_metrics,
-  nam = nam,
-  #export_dir = here::here("output_charts"),
-  filter_note = "Filtered: Top 95% of observations"
-)
-
-
 ```
 
 ###########################################################
 
 
-```{r fig.height=8, fig.width=10, warning=FALSE}
-library(dplyr)
-
-# 1. Identify hotspots by service
-df_hotspots <- df %>%
-  group_by(service) %>%
-  mutate(
-    upper_threshold = quantile(pct_ch, 0.999, na.rm = TRUE),
-    lower_threshold = quantile(pct_ch, 0.001, na.rm = TRUE),
-    hotspot_flag = case_when(
-      pct_ch >= upper_threshold ~ "high",
-      pct_ch <= lower_threshold ~ "low",
-      TRUE ~ NA_character_
-    ),
-    hotspot_binary = !is.na(hotspot_flag)
-  ) %>%
-  ungroup()
-
-# 2. Count how many times each HYBAS_ID is a hotspot
-hotspot_summary <- df_hotspots %>%
-  filter(hotspot_binary) %>%
-  group_by(HYBAS_ID) %>%
-  summarise(
-    hotspot_count = n(),
-    hotspot_services = list(unique(service))
-  )
-hotspot_summary <- hotspot_summary %>%
-  mutate(hotspot_services = lapply(hotspot_services, \(x) trimws(as.character(x))),
-         hotspot_services = sapply(hotspot_services, \(x) paste(x, collapse = ", ")))
-
-spring_ES <- spring_ES %>%
-  mutate(HYBAS_ID = as.double(HYBAS_ID))
-
-spring_ES <- left_join(spring_ES, hotspot_summary, by = "HYBAS_ID")
-
-#st_write(spring_ES, here('vector', "hydrosheds_lv_6_hotspots.gpkg"))
-```
 
 # Create maps
 ```{r create_maps}
@@ -497,8 +303,6 @@ library(htmltools)
 
 spring_ES <- st_read(here('vector', "hydrosheds_lv_6_hotspots.gpkg"))
 
-spring_ES <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/hydrosheds_lv_6_hotspots.gpkg')
->>>>>>> cb7af26 (Adjusted Scatterplots for meeting 27/05. Pendibg refibe (impacts/losses only))
 # ---------------------------------------------
 # Step 1. Define services to include in the map
 # ---------------------------------------------
