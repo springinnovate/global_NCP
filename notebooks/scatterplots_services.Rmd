@@ -43,20 +43,20 @@ Find out why i did this!!!
 Load the input ecosystem service data for the final priortized Ecosysye Service Change Data */output_data/metrics_change_hb_lev_6.csv* 
 By 19/05/2025 it contains. change values for following ES datalayers synthetzed at the Basin_lv6: 
 
-"Sed_export"         "Sed_Ret_Ratio"      "Coastal_Protection" "Pollination"        "N_export"           "Pop_sqkm"           "GDP"                "N_Ret_Ratio"
+"Sed_export"         "Sed_Ret_Ratio"      "Coastal_Protection" "Pollination"        "N_export"          "USLE"                "N_Ret_Ratio"
 
 
 #####################################
 
 Start HERE!!!!
 
-```{r setup}
+```{r setup2}
 # ---------------------------------------------------------
 # SETUP: Load Ecosystem Service - Beneficiary Data
 # ---------------------------------------------------------
 
 # Load long-format ES data (one row per basin-service-metric)
-df_raw <- read_csv(here("output_data", "hotspot_data_long.csv"))
+df_raw <- read.csv(here("output_data", "hotspot_data_long.csv"))
 
 # ---------------------------------------------------------
 # STEP 1: Filter out small basins by SUB_AREA
@@ -189,7 +189,7 @@ reverse_axes = TRUE,
 # Define services where we want the largest losses (negative change is bad)
 loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
 
-# Define services where we want the largest gains (positive change is bad, e.g. sediment/nutrient export)
+# Define services where we want to identify the largest gains (positive change is bad, e.g. sediment/nutrient export)
 gain_services <- c("Sed_export", "N_export", "USLE")
 
 # Create a new column where we flip the sign only for gain services
@@ -219,6 +219,28 @@ reverse_axes = FALSE,
 )
 ```
 
+
+# Plot hotspots/beneficiaries
+
+```{r plot by hotspots/benef2 , fig.height=8, fig.width = 11}
+
+
+# Now get the top 5% of "problematic" changes
+df_hotspots <- df %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch_focus, 0.95, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch_focus >= threshold)
+
+plot_es_lc_scatter(
+  df = df_hotspots,
+  lc_metrics = nam$lc_metrics,
+  nam = nam,
+  #xport_dir = here::here("output_charts"),
+reverse_axes = FALSE,
+  filter_note = "top % change per service"
+)
+```
 
 ###########################################################
 
