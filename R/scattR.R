@@ -96,9 +96,6 @@ plot_es_lc_scatter <- function(df, lc_metrics, nam,
         } else {
           paste(y_label, "vs. % Change in ES")
         },
-        subtitle = if (!is.null(filter_note) && filter_note != "No basin size filtering applied") filter_note else NULL,
-        subtitle = filter_note,
-
         subtitle = if (!is.null(filter_note) && grepl("No basin size filtering", filter_note)) NULL else filter_note,
         x = if (reverse_axes) y_label else "% Change in Ecosystem Service Provision, 1992–2020",
         y = if (reverse_axes) "% Change in Ecosystem Service Provision, 1992–2020" else y_label,
