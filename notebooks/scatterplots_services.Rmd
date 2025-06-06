@@ -1,0 +1,902 @@
+---
+title: "Beneficiary consolidation
+output: html_notebook
+---
+# Zonal Stat Exctraction and exploratory analysis 
+
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(tidytext)
+library(rlang)
+library(tidyr)
+library(forcats)
+library(scales)
+library(RColorBrewer)
+library(htmltools)
+library(leaflet)
+
+# source the helper functions
+source(here("R", "hotSpotR.R"))
+source(here("R","scattR.R"))
+source(here("R","utils_pct_change.R"))
+source(here("R", "utils_lcc_metrics.R"))
+source(here("R","utils_pct_change.R"))
+source(here("R", "perc_filteR.R"))
+
+```
+
+I moved some chunks from here to the end of **Consolidation.Rmd**. They kept distracting me and making me waste even more time each time i had to make sense of this, and the worst , wasting time. I will move what was here away to avoid getting confused (again), but keep record where i put in case i ever need to review this. If at some point that is not necessary anymore, i will move that to old_notebook, but for the love of Bochica, keep our working spaces clean !!
+THis cleans the data/consolidates columns that are going to be analyzed keep at hands, the rest is sent to a storage. there should be a database structure here. 
+
+
+Here, another dialogue to input the variable names, plot colors and set the factor order.
+Find out why i did this!!!
+Load the input ecosystem service data for the final priortized Ecosysye Service Change Data */output_data/metrics_change_hb_lev_6.csv* 
+By 19/05/2025 it contains. change values for following ES datalayers synthetzed at the Basin_lv6: 
+
+"Sed_export"         "Sed_Ret_Ratio"      "Coastal_Protection" "Pollination"        "N_export"           "Pop_sqkm"           "GDP"                "N_Ret_Ratio"
+
+
+#####################################
+
+Start HERE!!!!
+
+```{r setup}
+# ---------------------------------------------------------
+# SETUP: Load Ecosystem Service - Beneficiary Data
+# ---------------------------------------------------------
+
+# Load long-format ES data (one row per basin-service-metric)
+df_raw <- read_csv(here("output_data", "hotspot_data_long.csv"))
+
+# ---------------------------------------------------------
+# STEP 1: Filter out small basins by SUB_AREA
+# ---------------------------------------------------------
+
+# ---- USER OPTIONS ----
+filter_type <- "quantile"   # Options: "quantile", "percent", "absolute"
+filter_cutoff <- 0.05       # 5% cutoff if using quantile or percent
+filter_direction <- "bottom"  # Options: "bottom", "top", "both", "none" Actually here, only bottom makes sense. However, i need to think what i aqm going to do about the long format, and if this actually has some/any effect on the calculation 
+# -----------------------
+
+# Compute threshold based on filter type
+if (filter_type == "quantile") {
+  area_threshold <- quantile(df_raw$SUB_AREA, probs = filter_cutoff, na.rm = TRUE)
+} else if (filter_type == "percent") {
+  n_threshold <- ceiling(nrow(df_raw) * filter_cutoff)
+  area_threshold <- df_raw %>%
+    arrange(SUB_AREA) %>%
+    pull(SUB_AREA) %>%
+    {.[n_threshold]}
+} else if (filter_type == "absolute") {
+  area_threshold <- filter_cutoff
+} else {
+  stop("Invalid filter_type: must be 'quantile', 'percent', or 'absolute'")
+}
+
+# Apply filtering logic
+df <- df_raw
+if (filter_direction == "bottom") {
+  df <- df %>% filter(SUB_AREA > area_threshold)
+  filter_note <- paste0("Filtered: Smallest ", round(100 * filter_cutoff), "% basins removed")
+} else if (filter_direction == "top") {
+  df <- df %>% filter(SUB_AREA < area_threshold)
+  filter_note <- paste0("Filtered: Largest ", round(100 * filter_cutoff), "% basins removed")
+} else if (filter_direction == "both") {
+  q_low <- quantile(df_raw$SUB_AREA, probs = filter_cutoff / 2, na.rm = TRUE)
+  q_high <- quantile(df_raw$SUB_AREA, probs = 1 - filter_cutoff / 2, na.rm = TRUE)
+  df <- df %>% filter(SUB_AREA > q_low & SUB_AREA < q_high)
+  filter_note <- paste0("Filtered: Smallest and largest ", round(100 * (filter_cutoff / 2)), "% basins removed")
+} else {
+  filter_note <- "No basin size filtering applied"
+}
+
+# ---------------------------------------------------------
+# STEP 2: Set Service Order and Color
+# ---------------------------------------------------------
+
+service_levels <- c("Coastal_Protection", "N_export", "Sed_export",
+                    "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "USLE")
+
+
+df <- df %>%
+  mutate(service = factor(service, levels = service_levels))
+
+# ---------------------------------------------------------
+# STEP 3: Define LC Metric Labels (for scatterplots)
+# ---------------------------------------------------------
+
+lc_metrics <- c(
+  "rast_gdpTot_1990_2020_30arcsec.7_mean",
+  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # Leave this here for now because i need to recalculate this. 
+  #"GlobPOP_Count_30arc_2020_I32.1_sum",
+  "hdi_raster_predictions_2020.1_mean",
+  "farmsize_mehrabi.1_mean",
+  "GlobPOP_sqkm",
+  "dir_ch_2"
+)
+lc_labels <- c(
+  "Mean GDP 2020",
+  #"GHS Population Mean 2020", # this needs to be updated
+  #"GlobPop Sum 2020",
+  "Mean HDI 2020",
+  "Farmsize 2017",
+  "GlobPop/km²",
+  "Land Cover Change"
+)
+nam <- tibble(lc_metrics = lc_metrics, names = lc_labels)
+
+# ---------------------------------------------------------
+# READY: `df` is the filtered dataset
+#         `nam` is the label lookup
+#         `filter_note` is the subtitle / filename tag
+# ---------------------------------------------------------
+```
+
+# Produce Basic Scatterplot
+
+```{r run_scatterPLOT,  fig.height=8, fig.width = 11}
+plot_es_lc_scatter(
+  df = df,
+  lc_metrics = lc_metrics,
+  nam = nam,
+  #export_dir = here::here("output_charts"), # I NEED TO WROK ON THE EXPORTING PART, ESPECIALLY BUILDING THE NAMES, WORRY ABOUT THIS LATTER. 
+  filter_note = filter_note
+)
+# 
+# THIS HERE JSUT SHOWS ALL THE PARAMETERS. IT IS NOT REALLY NECESSARY, THIS NEEDS TO BE ADDED TO THE DOCUMENTATION/MANUAL BUT WILL KEEP IT HERE FOR THE MOMENT.
+# plot_es_lc_scatter <- function(df, lc_metrics, nam,
+#                                geom_type = "hex", bins = 60,
+#                                service_filter = NULL,
+#                                export_dir = NULL,
+#                                image_format = "jpg",
+#                                dpi = 300, width = 10, height = 8,
+#                                filter_note = NULL,
+#                                reverse_axes = FALSE,
+#                                apply_log = FALSE,
+#                                remove_outliers = TRUE) 
+```
+
+
+
+# Inverted Axes
+```{r scatterplots 2, fig.height=8, fig.width = 11}
+
+plot_es_lc_scatter(
+  df = df,
+  lc_metrics = nam$lc_metrics,
+  nam = nam,
+reverse_axes = TRUE,
+  #export_dir = here::here("output_charts")
+)
+
+
+
+```
+# Plot hotspots/beneficiaries
+
+```{r plot by hotspots/benef, fig.height=8, fig.width = 11}
+
+# Define services where we want the largest losses (negative change is bad)
+loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
+
+# Define services where we want the largest gains (positive change is bad, e.g. sediment/nutrient export)
+gain_services <- c("Sed_export", "N_export", "USLE")
+
+# Create a new column where we flip the sign only for gain services
+df <- df %>%
+  mutate(
+    pct_ch_focus = case_when(
+      service %in% gain_services ~ pct_ch,         # positive values are bad → keep as-is
+      service %in% loss_services ~ -pct_ch,        # negative values are bad → flip sign
+      TRUE ~ pct_ch                                 # fallback
+    )
+  )
+
+# Now get the top 5% of "problematic" changes
+df_hotspots <- df %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch_focus, 0.95, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch_focus >= threshold)
+
+plot_es_lc_scatter(
+  df = df_hotspots,
+  lc_metrics = nam$lc_metrics,
+  nam = nam,
+  #xport_dir = here::here("output_charts"),
+reverse_axes = FALSE,
+  filter_note = "top % change per service"
+)
+```
+
+
+###########################################################
+
+```{r, fig.height=8, fig.width=14}
+# library(dplyr)
+# library(ggplot2)
+# 
+# plt <- as_tibble(read.csv(here('output_data', "metrics_change_hb_lev_6.csv")))
+# plt[1] <- NULL 
+# # apply filter (5 or 2%) # Remove the smalles basins. That help. Also, it seems that some biomes are more prone to artifacts than others!!!
+# area_threshold <- quantile(plt$SUB_AREA, probs = 0.05, na.rm = TRUE)
+# # Filter the dataset
+# df <- plt %>% filter(SUB_AREA > area_threshold)
+# 
+# 
+# t_5 <- ggplot(df, aes(x = service, y = pct_ch, fill = color)) +
+#   geom_boxplot() +  # or geom_violin()
+#   scale_fill_identity() +
+#   facet_wrap(~ service, scales = "free_y") +
+#   labs(
+#     title = "Distribution of % Change by Service (Excl. Smallest 5% of Basins)",
+#     x = NULL,
+#     y = "Percentage Change"
+#   ) +
+#   theme_minimal() +
+#   theme(
+#     axis.text.x = element_blank(),
+#     strip.text = element_text(face = "bold"),
+#     legend.position = "none"
+#   )
+# 
+# library(ggplot2)
+# library(dplyr)
+# 
+# # Custom pseudo-log transformation
+# pseudo_log <- function(x) sign(x) * log1p(abs(x))
+# 
+# # Apply to the filtered dataframe
+# df <- plt %>% 
+#   mutate(pct_ch_trans = pseudo_log(pct_ch))
+# 
+# # Plot with transformed values
+# p <- ggplot(df, aes(x = service, y = pct_ch_trans, fill = color)) +
+#   geom_violin(trim = FALSE, scale = "width") +
+#   scale_fill_identity() +
+#   facet_wrap(~ service, scales = "free_y") +
+#   labs(
+#     title = "Pseudo-log Scaled % Change by Service",
+#     x = NULL,
+#     y = "Transformed % Change"
+#   ) +
+#   theme_minimal() +
+#   theme(
+#     axis.text.x = element_blank(),
+#     strip.text = element_text(face = "bold"),
+#     legend.position = "none"
+#   )
+# p
+```
+
+
+# Create maps (leaflet)
+
+```{r create_maps, eval=FALSE, include=FALSE}
+
+
+spring_ES <- st_read(here('vector', "hydrosheds_lv_6_hotspots.gpkg"))
+
+# ---------------------------------------------
+# Step 1. Define services to include in the map
+# ---------------------------------------------
+services <- c(
+  "sed_export_pct_ch", "Usle_pct_ch", "Sed_retention_ratio_pct_ch",
+  "Coastal_Protection_pct_ch", "Pollination_pct_ch", "N_export_pct_ch_2020_1992_sqkm"
+)
+
+# ---------------------------------------------
+# Step 2. Prepare data: pivot and clean
+# ---------------------------------------------
+spring_hotspots_long <- spring_ES %>%
+  select(HYBAS_ID, geom, all_of(services)) %>%
+  pivot_longer(
+    cols = all_of(services),
+    names_to = "service",
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value) & is.finite(value)) %>%
+  mutate(
+    label = paste("HYBAS:", HYBAS_ID,
+                  "<br>Service:", service,
+                  "<br>Change:", round(value, 2))
+  ) %>%
+  st_as_sf() %>%
+  st_make_valid() %>%
+  st_transform(4326)
+
+# ---------------------------------------------
+# Step 3. Define color palette (diverging red-blue)
+# ---------------------------------------------
+pal <- colorNumeric(
+  palette = "RdBu",
+  domain = spring_hotspots_long$value,
+  reverse = TRUE
+)
+
+# ---------------------------------------------
+# Step 4. Initialize leaflet map with base layers
+# ---------------------------------------------
+m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles("OpenStreetMap.Mapnik", group = "OSM") %>%
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addProviderTiles("Esri.WorldImagery", group = "Satellite")
+
+# ---------------------------------------------
+# Step 5. Add a service-specific overlay per layer
+# ---------------------------------------------
+for (svc in unique(spring_hotspots_long$service)) {
+  layer_data <- filter(spring_hotspots_long, service == svc)
+  m <- m %>% addPolygons(
+    data = layer_data,
+    fillColor = ~pal(value),
+    fillOpacity = 0.7,
+    color = "black", weight = 0.3,
+    label = ~lapply(label, HTML),
+    group = svc
+  )
+}
+
+# ---------------------------------------------
+# Step 6. Add layer control and legend
+# ---------------------------------------------
+m <- m %>%
+  addLayersControl(
+    baseGroups = c("OSM", "Positron", "Satellite"),
+    overlayGroups = unique(spring_hotspots_long$service),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = spring_hotspots_long$value,
+    title = "% Change"
+  )
+
+# ---------------------------------------------
+# Step 7. Render the map
+# ---------------------------------------------
+m
+
+
+```
+
+# light version
+
+```{r light version, eval=FALSE, include=FALSE}
+
+# Load libraries (if not already loaded)
+library(sf)
+library(dplyr)
+library(tidyr)
+library(leaflet)
+library(RColorBrewer)
+library(htmltools)
+
+# ---------------------------------------------
+# Step 1. Define services to include in the map
+# ---------------------------------------------
+services <- c(
+  "sed_export_pct_ch", "Usle_pct_ch", "Sed_retention_ratio_pct_ch",
+  "Coastal_Protection_pct_ch", "Pollination_pct_ch", "N_export_pct_ch_2020_1992_sqkm"
+)
+
+# ---------------------------------------------
+# Step 2. Pivot data and filter only one service + sample
+# ---------------------------------------------
+# Choose service to visualize (change as needed)
+target_service <- "Sed_retention_ratio_pct_ch"
+
+spring_hotspots_sample <- spring_ES %>%
+  select(HYBAS_ID, geom, all_of(target_service)) %>%
+  rename(value = !!target_service) %>%
+  filter(!is.na(value) & is.finite(value)) %>%
+  slice_sample(n = 5000) %>%
+  mutate(
+    service = target_service,
+    label = paste("HYBAS:", HYBAS_ID,
+                  "<br>Service:", service,
+                  "<br>Change:", round(value, 2))
+  ) %>%
+  st_as_sf() %>%
+  st_make_valid() %>%
+  st_transform(4326)
+
+# ---------------------------------------------
+# Step 3. Define color palette (diverging red-blue)
+# ---------------------------------------------
+pal <- colorNumeric(
+  palette = "RdBu",
+  domain = spring_hotspots_sample$value,
+  reverse = FALSE
+)
+
+# ---------------------------------------------
+# Step 4. Build fast interactive map
+# ---------------------------------------------
+m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addPolygons(
+    data = spring_hotspots_sample,
+    fillColor = ~pal(value),
+    fillOpacity = 0.7,
+    color = "black", weight = 0.3,
+    label = ~lapply(label, HTML),
+    group = target_service
+  ) %>%
+  addLayersControl(
+    baseGroups = c("Positron"),
+    overlayGroups = c(target_service),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = spring_hotspots_sample$value,
+    title = "% Change"
+  )
+
+# ---------------------------------------------
+# Step 5. Show the map
+# ---------------------------------------------
+m
+
+```
+############################################################################################################################################################################################################################################################################################################################################
+
+# Scratch
+
+**This is old, from the original barplots, i don't know if we are going to use it further, but keep at hand.** 
+
+# 3. Reorder countries based on dir_ch_2 (descending)
+```{r }
+df <- df %>%
+  mutate(ee_r264_name = reorder(ee_r264_name, -dir_ch_2))
+# 4. Create plot
+p <- ggplot(df, aes(x = ee_r264_name, y = pct_ch_trans, fill = ee_r264_name)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "Pseudo-log Scaled % Change by Service ",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  #theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+# 4. Create plot
+p2 <- ggplot(df, aes(x = ee_r264_name, y = pct_ch, fill = ee_r264_name)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "% Change by Service ",
+    x = NULL,
+    y = "Transformed % Change"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "none"
+  )
+p
+p2
+
+```
+######################################################################################
+## 5. add plots with the differences 
+
+Convert into function. We don't need this right now!!!
+```{r, fig.height=8, fig.width=14}
+col <- "HYBAS_ID"
+# create thew function. THIS is what i need to get righ (save as a function)
+plot_es_changes <- function(data, label_col, #labelr col has the column with the ind IDs.
+                            filter_type = "top_bottom", filter_val = 10) {
+  label_sym <- sym(label_col)
+  # Step 2: Apply filtering based on the chosen type
+  if (filter_type == "top_bottom") {
+    # Top/bottom n observations per service
+    top_bottom <- data %>%
+      group_by(service) %>%
+      slice_max(pct_ch, n = filter_val, with_ties = FALSE) %>%
+      bind_rows(
+        data %>%
+          group_by(service) %>%
+          slice_min(pct_ch, n = filter_val, with_ties = FALSE)
+      ) %>%
+      ungroup()
+
+  } else if (filter_type == "quantile") {
+    # Top/bottom quantile per service (e.g., top/bottom 10%)
+    top_bottom <- data %>%
+      group_by(service) %>%
+      filter(pct_ch >= quantile(pct_ch, 1 - filter_val, na.rm = TRUE) |
+             pct_ch <= quantile(pct_ch, filter_val, na.rm = TRUE)) %>%
+      ungroup()
+
+  } else if (filter_type == "all") {
+    top_bottom <- data
+  } else {
+    stop("Invalid `filter_type`. Use 'top_bottom', 'quantile', or 'all'.")
+  }
+
+  # Step 3: Reorder labels per service ## This is stupid. Better to order the labels outside
+  top_bottom <- top_bottom %>%
+    mutate(temp_label = reorder_within(!!label_sym, -pct_ch, service))
+
+  # Step 4: Plot
+  ggplot(top_bottom, aes(x = temp_label, y = pct_ch)) +#, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    scale_x_reordered() +
+    facet_wrap(~ service, scales = "free", ncol = 3) +
+    labs(
+      #title = paste("% Change 1992–2020 By", cols, sep= " "),
+      x = NULL,
+      y = "% Change"
+    ) +
+    theme_bw() +
+    theme(
+      strip.text = element_text(face = "bold", size = 10),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 8)
+    )
+}
+
+# Top/bottom 10 countries per service Send to the docuentnbsation, but we don't need to keep this here, just know thqat i is possible
+# There are several filter types availalbe, jus add to the docuemtnaiton 
+#plot_es_changes(plt_long, label_col = col, filter_type = "top_bottom", filter_val = 10)
+
+# Top/bottom 5% per service
+plot_es_changes(df, label_col = col, filter_type = "quantile", filter_val = 0.5)
+# 
+# # Show all values
+# plot_es_changes(plt, filter_type = "all")
+```
+
+######################################################################################
+
+## Scatterplots
+
+```{r}
+
+
+# List of LC metrics to analyze
+lc_metrics <- c("Gain_2", "Persistence_2", "Loss_2", "dir_ch_2")
+
+# Loop over each LC metric and generate a faceted scatterplot
+for (metric in lc_metrics) {
+  p <- plt %>%
+    ggplot(aes_string(x = metric, y = "pct_ch", color = "color")) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    facet_wrap(~ service, scales = "free") +
+    scale_color_identity() +
+    labs(
+      title = paste("Relationship Between", metric, "and ES % Change"),
+      x = metric,
+      y = "% Change in Ecosystem Service"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p)
+}
+```
+
+
+
+
+
+```{r leaflet 2}
+
+# Create separate boolean columns for each service being a hotspot
+for (svc in services) {
+  spring_ES[[paste0("is_", svc, "_hotspot")]] <- grepl(svc, spring_ES$hotspot_services)
+}
+# ---------------------------------------------
+# Step 1. Define services to include in the map
+# ---------------------------------------------
+services <- c(
+  "sed_export_pct_ch", "Usle_pct_ch", "Sed_retention_ratio_pct_ch",
+  "Coastal_Protection_pct_ch", "Pollination_pct_ch", "N_export_pct_ch_2020_1992_sqkm"
+)
+
+# ---------------------------------------------
+# Step 2. Fix malformed hotspot_services column
+# ---------------------------------------------
+# Final safe parser for all cases
+parse_hotspot_services <- function(x) {
+  if (is.null(x) || all(is.na(x))) return(NA_character_)
+  if (is.character(x) && length(x) > 1) return(x)
+  cleaned <- gsub("^c\\(|\\)$", "", x)                # remove c(...) wrapper
+  cleaned <- gsub('[\\"\\\']', "", cleaned)           # remove quotes
+  cleaned <- trimws(cleaned)
+  strsplit(cleaned, ",\\s*")[[1]]
+}
+
+spring_ES_fixed <- spring_ES %>%
+  mutate(hotspot_services = lapply(hotspot_services, parse_hotspot_services))
+
+# ---------------------------------------------
+# Step 3. Pivot to long format and filter to real hotspots
+# ---------------------------------------------
+spring_hotspots_long <- spring_ES_fixed %>%
+  select(HYBAS_ID, geom, all_of(services), hotspot_services) %>%
+  pivot_longer(cols = all_of(services), names_to = "service", values_to = "value") %>%
+  mutate(
+    is_hotspot = mapply(function(svc, hs) {
+      if (is.null(hs) || all(is.na(hs))) return(FALSE)
+      svc %in% hs
+    }, service, hotspot_services),
+    label = paste("HYBAS:", HYBAS_ID, "<br>Service:", service, "<br>Change:", round(value, 2))
+  ) %>%
+  filter(is_hotspot & !is.na(value)) %>%
+  st_as_sf() %>%
+  st_make_valid() %>%
+  st_transform(4326)
+
+# ---------------------------------------------
+# Step 4. Define color palette (diverging red-blue)
+# ---------------------------------------------
+pal <- colorNumeric(
+  palette = "RdBu",
+  domain = spring_hotspots_long$value,
+  reverse = TRUE
+)
+
+# ---------------------------------------------
+# Step 5. Initialize leaflet map with base layers
+# ---------------------------------------------
+m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles("OpenStreetMap.Mapnik", group = "OSM") %>%
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addProviderTiles("Esri.WorldImagery", group = "Satellite")
+
+# ---------------------------------------------
+# Step 6. Add a service-specific overlay per layer
+# ---------------------------------------------
+for (svc in unique(spring_hotspots_long$service)) {
+  layer_data <- filter(spring_hotspots_long, service == svc)
+  m <- m %>% addPolygons(
+    data = layer_data,
+    fillColor = ~pal(value),
+    fillOpacity = 0.7,
+    color = "black", weight = 0.3,
+    label = ~lapply(label, HTML),
+    group = svc
+  )
+}
+
+# ---------------------------------------------
+# Step 7. Add layer control and legend
+# ---------------------------------------------
+m <- m %>%
+  addLayersControl(
+    baseGroups = c("OSM", "Positron", "Satellite"),
+    overlayGroups = unique(spring_hotspots_long$service),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = spring_hotspots_long$value,
+    title = "% Change"
+  )
+
+# ---------------------------------------------
+# Step 8. Render the map
+# ---------------------------------------------
+m
+
+```
+
+```{r leaflet 2}
+
+# Create separate boolean columns for each service being a hotspot
+for (svc in services) {
+  spring_ES[[paste0("is_", svc, "_hotspot")]] <- grepl(svc, spring_ES$hotspot_services)
+}
+# ---------------------------------------------
+# Step 1. Define services to include in the map
+# ---------------------------------------------
+services <- c(
+  "sed_export_pct_ch", "Usle_pct_ch", "Sed_retention_ratio_pct_ch",
+  "Coastal_Protection_pct_ch", "Pollination_pct_ch", "N_export_pct_ch_2020_1992_sqkm"
+)
+
+# ---------------------------------------------
+# Step 2. Fix malformed hotspot_services column
+# ---------------------------------------------
+# Final safe parser for all cases
+parse_hotspot_services <- function(x) {
+  if (is.null(x) || all(is.na(x))) return(NA_character_)
+  if (is.character(x) && length(x) > 1) return(x)
+  cleaned <- gsub("^c\\(|\\)$", "", x)                # remove c(...) wrapper
+  cleaned <- gsub('[\\"\\\']', "", cleaned)           # remove quotes
+  cleaned <- trimws(cleaned)
+  strsplit(cleaned, ",\\s*")[[1]]
+}
+
+spring_ES_fixed <- spring_ES %>%
+  mutate(hotspot_services = lapply(hotspot_services, parse_hotspot_services))
+
+# ---------------------------------------------
+# Step 3. Pivot to long format and filter to real hotspots
+# ---------------------------------------------
+spring_hotspots_long <- spring_ES %>%
+  select(HYBAS_ID, geom, all_of(services)) %>%
+  pivot_longer(cols = all_of(services), names_to = "service", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  mutate(
+    label = paste("HYBAS:", HYBAS_ID, "<br>Service:", service, "<br>Change:", round(value, 2))
+  ) %>%
+  st_as_sf() %>%
+  st_make_valid() %>%
+  st_transform(4326)
+
+# ---------------------------------------------
+# Step 4. Define color palette (diverging red-blue)
+# ---------------------------------------------
+pal <- colorNumeric(
+  palette = "RdBu",
+  domain = spring_hotspots_long$value,
+  reverse = TRUE
+)
+
+m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles("OpenStreetMap.Mapnik", group = "OSM") %>%
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addProviderTiles("Esri.WorldImagery", group = "Satellite")
+
+for (svc in unique(spring_hotspots_long$service)) {
+  layer_data <- filter(spring_hotspots_long, service == svc)
+  m <- m %>% addPolygons(
+    data = layer_data,
+    fillColor = ~pal(value),
+    fillOpacity = 0.7,
+    color = "black", weight = 0.3,
+    label = ~lapply(label, HTML),
+    group = svc
+  )
+}
+
+m <- m %>%
+  addLayersControl(
+    baseGroups = c("OSM", "Positron", "Satellite"),
+    overlayGroups = unique(spring_hotspots_long$service),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = spring_hotspots_long$value,
+    title = "% Change"
+  )
+
+m
+
+```
+
+```{r leaflet 3}
+# Create separate boolean columns for each service being a hotspot
+for (svc in services) {
+  spring_ES[[paste0("is_", svc, "_hotspot")]] <- grepl(svc, spring_ES$hotspot_services)
+}
+spring_hotspots_long <- spring_ES %>%
+  select(HYBAS_ID, geom, all_of(services), starts_with("is_")) %>%
+  pivot_longer(cols = all_of(services), names_to = "service", values_to = "value") %>%
+  mutate(
+    hotspot_flag = case_when(
+      service == "sed_export_pct_ch" ~ is_sed_export_pct_ch_hotspot,
+      service == "Usle_pct_ch" ~ is_Usle_pct_ch_hotspot,
+      service == "Sed_retention_ratio_pct_ch" ~ is_Sed_retention_ratio_pct_ch_hotspot,
+      service == "Coastal_Protection_pct_ch" ~ is_Coastal_Protection_pct_ch_hotspot,
+      service == "Pollination_pct_ch" ~ is_Pollination_pct_ch_hotspot,
+      service == "N_export_pct_ch_2020_1992_sqkm" ~ is_N_export_pct_ch_2020_1992_sqkm_hotspot,
+      TRUE ~ FALSE
+    ),
+    label = paste("HYBAS:", HYBAS_ID, "<br>Service:", service, "<br>Change:", round(value, 2))
+  ) %>%
+  filter(hotspot_flag & !is.na(value)) %>%
+  st_as_sf() %>%
+  st_make_valid() %>%
+  st_transform(4326)
+pal <- colorNumeric(
+  palette = "RdBu",
+  domain = spring_hotspots_long$value,
+  reverse = TRUE
+)
+
+m <- leaflet(options = leafletOptions(preferCanvas = TRUE)) %>%
+  addProviderTiles("OpenStreetMap.Mapnik", group = "OSM") %>%
+  addProviderTiles("CartoDB.Positron", group = "Positron") %>%
+  addProviderTiles("Esri.WorldImagery", group = "Satellite")
+
+for (svc in unique(spring_hotspots_long$service)) {
+  layer_data <- filter(spring_hotspots_long, service == svc)
+  m <- m %>% addPolygons(
+    data = layer_data,
+    fillColor = ~pal(value),
+    fillOpacity = 0.7,
+    color = "black", weight = 0.3,
+    label = ~lapply(label, HTML),
+    group = svc
+  )
+}
+
+m <- m %>%
+  addLayersControl(
+    baseGroups = c("OSM", "Positron", "Satellite"),
+    overlayGroups = unique(spring_hotspots_long$service),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = spring_hotspots_long$value,
+    title = "% Change"
+  )
+
+m
+```
+
+```{r fig.height=8, fig.width=10, warning=FALSE}
+
+# 1. Filter the dataframe for top and bottom 10 by dir_ch_2
+df_top_bottom <- df %>%
+  arrange(desc(dir_ch_2)) %>%
+  slice_head(n = 10) %>%
+  bind_rows(
+    df %>%
+      arrange(dir_ch_2) %>%
+      slice_head(n = 10)
+  )
+
+# 2. Reorder countries inside the filtered data
+df_top_bottom <- df_top_bottom %>%
+  mutate(ee_r264_name = fct_reorder(ee_r264_name, -dir_ch_2))
+df_top_bottom <- df_top_bottom %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
+
+# 3. Create plot (pseudo-log scale)
+p <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch, fill = service)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  facet_wrap(~ service, scales = "free_y") +
+  scale_fill_viridis_d(option = "D") +
+  labs(
+    title = "% Change by Service (Top and Bottom 10 Countries)",
+    x = NULL,
+    y = "% Change"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    strip.text = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+# 5. Print
+p
+p2  # if you also want the regular % plot
+
+```
+
+
+
+
