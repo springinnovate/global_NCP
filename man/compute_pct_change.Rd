@@ -40,11 +40,11 @@ A data.frame with added percentage change columns.
 \description{
 This function computes percentage change between year pairs for specified services
 or auto-detects all available year pairs if none are specified. It assumes columns
-follow the naming convention: \if{html}{\out{<service>}}_\if{html}{\out{<year>}}\if{html}{\out{<suffix>}}
+follow the naming convention:
 
 This function computes percentage change between year pairs for specified services
 or auto-detects all available year pairs if none are specified. It assumes columns
-follow the naming convention: \if{html}{\out{<service>}}_\if{html}{\out{<year>}}.
+follow the naming convention: \if{html}{\out{<service>}}_\if{html}{\out{<year>}}\if{html}{\out{<suffix>}}.
 }
 \examples{
 compute_pct_change_all(df, year_pairs = list(c("1992", "2020")), services = c("Usle"))
