@@ -49,7 +49,7 @@ By 19/05/2025 it contains. change values for following ES datalayers synthetzed 
 #####################################
 
 Start HERE!!!!
-
+Load Data, filter small basins out!
 ```{r setup2}
 # ---------------------------------------------------------
 # SETUP: Load Ecosystem Service - Beneficiary Data
@@ -222,24 +222,23 @@ reverse_axes = FALSE,
 
 # Plot hotspots/beneficiaries
 
+
+Here, ineed to check how many are there per individual variable, and here is where i have an isse again. The column *hotspot_services_negative* can have more than one value and i need to think how to get it outside. 
 ```{r plot by hotspots/benef2 , fig.height=8, fig.width = 11}
 
+df_affected <- hotspots_change %>%
+  filter(!is.na(hotspot_services_negative))
 
-# Now get the top 5% of "problematic" changes
-df_hotspots <- df %>%
-  group_by(service) %>%
-  mutate(threshold = quantile(pct_ch_focus, 0.95, na.rm = TRUE)) %>%
-  ungroup() %>%
-  filter(pct_ch_focus >= threshold)
+soc_vars <- c("rast_gdpTot_1990_2020_30arcsec.7_mean",
+              "hdi_raster_predictions_2020.1_mean",
+              "GlobPOP_sqkm",
+              "farmsize_mehrabi.1_mean")
 
-plot_es_lc_scatter(
-  df = df_hotspots,
-  lc_metrics = nam$lc_metrics,
-  nam = nam,
-  #xport_dir = here::here("output_charts"),
-reverse_axes = FALSE,
-  filter_note = "top % change per service"
-)
+df_summary <- hotspots_change %>%
+  mutate(is_affected = !is.na(hotspot_services_negative)) %>%
+  group_by(is_affected) %>%
+  summarise(across(all_of(soc_vars), list(mean = mean, median = median), na.rm = TRUE))
+
 ```
 
 ###########################################################

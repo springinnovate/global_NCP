@@ -153,6 +153,10 @@ plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)
 
 # 3. Get Hotspots 
 
+Need to think on an effectve way to change the value (the share/quantile we want to extract and also filter by group!!!!)
+
+So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. Taht wouls be awesome 
+
 ```{r get_hotspots}
 
 # 1. Identify hotspots by service. Here i will have to adjust, because in some cases the key hotspots are the gains, and in others are the losses. 
@@ -164,7 +168,7 @@ plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)
 # Define which services are considered "losses" vs "damages"
 loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
 gain_services <- c("Sed_export", "N_export", "USLE")
-pct_cutoff <- 0.05  # Top/bottom 5%
+pct_cutoff <- 0.01  # Top/bottom 5%
 
 # STEP 1: Identify Top/Bottom % Hotspots Per Service
 df_hotspots <- plt_long %>%
@@ -218,20 +222,36 @@ hotspot_summary <- hotspot_summary %>%
   select(-hotspot_services_list)  # Optional cleanup
 
 
-# remove unnecesary columns (original 92-2020 values, keep)
-spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
-# reorganize columns
-spring_ES <- spring_ES[c(1:19, 20, 22,21,25,34,23,24,26:33)]
-spring_ES$N_export_2020_sqkm <- NULL
+hotspot_1 <- left_join(poly, hotspot_summary)
+
+
+# ###############################################
+# # remove unnecesary columns (original 92-2020 values, keep)
+# spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
+# # reorganize columns
+# spring_ES <- spring_ES[c(1:19, 20, 22,21,25,34,23,24,26:33)]
+# spring_ES$N_export_2020_sqkm <- NULL
 
 spring_ES <- left_join(spring_ES, hotspot_summary, by = "HYBAS_ID")
 hotspots_change <- spring_ES # rename (i could just clean this but too lazy)
 
-hotspots_change <- left_join(hotspots_change,ct)
+#hotspots_change <- left_join(hotspots_change,ct)
 names(hotspots_change) <- stringr::str_replace_all(names(hotspots_change), "_2020_1992", "")
+
+
+# Define the services interested in
+services <- c("Sed_export", "USLE", "Sed_Ret_Ratio", "Coastal_Protection", 
+              "Pollination", "N_export", "N_Ret_Ratio")
+
+# Create binary columns from the hotspot_services_negative column
+for (s in services) {
+  hotspots_change[[s]] <- ifelse(grepl(s, hotspots_change$hotspot_services_negative), 1, 0)
+}
+
+
 # Export aoutputs (this also needs to be adjusted, it makes no sense to kee storing this inb two differnet places)
-st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
-st_write(hotspots_change, paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"), append=FALSE)
+st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), layer= "hotspots_1_pct", append = TRUE)
+st_write(hotspots_change, paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"), layer= "hotspots_1_pct", append = TRUE)
 
 # Drop Geometry 
 
