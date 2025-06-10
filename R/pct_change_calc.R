@@ -2,7 +2,7 @@
 #'
 #' This function computes percentage change between year pairs for specified services
 #' or auto-detects all available year pairs if none are specified. It assumes columns
-#' follow the naming convention: <service>_<year><suffix>
+#' follow the naming convention:
 #'
 #' @param df A data.frame or sf object.
 #' @param year_pairs A list of year pairs. Each element should be a character vector of length 2.

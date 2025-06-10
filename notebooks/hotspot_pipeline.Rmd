@@ -1,0 +1,135 @@
+---
+title: "hotpot_pipeline"
+author: "Jeronimo Rodriguez-Escobar"
+date: "2025-06-10"
+output: html_document
+---
+
+`---
+title: "Workflow: Mapping Ecosystem Service Change and Affected Populations"
+output: html_document
+---
+
+# Overview
+
+This document describes the processing pipeline used to assess changes in Ecosystem Services (ES) over time, identify global hotspots of loss or increased damage, and characterize affected populations based on socioeconomic indicators. The goal is to build a reproducible and scalable workflow for analysis and visualization.
+
+# 1. Data Preparation and Summary Metrics
+
+We use **HydroBASINS level 6** polygons as our spatial unit. ES variables were modeled using InVEST for the years **1992** and **2020**. Key services include:
+
+- Sediment Export (`Sed_export`)
+- Soil Erosion (USLE)
+- Sediment Retention Ratio (`Sed_Ret_Ratio`)
+- Nitrogen Export (`N_export`)
+- Nitrogen Retention Ratio (`N_Ret_Ratio`)
+- Coastal Protection
+- Pollination Potential
+
+### Summary Metric Extraction
+We use `exactextractr::exact_extract()` to compute per-basin statistics (mean or sum) from the modeled rasters:
+
+```r
+exact_extract(service_raster, hydrobasins, fun = "mean")
+```
+
+We also extract gridded socioeconomic and land cover variables:
+- Population (`GlobPOP_sqkm`)
+- GDP (`rast_gdpTot_*`)
+- HDI (`hdi_raster_predictions_*`)
+- Farm size (`farmsize_mehrabi.*`)
+
+> Future enhancement: use `weights = population_raster` for population-weighted averages.
+
+# 2. Calculating Change and Reorganizing
+
+For each ES, we calculate **percentage change**:
+
+```r
+df <- df %>%
+  mutate(Sed_export_pct_ch = 100 * (Sed_export_2020 - Sed_export_1992) / Sed_export_1992)
+```
+
+Columns are organized by type:
+- Raw attributes (HydroBASINS)
+- Geographic groupings (country, region, biome, etc.)
+- ES metrics (1992, 2020, change)
+- Beneficiary metrics (population, GDP, etc.)
+
+# 3. Hotspot Identification
+
+We classify hotspots based on **top or bottom X%** of change per service. The threshold (e.g., 1%, 5%) can be adjusted.
+
+We distinguish between:
+- **Loss services**: Negative change is bad (e.g., `Pollination`, `Coastal_Protection`, `N_Ret_Ratio`, `Sed_Ret_Ratio`)
+- **Damage services**: Positive change is bad (e.g., `Sed_export`, `N_export`, `USLE`)
+
+### Hotspot Flagging
+
+```r
+loss_services <- c("Pollination", "Coastal_Protection", "N_Ret_Ratio", "Sed_Ret_Ratio")
+gain_services <- c("Sed_export", "N_export", "USLE")
+
+# Identify top/bottom change
+hotspots <- df %>%
+  group_by(service) %>%
+  mutate(...custom ranking logic...) %>%
+  ungroup()
+
+# Summarize
+hotspot_summary <- hotspots %>%
+  filter(hotspot_binary) %>%
+  group_by(HYBAS_ID) %>%
+  summarise(...)
+```
+
+Columns like `hotspot_services` and `hotspot_services_negative` summarize where basins fall into loss/damage hotspots.
+
+# 4. Identifying Affected Populations
+
+To assess *who* is most affected:
+- Filter to `hotspot_services_negative`
+- Compare socioeconomic attributes (GDP, HDI, population, farm size)
+
+This can be visualized using:
+- Boxplots of socioeconomic values per hotspot service
+- Scatterplots (e.g., % change in ES vs. HDI)
+- Maps colored by beneficiary value within hotspots
+
+# 5. Visualization
+
+We use both **ggplot2** (for exploratory plots) and **tmap** (for mapping in R):
+
+```r
+# Example scatterplot
+plot_es_lc_scatter(
+  df = df,
+  lc_metrics = lc_metrics,
+  nam = label_table,
+  reverse_axes = TRUE,
+  remove_outliers = TRUE
+)
+
+# Example map
+library(tmap)
+tm_shape(hotspot_sf) +
+  tm_fill("hotspot_count", palette = "YlOrRd") +
+  tm_borders()
+```
+
+Maps can be exported per-service or per-region to summarize where losses or damages concentrate.
+
+# 6. Outlook
+
+The current approach relies on in-memory spatial tables and multiple export steps. To increase flexibility and reduce manual processing, we plan to:
+
+- Migrate core datasets into a **PostGIS database**
+- Use SQL queries for dynamic filtering, joining, and aggregation
+- Build mapping views using `dbplyr` or `tmap` with `sf` directly from the database
+
+This will enable:
+- Dynamic queries (e.g., "hotspots in Sub-Saharan Africa with HDI < 0.5")
+- Region-specific analyses without duplicating data
+- Easier version control and scaling
+
+# End of Pipeline
