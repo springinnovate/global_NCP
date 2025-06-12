@@ -23,6 +23,9 @@ library(scales)
 library(RColorBrewer)
 library(htmltools)
 library(leaflet)
+library(tmap)
+library(rnaturalearth)
+library(rnaturalearthdata)
 
 # source the helper functions
 source(here("R", "hotSpotR.R"))
@@ -229,7 +232,7 @@ Here, ineed to check how many are there per individual variable, and here is whe
 df_affected <- hotspots_change %>%
   filter(!is.na(hotspot_services_negative))
 
-soc_vars <- c("rast_gdpTot_1990_2020_30arcsec.7_mean",
+beneficiaries <- c("rast_gdpTot_1990_2020_30arcsec.7_mean",
               "hdi_raster_predictions_2020.1_mean",
               "GlobPOP_sqkm",
               "farmsize_mehrabi.1_mean")
@@ -237,7 +240,70 @@ soc_vars <- c("rast_gdpTot_1990_2020_30arcsec.7_mean",
 df_summary <- hotspots_change %>%
   mutate(is_affected = !is.na(hotspot_services_negative)) %>%
   group_by(is_affected) %>%
-  summarise(across(all_of(soc_vars), list(mean = mean, median = median), na.rm = TRUE))
+  summarise(across(all_of(beneficiaries), list(mean = mean, median = median), na.rm = TRUE))
+
+
+df_summary_cs <- st_drop_geometry(df_summary)
+write.csv(df_summary_cs, here("output_data", "summary_hotspots.csv"))
+
+# Service change columns (the ones with the % change)
+change_vars <- c("sed_export_pct_ch", "N_export_pct_ch_sqkm", "Usle_pct_ch",
+                 "Sed_retention_ratio_pct_ch", "N_Ret_Ratio_pct_ch")
+```
+
+
+# Export maps
+
+```{r tmaps}
+
+
+# Map services to their % change columns
+service_map <- c(
+  "Sed_export" = "sed_export_pct_ch",
+  "N_export" = "N_export_pct_ch_sqkm",
+  "USLE" = "Usle_pct_ch",
+  "Sed_Ret_Ratio" = "Sed_retention_ratio_pct_ch",
+  "N_Ret_Ratio" = "N_Ret_Ratio_pct_ch"
+)
+
+# Load country borders for context
+world_borders <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+
+# Loop through services
+for (service in names(service_map)) {
+  change_var <- service_map[[service]]
+
+  # Subset only the relevant hotspot polygons with finite values
+  hotspots_only <- hotspots_change %>%
+    filter(.data[[service]] == 1, is.finite(.data[[change_var]]))
+
+  if (nrow(hotspots_only) == 0) next
+
+  map_title <- paste("Hotspots of", service)
+
+  tm <- tm_shape(world_borders) +
+    tm_borders(lwd = 0.3, col = "gray60") +
+    tm_shape(hotspots_only) +
+    tm_polygons(
+      fill = change_var,
+      fill.scale = tm_scale_intervals(style = "quantile", n = 5, values = "reds"),
+      fill.legend = tm_legend(title = paste0("% Change in ", service)),
+      col = NA  # no polygon borders
+    ) +
+    tm_title(map_title) +
+    tm_layout(
+      legend.outside = FALSE,
+      legend.position = c("center", "bottom"),
+      legend.title.size = 0.9,
+      legend.text.size = 0.7,
+      frame = FALSE
+    ) +
+    tm_crs("auto")
+
+  # Save map
+  filename <- here("output_maps", paste0("map_", service, ".png"))
+  tmap_save(tm, filename, width = 10, height = 6, units = "in", dpi = 600)
+}
 
 ```
 
