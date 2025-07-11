@@ -1,5 +1,5 @@
 ---
-title: "DaTa Preparation NBS"    
+title: "Data Preparation NBS"    
 output: html_notebook
 editor_options: 
   markdown: 
@@ -15,12 +15,14 @@ data for the polygons in the 5 prioritized areas.
 packs <- c('terra', 'purrr', 'landscapemetrics', 'sf','dplyr',
            'here', 'gdalUtilities', 'jsonlite', 'devtools', 'stringr',
            'parallel', 'dplyr', 'tidyr', 'ggplot2', 'janitor', 'forcats', 'foreign')
+sapply(packs, install.packages, character.only = TRUE, quietly=TRUE)
 sapply(packs, require, character.only = TRUE, quietly=TRUE)
-rm(packs)
+rm(packs)   
 ```
 
-## 1.1 set class names and colors
+## 1.1 Set simplified Land Cover Legend
 
+I might not need this anymore in the future. 
 ```{r set symbols, include=FALSE}
 #create vector with the country names
 nam <- c("BRAZIL","MADAGASCAR","MEXICO","PERU","VIETNAM") 
@@ -31,28 +33,6 @@ lb <- data.frame(
             "#fff5d7", "#0046c8"),
   value=c(1:8))
 names(lb) <- c("Class", "color", "value")
-```
-
-## 1.3 Define align function
-Because of course
-```{r align list of rasters }
-
-
-library(terra)
-
-align_rasters <- function(raster_list, template, resample_method = "near") {
-  lapply(raster_list, function(r) {
-    if (!compareGeom(r, template, stopOnError = FALSE)) {
-      message("Aligning raster: ", names(r))
-      # Resample to align with the template
-      resample(r, template, method = resample_method)
-    } else {
-      # Return raster as is if already aligned
-      message("Raster already aligned: ", names(r))
-      r
-    }
-  })
-}
 ```
 
 
@@ -68,17 +48,20 @@ poly <- poly%>%split(.$COUNTR)
 ```
 
 ## 2.1. Serv_rasters data
+I think for Roadmap 2030 i really simplified all this stuff here  (July 2025)
+
 ```{r select input rasters data to process}
 
 inpath <- here(("Downloaded_data_ES2"))
 
 #This is one of the most basic but also annoying parts of this workflow; select the rasters to process. I have not been able to come with an autoamted manner, in some cases the strings in the product names have no common patterns that i can use, the easiest way is just to sue excel to sort and filter. Just by hand is difficult and tiresome. 
+# July 2025. I think i took care of this in a way more effective way. 
 #Restoration:
 # do not include data with a differnet crs here, we will deal with that on the next chunk.
 
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
 #Remove points, risk reduction baseline
-tiffes <- tiffes[c(3,23,25,26,30)]
+tiffes <- tiffes[c(3,23,25,26,30)] # this is stupid. I don;t remember exactly how it went at the endm but not like thi!!!
 tiffes <- tiffes[-5]
 print(tiffes)
 
@@ -87,7 +70,7 @@ print(tiffes)
 
 ## 2.2 Access data
 ```{r select accessibility data to process}
-
+# I think we don't need this anymore. We manage the whole thing at once, instead of dealing with reprojecting rasters. Need to remember where i have that to rebuild. 
 tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= 'nature_access.*\\.tif$'))
 tiffes <- tiffes[2]
 # Access restoration
@@ -141,7 +124,7 @@ map(1:length(acces_rest), function(x) writeRaster(acces_rest[[x]], paste0(here('
 ```
 
 
-This runs the same process in batch. Memory was optimized to not load all the data at thesame time, but process and write each raster individually before going to the next one.  
+This runs the same process in batch. Memory was optimized to not load all the data at the same time, but process and write each raster individually before going to the next one.  I don't even know if this is still necessary....
 
 ## Other Data (WGS - 84)
 ```{r iterate cropMask, eval=FALSE, include=FALSE}
@@ -178,7 +161,7 @@ for (i in seq_along(tiffes)) {
 ## 2.3. Reproj and CropMask Accesibility Raster
 
 The accessibility data was handled separately because it is  in another crs because of course, it is a
-distance raster and an equal distance projection is required.
+distance raster and an equal distance projection is required. I think we don't need this anymore.
 
 ```{r reproj access, eval=FALSE, include=FALSE}
 
@@ -274,7 +257,7 @@ Here, we take the rasters with the target data (provided ecosystem service on ti
 
 It is possible to do this systematically,  gain on replicabillity and to be able to make adjustments easily . We load the polygons/rasters, cropMask to get what's inside and the inverse.
 
-
+#####################################################
 
 ### 4.2.1 Load the Polygons with the Areas of interest
 
