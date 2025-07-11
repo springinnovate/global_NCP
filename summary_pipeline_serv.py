@@ -69,7 +69,7 @@ ANALYSIS_DATA = {
     },
 }
 
-ZONAL_OPS = ["mean", "max", "min"]
+ZONAL_OPS = ["sum"]
 
 
 WORKSPACE_DIR = "./summary_pipeline_workspace"
