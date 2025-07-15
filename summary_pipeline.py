@@ -31,9 +31,15 @@ LOGGER = logging.getLogger(__name__)
 logging.getLogger("ecoshard.taskgraph").setLevel(logging.INFO)
 logging.getLogger("rasterio").setLevel(logging.INFO)
 
+<<<<<<< HEAD
 YAML_EXAMPLE = textwrap.dedent(
     """\
     Example YAML format:
+=======
+REFERENCE_SUMMARY_VECTOR_PATHS = {
+    "grid_UICN": "./data/reference/grid_UICN.shp"
+}
+>>>>>>> bec61f0 (Untangling some mess.)
 
     workspace:
         path: "summary_pipeline_workspace"
