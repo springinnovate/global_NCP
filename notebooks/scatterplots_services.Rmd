@@ -28,24 +28,25 @@ library(rnaturalearth)
 library(rnaturalearthdata)
 library(devtools)
 load_all()
+<<<<<<< HEAD
+
+=======
+>>>>>>> 31bf15c (cleaning)
 # source the helper functions
 # source(here("R", "hotSpotR.R"))
 # source(here("R","utils_pct_change.R"))
 # source(here("R", "utils_lcc_metrics.R"))
 # source(here("R","utils_pct_change.R"))
 # source(here("R", "perc_filteR.R"))
-# source the helper functions
-source(here("R", "hotSpotR.R"))
-source(here("R","scattR.R"))
-source(here("R","utils_pct_change.R"))
-source(here("R", "utils_lcc_metrics.R"))
-source(here("R","utils_pct_change.R"))
-source(here("R", "perc_filteR.R"))
 
 ```
+<<<<<<< HEAD
 
 I moved some chunks from here to the end of **Consolidation.Rmd**. They kept distracting me and making me waste even more time each time i had to make sense of this, and the worst , wasting time. I will move what was here away to avoid getting confused (again), but keep record where i put in case i ever need to review this. If at some point that is not necessary anymore, i will move that to old_notebook, but for the love of Bochica, keep our working spaces clean !!
 
+=======
+ I moved some chunks from here to the end of **Consolidation.Rmd**. They kept distracting me and making me waste even more time each time i had to make sens of this, and the worst , wasting time. I will move wha was here away to avoidgetting confused (again), but kep record where i put in csase i ever need to review this. If at some point that is nto neceesary anymore, i will move that to old_notebook, but for the love of Bochica, keep our working spaces clean !!
+>>>>>>> 31bf15c (cleaning)
 THis cleans the data/consolidates columns that are going to be analyzed keep at hands, the rest is sent to a storage. there should be a database structure here. 
 
 
@@ -63,8 +64,46 @@ Start HERE!!!!
 
 
 
-
 ```{r plotting_scenarios}
+<<<<<<< HEAD
+# ---------------------------------------------------------
+# SETUP: Load Ecosystem Service - Beneficiary Data
+# ---------------------------------------------------------
+library(dplyr)
+library(readr)
+library(tibble)
+library(here)
+
+# Load long-format ES data (one row per basin-service-metric)
+df_raw <- read_csv(here("output_data", "serv_benef_synth_02.csv"))
+
+# ---------------------------------------------------------
+# STEP 1: Filter by Basin Area (SUB_AREA)
+# ---------------------------------------------------------
+
+# ---- USER OPTIONS ----
+filter_type <- "percent"       # Options: "quantile", "percent", "absolute"
+filter_cutoff <- 0.05          # E.g., 0.05 = 5% cutoff
+filter_direction <- "tail"     # Options: "top", "bottom", "both", "tail", "middle", "none"
+# -----------------------
+
+# Compute thresholds
+if (filter_type == "quantile") {
+  q_val <- quantile(df_raw$SUB_AREA, probs = c(filter_cutoff, 1 - filter_cutoff), na.rm = TRUE)
+} else if (filter_type == "percent") {
+  sorted_areas <- df_raw %>% arrange(SUB_AREA) %>% pull(SUB_AREA)
+  n_total <- length(sorted_areas)
+  n_cut <- ceiling(n_total * filter_cutoff)
+  q_val <- c(sorted_areas[n_cut], sorted_areas[n_total - n_cut])
+} else if (filter_type == "absolute") {
+  q_val <- c(filter_cutoff, max(df_raw$SUB_AREA)
+```
+
+Load Data, filter small basins out!
+
+```{r setup2}
+=======
+>>>>>>> 31bf15c (cleaning)
 # ---------------------------------------------------------
 # SETUP: Load Ecosystem Service - Beneficiary Data
 # ---------------------------------------------------------
@@ -96,37 +135,6 @@ if (filter_type == "quantile") {
   q_val <- c(sorted_areas[n_cut], sorted_areas[n_total - n_cut])
 } else if (filter_type == "absolute") {
   q_val <- c(filter_cutoff, max(df_raw$SUB_AREA))
-=======
-Load Data, filter small basins out!
-```{r setup2}
-# ---------------------------------------------------------
-# SETUP: Load Ecosystem Service - Beneficiary Data
-# ---------------------------------------------------------
-
-# Load long-format ES data (one row per basin-service-metric)
-df_raw <- read.csv(here("output_data", "hotspot_data_long.csv"))
-
-# ---------------------------------------------------------
-# STEP 1: Filter out small basins by SUB_AREA
-# ---------------------------------------------------------
-
-# ---- USER OPTIONS ----
-filter_type <- "quantile"   # Options: "quantile", "percent", "absolute"
-filter_cutoff <- 0.05       # 5% cutoff if using quantile or percent
-filter_direction <- "bottom"  # Options: "bottom", "top", "both", "none" Actually here, only bottom makes sense. However, i need to think what i aqm going to do about the long format, and if this actually has some/any effect on the calculation 
-# -----------------------
-
-# Compute threshold based on filter type
-if (filter_type == "quantile") {
-  area_threshold <- quantile(df_raw$SUB_AREA, probs = filter_cutoff, na.rm = TRUE)
-} else if (filter_type == "percent") {
-  n_threshold <- ceiling(nrow(df_raw) * filter_cutoff)
-  area_threshold <- df_raw %>%
-    arrange(SUB_AREA) %>%
-    pull(SUB_AREA) %>%
-    {.[n_threshold]}
-} else if (filter_type == "absolute") {
-  area_threshold <- filter_cutoff
 } else {
   stop("Invalid filter_type: must be 'quantile', 'percent', or 'absolute'")
 }
@@ -139,6 +147,7 @@ if (filter_direction == "top") {
 } else if (filter_direction == "bottom") {
   df <- df %>% filter(SUB_AREA <= q_val[1])
   filter_note <- paste0("Bottom ", round(100 * filter_cutoff), "% smallest basins")
+<<<<<<< HEAD
 } else if (filter_direction == "both") {
   df <- df %>% filter(SUB_AREA <= q_val[1] | SUB_AREA >= q_val[2])
   filter_note <- paste0("Top & bottom ", round(100 * filter_cutoff), "% basins")
@@ -154,17 +163,24 @@ if (filter_direction == "bottom") {
 } else if (filter_direction == "top") {
   df <- df %>% filter(SUB_AREA < area_threshold)
   filter_note <- paste0("Filtered: Largest ", round(100 * filter_cutoff), "% basins removed")
+=======
+>>>>>>> 31bf15c (cleaning)
 } else if (filter_direction == "both") {
-  q_low <- quantile(df_raw$SUB_AREA, probs = filter_cutoff / 2, na.rm = TRUE)
-  q_high <- quantile(df_raw$SUB_AREA, probs = 1 - filter_cutoff / 2, na.rm = TRUE)
-  df <- df %>% filter(SUB_AREA > q_low & SUB_AREA < q_high)
-  filter_note <- paste0("Filtered: Smallest and largest ", round(100 * (filter_cutoff / 2)), "% basins removed")
+  df <- df %>% filter(SUB_AREA <= q_val[1] | SUB_AREA >= q_val[2])
+  filter_note <- paste0("Top & bottom ", round(100 * filter_cutoff), "% basins")
+} else if (filter_direction == "tail") {
+  df <- df %>% filter(SUB_AREA <= q_val[1] | SUB_AREA >= q_val[2])
+  filter_note <- paste0("Filtered: Extreme tails (", round(100 * filter_cutoff), "%)")
+} else if (filter_direction == "middle") {
+  df <- df %>% filter(SUB_AREA > q_val[1] & SUB_AREA < q_val[2])
+  filter_note <- paste0("Filtered: Middle ", round(100 * (1 - 2 * filter_cutoff)), "% of basins")
 } else {
   filter_note <- "No basin size filtering applied"
 }
 
 # ---------------------------------------------------------
 # STEP 2: Set Service Order and Colors
+<<<<<<< HEAD
 # ---------------------------------------------------------
 service_levels <- c("Coastal_Protection", "N_export", "Sed_export",
                     "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
@@ -175,21 +191,19 @@ df <- df %>% mutate(service = factor(service, levels = service_levels))
 # ---------------------------------------------------------
 # STEP 3: Define LC Metric Labels for Plotting
 # ---------------------------------------------------------
-=======
 # STEP 2: Set Service Order and Color
+=======
+>>>>>>> 31bf15c (cleaning)
 # ---------------------------------------------------------
-
 service_levels <- c("Coastal_Protection", "N_export", "Sed_export",
-                    "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "USLE")
+                    "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
 
 
-df <- df %>%
-  mutate(service = factor(service, levels = service_levels))
+df <- df %>% mutate(service = factor(service, levels = service_levels))
 
 # ---------------------------------------------------------
-# STEP 3: Define LC Metric Labels (for scatterplots)
+# STEP 3: Define LC Metric Labels for Plotting
 # ---------------------------------------------------------
-
 lc_metrics <- c(
   "rast_gdpTot_1990_2020_30arcsec.7_mean",
   #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # Leave this here for now because i need to recalculate this. 
@@ -203,8 +217,11 @@ lc_labels <- c(
   "Mean GDP 2020",
   "GHS Population Mean 2020",
   "GlobPop Sum 2020",
+<<<<<<< HEAD
   #"GHS Population Mean 2020", # this needs to be updated
   #"GlobPop Sum 2020",
+=======
+>>>>>>> 31bf15c (cleaning)
   "Mean HDI 2020",
   "Farmsize 2017",
   "GlobPop/km²",
@@ -216,8 +233,13 @@ nam <- tibble(lc_metrics = lc_metrics, names = lc_labels)
 # READY: `df` is the filtered dataset
 #         `nam` is the label lookup
 #         `filter_note` is the subtitle / filename tag
+<<<<<<< HEAD
 
 # ✅ READY: Filtered Data + Labels + Notes
+
+=======
+# ✅ READY: Filtered Data + Labels + Notes
+>>>>>>> 31bf15c (cleaning)
 # ---------------------------------------------------------
 ```
 
@@ -262,13 +284,17 @@ reverse_axes = TRUE,
 
 ```
 
+<<<<<<< HEAD
 
 ```{r plot by hotspots/benef, fig.height=8, fig.width = 11}
+=======
+```{r filtered, fig.height=8, fig.width = 11}
+>>>>>>> 31bf15c (cleaning)
 
 # Define services where we want the largest losses (negative change is bad)
 loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
 
-# Define services where we want to identify the largest gains (positive change is bad, e.g. sediment/nutrient export)
+# Define services where we want the largest gains (positive change is bad, e.g. sediment/nutrient export)
 gain_services <- c("Sed_export", "N_export", "USLE")
 
 # Create a new column where we flip the sign only for gain services
@@ -289,6 +315,10 @@ df_hotspots <- df %>%
   filter(pct_ch_focus >= threshold)
 
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 31bf15c (cleaning)
 # df_f <- df %>%
 #   group_by(service) %>%
 #   mutate(threshold = quantile(pct_ch, 0.05, na.rm = TRUE)) %>%
@@ -296,6 +326,7 @@ df_hotspots <- df %>%
 #   filter(pct_ch <= threshold)
 # 
 
+<<<<<<< HEAD
 plot_es_lc_scatter(
   df = df,
 geom_type = "hex", bins = 80,
@@ -305,6 +336,7 @@ geom_type = "hex", bins = 80,
 flip_axes = FALSE#here::here("output_charts")
 )
 ```
+
 
 ```{r filtered, fig.height=9, fig.width = 12}
 
@@ -322,18 +354,42 @@ plot_es_lc_scatter(
   nam = nam,
   #xport_dir = here::here("output_charts"),
   filter_note = "Filtered: Top 95% of observations"
+=======
+>>>>>>> 31bf15c (cleaning)
 plot_es_lc_scatter(
-  df = df_hotspots,
+  df = df,
+geom_type = "hex", bins = 80,
+  lc_metrics = nam$lc_metrics,
+  nam = nam,
+  export_dir = NULL,
+flip_axes = FALSE#here::here("output_charts")
+)
+
+```{r filtered, fig.height=9, fig.width = 12}
+
+
+df_f <- df %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch, 0.95, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch <= threshold)
+
+
+plot_es_lc_scatter(
+  df = df_f,
   lc_metrics = nam$lc_metrics,
   nam = nam,
   #xport_dir = here::here("output_charts"),
-reverse_axes = FALSE,
-  filter_note = "top % change per service"
+  filter_note = "Filtered: Top 95% of observations"
 )
 ```
 
 
 <<<<<<< HEAD
+
+=======
+<<<<<<< HEAD
+>>>>>>> 31bf15c (cleaning)
 # Plot hotspots/beneficiaries
 
 
@@ -416,47 +472,9 @@ for (service in names(service_map)) {
   tmap_save(tm, filename, width = 10, height = 6, units = "in", dpi = 600)
 }
 
-=======
->>>>>>> 66574a5 (synch lilling)
-```
-###########################################################
-
-
-
-# Create maps
-```{r create_maps}
-# Load libraries
-library(sf)
-library(dplyr)
-library(tidyr)
-library(leaflet)
-library(RColorBrewer)
-library(htmltools)
-
-spring_ES <- st_read(here('vector', "hydrosheds_lv_6_hotspots.gpkg"))
-spring_ES <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/hydrosheds_lv_6_hotspots.gpkg')
-=======
-# Plot hotspots/beneficiaries
-
-
-Here, ineed to check how many are there per individual variable, and here is where i have an isse again. The column *hotspot_services_negative* can have more than one value and i need to think how to get it outside. 
-```{r plot by hotspots/benef2 , fig.height=8, fig.width = 11}
-
-df_affected <- hotspots_change %>%
-  filter(!is.na(hotspot_services_negative))
-
-soc_vars <- c("rast_gdpTot_1990_2020_30arcsec.7_mean",
-              "hdi_raster_predictions_2020.1_mean",
-              "GlobPOP_sqkm",
-              "farmsize_mehrabi.1_mean")
-
-df_summary <- hotspots_change %>%
-  mutate(is_affected = !is.na(hotspot_services_negative)) %>%
-  group_by(is_affected) %>%
-  summarise(across(all_of(soc_vars), list(mean = mean, median = median), na.rm = TRUE))
+<<<<<<< HEAD
 
 ```
-
 ###########################################################
 
 ```{r, fig.height=8, fig.width=14}
@@ -523,8 +541,74 @@ df_summary <- hotspots_change %>%
 
 
 spring_ES <- st_read(here('vector', "hydrosheds_lv_6_hotspots.gpkg"))
+spring_ES <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/hydrosheds_lv_6_hotspots.gpkg')
 
->>>>>>> 63f65ea (sync lilling)
+# Plot hotspots/beneficiaries
+
+
+Here, ineed to check how many are there per individual variable, and here is where i have an isse again. The column *hotspot_services_negative* can have more than one value and i need to think how to get it outside. 
+```{r plot by hotspots/benef2 , fig.height=8, fig.width = 11}
+
+df_affected <- hotspots_change %>%
+  filter(!is.na(hotspot_services_negative))
+
+soc_vars <- c("rast_gdpTot_1990_2020_30arcsec.7_mean",
+              "hdi_raster_predictions_2020.1_mean",
+              "GlobPOP_sqkm",
+              "farmsize_mehrabi.1_mean")
+
+df_summary <- hotspots_change %>%
+  mutate(is_affected = !is.na(hotspot_services_negative)) %>%
+  group_by(is_affected) %>%
+  summarise(across(all_of(soc_vars), list(mean = mean, median = median), na.rm = TRUE))
+
+
+# Plot hotspots/beneficiaries
+
+```{r plot by hotspots/benef2 , fig.height=8, fig.width = 11}
+
+
+# Now get the top 5% of "problematic" changes
+df_hotspots <- df %>%
+  group_by(service) %>%
+  mutate(threshold = quantile(pct_ch_focus, 0.95, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(pct_ch_focus >= threshold)
+
+plot_es_lc_scatter(
+  df = df_hotspots,
+  lc_metrics = nam$lc_metrics,
+  nam = nam,
+  #xport_dir = here::here("output_charts"),
+reverse_axes = FALSE,
+  filter_note = "top % change per service"
+)
+=======
+=======
+>>>>>>> 66574a5 (synch lilling)
+>>>>>>> 31bf15c (cleaning)
+```
+###########################################################
+
+
+
+# Create maps
+```{r create_maps}
+# Load libraries
+library(sf)
+library(dplyr)
+library(tidyr)
+library(leaflet)
+library(RColorBrewer)
+library(htmltools)
+
+spring_ES <- st_read(here('vector', "hydrosheds_lv_6_hotspots.gpkg"))
+<<<<<<< HEAD
+
+
+=======
+spring_ES <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/hydrosheds_lv_6_hotspots.gpkg')
+>>>>>>> 31bf15c (cleaning)
 # ---------------------------------------------
 # Step 1. Define services to include in the map
 # ---------------------------------------------
