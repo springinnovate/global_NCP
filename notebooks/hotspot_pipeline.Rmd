@@ -5,14 +5,14 @@ date: "2025-06-10"
 output: html_document
 ---
 
-`---
+---
 title: "Workflow: Mapping Ecosystem Service Change and Affected Populations"
 output: html_document
 ---
 
 # Overview
 
-This document describes the processing pipeline used to assess changes in Ecosystem Services (ES) over time, identify global hotspots of loss or increased damage, and characterize affected populations based on socioeconomic indicators. The goal is to build a reproducible and scalable workflow for analysis and visualization.
+Processing pipeline used to assess changes in Ecosystem Services (ES) over time, identify global hotspots of loss or increased damage, and characterize affected populations based on socioeconomic indicators. The goal is to build a reproducible and scalable workflow for analysis and visualization.
 
 # 1. Data Preparation and Summary Metrics
 
@@ -27,7 +27,7 @@ We use **HydroBASINS level 6** polygons as our spatial unit. ES variables were m
 - Pollination Potential
 
 ### Summary Metric Extraction
-We use `exactextractr::exact_extract()` to compute per-basin statistics (mean or sum) from the modeled rasters:
+We use `exactextractr::exact_extract()` to compute zonal statistics (currently mean and sum) from the modeled rasters:
 
 ```r
 exact_extract(service_raster, hydrobasins, fun = "mean")
@@ -35,11 +35,15 @@ exact_extract(service_raster, hydrobasins, fun = "mean")
 
 We also extract gridded socioeconomic and land cover variables:
 - Population (`GlobPOP_sqkm`)
+- Population GSH
+- Building Density
 - GDP (`rast_gdpTot_*`)
 - HDI (`hdi_raster_predictions_*`)
 - Farm size (`farmsize_mehrabi.*`)
 
-> Future enhancement: use `weights = population_raster` for population-weighted averages.
+**Note**
+Consider use `weights = population_raster` for population-weighted averages.
+What for? This is waht we use after.
 
 # 2. Calculating Change and Reorganizing
 

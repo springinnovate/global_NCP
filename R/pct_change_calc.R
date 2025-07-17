@@ -16,48 +16,60 @@
 #'
 #' @examples
 #' compute_pct_change_all(df, year_pairs = list(c("1992", "2020")), services = c("Usle"))
-compute_pct_change <- function(df, year_pairs = NULL, services = NULL, suffix = "", round_digits = NULL) {
-  cols <- names(df)
+compute_pct_change <- function(df, suffix = c("_sum", "_mean"), round_digits = NULL, drop_columns = FALSE) {
+  suffix_pattern <- paste0("(", paste(suffix, collapse = "|"), ")")
+  pattern <- paste0("^(.*)_([0-9]{4})", suffix_pattern, "$")
   
-  # Auto-detect services and years if not provided
-  detected <- stringr::str_match(cols, paste0("^(.*)_([0-9]{4})", suffix, "$"))
+  detected <- stringr::str_match(names(df), pattern)
+  valid_idx <- which(!is.na(detected[, 1]))
+  
+  if (length(valid_idx) == 0) {
+    warning("No valid columns detected for percentage change.")
+    return(df)
+  }
+  
   col_info <- tibble::tibble(
-    col = cols,
-    service = detected[, 2],
-    year = detected[, 3]
-  ) %>% 
-    dplyr::filter(!is.na(service), !is.na(year))
+    full_col = detected[valid_idx, 1],
+    prefix = detected[valid_idx, 2],
+    year = detected[valid_idx, 3],
+    suffix = detected[valid_idx, 4]
+  )
   
-  if (is.null(services)) {
-    services <- unique(col_info$service)
-  }
+  new_cols <- c()
+  var_groups <- split(col_info, paste0(col_info$prefix, col_info$suffix))
   
-  if (is.null(year_pairs)) {
-    years <- sort(unique(col_info$year))
-    year_pairs <- purrr::map2(years[-length(years)], years[-1], ~c(.x, .y))
-  }
-  
-  for (service in services) {
-    for (years in year_pairs) {
-      y1 <- years[1]
-      y2 <- years[2]
-      
-      col1 <- paste0(service, "_", y1, suffix)
-      col2 <- paste0(service, "_", y2, suffix)
-      new_col <- paste0(service, "_pct_ch_", y2, "_", y1, suffix)
-      
-      if (!all(c(col1, col2) %in% names(df))) {
-        warning(paste("Skipping:", new_col, ": missing columns."))
-        next
-      }
-      
-      df[[new_col]] <- ((df[[col2]] - df[[col1]]) / df[[col1]]) * 100
-      if (!is.null(round_digits)) {
-        df[[new_col]] <- round(df[[new_col]], round_digits)
-      }
+  for (group_name in names(var_groups)) {
+    group <- var_groups[[group_name]]
+    if (nrow(group) < 2) next
+    
+    group <- dplyr::arrange(group, as.numeric(group$year))
+    col1 <- group$full_col[1]
+    col2 <- group$full_col[2]
+    
+    new_col <- paste0(stringr::str_remove(group$prefix[1], "_$"), "_pct_chg")
+    
+    if (!all(c(col1, col2) %in% names(df))) next
+    
+    df[[new_col]] <- ((df[[col2]] - df[[col1]]) / df[[col1]]) * 100
+    if (!is.null(round_digits)) {
+      df[[new_col]] <- round(df[[new_col]], round_digits)
     }
+    
+    new_cols <- c(new_cols, new_col)
+  }
+  
+  if (drop_columns) {
+    geom_col <- attr(df, "sf_column") %||% "geometry"
+    keep_cols <- c("fid", new_cols, geom_col)
+    keep_cols <- keep_cols[keep_cols %in% names(df)]
+    df <- df[, keep_cols, drop = FALSE]
   }
   
   return(df)
 }
 
+
+############### Future developments:
+# Support more than two years per variable
+# Include absolute change
+# Include year pair explicitly in the new column name (e.g., pct_chg_1992_2020)

@@ -27,7 +27,8 @@ library(devtools)
 load_all()
 #source the helper functions
 source(here("R", "hotSpotR.R"))
-source(here("R","utils_pct_change.R"))
+#source(here("R","utils_pct_change.R"))
+source(here("R","pct_change_calc.R"))
 source(here("R", "utils_lcc_metrics.R"))
 source(here("R","utils_pct_change.R"))
 source(here("R", "perc_filteR.R"))
@@ -43,23 +44,81 @@ Right now, 24/04/2025 the problem is on the way the dataframe with the class col
 Also, the order of the factors needs to be set, and new classes have to be added. Again, i don't how to do it easily. I mean, it is easy, but annoying to do and easy to get wrong.
 
 
-Here, i need to clean the directory form a lot of old versions. Only the groupings. If pct not there, it is fine, that is easy to calculate now. 
-**Finally, synthesis data consolidated into a single dataset**
 
 ```{r consolidate final outputs}
 
 #Builds a list of files in the vector directory
-inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector'
-sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data'
+sets <- file.path(inpath, list.files(inpath, pattern = "gpkg$"))
 # Set and select an index to load the desired dastaset
-t <- 1
-set <- sets[t]
 
-print(lyr)
-test1 <- st_read(set) #I already procesed this, not necessary anymore. 
+sets1 <- sets[c(3,4)]
+sets2 <- sets[c(1,2)]
+# Step 1. Load vectors with the summary stats objects
+sf_a <- lapply(sets1, st_read)
 
-lyr <- st_layers(sets[2])
-poly <- st_read(sets[2],layer= "hydrosheds_lv6_synth")
+# Step 2: Add fid to each (all have same row count & order)
+sf_a <- lapply(sf_a, function(x) dplyr::mutate(x, fid = dplyr::row_number()))
+
+# this is not working now, naming stuctre too complex, adjusting manually for the moment
+# sf_a <- lapply(sf_a, function(x) {
+#   names(x) <- standardize_colnames(names(x))
+#   x
+# })
+
+library(dplyr)
+
+# Define name replacements per object
+rename_list <- list(
+  # For sf_a[[1]]
+  c(
+    usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean",
+    usle_2020_mean = "global_usle_marine_mod_ESA_2020_mean",
+    nature_access_1992_mean = "nature_access_lspop2019_ESA1992_mean",
+    nature_access_2020_mean = "nature_access_lspop2019_ESA2020._mean",
+    n_ret_1992_mean = "N_ret_ratio_1992_mean",
+    n_ret_2020_mean = "N_ret_ratio_2020_mean",
+    sed_ret_1992_mean = "Sed_ret_ratio_1992_mean",
+    sed_ret_2020_mean = "Sed_ret_ratio_2020_mean"
+  ),
+  
+  # For sf_a[[2]]
+  c(
+    n_export_1992_sum = "global_n_export_tnc_esa1992_sum",
+    n_export_2020_sum = "global_n_export_tnc_esa2020_sum",
+    n_retention_1992_sum = "global_n_retention_ESAmar_1992_fertilizer_sum",
+    n_retention_2020_sum = "global_n_retention_ESAmar_2020_fertilizer_sum",
+    sed_export_1992_sum = "global_sed_export_marine_mod_ESA_1992_sum",
+    sed_export_2020_sum = "global_sed_export_marine_mod_ESA_2020_sum",
+    pollination_1992_sum = "realized_polllination_on_ag_ESA1992_sum",
+    pollination_2020_sum = "realized_polllination_on_ag_ESA2020_sum"
+  )
+)
+sf_a <- Map(function(x, renames) {
+  dplyr::rename(x, !!!renames)
+}, sf_a, rename_list)
+
+
+# Apply renaming to each sf object
+sf_a <- Map(function(x, renames) {
+  dplyr::rename(x, !!!renames)
+}, sf_a, rename_list)
+
+
+sf_a <- lapply(sf_a, function(x) compute_pct_change(x, suffix = c("_sum", "_mean"), drop_columns = TRUE))
+
+sf_f <- sf_a[[1]]
+
+# Step 2: Loop over the rest and join by 'fid'
+for (i in 2:length(sf_a)) {
+  sf_f <- dplyr::left_join(sf_f, sf_a[[i]] %>% sf::st_drop_geometry(), by = "fid")
+}
+
+rm(sf_a,sf_a.)
+# load beneficiaries data
+sf_ben <- lapply(sets2,st_read)
+
+
 
 # 1. Drop geometry from the one you're joining in
 test1 <-test1 %>% st_drop_geometry()
