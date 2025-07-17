@@ -1,22 +1,46 @@
-#' Compute Percentage Change Between Year Pairs for Selected Variables
+#' Compute Absolute and/or Percentage Change Between Two Time Points
 #'
-#' This function computes percentage change between year pairs for specified services
-#' or auto-detects all available year pairs if none are specified. It assumes columns
-#' follow the naming convention:
+#' This function computes absolute and/or percentage change between two time points
+#' for variables that follow a specific naming convention: `"variable_YYYY_suffix"`, 
+#' where `variable` is the service name or indicator, `YYYY` is a 4-digit year, 
+#' and `suffix` is a known ending such as `"_sum"` or `"_mean"`.
 #'
-#' @param df A data.frame or sf object.
-#' @param year_pairs A list of year pairs. Each element should be a character vector of length 2.
-#'        If NULL, will auto-detect all valid year pairs for each service.
-#' @param services Optional character vector of service prefixes to include. If NULL, uses all detected.
-#' @param suffix Optional suffix string (e.g., "_per_ha"). Default is "".
-#' @param round_digits Number of digits to round results. Default is NULL (no rounding).
+#' The function detects variable-year pairs based on matching variable prefixes and suffixes.
+#' It supports multiple suffix types and returns either absolute change, percentage change,
+#' or both.
 #'
-#' @return A data.frame with added percentage change columns.
+#' @param df A `data.frame` or `sf` object with time-stamped variable columns.
+#' @param suffix A character vector of valid suffixes (e.g., `c("_sum", "_mean")`). 
+#'        Used to detect columns to compare. Defaults to `c("_sum", "_mean")`.
+#' @param round_digits Integer. If specified, will round the computed values to this number of digits. Default is `NULL` (no rounding).
+#' @param drop_columns Logical. If `TRUE`, drops all original columns except for `"fid"`, computed change columns, and geometry. Default is `FALSE`.
+#' @param change_type Type of change to compute. One of `"pct"` (percentage), `"abs"` (absolute), or `"both"` (default).
+#'
+#' @return A `data.frame` or `sf` object with added change columns. If `drop_columns = TRUE`, only `"fid"`, the computed columns, and geometry are kept.
+#'
 #' @export
 #'
 #' @examples
-#' compute_pct_change_all(df, year_pairs = list(c("1992", "2020")), services = c("Usle"))
-compute_pct_change <- function(df, suffix = c("_sum", "_mean"), round_digits = NULL, drop_columns = FALSE) {
+#' # Default use: computes both pct and abs changes for _sum and _mean columns
+#' compute_variable_change(df)
+#'
+#' # Compute only percentage change
+#' compute_variable_change(df, change_type = "pct")
+#'
+#' # Compute only absolute change and round to 2 digits
+#' compute_variable_change(df, change_type = "abs", round_digits = 2)
+#'
+#' # Use custom suffix (e.g., "_total")
+#' compute_variable_change(df, suffix = "_total", change_type = "both")
+
+compute_variable_change <- function(df, 
+                                    suffix = c("_sum", "_mean"), 
+                                    round_digits = NULL, 
+                                    drop_columns = FALSE,
+                                    change_type = c("both", "pct", "abs")) {
+  
+  change_type <- match.arg(change_type)
+  
   suffix_pattern <- paste0("(", paste(suffix, collapse = "|"), ")")
   pattern <- paste0("^(.*)_([0-9]{4})", suffix_pattern, "$")
   
@@ -24,15 +48,15 @@ compute_pct_change <- function(df, suffix = c("_sum", "_mean"), round_digits = N
   valid_idx <- which(!is.na(detected[, 1]))
   
   if (length(valid_idx) == 0) {
-    warning("No valid columns detected for percentage change.")
+    warning("No valid columns detected for change calculation.")
     return(df)
   }
   
   col_info <- tibble::tibble(
     full_col = detected[valid_idx, 1],
-    prefix = detected[valid_idx, 2],
-    year = detected[valid_idx, 3],
-    suffix = detected[valid_idx, 4]
+    prefix   = detected[valid_idx, 2],
+    year     = detected[valid_idx, 3],
+    suffix   = detected[valid_idx, 4]
   )
   
   new_cols <- c()
@@ -45,17 +69,27 @@ compute_pct_change <- function(df, suffix = c("_sum", "_mean"), round_digits = N
     group <- dplyr::arrange(group, as.numeric(group$year))
     col1 <- group$full_col[1]
     col2 <- group$full_col[2]
+    var_base <- stringr::str_remove(group$prefix[1], "_$")
     
-    new_col <- paste0(stringr::str_remove(group$prefix[1], "_$"), "_pct_chg")
-    
-    if (!all(c(col1, col2) %in% names(df))) next
-    
-    df[[new_col]] <- ((df[[col2]] - df[[col1]]) / df[[col1]]) * 100
-    if (!is.null(round_digits)) {
-      df[[new_col]] <- round(df[[new_col]], round_digits)
+    # Absolute change
+    if (change_type %in% c("abs", "both")) {
+      new_col_abs <- paste0(var_base, "_abs_chg")
+      df[[new_col_abs]] <- df[[col2]] - df[[col1]]
+      if (!is.null(round_digits)) {
+        df[[new_col_abs]] <- round(df[[new_col_abs]], round_digits)
+      }
+      new_cols <- c(new_cols, new_col_abs)
     }
     
-    new_cols <- c(new_cols, new_col)
+    # Percentage change
+    if (change_type %in% c("pct", "both")) {
+      new_col_pct <- paste0(var_base, "_pct_chg")
+      df[[new_col_pct]] <- ((df[[col2]] - df[[col1]]) / df[[col1]]) * 100
+      if (!is.null(round_digits)) {
+        df[[new_col_pct]] <- round(df[[new_col_pct]], round_digits)
+      }
+      new_cols <- c(new_cols, new_col_pct)
+    }
   }
   
   if (drop_columns) {
@@ -69,7 +103,7 @@ compute_pct_change <- function(df, suffix = c("_sum", "_mean"), round_digits = N
 }
 
 
+
 ############### Future developments:
 # Support more than two years per variable
-# Include absolute change
 # Include year pair explicitly in the new column name (e.g., pct_chg_1992_2020)

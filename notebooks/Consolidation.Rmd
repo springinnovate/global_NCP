@@ -52,37 +52,34 @@ inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/
 sets <- file.path(inpath, list.files(inpath, pattern = "gpkg$"))
 # Set and select an index to load the desired dastaset
 
-sets1 <- sets[c(3,4)]
-sets2 <- sets[c(1,2)]
+sets1 <- sets[c(4,5)] # 10 km grid, zonals stats for ES services 1992, 2020), sums and means
+sets2 <- sets[c(2,3)] # 10 km grid, zonal stats for beneficiaries  , sums and means (depends on the variable)
+
 # Step 1. Load vectors with the summary stats objects
 sf_a <- lapply(sets1, st_read)
 
 # Step 2: Add fid to each (all have same row count & order)
 sf_a <- lapply(sf_a, function(x) dplyr::mutate(x, fid = dplyr::row_number()))
 
-# this is not working now, naming stuctre too complex, adjusting manually for the moment
+# this is not working now, naming structure is too complex, adjusting manually for the moment
 # sf_a <- lapply(sf_a, function(x) {
 #   names(x) <- standardize_colnames(names(x))
 #   x
 # })
 
-library(dplyr)
+# Define name replacements per object. Had to do it manually, there is just too much variability to automatize, did it by hand, but this is the kind of thing an LLM helps to write easily. Still, there must be a smarter, more flexible way to do it (maybe the best approach is to keep a consistent naming convention for the modeled rasters, this has been a PIA since i started this work)
 
-# Define name replacements per object
 rename_list <- list(
-  # For sf_a[[1]]
   c(
     usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean",
     usle_2020_mean = "global_usle_marine_mod_ESA_2020_mean",
     nature_access_1992_mean = "nature_access_lspop2019_ESA1992_mean",
     nature_access_2020_mean = "nature_access_lspop2019_ESA2020._mean",
-    n_ret_1992_mean = "N_ret_ratio_1992_mean",
-    n_ret_2020_mean = "N_ret_ratio_2020_mean",
-    sed_ret_1992_mean = "Sed_ret_ratio_1992_mean",
-    sed_ret_2020_mean = "Sed_ret_ratio_2020_mean"
+    n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean",
+    n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
+    sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean",
+    sed_ret_ration_2020_mean = "Sed_ret_ratio_2020_mean"
   ),
-  
-  # For sf_a[[2]]
   c(
     n_export_1992_sum = "global_n_export_tnc_esa1992_sum",
     n_export_2020_sum = "global_n_export_tnc_esa2020_sum",
@@ -98,15 +95,10 @@ sf_a <- Map(function(x, renames) {
   dplyr::rename(x, !!!renames)
 }, sf_a, rename_list)
 
+# Calculate bitemporal change in %
+sf_a. <- lapply(sf_a, function(x) compute_change(x, suffix = c("_sum", "_mean"), change_type= "both", drop_columns = TRUE))
 
-# Apply renaming to each sf object
-sf_a <- Map(function(x, renames) {
-  dplyr::rename(x, !!!renames)
-}, sf_a, rename_list)
-
-
-sf_a <- lapply(sf_a, function(x) compute_pct_change(x, suffix = c("_sum", "_mean"), drop_columns = TRUE))
-
+# Join into a single sf object
 sf_f <- sf_a[[1]]
 
 # Step 2: Loop over the rest and join by 'fid'
@@ -114,43 +106,27 @@ for (i in 2:length(sf_a)) {
   sf_f <- dplyr::left_join(sf_f, sf_a[[i]] %>% sf::st_drop_geometry(), by = "fid")
 }
 
-rm(sf_a,sf_a.)
+
 # load beneficiaries data
 sf_ben <- lapply(sets2,st_read)
+# Add fid (primary key)
+sf_ben <- lapply(sf_ben, function(x) dplyr::mutate(x, fid = dplyr::row_number()))
+
+sf_benf <- sf_ben[[1]]
+
+# Step 2: Loop over the rest and join by 'fid'
+for (i in 2:length(sf_ben)) {
+  sf_benf <- dplyr::left_join(sf_benf, sf_ben[[i]] %>% sf::st_drop_geometry(), by = "fid")
+}
+
+# join beneficiary data to the ES change data
+sf_final <- dplyr::left_join(sf_f, sf_benf %>% sf::st_drop_geometry(), by = "fid")
+
+# export output
+
+st_write(sf_final, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
 
 
-
-# 1. Drop geometry from the one you're joining in
-test1 <-test1 %>% st_drop_geometry()
-
-# 2. Identify overlapping columns (besides ID or join key)
-overlap <- intersect(names(poly), names(test1))
-
-# Optionally drop duplicates (except for the join key, say "HYBAS_ID")
-join_key <- "HYBAS_ID"
-to_drop <- setdiff(overlap, join_key)
-
-
-# 3. Remove those overlapping columns from b_data
-test1 <- test1 %>% select(-all_of(to_drop))
-test1 <- test1 %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
-
-
-
-poly<- left_join(poly, test1, by = join_key)
-poly<- left_join(poly2, test1, by = join_key)
-poly <- poly %>% rename(N_Ret_Ratio_pct_ch = N_Ret_Ratio)
-
-poly<- left_join(poly, test1, by = join_key)
-
-
-# Move columns 41–42 (Nitrogen export sqkm) after column 34
-# Move column 54 (area_sqkm_country) after column 40
-poly <- poly %>%
-  select(
-    1:16,53:59,17:52,62:65, geom)
-
- st_write(poly, paste0(inpath, '/', 'hydrosheds_lv6_synth.gpkg'), append=FALSE)
 ```
 
 # 2 Load Vector Data and pivot 
@@ -164,11 +140,44 @@ This should actually be done as a database structure. The columns live somewhere
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
  
- plt <- st_drop_geometry(poly)
+ plt <- st_drop_geometry(sf_final)
  
- # Edit/Adjust column names # not yet
- names(plt) <- stringr::str_replace_all(names(plt), "_2020_1992", "")
- # calculate POP Density
+
+ # Define the socioeconomic variables
+socio_vars <- c(
+  "GHS_BUILT_S_E2020_mean",# this is also a problem!!!Will have to calculate again, but the sum. not the mean. 
+  "fields_mehrabi_2017_mean",
+  "hdi_raster_predictions_2020_mean",
+  "rast_adm1_gini_disp_2020_mean",
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum",
+  "GHS_POP_E2020_GLOBE_sum",
+  "GlobPOP_Count_30arc_2020_sum"
+)
+
+
+
+# Pivot all columns that contain pct_ch, keeping other relevant vars
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_chg"),
+    names_to = "service",
+    values_to = "pct_chg"
+  ) %>%
+  select(fid, service, pct_chg, all_of(socio_vars)) %>% 
+   mutate(service = str_replace(service, "_pct_chg.*", ""))
+  
+
+
+# remove infinite values 
+plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)  
+
+  plt_long <- plt_long %>% mutate(service = case_when(
+   service == "sed_export" ~ "Sed_export",
+   service == "Sed_retention_ratio" ~ "Sed_Ret_Ratio",
+   service == "Usle" ~ "USLE",
+   TRUE ~ service
+   ))
+
 
 ct <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg')
 
@@ -179,42 +188,7 @@ plt <- left_join(plt, ct)
 #. Have a method to name versions or something (maybe?)
 write.csv(plt, file= here('output_data', "full_metrics_wide.csv")) # This maybe not be necessary anymore
 
-############# PIVOT TABLE ##############################
 
-plt <- st_drop_geometry(poly)
- 
- # Define the socioeconomic variables
-socio_vars <- c(
-  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",# this is also a problem!!!Will have to calculate again, but the sum. not the mean. 
-  "rast_gdpTot_1990_2020_30arcsec.7_mean",
-  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # this is a problem here!!!! Will have to calculate again, but the sum. not the mean. 
-  #"GlobPOP_Count_30arc_2020_I32.1_sum", we don't need this one anymore, already calc per sq km
-  "hdi_raster_predictions_2020.1_mean",
-  "farmsize_mehrabi.1_mean",
-  "GlobPOP_sqkm"
-)
-###### #### #### Attention, thos will be reviewd for per sq/km and check pollinayion and USLE, but 
-# Pivot all columns that contain pct_ch, keeping other relevant vars
-plt_long <- plt %>%
-  pivot_longer(
-    cols = matches("pct_ch"),
-    names_to = "service",
-    values_to = "pct_ch"
-  ) %>%
-  select(HYBAS_ID, service, pct_ch, all_of(socio_vars)) %>% 
-   mutate(service = str_replace(service, "_pct_ch.*", ""))
-  
-
-plt_long <- plt_long%>% filter(service != "Pop") %>% filter(service!= "n_export")
-# remove infinite values 
-plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)  
-
-  plt_long <- plt_long %>% mutate(service = case_when(
-   service == "sed_export" ~ "Sed_export",
-   service == "Sed_retention_ratio" ~ "Sed_Ret_Ratio",
-   service == "Usle" ~ "USLE",
-   TRUE ~ service
-   ))
  # here, we only have 8 columns, are missing basin and country data, biome, etc etc. , but the services are complete. An intermediary output, that's why i did not export it yet!
 ```
 
