@@ -78,7 +78,7 @@ rename_list <- list(
     n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean",
     n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
     sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean",
-    sed_ret_ration_2020_mean = "Sed_ret_ratio_2020_mean"
+    sed_ret_ratio_2020_mean = "Sed_ret_ratio_2020_mean"
   ),
   c(
     n_export_1992_sum = "global_n_export_tnc_esa1992_sum",
@@ -95,8 +95,8 @@ sf_a <- Map(function(x, renames) {
   dplyr::rename(x, !!!renames)
 }, sf_a, rename_list)
 
-# Calculate bitemporal change in %
-sf_a. <- lapply(sf_a, function(x) compute_change(x, suffix = c("_sum", "_mean"), change_type= "both", drop_columns = TRUE))
+# Calculate bitemporal change in % and absolute terms. Drop original columns
+sf_a <- lapply(sf_a, function(x) compute_change(x, suffix = c("_sum", "_mean"), change_type= "both", drop_columns = TRUE))
 
 # Join into a single sf object
 sf_f <- sf_a[[1]]
@@ -105,9 +105,10 @@ sf_f <- sf_a[[1]]
 for (i in 2:length(sf_a)) {
   sf_f <- dplyr::left_join(sf_f, sf_a[[i]] %>% sf::st_drop_geometry(), by = "fid")
 }
+rm(sf_a)
+ # NaN are divisions by 0, NA is when values are NA
 
-
-# load beneficiaries data
+# load beneficiaries data. There is no change going on here right now, but maybe in the future. The workflow can handle this
 sf_ben <- lapply(sets2,st_read)
 # Add fid (primary key)
 sf_ben <- lapply(sf_ben, function(x) dplyr::mutate(x, fid = dplyr::row_number()))
@@ -118,15 +119,13 @@ sf_benf <- sf_ben[[1]]
 for (i in 2:length(sf_ben)) {
   sf_benf <- dplyr::left_join(sf_benf, sf_ben[[i]] %>% sf::st_drop_geometry(), by = "fid")
 }
-
+rm(sf_ben) # remove not needed anymore
 # join beneficiary data to the ES change data
-sf_final <- dplyr::left_join(sf_f, sf_benf %>% sf::st_drop_geometry(), by = "fid")
-
+sf_f <- dplyr::left_join(sf_f, sf_benf %>% sf::st_drop_geometry(), by = "fid")
+rm(sf_benf) 
 # export output
 
-st_write(sf_final, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
-
-
+st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
 ```
 
 # 2 Load Vector Data and pivot 
@@ -140,20 +139,14 @@ This should actually be done as a database structure. The columns live somewhere
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
  
- plt <- st_drop_geometry(sf_final)
+ plt <- st_drop_geometry(sf_f)
  
 
- # Define the socioeconomic variables
-socio_vars <- c(
-  "GHS_BUILT_S_E2020_mean",# this is also a problem!!!Will have to calculate again, but the sum. not the mean. 
-  "fields_mehrabi_2017_mean",
-  "hdi_raster_predictions_2020_mean",
-  "rast_adm1_gini_disp_2020_mean",
-  "rast_gdpTot_1990_2020_30arcsec_2020_sum",
-  "GHS_POP_E2020_GLOBE_sum",
-  "GlobPOP_Count_30arc_2020_sum"
-)
-
+# get the benef vars (all that are not "chg)
+socio_vars <- names(plt)[
+  names(plt) != "fid" & 
+  !grepl("chg$", names(plt))
+]
 
 
 # Pivot all columns that contain pct_ch, keeping other relevant vars
@@ -166,10 +159,11 @@ plt_long <- plt %>%
   select(fid, service, pct_chg, all_of(socio_vars)) %>% 
    mutate(service = str_replace(service, "_pct_chg.*", ""))
   
-
-
 # remove infinite values 
 plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)  
+
+
+
 
   plt_long <- plt_long %>% mutate(service = case_when(
    service == "sed_export" ~ "Sed_export",
@@ -178,30 +172,20 @@ plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)
    TRUE ~ service
    ))
 
-
-ct <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg')
-
-ct <- ct %>% mutate(area_sqkm_country = as.numeric(st_area(geom)) / 10^6)
-ct <- st_drop_geometry(ct)
-ct <- ct[c(1,37)]
-plt <- left_join(plt, ct)
 #. Have a method to name versions or something (maybe?)
-write.csv(plt, file= here('output_data', "full_metrics_wide.csv")) # This maybe not be necessary anymore
-
-
- # here, we only have 8 columns, are missing basin and country data, biome, etc etc. , but the services are complete. An intermediary output, that's why i did not export it yet!
+write.csv(plt, file= here('output_data', "full_metrics_grid_wide.csv")) # This maybe not be necessary anymore there
 ```
 
 
 # 3. Get Hotspots 
 
-Need to think on an effectve way to change the value (the share/quantile we want to extract and also filter by group!!!!)
+Need to think on an effective way to change the value (the share/quantile we want to extract and also filter by group!!!!)
 
 So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. Taht wouls be awesome 
 
 ```{r get_hotspots}
 
-# 1. Identify hotspots by service. Here i will have to adjust, because in some cases the key hotspots are the gains, and in others are the losses. 
+# 1. Identify hotspots by service. Keep present that in some cases the key hotspots are the gains, and in others are the losses. 
 
 # ---------------------------------------------------------
 # Identify Hotspots by Service Type (Losses and Damages)
