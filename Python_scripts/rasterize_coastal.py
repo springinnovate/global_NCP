@@ -1,72 +1,90 @@
 import geopandas as gpd
-from pathlib import Path
 import rasterio
 from rasterio.features import rasterize
+from rasterio.windows import Window
+from pathlib import Path
 import numpy as np
-# Load the point vector file (assuming it's a shapefile or GeoPackage)
-gdf = gpd.read_file("/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/data/Spring/Inspring/coastal_protection_Wchange.shp")
+from tqdm import tqdm
 
-# Open the raster template
-with rasterio.open("/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/data/input_rasters/LandCovers/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif") as src:
+# Paths
+points_fp = "/home/jeronimo/OneDrive/global_NCP/data/Spring/Inspring/coastal_protection_Wchange.shp"
+template_fp = "/home/jeronimo/OneDrive/global_NCP/data/input_rasters/LandCovers/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif"
+output_dir = Path("/home/jeronimo/OneDrive/global_NCP/data/input_rasters/coastal_protection_rast_tiles")
+output_dir.mkdir(parents=True, exist_ok=True)
+
+# Parameters
+columns = ["Rt_1992", "Rt_2020"]  # Removed Rt_serv_ch
+
+def tile_bounds(width, height, tile_size):
+    for y in range(0, height, tile_size):
+        for x in range(0, width, tile_size):
+            w = min(tile_size, width - x)
+            h = min(tile_size, height - y)
+            yield x, y, w, h
+
+# Load data
+print("Loading points...")
+gdf = gpd.read_file(points_fp)
+print(f"✓ Loaded {len(gdf)} points")
+
+# Open template
+with rasterio.open(template_fp) as src:
     meta = src.meta.copy()
     transform = src.transform
-    out_shape = (src.height, src.width)
+    width = src.width
+    height = src.height
     crs = src.crs
+    res = src.res
 
-def rasterize_column(gdf, value_col, transform, out_shape, agg_func=np.mean):
-    # Create a generator of ((x, y), value)
-    shapes = ((geom, value) for geom, value in zip(gdf.geometry, gdf[value_col]))
-    
-    # Create an array to count the number of overlapping points
-    count = np.zeros(out_shape, dtype=np.uint16)
-    values = np.zeros(out_shape, dtype=np.float32)
+meta.update(dtype="float32", count=1, nodata=np.nan, compress="deflate")
+tile_size = 2000  # Adjust based on available memory
 
-    # Rasterize by iterating and aggregating manually
-    for geom, val in shapes:
-        mask = rasterize(
-            [(geom, 1)],
-            out_shape=out_shape,
-            transform=transform,
+# Rasterize each variable by tile
+for column in columns:
+    print(f"\nRasterizing: {column}")
+    tile_files = []
+
+    for x, y, w, h in tqdm(tile_bounds(width, height, tile_size)):
+        window = Window(x, y, w, h)
+        bbox = rasterio.windows.bounds(window, transform)
+        tile_gdf = gdf.cx[bbox[0]:bbox[2], bbox[1]:bbox[3]]
+        if tile_gdf.empty:
+            continue
+
+        shapes = ((geom, val) for geom, val in zip(tile_gdf.geometry, tile_gdf[column]))
+        counts = ((geom, 1) for geom in tile_gdf.geometry)
+
+        sum_r = rasterize(
+            shapes,
+            out_shape=(h, w),
+            transform=rasterio.windows.transform(window, transform),
             fill=0,
             all_touched=False,
-            dtype=np.uint8
+            dtype="float32"
         )
-        count += mask
-        values += mask * val
 
-    # Avoid division by zero
-    with np.errstate(divide='ignore', invalid='ignore'):
-        out = np.where(count > 0, values / count, np.nan)
+        count_r = rasterize(
+            counts,
+            out_shape=(h, w),
+            transform=rasterio.windows.transform(window, transform),
+            fill=0,
+            all_touched=False,
+            dtype="uint16"
+        )
 
-    return out
+        with np.errstate(divide='ignore', invalid='ignore'):
+            mean_r = np.where(count_r > 0, sum_r / count_r, np.nan)
 
-# Adjust these to match your column names
-col1 = "Rt_1992"
-col2 = "Rt_2020"
-col_diff = "Rt_serv_ch"
+        tile_fp = output_dir / f"{column}_x{x}_y{y}.tif"
+        tile_meta = meta.copy()
+        tile_meta.update({"height": h, "width": w, "transform": rasterio.windows.transform(window, transform)})
 
-r1 = rasterize_column(gdf, col1, transform, out_shape)
-r2 = rasterize_column(gdf, col2, transform, out_shape)
-rd = rasterize_column(gdf, col_diff, transform, out_shape)
+        with rasterio.open(tile_fp, "w", **tile_meta) as dst:
+            dst.write(mean_r, 1)
 
-meta.update(dtype=r1.dtype, count=1, nodata=np.nan)
+        tile_files.append(tile_fp)
 
-output_dir = Path("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/coastal_protection_rast")
-output_dir.mkdir(exist_ok=True)  # make the folder if it doesn't exist
+    print(f"✓ Finished rasterizing {column}, {len(tile_files)} tiles saved")
 
-
-# Create output directory
-output_dir = Path("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/coastal_protection_rast")
-output_dir.mkdir(parents=True, exist_ok=True)  # `parents=True` handles nested folders
-
-# Export rasters using full path
-with rasterio.open(output_dir / "Rt_1992_coastal_protection.tif", "w", **meta) as dst:
-    dst.write(r1, 1)
-
-with rasterio.open(output_dir / "Rt_2020_coastal_protection.tif", "w", **meta) as dst:
-    dst.write(r2, 1)
-
-with rasterio.open(output_dir / "Rt_ch_coastal_protection.tif", "w", **meta) as dst:
-    dst.write(rd, 1)
-
+# Note: Final mosaic step not included yet
 
