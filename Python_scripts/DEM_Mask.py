@@ -4,6 +4,8 @@ import numpy as np
 
 print("Everything is working!")
 
+
+# this is a jupyter notebook. Convert into python code. 
 ```
 
     Everything is working!
