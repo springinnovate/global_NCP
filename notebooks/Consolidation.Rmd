@@ -3,7 +3,6 @@ title: "Current Status"
 output: html_notebook
 ---
 
-
 ```{r setup, message=FALSE, warning=FALSE}
 library(terra)
 library(sf)
@@ -27,23 +26,16 @@ library(devtools)
 load_all()
 #source the helper functions
 source(here("R", "hotSpotR.R"))
-#source(here("R","utils_pct_change.R"))
 source(here("R","pct_change_calc.R"))
 source(here("R", "utils_lcc_metrics.R"))
-source(here("R","utils_pct_change.R"))
 source(here("R", "perc_filteR.R"))
 ```
 
-
-# 1. Clean and Organize Synthesis Data 
+# 1. Clean and Organize Synthesis Data
 
 Make sure that they are complete and correclty named)
 
-
-Right now, 24/04/2025 the problem is on the way the dataframe with the class colors and names is built. The process is still too manual (writing the table) and is easy to get it wrong when it should not be big deal. Ideally, there should be a dialogue box to fill this instead. This should take care of the class names, values and colors neatl
-Also, the order of the factors needs to be set, and new classes have to be added. Again, i don't how to do it easily. I mean, it is easy, but annoying to do and easy to get wrong.
-
-
+Right now, 24/04/2025 the problem is on the way the dataframe with the class colors and names is built. The process is still too manual (writing the table) and is easy to get it wrong when it should not be big deal. Ideally, there should be a dialogue box to fill this instead. This should take care of the class names, values and colors neatl Also, the order of the factors needs to be set, and new classes have to be added. Again, i don't how to do it easily. I mean, it is easy, but annoying to do and easy to get wrong.
 
 ```{r consolidate final outputs}
 
@@ -78,7 +70,7 @@ rename_list <- list(
     n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean",
     n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
     sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean",
-    sed_ret_ration_2020_mean = "Sed_ret_ratio_2020_mean"
+    sed_ret_ratio_2020_mean = "Sed_ret_ratio_2020_mean"
   ),
   c(
     n_export_1992_sum = "global_n_export_tnc_esa1992_sum",
@@ -95,8 +87,8 @@ sf_a <- Map(function(x, renames) {
   dplyr::rename(x, !!!renames)
 }, sf_a, rename_list)
 
-# Calculate bitemporal change in %
-sf_a. <- lapply(sf_a, function(x) compute_change(x, suffix = c("_sum", "_mean"), change_type= "both", drop_columns = TRUE))
+# Calculate bitemporal change in % and absolute terms. Drop original columns
+sf_a <- lapply(sf_a, function(x) compute_change(x, suffix = c("_sum", "_mean"), change_type= "both", drop_columns = TRUE))
 
 # Join into a single sf object
 sf_f <- sf_a[[1]]
@@ -105,9 +97,10 @@ sf_f <- sf_a[[1]]
 for (i in 2:length(sf_a)) {
   sf_f <- dplyr::left_join(sf_f, sf_a[[i]] %>% sf::st_drop_geometry(), by = "fid")
 }
+rm(sf_a)
+ # NaN are divisions by 0, NA is when values are NA
 
-
-# load beneficiaries data
+# load beneficiaries data. There is no change going on here right now, but maybe in the future. The workflow can handle this
 sf_ben <- lapply(sets2,st_read)
 # Add fid (primary key)
 sf_ben <- lapply(sf_ben, function(x) dplyr::mutate(x, fid = dplyr::row_number()))
@@ -118,48 +111,32 @@ sf_benf <- sf_ben[[1]]
 for (i in 2:length(sf_ben)) {
   sf_benf <- dplyr::left_join(sf_benf, sf_ben[[i]] %>% sf::st_drop_geometry(), by = "fid")
 }
-
+rm(sf_ben) # remove not needed anymore
 # join beneficiary data to the ES change data
-sf_final <- dplyr::left_join(sf_f, sf_benf %>% sf::st_drop_geometry(), by = "fid")
-
+sf_f <- dplyr::left_join(sf_f, sf_benf %>% sf::st_drop_geometry(), by = "fid")
+rm(sf_benf) 
 # export output
 
-
-poly<- left_join(poly, test1, by = join_key)
-poly<- left_join(poly2, test1, by = join_key)
-poly <- poly %>% rename(N_Ret_Ratio_pct_ch = N_Ret_Ratio)
-
-poly<- left_join(poly, test1, by = join_key)
-
-
-
+st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
 ```
 
-# 2 Load Vector Data and pivot 
+# 2 Load Vector Data and pivot
 
-Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. 
-Add to the documentation , environment or however that's called the vectors to select and order the columns. 
-This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir). 
-  
+Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. Add to the documentation , environment or however that's called the vectors to select and order the columns. This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir).
+
 ```{r pivot, eval=FALSE, include=FALSE}
 # 
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
- 
- plt <- st_drop_geometry(sf_final)
- 
 
- # Define the socioeconomic variables
-socio_vars <- c(
-  "GHS_BUILT_S_E2020_mean",# this is also a problem!!!Will have to calculate again, but the sum. not the mean. 
-  "fields_mehrabi_2017_mean",
-  "hdi_raster_predictions_2020_mean",
-  "rast_adm1_gini_disp_2020_mean",
-  "rast_gdpTot_1990_2020_30arcsec_2020_sum",
-  "GHS_POP_E2020_GLOBE_sum",
-  "GlobPOP_Count_30arc_2020_sum"
-)
-
+ sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
+ plt <- st_drop_geometry(sf_f)
+ 
+# get the benef vars (all that are not "chg)
+socio_vars <- names(plt)[
+  names(plt) != "fid" & 
+  !grepl("chg$", names(plt))
+]
 
 
 # Pivot all columns that contain pct_ch, keeping other relevant vars
@@ -172,10 +149,11 @@ plt_long <- plt %>%
   select(fid, service, pct_chg, all_of(socio_vars)) %>% 
    mutate(service = str_replace(service, "_pct_chg.*", ""))
   
-
-
 # remove infinite values 
 plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)  
+
+
+
 
   plt_long <- plt_long %>% mutate(service = case_when(
    service == "sed_export" ~ "Sed_export",
@@ -184,59 +162,31 @@ plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)
    TRUE ~ service
    ))
 
-
-ct <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg')
-
-ct <- ct %>% mutate(area_sqkm_country = as.numeric(st_area(geom)) / 10^6)
-ct <- st_drop_geometry(ct)
-ct <- ct[c(1,37)]
-plt <- left_join(plt, ct)
 #. Have a method to name versions or something (maybe?)
-write.csv(plt, file= here('output_data', "full_metrics_wide.csv")) # This maybe not be necessary anymore
-
-
- # here, we only have 8 columns, are missing basin and country data, biome, etc etc. , but the services are complete. An intermediary output, that's why i did not export it yet!
+write.csv(plt, file= here('output_data', "full_metrics_grid_wide.csv")) # This maybe not be necessary anymore there
 ```
 
+# 3. Get Hotspots
 
-# 3. Get Hotspots 
-
-Need to think on an effectve way to change the value (the share/quantile we want to extract and also filter by group!!!!)
-
-So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. Taht wouls be awesome 
-<<<<<<< HEAD
-=======
+Need to think on an effective way to change the value (the share/quantile we want to extract and also filter by group!!!!)
 
 
->>>>>>> 619f7fa (syncing to local. Remoteis too slow)
+So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. Taht wouls be awesome
 
 ```{r get_hotspots}
 
-# 1. Identify hotspots by service. Here i will have to adjust, because in some cases the key hotspots are the gains, and in others are the losses. 
-
-<<<<<<< HEAD
-# ---------------------------------------------------------
-# Identify Hotspots by Service Type (Losses and Damages)
-# ---------------------------------------------------------
-=======
+# 1. Identify hotspots by service. Keep present that in some cases the key hotspots are the gains, and in others are the losses. 
 
 # ---------------------------------------------------------
 # Identify Hotspots by Service Type (Losses and Damages)
 # ---------------------------------------------------------
-# Set cutoff
-pct_cutoff <- 0.05  # for top/bottom 5%
-
->>>>>>> 619f7fa (syncing to local. Remoteis too slow)
 
 # Define which services are considered "losses" vs "damages"
 loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
 gain_services <- c("Sed_export", "N_export", "USLE")
-<<<<<<< HEAD
 pct_cutoff <- 0.01  # Top/bottom 5%
 pct_cutoff <- 0.05  # for top/bottom 5%
 
-=======
->>>>>>> 619f7fa (syncing to local. Remoteis too slow)
 
 # STEP 1: Identify Top/Bottom % Hotspots Per Service
 df_hotspots <- plt_long %>%
@@ -315,20 +265,14 @@ hotspot_summary <- hotspot_summary %>%
 
 hotspot_1 <- left_join(poly, hotspot_summary)
 
-<<<<<<< HEAD
 
-=======
->>>>>>> 619f7fa (syncing to local. Remoteis too slow)
 # remove unnecesary columns (original 92-2020 values, keep)
 spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
 # reorganize columns
 spring_ES <- spring_ES[c(1:19, 20, 22,21,25,34,23,24,26:33)]
 spring_ES$N_export_2020_sqkm <- NULL
 
-<<<<<<< HEAD
 
-=======
->>>>>>> 619f7fa (syncing to local. Remoteis too slow)
 # ###############################################
 # # remove unnecesary columns (original 92-2020 values, keep)
 # spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
@@ -342,7 +286,6 @@ hotspots_change <- spring_ES # rename (i could just clean this but too lazy)
 #hotspots_change <- left_join(hotspots_change,ct)
 names(hotspots_change) <- stringr::str_replace_all(names(hotspots_change), "_2020_1992", "")
 
-<<<<<<< HEAD
 # ###############################################
 # # remove unnecesary columns (original 92-2020 values, keep)
 # spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
@@ -350,8 +293,6 @@ names(hotspots_change) <- stringr::str_replace_all(names(hotspots_change), "_202
 # spring_ES <- spring_ES[c(1:19, 20, 22,21,25,34,23,24,26:33)]
 # spring_ES$N_export_2020_sqkm <- NULL
 
-=======
->>>>>>> 619f7fa (syncing to local. Remoteis too slow)
 spring_ES <- left_join(spring_ES, hotspot_summary, by = "HYBAS_ID")
 hotspots_change <- spring_ES # rename (i could just clean this but too lazy)
 
@@ -363,10 +304,7 @@ names(hotspots_change) <- stringr::str_replace_all(names(hotspots_change), "_202
 # Export aoutputs (this also needs to be adjusted, it makes no sense to kee storing this inb two differnet places)
 st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
 st_write(hotspots_change, paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"), append=FALSE)
-<<<<<<< HEAD
 
-=======
->>>>>>> 619f7fa (syncing to local. Remoteis too slow)
 
 
 # Define the services interested in
@@ -462,13 +400,10 @@ plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)
 write.csv(plt_long, here("output_data", "hotspot_data_long.csv")) 
 ```
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 619f7fa (syncing to local. Remoteis too slow)
 # 4. Join Country Data (improve Analysis)
 
 **I still have not been able to make sense of this shit. And it is really annoyingm anbd a huge waste of time. I absolutely need to transcend this.**
+
 ```{r add country data, eval=FALSE, include=FALSE}
 # load the country data (to get income level and stuff)
 hotspots_change <- st_read(paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"))
@@ -486,7 +421,3 @@ hotspots_change <- hotspots_change[c(1:16,38:43,17,18,19:37)]
 st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
 
 ```
-<<<<<<< HEAD
-=======
-
->>>>>>> 619f7fa (syncing to local. Remoteis too slow)
