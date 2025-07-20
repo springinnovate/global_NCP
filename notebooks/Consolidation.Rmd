@@ -3,7 +3,6 @@ title: "Current Status"
 output: html_notebook
 ---
 
-
 ```{r setup, message=FALSE, warning=FALSE}
 library(terra)
 library(sf)
@@ -30,20 +29,14 @@ source(here("R", "hotSpotR.R"))
 #source(here("R","utils_pct_change.R"))
 source(here("R","pct_change_calc.R"))
 source(here("R", "utils_lcc_metrics.R"))
-source(here("R","utils_pct_change.R"))
 source(here("R", "perc_filteR.R"))
 ```
 
-
-# 1. Clean and Organize Synthesis Data 
+# 1. Clean and Organize Synthesis Data
 
 Make sure that they are complete and correclty named)
 
-
-Right now, 24/04/2025 the problem is on the way the dataframe with the class colors and names is built. The process is still too manual (writing the table) and is easy to get it wrong when it should not be big deal. Ideally, there should be a dialogue box to fill this instead. This should take care of the class names, values and colors neatl
-Also, the order of the factors needs to be set, and new classes have to be added. Again, i don't how to do it easily. I mean, it is easy, but annoying to do and easy to get wrong.
-
-
+Right now, 24/04/2025 the problem is on the way the dataframe with the class colors and names is built. The process is still too manual (writing the table) and is easy to get it wrong when it should not be big deal. Ideally, there should be a dialogue box to fill this instead. This should take care of the class names, values and colors neatl Also, the order of the factors needs to be set, and new classes have to be added. Again, i don't how to do it easily. I mean, it is easy, but annoying to do and easy to get wrong.
 
 ```{r consolidate final outputs}
 
@@ -128,17 +121,15 @@ rm(sf_benf)
 st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
 ```
 
-# 2 Load Vector Data and pivot 
+# 2 Load Vector Data and pivot
 
-Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. 
-Add to the documentation , environment or however that's called the vectors to select and order the columns. 
-This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir). 
-  
+Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. Add to the documentation , environment or however that's called the vectors to select and order the columns. This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir).
+
 ```{r pivot, eval=FALSE, include=FALSE}
 # 
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
- 
+ sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
  plt <- st_drop_geometry(sf_f)
  
 
@@ -176,12 +167,11 @@ plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)
 write.csv(plt, file= here('output_data', "full_metrics_grid_wide.csv")) # This maybe not be necessary anymore there
 ```
 
-
-# 3. Get Hotspots 
+# 3. Get Hotspots
 
 Need to think on an effective way to change the value (the share/quantile we want to extract and also filter by group!!!!)
 
-So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. Taht wouls be awesome 
+So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. Taht wouls be awesome
 
 ```{r get_hotspots}
 
@@ -413,6 +403,7 @@ write.csv(plt_long, here("output_data", "hotspot_data_long.csv"))
 # 4. Join Country Data (improve Analysis)
 
 **I still have not been able to make sense of this shit. And it is really annoyingm anbd a huge waste of time. I absolutely need to transcend this.**
+
 ```{r add country data, eval=FALSE, include=FALSE}
 # load the country data (to get income level and stuff)
 hotspots_change <- st_read(paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"))
