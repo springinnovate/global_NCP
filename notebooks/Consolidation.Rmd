@@ -193,9 +193,6 @@ plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)
    service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
    TRUE ~ service
    ))
-
-#. Have a method to name versions or something (maybe?)
-write.csv(plt, file= here('output_data', "full_metrics_grid_wide.csv")) # This maybe not be necessary anymore there
 ```
 
 # 3. Get Hotspots
@@ -207,22 +204,17 @@ So, we need a long table format, then define the threshold the services with gai
 
 ```{r get_hotspots}
 
-# 1. Identify hotspots by service. Keep present that in some cases the key hotspots are the gains, and in others are the losses. 
-
-# ---------------------------------------------------------
-# Identify Hotspots by Service Type (Losses and Damages)
-# ---------------------------------------------------------
-
-# Define which services are considered "losses" vs "damages"
-loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "Nature_Access", "N_retention")
+# ------------------------------------------
+# Step 0: Define Parameters
+# ------------------------------------------
+loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio",
+                   "Sed_Ret_Ratio", "Nature_Access", "N_retention")
 gain_services <- c("Sed_export", "N_export", "USLE")
-#pct_cutoff <- 0.01  # Top/bottom 1%
-pct_cutoff <- 0.05  # for top/bottom 5%
-# create vector with the service names
-services <- unique(plt_long$service)
-# STEP 1: Identify Top/Bottom % Hotspots Per Service
-#This function sorts and labels the hotpots by individual services in ascending and descending order based on the provided cutoff value
-# It adds following columns: total rows per service, cutoff value, rank (ascending and descending) wether it is a hotspot or not and a binary column with the same information
+pct_cutoff <- 0.05  # e.g. top/bottom 5%
+
+# ------------------------------------------
+# Step 1: Identify Top/Bottom Hotspots per Service
+# ------------------------------------------
 df_hotspots <- plt_long %>%
   group_by(service) %>%
   mutate(
@@ -239,133 +231,65 @@ df_hotspots <- plt_long %>%
   ) %>%
   ungroup()
 
-# STEP 2: Aggregate Hotspot Summary Per spatial unit (HYBAS_ID for basins, fid for the grid)
-# this stpe processes df_hotspots to extract thte fid of the units that are a hotspot, labels the variables in terms of ecosystem service loss/increased damage and adds a colunmn that list the variables for which the unit is a hotspot. 
-hotspot_summary <- df_hotspots %>%
-  filter(hotspot_binary) %>%
+# ----------------------------------------------------
+# Step 2: Keep only NEGATIVE hotspot services
+# ----------------------------------------------------
+negative_services <- c(loss_services, gain_services)
+
+df_hotspots_negative <- df_hotspots %>%
+  filter(hotspot_binary, service %in% negative_services)
+
+# ----------------------------------------------------
+# Step 3: Summarize by polygon
+# ----------------------------------------------------
+hotspot_summary <- df_hotspots_negative %>%
   group_by(fid) %>%
   summarise(
     hotspot_count = n(),
     hotspot_services = list(unique(service))
   ) %>%
   mutate(
-    hotspot_services = sapply(hotspot_services, \(x) paste(trimws(as.character(x)), collapse = ", "))
-  )
-# This function 
-
-# STEP 3: Add Hotspot Types and Negative-Impact Subset
-# This step adds a definitopn to the hotspot type (ES loss/increased damage and specifies which one(s)) focuisng only on the damage/losses
-hotspot_summary <- hotspot_summary %>%
-  mutate(
-    # Extract list of services again for classification
+    hotspot_services = sapply(hotspot_services, \(x) paste(trimws(as.character(x)), collapse = ", ")),
     hotspot_services_list = strsplit(hotspot_services, ",\\s*"),
-    # Classify each service as loss or damage
-    hotspot_types = lapply(hotspot_services_list, function(svcs) {
-      sapply(svcs, function(s) {
+    hotspot_types = sapply(hotspot_services_list, function(svcs) {
+      types <- sapply(svcs, function(s) {
         if (s %in% loss_services) "loss"
         else if (s %in% gain_services) "damage"
         else NA_character_
       })
+      paste(na.omit(types), collapse = ", ")
     }),
-    hotspot_types = sapply(hotspot_types, function(x) paste(x[!is.na(x)], collapse = ", ")),
-    # Keep only "negative" services
-    hotspot_services_negative = sapply(hotspot_services_list, function(svcs) {
-      neg <- svcs[svcs %in% c(loss_services, gain_services)]
-      paste(neg, collapse = ", ")
-    })
+    hotspot_services_negative = hotspot_services  # since only negatives are kept
   ) %>%
-  select(-hotspot_services_list)  # Optional cleanup
+  select(fid, hotspot_count, hotspot_services, hotspot_types, hotspot_services_negative)
 
-# STEP 4. Split the hotspot services field into rows (so i can build the new columns)
-hotspot_long <- hotspot_summary %>%
-  select(fid, hotspot_services) %>%
-  separate_rows(hotspot_services, sep = ",\\s*")  # split by comma and optional space
-
-
-# STEP 5. Pivot wider to have a binary matrix with the services
-hotspot_wide <- hotspot_long %>%
-  mutate(is_hotspot = 1) %>%
+# ----------------------------------------------------
+# Step 4: Pivot to wide binary matrix
+# ----------------------------------------------------
+hotspot_binary_matrix <- hotspot_summary %>%
+  select(fid, hotspot_count, hotspot_services) %>%
+  separate_rows(hotspot_services, sep = ",\\s*") %>%
+  mutate(is_hotspot = 1L) %>%
   pivot_wider(names_from = hotspot_services, values_from = is_hotspot, values_fill = 0)
 
+# ----------------------------------------------------
+# Step 5: Join with sf object
+# Only polygons that are hotspots for negative services are retained
+# ----------------------------------------------------
+hotspots_final <- sf_f %>%
+  inner_join(hotspot_binary_matrix, by = "fid") %>%
+  left_join(hotspot_summary, by = "fid")
+# ------------------------------------------
+# Step 6: Export to file
+# ------------------------------------------
+st_write(hotspots_final, file.path(inpath, "10k_grid_hotspots.gpkg"), append = FALSE)
 
-hotspots_f <- left_join(sf_f, hotspot_wide)
-# Export aoutputs (this also needs to be adjusted, it makes no sense to kee storing this inb two differnet places)
-
-st_write(hotspots_f, paste0(inpath, '/',"10k_grid_hotspots.gpkg"), append=FALSE)
-```
-
-
-
-
-################# We're here. Need to finish tomorrow. I need to recall what happened here so i cna prodcue my final scatterplots and the maps. 
-#I think everything makes sens, but i just can't think anymore. Need some rest and fresh mind to cathc up here, but it is almost done
-services <- unique(plt_long$service)
-
-for (s in services) {
-  hotspots_change[[s]] <- ifelse(grepl(s, hotspots_change$hotspot_services_negative), 1, 0)
-}
-
-# Drop Geometry 
-hotspots_change <- st_drop_geometry(hotspot_1)
-
-###### #### #### Attention, Eventually get the ones we need in terms of per ha/per kmˆ2 but right now it is not necessary. 
-# Pivot all columns that contain pct_ch, keeping other relevant vars
-plt_long <- plt %>%
-  pivot_longer(
-    cols = matches("pct_ch"),
-    names_to = "service",
-    values_to = "pct_ch"
-  ) %>%
-  select(HYBAS_ID,SUB_AREA, id, ee_r264_name, iso3, gtapv7_r50_description, area_sqkm_country, continent, region_wb,fao_reg,income_grp, subregion, BIOME, ecoregion, service, dir_ch_2, pct_ch, all_of(socio_vars), hotspot_count,hotspot_services,hotspot_types, hotspot_services_negative) %>% 
-   mutate(service = str_replace(service, "_pct_chg.*", ""))
-  
-
-
-
-# Remove unnecesary columns
-hot <- hotspots_change[c(1:19,35:37)]
-
- # Define the socioeconomic variables
-socio_vars <- c(
-  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",# this is also a problem!!!Will have to calculate again, but the sum. not the mean. 
-  "rast_gdpTot_1990_2020_30arcsec.7_mean",
-  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # this is a problem here!!!! Will have to calculate again, but the sum. not the mean. 
-  #"GlobPOP_Count_30arc_2020_I32.1_sum", we don't need this one anymore, already calc per sq km
-  "hdi_raster_predictions_2020.1_mean",
-  "farmsize_mehrabi.1_mean",
-  "GlobPOP_sqkm")
-
-# Remove NAs and Inf values
-
-###### #### #### Attention, thos will be reviewd for per sq/km and check pollinayion and USLE, but 
-# Pivot all columns that contain pct_ch, keeping other relevant vars
-plt_long <- plt %>%
-  pivot_longer(
-    cols = matches("pct_ch"),
-    names_to = "service",
-    values_to = "pct_ch"
-  ) %>%
-  select(HYBAS_ID,SUB_AREA, id, ee_r264_name, iso3, gtapv7_r50_description, area_sqkm_country, continent, region_wb,fao_reg,income_grp, subregion, BIOME, ecoregion, service, dir_ch_2, pct_ch, all_of(socio_vars), hotspot_count,hotspot_services,hotspot_types, hotspot_services_negative) %>% 
-   mutate(service = str_replace(service, "_pct_ch.*", ""))
-  
-
-plt_long <- plt_long%>% filter(service != "Pop") %>% filter(service!= "n_export")
-# remove infinite values 
-plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)  
-
-
-# join hotspot data with the small plt_long data (8 columns). Th
-#plt_long <- left_join(hot, plt_long)
-
-# export final database long. 
-
-write.csv(plt_long, here("output_data", "hotspot_data_long.csv")) 
 ```
 
 # 4. Join Country Data (improve Analysis)
 
 **I still have not been able to make sense of this shit. And it is really annoyingm anbd a huge waste of time. I absolutely need to transcend this.**
-<<<<<<< HEAD
+
 
 ```{r add country data, eval=FALSE, include=FALSE}
 # load the country data (to get income level and stuff)
@@ -384,5 +308,3 @@ hotspots_change <- hotspots_change[c(1:16,38:43,17,18,19:37)]
 st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
 
 ```
-=======
->>>>>>> main
