@@ -215,9 +215,11 @@ loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_
 gain_services <- c("Sed_export", "N_export", "USLE")
 #pct_cutoff <- 0.01  # Top/bottom 1%
 pct_cutoff <- 0.05  # for top/bottom 5%
-
-
+# create vector with the service names
+services <- unique(plt_long$service)
 # STEP 1: Identify Top/Bottom % Hotspots Per Service
+#This function sorts and labels the hotpots by individual services in ascending and descending order based on the provided cutoff value
+# It adds following columns: total rows per service, cutoff value, rank (ascending and descending) wether it is a hotspot or not and a binary column with the same information
 df_hotspots <- plt_long %>%
   group_by(service) %>%
   mutate(
@@ -235,6 +237,7 @@ df_hotspots <- plt_long %>%
   ungroup()
 
 # STEP 2: Aggregate Hotspot Summary Per spatial unit (HYBAS_ID for basins, fid for the grid)
+# this stpe processes df_hotspots to extract thte fid of the units that are a hotspot, labels the variables in terms of ecosystem service loss/increased damage and adds a colunmn that list the variables for which the unit is a hotspot. 
 hotspot_summary <- df_hotspots %>%
   filter(hotspot_binary) %>%
   group_by(fid) %>%
@@ -245,9 +248,10 @@ hotspot_summary <- df_hotspots %>%
   mutate(
     hotspot_services = sapply(hotspot_services, \(x) paste(trimws(as.character(x)), collapse = ", "))
   )
-
+# This function 
 
 # STEP 3: Add Hotspot Types and Negative-Impact Subset
+# This step adds a definitopn to the hotspot type (ES loss/increased damage and specifies which one(s)) focuisng only on the damage/losses
 hotspot_summary <- hotspot_summary %>%
   mutate(
     # Extract list of services again for classification
@@ -269,11 +273,22 @@ hotspot_summary <- hotspot_summary %>%
   ) %>%
   select(-hotspot_services_list)  # Optional cleanup
 
+# STEP 4. Split the hotspot services field into rows (so i can build the new columns)
+hotspot_long <- hotspot_summary %>%
+  select(fid, hotspot_services) %>%
+  separate_rows(hotspot_services, sep = ",\\s*")  # split by comma and optional space
 
-hotspot_1 <- left_join(sf_f, hotspot_summary)
+
+# STEP 5. Pivot wider to have a binary matrix with the services
+hotspot_wide <- hotspot_long %>%
+  mutate(is_hotspot = 1) %>%
+  pivot_wider(names_from = hotspot_services, values_from = is_hotspot, values_fill = 0)
+
+
+hotspots_f <- left_join(sf_f, hotspot_wide)
 # Export aoutputs (this also needs to be adjusted, it makes no sense to kee storing this inb two differnet places)
 
-st_write(hotspot_1, paste0(inpath, '/',"10k_grid_hotspots.gpkg"), append=FALSE)
+st_write(hotspots_f, paste0(inpath, '/',"10k_grid_hotspots.gpkg"), append=FALSE)
 
 ################# We're here. Need to finish tomorrow. I need to recall what happened here so i cna prodcue my final scatterplots and the maps. 
 #I think everything makes sens, but i just can't think anymore. Need some rest and fresh mind to cathc up here, but it is almost done
