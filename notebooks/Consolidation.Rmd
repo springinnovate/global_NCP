@@ -26,7 +26,6 @@ library(devtools)
 load_all()
 #source the helper functions
 source(here("R", "hotSpotR.R"))
-#source(here("R","utils_pct_change.R"))
 source(here("R","pct_change_calc.R"))
 source(here("R", "utils_lcc_metrics.R"))
 source(here("R", "perc_filteR.R"))
@@ -54,12 +53,8 @@ sf_a <- lapply(sets1, st_read)
 # Step 2: Add fid to each (all have same row count & order)
 sf_a <- lapply(sf_a, function(x) dplyr::mutate(x, fid = dplyr::row_number()))
 
-# this is not working now, naming structure is too complex, adjusting manually for the moment
-# sf_a <- lapply(sf_a, function(x) {
-#   names(x) <- standardize_colnames(names(x))
-#   x
-# })
-
+# Update: include the coastal prtection data:
+sf_cp <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/summary_pipeline_workspace/grid_10k_synth_zonal_2025_07_20_23_45_27.gpkg')
 # Define name replacements per object. Had to do it manually, there is just too much variability to automatize, did it by hand, but this is the kind of thing an LLM helps to write easily. Still, there must be a smarter, more flexible way to do it (maybe the best approach is to keep a consistent naming convention for the modeled rasters, this has been a PIA since i started this work)
 
 rename_list <- list(
@@ -116,12 +111,42 @@ rm(sf_ben) # remove not needed anymore
 # join beneficiary data to the ES change data
 sf_f <- dplyr::left_join(sf_f, sf_benf %>% sf::st_drop_geometry(), by = "fid")
 rm(sf_benf) 
+
 # export output
 
 st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
 ```
+# 1.1 Include new columns (C.Protection)
 
+
+```{r add c protection}
+# Update: include the coastal prtection data:
+sf_cp <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/summary_pipeline_workspace/grid_10k_synth_zonal_2025_07_20_23_45_27.gpkg')
+# Define name replacements per object. Had to do it manually, there is just too much variability to automatize, did it by hand, but this is the kind of thing an LLM helps to write easily. Still, there must be a smarter, more flexible way to do it (maybe the best approach is to keep a consistent naming convention for the modeled rasters, this has been a PIA since i started this work)
+sf_cp <- sf_cp %>% mutate(fid = dplyr::row_number())
+# Calculate bitemporal change in % and absolute terms. Drop original columns
+sf_cp <- compute_variable_change(sf_cp, suffix = c("_mean"), change_type= "both", drop_columns = TRUE)
+
+sf_cp <- st_drop_geometry(sf_cp)
+# load previous version
+sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
+sf_f <-  sf_f %>% mutate(fid = dplyr::row_number()) # not sure why fid is missing. Nevermind, added here 
+sf_f <- left_join(sf_f, sf_cp)
+# reorganize columns:
+
+sf_f <- sf_f %>%
+  relocate(
+    coastal_protection_Rt_abs_chg,
+    coastal_protection_Rt_pct_chg,
+    .before = GHS_BUILT_S_E2020_mean
+  )
+
+# export output
+
+st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
+```
 # 2 Load Vector Data and pivot
+
 
 Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. Add to the documentation , environment or however that's called the vectors to select and order the columns. This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir).
 
@@ -141,6 +166,7 @@ socio_vars <- names(plt)[
 
 
 # Pivot all columns that contain pct_ch, keeping other relevant vars
+
 plt_long <- plt %>%
   pivot_longer(
     cols = matches("pct_chg"),
@@ -153,13 +179,18 @@ plt_long <- plt %>%
 # remove infinite values 
 plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)  
 
-
-
+# rename some variables (just for aesthetics)
 
   plt_long <- plt_long %>% mutate(service = case_when(
    service == "sed_export" ~ "Sed_export",
-   service == "Sed_retention_ratio" ~ "Sed_Ret_Ratio",
-   service == "Usle" ~ "USLE",
+   service == "n_export" ~ "N_export",
+   service == "n_retention" ~ "N_retention",
+   service == "coastal_protection_Rt" ~ "Coastal_Protection",
+   service == "nature_access" ~ "Nature_Access",
+   service == "pollination" ~ "Pollination",
+   service == "usle" ~ "USLE",
+   service == "n_ret_ratio" ~ "N_Ret_Ratio",
+   service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
    TRUE ~ service
    ))
 
@@ -170,6 +201,7 @@ write.csv(plt, file= here('output_data', "full_metrics_grid_wide.csv")) # This m
 # 3. Get Hotspots
 
 Need to think on an effective way to change the value (the share/quantile we want to extract and also filter by group!!!!)
+
 
 So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. Taht wouls be awesome
 
@@ -182,20 +214,22 @@ So, we need a long table format, then define the threshold the services with gai
 # ---------------------------------------------------------
 
 # Define which services are considered "losses" vs "damages"
-loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
+loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "Nature_Access", "N_retention")
 gain_services <- c("Sed_export", "N_export", "USLE")
-pct_cutoff <- 0.01  # Top/bottom 5%
+#pct_cutoff <- 0.01  # Top/bottom 1%
 pct_cutoff <- 0.05  # for top/bottom 5%
-
-
+# create vector with the service names
+services <- unique(plt_long$service)
 # STEP 1: Identify Top/Bottom % Hotspots Per Service
+#This function sorts and labels the hotpots by individual services in ascending and descending order based on the provided cutoff value
+# It adds following columns: total rows per service, cutoff value, rank (ascending and descending) wether it is a hotspot or not and a binary column with the same information
 df_hotspots <- plt_long %>%
   group_by(service) %>%
   mutate(
     n_total = n(),
     n_cut = ceiling(n_total * pct_cutoff),
-    rank_high = rank(-pct_ch, ties.method = "first"),
-    rank_low = rank(pct_ch, ties.method = "first"),
+    rank_high = rank(-pct_chg, ties.method = "first"),
+    rank_low = rank(pct_chg, ties.method = "first"),
     hotspot_flag = case_when(
       rank_high <= n_cut ~ "high",
       rank_low <= n_cut ~ "low",
@@ -205,10 +239,11 @@ df_hotspots <- plt_long %>%
   ) %>%
   ungroup()
 
-# STEP 2: Aggregate Hotspot Summary Per HYBAS_ID
+# STEP 2: Aggregate Hotspot Summary Per spatial unit (HYBAS_ID for basins, fid for the grid)
+# this stpe processes df_hotspots to extract thte fid of the units that are a hotspot, labels the variables in terms of ecosystem service loss/increased damage and adds a colunmn that list the variables for which the unit is a hotspot. 
 hotspot_summary <- df_hotspots %>%
   filter(hotspot_binary) %>%
-  group_by(HYBAS_ID) %>%
+  group_by(fid) %>%
   summarise(
     hotspot_count = n(),
     hotspot_services = list(unique(service))
@@ -216,9 +251,10 @@ hotspot_summary <- df_hotspots %>%
   mutate(
     hotspot_services = sapply(hotspot_services, \(x) paste(trimws(as.character(x)), collapse = ", "))
   )
-
+# This function 
 
 # STEP 3: Add Hotspot Types and Negative-Impact Subset
+# This step adds a definitopn to the hotspot type (ES loss/increased damage and specifies which one(s)) focuisng only on the damage/losses
 hotspot_summary <- hotspot_summary %>%
   mutate(
     # Extract list of services again for classification
@@ -240,105 +276,39 @@ hotspot_summary <- hotspot_summary %>%
   ) %>%
   select(-hotspot_services_list)  # Optional cleanup
 
-# STEP 3: Add Hotspot Types and Negative-Impact Subset
-hotspot_summary <- hotspot_summary %>%
-  mutate(
-    # Extract list of services again for classification
-    hotspot_services_list = strsplit(hotspot_services, ",\\s*"),
-    # Classify each service as loss or damage
-    hotspot_types = lapply(hotspot_services_list, function(svcs) {
-      sapply(svcs, function(s) {
-        if (s %in% loss_services) "loss"
-        else if (s %in% gain_services) "damage"
-        else NA_character_
-      })
-    }),
-    hotspot_types = sapply(hotspot_types, function(x) paste(x[!is.na(x)], collapse = ", ")),
-    # Keep only "negative" services
-    hotspot_services_negative = sapply(hotspot_services_list, function(svcs) {
-      neg <- svcs[svcs %in% c(loss_services, gain_services)]
-      paste(neg, collapse = ", ")
-    })
-  ) %>%
-  select(-hotspot_services_list)  # Optional cleanup
+# STEP 4. Split the hotspot services field into rows (so i can build the new columns)
+hotspot_long <- hotspot_summary %>%
+  select(fid, hotspot_services) %>%
+  separate_rows(hotspot_services, sep = ",\\s*")  # split by comma and optional space
 
 
-hotspot_1 <- left_join(poly, hotspot_summary)
+# STEP 5. Pivot wider to have a binary matrix with the services
+hotspot_wide <- hotspot_long %>%
+  mutate(is_hotspot = 1) %>%
+  pivot_wider(names_from = hotspot_services, values_from = is_hotspot, values_fill = 0)
 
 
-# remove unnecesary columns (original 92-2020 values, keep)
-spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
-# reorganize columns
-spring_ES <- spring_ES[c(1:19, 20, 22,21,25,34,23,24,26:33)]
-spring_ES$N_export_2020_sqkm <- NULL
-
-
-# ###############################################
-# # remove unnecesary columns (original 92-2020 values, keep)
-# spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
-# # reorganize columns
-# spring_ES <- spring_ES[c(1:19, 20, 22,21,25,34,23,24,26:33)]
-# spring_ES$N_export_2020_sqkm <- NULL
-
-spring_ES <- left_join(spring_ES, hotspot_summary, by = "HYBAS_ID")
-hotspots_change <- spring_ES # rename (i could just clean this but too lazy)
-
-#hotspots_change <- left_join(hotspots_change,ct)
-names(hotspots_change) <- stringr::str_replace_all(names(hotspots_change), "_2020_1992", "")
-
-# ###############################################
-# # remove unnecesary columns (original 92-2020 values, keep)
-# spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
-# # reorganize columns
-# spring_ES <- spring_ES[c(1:19, 20, 22,21,25,34,23,24,26:33)]
-# spring_ES$N_export_2020_sqkm <- NULL
-
-spring_ES <- left_join(spring_ES, hotspot_summary, by = "HYBAS_ID")
-hotspots_change <- spring_ES # rename (i could just clean this but too lazy)
-
-
-#hotspots_change <- left_join(hotspots_change,ct)
-names(hotspots_change) <- stringr::str_replace_all(names(hotspots_change), "_2020_1992", "")
-hotspots_change <- left_join(hotspots_change,ct)
-names(hotspots_change) <- stringr::str_replace_all(names(hotspots_change), "_2020_1992", "")
+hotspots_f <- left_join(sf_f, hotspot_wide)
 # Export aoutputs (this also needs to be adjusted, it makes no sense to kee storing this inb two differnet places)
-st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
-st_write(hotspots_change, paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"), append=FALSE)
+
+st_write(hotspots_f, paste0(inpath, '/',"10k_grid_hotspots.gpkg"), append=FALSE)
+```
 
 
 
-# Define the services interested in
-services <- c("Sed_export", "USLE", "Sed_Ret_Ratio", "Coastal_Protection", 
-              "Pollination", "N_export", "N_Ret_Ratio")
 
-# Create binary columns from the hotspot_services_negative column
+################# We're here. Need to finish tomorrow. I need to recall what happened here so i cna prodcue my final scatterplots and the maps. 
+#I think everything makes sens, but i just can't think anymore. Need some rest and fresh mind to cathc up here, but it is almost done
+services <- unique(plt_long$service)
+
 for (s in services) {
   hotspots_change[[s]] <- ifelse(grepl(s, hotspots_change$hotspot_services_negative), 1, 0)
 }
 
-
-# Export aoutputs (this also needs to be adjusted, it makes no sense to kee storing this inb two differnet places)
-st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), layer= "hotspots_1_pct", append = TRUE)
-st_write(hotspots_change, paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"), layer= "hotspots_1_pct", append = TRUE)
-
 # Drop Geometry 
+hotspots_change <- st_drop_geometry(hotspot_1)
 
-hotspots_change <- st_drop_geometry(hotspots_change)
-
-
- # Define the socioeconomic variables
-socio_vars <- c(
-  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",# this is also a problem!!!Will have to calculate again, but the sum. not the mean. 
-  "rast_gdpTot_1990_2020_30arcsec.7_mean",
-  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # this is a problem here!!!! Will have to calculate again, but the sum. not the mean. 
-  #"GlobPOP_Count_30arc_2020_I32.1_sum", we don't need this one anymore, already calc per sq km
-  "hdi_raster_predictions_2020.1_mean",
-  "farmsize_mehrabi.1_mean",
-  "GlobPOP_sqkm")
-
-
-
-###### #### #### Attention, thos will be reviewd for per sq/km and check pollinayion and USLE, but 
+###### #### #### Attention, Eventually get the ones we need in terms of per ha/per kmˆ2 but right now it is not necessary. 
 # Pivot all columns that contain pct_ch, keeping other relevant vars
 plt_long <- plt %>%
   pivot_longer(
@@ -347,11 +317,10 @@ plt_long <- plt %>%
     values_to = "pct_ch"
   ) %>%
   select(HYBAS_ID,SUB_AREA, id, ee_r264_name, iso3, gtapv7_r50_description, area_sqkm_country, continent, region_wb,fao_reg,income_grp, subregion, BIOME, ecoregion, service, dir_ch_2, pct_ch, all_of(socio_vars), hotspot_count,hotspot_services,hotspot_types, hotspot_services_negative) %>% 
-   mutate(service = str_replace(service, "_pct_ch.*", ""))
+   mutate(service = str_replace(service, "_pct_chg.*", ""))
   
 
-plt_long <- plt_long%>% filter(service != "Pop") %>% filter(service!= "n_export")
-# remove infinite values 
+
 
 # Remove unnecesary columns
 hot <- hotspots_change[c(1:19,35:37)]
@@ -384,13 +353,6 @@ plt_long <- plt_long%>% filter(service != "Pop") %>% filter(service!= "n_export"
 # remove infinite values 
 plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)  
 
-  plt_long <- plt_long %>% mutate(service = case_when(
-   service == "sed_export" ~ "Sed_export",
-   service == "Sed_retention_ratio" ~ "Sed_Ret_Ratio",
-   service == "Usle" ~ "USLE",
-   TRUE ~ service
-   ))
-
 
 # join hotspot data with the small plt_long data (8 columns). Th
 #plt_long <- left_join(hot, plt_long)
@@ -403,6 +365,7 @@ write.csv(plt_long, here("output_data", "hotspot_data_long.csv"))
 # 4. Join Country Data (improve Analysis)
 
 **I still have not been able to make sense of this shit. And it is really annoyingm anbd a huge waste of time. I absolutely need to transcend this.**
+<<<<<<< HEAD
 
 ```{r add country data, eval=FALSE, include=FALSE}
 # load the country data (to get income level and stuff)
@@ -421,3 +384,5 @@ hotspots_change <- hotspots_change[c(1:16,38:43,17,18,19:37)]
 st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
 
 ```
+=======
+>>>>>>> main

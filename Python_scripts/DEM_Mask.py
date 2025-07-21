@@ -4,6 +4,8 @@ import numpy as np
 
 print("Everything is working!")
 
+
+# this is a jupyter notebook. Convert into python code. 
 ```
 
     Everything is working!
@@ -16,10 +18,10 @@ print("Everything is working!")
 
     Collecting tqdm
       Downloading tqdm-4.67.1-py3-none-any.whl.metadata (57 kB)
-    [2K     [38;2;114;156;31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m57.7/57.7 kB[0m [31m3.2 MB/s[0m eta [36m0:00:00[0m
-    [?25hDownloading tqdm-4.67.1-py3-none-any.whl (78 kB)
-    [2K   [38;2;114;156;31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m78.5/78.5 kB[0m [31m7.8 MB/s[0m eta [36m0:00:00[0m
-    [?25hInstalling collected packages: tqdm
+    [2K     [38;2;114;156;31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m57.7/57.7 kB[0m [31m3.2 MB/s[0m eta [36m0:00:00[0m
+    [?25hDownloading tqdm-4.67.1-py3-none-any.whl (78 kB)
+    [2K   [38;2;114;156;31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m [32m78.5/78.5 kB[0m [31m7.8 MB/s[0m eta [36m0:00:00[0m
+    [?25hInstalling collected packages: tqdm
     Successfully installed tqdm-4.67.1
 
 
