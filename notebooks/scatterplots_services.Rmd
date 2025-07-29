@@ -87,37 +87,6 @@ if (filter_type == "quantile") {
   q_val <- c(filter_cutoff, max(df_raw$SUB_AREA)
 ```
 
-Load Data, filter small basins out!
-
-```{r setup2}
-# ---------------------------------------------------------
-# SETUP: Load Ecosystem Service - Beneficiary Data
-# ---------------------------------------------------------
-
-# Load long-format ES data (one row per basin-service-metric)
-df_raw <- read_csv(here("output_data", "serv_benef_synth_02.csv"))
-
-# ---------------------------------------------------------
-# STEP 1: Filter by Basin Area (SUB_AREA)
-# ---------------------------------------------------------
-
-# ---- USER OPTIONS ----
-filter_type <- "percent"       # Options: "quantile", "percent", "absolute"
-filter_cutoff <- 0.05          # E.g., 0.05 = 5% cutoff
-filter_direction <- "tail"     # Options: "top", "bottom", "both", "tail", "middle", "none"
-# -----------------------
-
-# Compute thresholds
-if (filter_type == "quantile") {
-  q_val <- quantile(df_raw$SUB_AREA, probs = c(filter_cutoff, 1 - filter_cutoff), na.rm = TRUE)
-} else if (filter_type == "percent") {
-  sorted_areas <- df_raw %>% arrange(SUB_AREA) %>% pull(SUB_AREA)
-  n_total <- length(sorted_areas)
-  n_cut <- ceiling(n_total * filter_cutoff)
-  q_val <- c(sorted_areas[n_cut], sorted_areas[n_total - n_cut])
-} else if (filter_type == "absolute") {
-  q_val <- c(filter_cutoff, max(df_raw$SUB_AREA))
-```
 
 #Load Data, filter small basins out!
 ```{r setup2}

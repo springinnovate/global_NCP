@@ -33,7 +33,7 @@
 #' # Use custom suffix (e.g., "_total")
 #' compute_variable_change(df, suffix = "_total", change_type = "both")
 
-compute_variable_change <- function(df, 
+compute_change <- function(df, 
                                     suffix = c("_sum", "_mean"), 
                                     round_digits = NULL, 
                                     drop_columns = FALSE,

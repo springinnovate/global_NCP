@@ -57,12 +57,16 @@ sf_a <- lapply(sf_a, function(x) dplyr::mutate(x, fid = dplyr::row_number()))
 sf_cp <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/summary_pipeline_workspace/grid_10k_synth_zonal_2025_07_20_23_45_27.gpkg')
 # Define name replacements per object. Had to do it manually, there is just too much variability to automatize, did it by hand, but this is the kind of thing an LLM helps to write easily. Still, there must be a smarter, more flexible way to do it (maybe the best approach is to keep a consistent naming convention for the modeled rasters, this has been a PIA since i started this work)
 
+# Update 2. Include corrected Access Data
+
+
+
 rename_list <- list(
   c(
     usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean",
     usle_2020_mean = "global_usle_marine_mod_ESA_2020_mean",
     nature_access_1992_mean = "nature_access_lspop2019_ESA1992_mean",
-    nature_access_2020_mean = "nature_access_lspop2019_ESA2020._mean",
+    nature_access_2020_mean = "nature_access_lspop2019_ESA2020_mean",
     n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean",
     n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
     sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean",
@@ -190,6 +194,47 @@ joined <- st_join(grid, cp) %>%
 
 # 2 Load Vector Data and pivot
 
+# 2.1 Add Updated Access Data
+
+```{r add access}
+
+sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
+
+sf_1 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_synth_serv_means.gpkg')
+
+sf_1 <- sf_1 %>% mutate(fid = dplyr::row_number())
+
+
+poly1 <- poly1 %>% rename(nature_access_lspop2019_ESA2020_mean = nature_access_lspop2019_ESA2020._mean)
+sf_1 <- sf_1 %>% rename(nature_access_lspop2019_ESA2020_mean = nature_access_lspop2019_ESA2020._mean)
+poly1 <- poly1 %>% mutate(fid = dplyr::row_number())
+
+poly1 <- st_drop_geometry(poly1)
+
+
+sf_1$nature_access_lspop2019_ESA2020_mean <- NULL
+sf_1$nature_access_lspop2019_ESA2020_mean <- poly1$nature_access_lspop2019_ESA2020_mean
+
+sf_1 <- sf_1 %>% select(fid, global_usle_marine_mod_ESA_1992_mean, global_usle_marine_mod_ESA_2020_mean,nature_access_lspop2019_ESA1992_mean,nature_access_lspop2019_ESA2020_mean, N_ret_ratio_1992_mean,N_ret_ratio_2020_mean, Sed_ret_ratio_1992_mean, Sed_ret_ratio_2020_mean)
+
+st_write(sf_1, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_synth_serv_means.gpkg', append=FALSE)
+
+
+names(sf_f)
+
+names(poly1)
+
+poly1 <- poly1 %>% rename(nature_access_abs_chg=access_abs_chg)
+poly1 %>% rename(nature_access_pct_chg = access_pct_chg)
+
+names(sf_1)
+
+names(sf_f)
+
+sf_f$nature_access_abs_chg=poly1$nature_access_abs_chg
+sf_f$nature_access_pct_chg=poly1$access_pct_chg
+st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
+```
 
 Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. Add to the documentation , environment or however that's called the vectors to select and order the columns. This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir).
 
@@ -197,7 +242,7 @@ Here, the spatial objects with the additional attributes are loaded and reformat
 # 
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
- sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
+sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
 sf_f$fid <- seq_len(nrow(sf_f)) 
  plt <- st_drop_geometry(sf_f)
  
@@ -224,7 +269,7 @@ plt_long <- plt %>%
 plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)  
 
 # remove old coastal protection
-plt_long <- plt_long%>% filter(service != "coastal_protection_Rt")
+plt_long <- plt_long%>% filter(service != "coastal_protection_Rt") #why??
 
 
 # rename some variables (just for aesthetics)
@@ -283,10 +328,12 @@ df_hotspots <- plt_long %>%
 # ----------------------------------------------------
 # Step 2: Keep only NEGATIVE hotspot services
 # ----------------------------------------------------
-negative_services <- c(loss_services, gain_services)
-
 df_hotspots_negative <- df_hotspots %>%
-  filter(hotspot_binary, service %in% negative_services)
+  filter(
+    hotspot_binary,
+    (service %in% loss_services & hotspot_flag == "low") |
+    (service %in% gain_services & hotspot_flag == "high")
+  )
 
 # ----------------------------------------------------
 # Step 3: Summarize by polygon
@@ -316,7 +363,7 @@ hotspot_summary <- df_hotspots_negative %>%
 # Step 4: Pivot to wide binary matrix
 # ----------------------------------------------------
 hotspot_binary_matrix <- hotspot_summary %>%
-  select(fid, hotspot_count, hotspot_services) %>%
+  select(fid, hotspot_services) %>%
   separate_rows(hotspot_services, sep = ",\\s*") %>%
   mutate(is_hotspot = 1L) %>%
   pivot_wider(names_from = hotspot_services, values_from = is_hotspot, values_fill = 0)
