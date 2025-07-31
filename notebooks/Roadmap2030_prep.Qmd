@@ -1,0 +1,511 @@
+---
+title: "Current Status"
+output: html_notebook
+---
+
+
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(tidytext)
+library(rlang)
+library(tidyr)
+library(forcats)
+library(scales)
+library(RColorBrewer)
+library(htmltools)
+library(leaflet)
+library(devtools)
+library(exactextractr)
+library(parallel)
+#load_all()
+#source the helper functions
+source(here("R", "normalizR.R"))
+source(here("R", "rast_alignR.R"))
+source(here("R", "cookiecutteR.R"))
+```
+
+
+# 1. Create Pollination Mask
+
+This was done to convert non pollination areas into NAs (fix dataset)
+```{r pollination, eval=FALSE, include=FALSE}
+# I will have to update the paths here!!! (on it)
+po_c <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Change/ndv_0.0_realized_pollination_on_ag_marESA_2020-1992_fullchange_md5_8e63e2.tif')
+
+outpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Change'
+# Reclassification matrix
+# Format: from, to, becomes
+rcl <- matrix(c(
+  -Inf, -0.09, 0,
+  -0.09, Inf, 1
+), ncol = 3, byrow = TRUE)
+
+msk_po_c <- classify(po_c,rcl)
+
+po_c <- mask(po_c, msk_po_c, maskvalues=0)
+writeRaster(po_c,paste0(outpath, '/', 'masked_ndv_0.0_realized_pollination_on_ag_marESA_2020-1992_fullchange_md5_8e63e2.tif'), overwrite =TRUE)
+writeRaster(msk_po_c,paste0(outpath, '/', 'mask_pollination_change.tif'))
+```
+
+
+#2.  Clip The rasters by the Project Areas.
+
+```{r clip rasters, eval=FALSE, include=FALSE}
+# Set path to the consolidated polygons
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Change' # maybe remove. I don't remember what the purpose of this is right now. 
+# Load Polygons
+inpath_pol <- '/Users/rodriguez/Library/CloudStorage/OneDrive-SharedLibraries-WorldWildlifeFund,Inc/RM2030 Pilot - Geospatial Analysis - Geospatial Analysis'
+poly <- st_read(paste0(inpath_pol,'/', 'consolidated_pilot_areas.shp'))
+
+# Fix eventual valid geometry issues. 
+poly <- st_make_valid(poly)
+poly <- st_cast(poly, "MULTIPOLYGON")
+
+# Adjust the order 
+poly <- poly %>% arrange(layer)
+# get unique names for exporting 
+ct <- unique(as.character(poly$layer))
+# split polyhons into a list 
+poly_list <- poly %>%
+  group_split(layer)
+
+# Load population data
+pop <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Change/landscan-global-2023.tif')
+# Clip population rasters by the desired uni
+pop <- lapply(poly_list, function(p){
+  t <- crop(pop, ext(p))
+  t <- mask(t, p)
+  t <- trim(t)
+})
+
+# set output directory and export 
+outpath <-  '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/population_projects'
+map(1:length(pop), function(x) writeRaster(pop[[x]], paste0(outpath, '/', "pop_", ct[x], ".tif"), overwrite=TRUE))
+
+
+# Load pollination change raster 
+
+po_c <- rast(paste0(inpath, '/', 'masked_ndv_0.0_realized_pollination_on_ag_marESA_2020-1992_fullchange_md5_8e63e2.tif')
+# Run masking and trimming 
+po_c <- lapply(poly_list, function(p) {
+  t <- crop(po_c, ext(p))
+  t <- mask(t, p)
+  t <- trim(t)
+})
+outpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/pollination_ch_projects'
+# Export Clipped Rasters
+map(1:length(pop), function(x) writeRaster(po_c[[x]], paste0(outpath, '/', "pol_ch_", ct[x], ".tif"), overwrite=TRUE))
+```
+
+# 3. Pollination Summaries
+
+```{r pollination update}
+
+po_c <- rast(paste0(inath, '/', 'masked_ndv_0.0_realized_pollination_on_ag_marESA_2020-1992_fullchange_md5_8e63e2.tif'))
+
+summary_a <- exact_extract(po_c, poly, "sum", append_cols=c("layer")) #normally by layer buy had to do by individual polygon beause of Paraguay)
+
+# remove overlaps. For countrywide summaries 
+poly_dissolved <- poly %>%
+  group_by(Country) %>%
+  summarize(geometry = st_union(geometry), .groups = "drop")
+
+# calculate totals country level 
+summary_ct <- exact_extract(po_c, poly_dissolved, "sum", append_cols=c("Country"))
+
+# Just some patches because the data was not complete. Not really needed anymore.
+poly_p <- poly %>% filter(Country=="Paraguay")
+summary_pa <- exact_extract(po_c, poly_p, "sum", append_cols=c("Name"))
+# Paraguay because of course, but the best thing would be to work withh them separeated 
+poly_ne <- poly %>% filter(Country=="Nepal")
+summary_ne <- exact_extract(po_c, poly_ne, "sum", append_cols=c("Name"))
+
+
+##################################################
+
+summary_by_project <- summary_a %>%
+  group_by(layer) %>%
+  summarise(total_sum = sum(sum, na.rm = TRUE))
+write.csv(summary_by_project, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/pollination_ch_projects/output_pollination.csv')
+write.csv(summary_ct, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/pollination_ch_projects/output_pollination_country.csv')
+```
+# 4. Population (Benfeficiary) Analysis  
+
+```{r population}
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Change'
+#Load Popualtion Raster
+pop <- rast(paste0(inpath,'/','landscan-global-2023.tif'))
+
+
+# order by name, so the export is correct 
+poly <- poly %>% arrange(Country)
+poly_py <- poly %>% filter(Country=="Paraguay") %>% filter(layer=="Area_de_proyecto_FCAP")
+
+# Merge projects by Country, which is what we need right now 
+poly_dissolved <- poly %>%
+  group_by(Country) %>%
+  summarize(geometry = st_union(geometry), .groups = "drop")
+
+# Get the polygon list  by country 
+poly_list <- poly_dissolved %>%
+  group_split(Country)
+
+# Clip Rasters 
+pop <- lapply(poly_list, function(p){
+  t <- crop(pop, ext(p))
+  t <- mask(t, p)
+  t <- trim(t)
+})
+
+# create name vector 
+ct <- unique(as.character(poly$Country))
+outpath <-  '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/population_projects'
+# export masked popualtions
+map(1:length(pop), function(x) writeRaster(pop[[x]], paste0(outpath, '/', "pop_", ct[x], ".tif"), overwrite=TRUE))
+# Resample pollination mask to population, we already know it does not work the other way!!!!
+
+# load mask. pollination (nop change or increase)
+msk_po_c
+msk_po_c <- lapply(poly_list, function(p){
+  t <- crop(msk_po_c, ext(p))
+  t <- mask(t, p)
+})
+
+# resample to the resolution of the population raster 
+msk_po_c_rs <- map2(msk_po_c, pop, resample, method="near")
+# merge all in one single raster  with all masked (intermediary step, to deal with processing limitations ,most likely will not need that in the future)
+msk_po_c_rs. <- do.call(merge, msk_po_c_rs) 
+
+# load population raster
+pop <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Change/landscan-global-2023.tif')
+# crop and mask by the mask we just prepared
+pop <- crop(pop,msk_po_c_rs.)
+pop <- mask(pop, msk_po_c_rs.)
+
+# get metrics (finally)
+summary_pop <- exact_extract(pop, poly, "sum", append_cols= "layer")
+
+# get metrics by project
+summary_pop_project <- summary_pop %>%
+  group_by(layer) %>%
+  summarise(total_sum = sum(sum, na.rm = TRUE))
+
+# here, fix freaking Paraguay shit. Of course this was a stupid way to do it. Getting things right from the beginning is always better thatn trying to fix along the way.
+summary_pop_py <- exact_extract(pop, poly_py, "sum", append_cols= "Name")
+
+summary_pop_ne <- exact_extract(pop, poly_ne, "sum", append_cols= "Name")
+
+
+# export beneficiaries by project 
+write.csv(summary_pop_project, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/pollination_ch_projects/benef_by_project.csv')
+
+pop_stats <- exact_extract(pop, po0ly, "sum", append_cols = "layer")
+pop_by_project <- pop_stats %>%
+  group_by(layer) %>%
+  summarise(total_sum = sum(sum, na.rm = TRUE))
+
+
+summary <- exact_extract(pop, poly, summarize_df= TRUE , append_cols=c("Country", "layer"))
+
+write.csv(summary_table, paste0(outpath, '/', "benef_change.csv"))
+# calcualte totals country level 
+summary_benef_ct<- exact_extract(pop, poly_dissolved, "sum", append_cols=c("Country"))
+
+#write.csv(summary_table, paste0(outpath, '/', "pollination_change.csv"))
+```
+
+# 5. Clip the Land Covers (just for mapping) optional
+
+```{r clip LC, eval=FALSE, include=FALSE}
+
+lc_92_rc <- rast('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/data/input_rasters/LandCovers/landcover_gl_1992.tif')
+lc_20_rc <- rast('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/data/input_rasters/LandCovers/landcover_gl_2020.tif')
+
+lc_92_or <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/WWF_nbs_op/Downloaded_data_ES/ESA_LC/ESACCI-LC-L4-LCCS-Map-300m-P1Y-1992-v2.0.7cds_compressed_md5_60cf30.tif')
+crs(lc_92_or) <- crs(lc_20_or)
+lc_20_or <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/WWF_nbs_op/Downloaded_data_ES/ESA_LC/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif')
+
+lcl <- list(lc_92_rc, lc_20_rc, lc_92_or, lc_20_or)
+lcl <- rast(lcl)
+
+
+lcl <- lapply(poly, function(p){
+  t <- crop(lcl, ext(p))
+  t <- mask(t, p)
+  t <- trim(t)
+})
+
+
+outpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/Rasters_projects'
+walk2(lcl, ct, ~writeRaster(.x, filename = file.path(outpath, paste0(.y, "_lc.tif")), overwrite = TRUE))
+
+```
+
+
+# 5. Coastal Protection 
+
+## 5.1  Create 10 m/3km elevation mask Colombia UK 
+
+```{r create elevation mask}
+
+outpath <- '/home/jeronimo/OneDrive/Roadmap_2030/Polygons_projects/Coastal_p'
+mask_10 <- rast('/home/jeronimo/OneDrive/global_NCP/data/input_rasters/aux_data/dem_10m.tif')
+mask_10
+#poly <- st_read('/home/jeronimo/OneDrive/Roadmap_2030/Polygons_projects/Coastal_p/inland_buffer_2km.shp')
+poly <- st_read('/home/jeronimo/OneDrive/Roadmap_2030/Polygons_projects/Coastal_p/3km_Shoreline_inlandbuffer_UK_CO.shp')
+poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/Polygons_projects/Coastal_p/3km_Shoreline_inlandbuffer_UK_CO.shp')
+# poly. <- st_transform(poly, crs=crs(mask_10))
+poly. <- split(poly., poly.$fid) 
+
+# create vector to export names 
+
+ct <- c("UK", "CO")
+
+mask_10 <- lapply(poly., function(s){
+  r <- crop(mask_10, s)
+  r <- mask(r,s)
+  return(r)
+})#, mc.cores = length(poly.))
+
+walk2(mask_10, ct, ~writeRaster(.x, filename = file.path(outpath, paste0(.y, "_coastal_mask_3k.tif")), overwrite = TRUE))
+```
+
+## 5.2 Apply mask /elevation 3 km inland buffer to population
+
+```{r apply mask to population}
+
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/Polygons_projects/Coastal_p'
+# Read filename list.
+tiffes <- file.path(inpath, list.files(inpath,pattern= '3k')) # and ends with .tif...
+tiffes <- tiffes[c(6,7)]
+#load masks 
+msk <- lapply(tiffes, rast)
+#Remove points, risk reduction baseline
+pop <- rast('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/data/Spring/Change/landscan-global-2023.tif')
+
+poly. <- st_transform(poly, crs= crs(pop))
+poly. <- split(poly., poly.$fid) 
+
+# create vector to export names 
+ct <- c("UK", "CO")
+pop <- lapply(poly., function(s){
+  r <- crop(pop, s)
+  r <- mask(r,s)
+  return(r)
+})#, mc.cores = length(poly.))
+
+
+outpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/Polygons_projects/Coastal_p'
+walk2(pop, ct, ~writeRaster(.x, filename = file.path(outpath, paste0(.y, "_landscan_pop_2023_3k.tif")), overwrite = TRUE))
+
+
+# Reorder `msk` to match names in `pop` #need to check wehre di our order get inverted. That's the problem
+# 9358 is UK, 13596 is CO, so we reorder accordingly:
+msk <- msk[c(2, 1)]
+names(msk) <- names(pop)
+
+
+
+
+# align and resample elevation mask for population
+align_and_resample_mask <- function(mask, target_raster) {
+  # Step 1: Trim NA edges
+  mask_trimmed <- trim(mask)
+  
+  # Step 2: Align extent (crop or extend)
+  mask_aligned <- if (ext(mask_trimmed) > ext(target_raster)) {
+    crop(mask_trimmed, ext(target_raster))
+  } else {
+    extend(mask_trimmed, ext(target_raster))
+  }
+  
+  # Step 3: Resample with nearest neighbor
+  mask_resampled <- resample(mask_aligned, target_raster, method = "near")
+  
+  # Step 4: Enforce binary logic — values must be 0 or NA
+  # Step 4: Enforce binary mask: 1 or NA
+  out <- mask_resampled
+  out[!is.na(out)] <- 1
+  
+  return(out)
+}
+
+mask_resampled <- map2(msk, pop, align_and_resample_mask)
+lapply(mask_resampled, unique)
+
+ walk2(mask_resampled, ct, ~writeRaster(.x, filename = file.path(inpath, paste0(.y, "_elev_mask_rsmp.tif")), overwrite = TRUE))
+
+pop_masked <- map2(pop, mask_resampled, mask)
+
+walk2(pop_masked, ct, ~writeRaster(.x, filename = file.path(inpath, paste0(.y, "_pop_landscan_2023_10m_3k.tif")), overwrite = TRUE))
+
+# fix juntanza
+
+junt <- st_read('/Users/rodriguez/World Wildlife Fund, Inc/RM2030 Pilot - Geospatial Analysis - Geospatial Analysis/Colombia/ECC_Juntanza/ECC_Juntaza.shp')
+junt <- st_make_valid(junt)
+st_write(junt, paste0(inpath, '/', 'juntannza.shp'))
+
+
+```
+
+
+## 5.3Summaries Coastal protection change
+
+```{r cp summary}
+
+# upload project polygons 
+poly <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/Polygons_projects/Coastal_p/2k_bufffer_cp_gain_poly.shp')
+
+
+poly <- poly %>%
+  mutate(nombre = if_else(is.na(nombre) | nombre == "", layer, nombre))
+
+
+pop_col <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/Polygons_projects/Coastal_p/CO_pop_landscan_2023_10m_3k.tif')
+
+pop_uk <- rast('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Roadmap_2030/Polygons_projects/Coastal_p/UK_pop_landscan_2023_10m_3k.tif')
+pop <- merge(pop_uk, pop_col)
+
+benef <- exact_extract(pop, poly, fun = c('sum','mean', 'max', 'min', 'stdev'),append_cols = "nombre") 
+
+#There is an issue here. If the polygons of more than one pilot are overlap, as is, the script will count them double. (or triple), and the total value will overestimated. We want to keep record for all of them, but also make sure that we are not double counting the, I am not sure how to proceed here  
+
+att <- st_drop_geometry(poly)
+att <- att %>% select(Country, layer)
+benef <- cbind(benef, att)
+benef <- benef %>% select(Country, layer, nombre, sum, mean,max,min, stdev)
+write.csv(benef, paste0(inpath, '/', 'coastal_protection_benef_2023.csv'))                     
+
+benef_summary <- benef %>%
+  group_by(layer) %>%
+  summarise(total_sum = sum(sum, na.rm = TRUE))
+
+    
+
+```
+
+
+
+```{r prepare coastal}
+
+inpath <- '/home/jeronimo/OneDrive/global_NCP/data/Spring/Inspring'
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Inspring'
+gp <- list.files(inpath, pattern = 'gpkg')
+
+#gp <- gp[c(1,4)]
+
+# load vector files
+cp_92 <- st_read(paste0(inpath,"/", gp[1]))
+#drop unnecessary columns, keep only the Rt and Rt_nohab_all columns
+cp_92 <- cp_92 %>% select(Rt, Rt_nohab_all)
+# calculate Service
+cp_92 <- cp_92 %>% mutate(Rt_service_1992 = Rt_nohab_all-Rt)
+
+# do the same for 2020
+cp_20 <- st_read(paste0(inpath,"/", gp[2]))
+cp_20 <- cp_20 %>% select(Rt, Rt_nohab_all)
+cp_20 <- cp_20 %>% mutate(Rt_service_2020 = Rt_nohab_all-Rt)
+
+# add row number as fid for join. I suspect this is unnecesary but nevertheless
+cp_92$id <- seq_len(nrow(cp_92))
+cp_20$id <- seq_len(nrow(cp_20))
+
+# rename the Rt and Rt_nohab_all columns to indicate the year
+cp_92 <- cp_92 %>% rename(Rt_1992 = Rt) %>% rename(Rt_nohab_all_1992 = Rt_nohab_all)
+cp_20 <- cp_20 %>% rename(Rt_2020 = Rt) %>% rename(Rt_nohab_all_2020 = Rt_nohab_all)
+
+#drop geometry, join is easier like this, no need to spatial join. It should not be big deal here but nevertheless
+cp_20 <- st_drop_geometry(cp_20)
+# apply join
+cp_serv <- left_join(cp_92,cp_20)
+cp_serv$id <- NULL
+
+# some safety check, making sure that they are not identical
+identical(cp_serv$Rt_1992, cp_serv$Rt_2020)
+mean(cp_serv$Rt_1992 == cp_serv$Rt_2020, na.rm = TRUE)
+
+identical(cp_serv$Rt_nohab_all_1992, cp_serv$Rt_nohab_all_2020)
+mean(cp_serv$Rt_nohab_all_1992 == cp_serv$Rt_nohab_all_2020, na.rm = TRUE)
+
+identical(cp_serv$Rt_service_1992, cp_serv$Rt_service_2020)
+mean(cp_serv$Rt_service_1992 == cp_serv$Rt_service_2020, na.rm = TRUE)
+
+cp_serv <- cp_serv %>% mutate(Rt_serv_ch = Rt_service_2020-Rt_service_1992)
+
+outpath <- '/home/jeronimo/OneDrive/global_NCP/data/Spring/Change'
+outpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Inspring'
+st_write(cp_serv, paste0(outpath, '/', 'coastal_risk_tnc_esa1992_2020_ch.gpkg'), layer = "cp_change_1992_2020", append=FALSE)
+
+
+cp_test <- st_layers(paste0(outpath, '/', 'coastal_risk_tnc_esa1992_2020_ch.gpkg'))
+```
+
+# 4. Get population Raster (10 m)
+
+```{r pop mask}
+
+
+pop_2023 <- rast('/home/jeronimo/OneDrive/global_NCP/data/Spring/Change/landscan-global-2023.tif')
+
+dem <- rast('/home/jeronimo/global_ES_modeling/esos-c/data/ndr/global_dem.vrt')
+
+rcl <- matrix(c(-Inf, 10.1, 1,
+                10.1, Inf, NA
+                ), ncol = 3, byrow=T)
+dem <- classify(dem,rcl)
+dem_resampled <- resample(dem, pop_2023, method = "near")
+
+pop_2023 <- mask(pop_2023, dem)#,'/home/jeronimo/OneDrive/global_NCP/data/analysis/Landscan/Landscan2023_10m.tif')
+
+writeRaster(dem, '/home/jeronimo/OneDrive/global_NCP/data/input_rasters/aux_data/dem_10m.tif')
+
+
+# nesxt time do this:
+elev_mask <- dem < 10
+elev_mask_small <- crop(elev_mask, ext(pop_2023))
+elev_mask_resampled <- resample(elev_mask_small, pop_2023, method = "near")
+pop_below10m <- mask(pop_2023, elev_mask_resampled)
+
+```
+
+
+
+# 4. Coastal Protection 
+  
+
+```{r coastal}
+cp <- rast("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/Change_Spring/coastal_risk_esa2020_change_esa1992_md5_ea900e.tif")
+
+
+pk <-  file.path(inpath,
+  list.files(inpath, 
+    pattern = "gpkg$" # keep in mind that there is a typo in the original filename and "polllination "has 3 "l"
+  ))
+pk <- pk[c(1,8)]
+# load the polygons
+poly <- lapply(pk, st_read)
+# reproject Uganda Polygons (i wasted quite a bit of time on this because of course)
+# set labels for the countries. 
+ct <- c("CO", "UK")
+# Clip Rasters 
+cp. <- lapply(poly, function(p){
+  t <- crop(cp, ext(p))
+  t <- mask(t, p)
+  t <- trim(t)
+})
+
+map(1:length(cp.), function(x) writeRaster(cp.[[x]], paste0(inpath, '/', "cp", ct[x], ".tif"), overwrite=TRUE))
+
+summary_table <- map2_dfr(poly, ct, ~ NBSOp::summarize_project(.x, cp, .y, fun = c("mean")))
+write.csv(summary_df, paste0(inpath, '/', "cp_change.csv"))
+
+```

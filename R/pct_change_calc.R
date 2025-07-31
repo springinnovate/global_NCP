@@ -34,10 +34,10 @@
 #' compute_variable_change(df, suffix = "_total", change_type = "both")
 
 compute_change <- function(df, 
-                                    suffix = c("_sum", "_mean"), 
-                                    round_digits = NULL, 
-                                    drop_columns = FALSE,
-                                    change_type = c("both", "pct", "abs")) {
+                           suffix = c("_sum", "_mean"), 
+                           round_digits = NULL, 
+                           drop_columns = FALSE,
+                           change_type = c("both", "pct", "abs")) {
   
   change_type <- match.arg(change_type)
   
@@ -69,7 +69,9 @@ compute_change <- function(df,
     group <- dplyr::arrange(group, as.numeric(group$year))
     col1 <- group$full_col[1]
     col2 <- group$full_col[2]
-    var_base <- stringr::str_remove(group$prefix[1], "_$")
+    
+    # Keep both prefix and suffix in the base name
+    var_base <- paste0(stringr::str_remove(group$prefix[1], "_$"), group$suffix[1])
     
     # Absolute change
     if (change_type %in% c("abs", "both")) {
@@ -92,6 +94,9 @@ compute_change <- function(df,
     }
   }
   
+  # Remove duplicates before subsetting
+  new_cols <- unique(new_cols)
+  
   if (drop_columns) {
     geom_col <- attr(df, "sf_column") %||% "geometry"
     keep_cols <- c("fid", new_cols, geom_col)
@@ -101,7 +106,6 @@ compute_change <- function(df,
   
   return(df)
 }
-
 
 
 ############### Future developments:

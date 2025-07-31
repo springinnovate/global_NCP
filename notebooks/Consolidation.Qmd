@@ -23,12 +23,11 @@ library(RColorBrewer)
 library(htmltools)
 library(leaflet)
 library(devtools)
+library(reticulate)
 load_all()
 #source the helper functions
-source(here("R", "hotSpotR.R"))
-source(here("R","pct_change_calc.R"))
-source(here("R", "utils_lcc_metrics.R"))
-source(here("R", "perc_filteR.R"))
+# set venv for Python
+use_virtualenv("~/venvs/coastal_snap_env", required = TRUE)
 ```
 
 # 1. Clean and Organize Synthesis Data
@@ -120,12 +119,17 @@ rm(sf_benf)
 
 st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
 ```
-# 1.1 Include new columns (C.Protection)
 
 
-```{r add c protection}
-# Update: include the coastal prtection data:
+## 1.1 Include new columns (C.Protection)
+
+
+Not RUN. This is is an earlier approach that Becky told me ( i don't remember the exact reason) was not great). Rasterizing to the ESA resoluton and the using exactextractr. That's why i did not use that at the end. 
+
+```{r add c protection, eval=FALSE, include=FALSE}
+# Update: include the coastal protection data:
 sf_cp <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/summary_pipeline_workspace/grid_10k_synth_zonal_2025_07_20_23_45_27.gpkg')
+
 # Define name replacements per object. Had to do it manually, there is just too much variability to automatize, did it by hand, but this is the kind of thing an LLM helps to write easily. Still, there must be a smarter, more flexible way to do it (maybe the best approach is to keep a consistent naming convention for the modeled rasters, this has been a PIA since i started this work)
 sf_cp <- sf_cp %>% mutate(fid = dplyr::row_number())
 # Calculate bitemporal change in % and absolute terms. Drop original columns
@@ -144,13 +148,84 @@ sf_f <- sf_f %>%
     coastal_protection_Rt_pct_chg,
     .before = GHS_BUILT_S_E2020_mean
   )
+```
 
-cp2 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.shp')
-cp2 <- cp2 %>%
-  rename(
-    Rt_max = Rt_serv_ch,
-    Rt_mean = Rt_serv__1
+
+## 1.2 Include Coastal Protection (all Columns) 
+This apprach was not great, because I did the calculation on QGIS 
+Here are the instructions:
+
+Option 2: QGIS (no coding)
+
+Use the “Join attributes by location (summary)” tool:
+
+    Input layer: your cp2
+
+    Join layer: your points
+
+    Geometric predicate: intersects (or within, if points are entirely inside)
+
+    Choose the column to summarize
+
+    Statistics to calculate: check Mean and Max
+
+    Run and save the result
+
+
+
+Quite easy, but doing this leaves no record, abd ui just wasted two days trying to remember where the hell was I, so it may be better to run it here so we have ALL the steps on. single location
+
+
+```{r include coastal points}
+# Load grid (nothing special, just a template)
+ cp2 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg')
+ cp2$fid <- as.integer(cp2$fid)
+# st_write(cp2, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg', append=FALSE)
+
+# load cleaned coastal protection data:
+cp_points <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Inspring/coastal_risk_tnc_esa1992_2020_ch.gpkg')
+
+# Ensure same CRS (optional) Add a conditional here that checks before trying to reproject!
+cp_points <- st_transform(cp_points, st_crs(cp2))
+
+# Join and summarize
+###### I WILL HAVE TO RUN THIS IN PYTHON BECAUSE IT IS TOO SLOW IN R. MAYBE I COULD CHUNCK HERE, BUT NO POINT OF LEANRING NEW TOOLS ON R WHNE PYTHON DOES IT FINE AND I CAN KEEP TRANSITIONING THERE 
+cp2_joined <- st_join(cp2, cp_points) %>%
+  group_by(fid) %>% # use the fid or any other unique identifier fro mthe polygon dataset.
+  summarise(
+    Rt_1992_mean = mean(Rt_1992, na.rm = TRUE),
+    Rt_1992_max = max(Rt_1992, na.rm = TRUE),
+    Rt_nohab_1992_mean = mean(Rt_nohab_all_1992, na.rm = TRUE),
+    Rt_nohab_1992_max = max(Rt_nohab_all_1992, na.rm = TRUE),
+    Rt_service_1992_mean = mean(Rt_service_1992, na.rm = TRUE),
+    Rt_service_1992_max = max(Rt_service_1992, na.rm = TRUE),
+    Rt_2020_mean = mean(Rt_2020, na.rm = TRUE),
+    Rt_2020_max = max(Rt_2020, na.rm = TRUE),
+    Rt_nohab_2020_mean = mean(Rt_nohab_all_2020, na.rm = TRUE),
+    Rt_nohab_2020_max = max(Rt_nohab_all_2020, na.rm = TRUE),
+    Rt_service_2020_mean = mean(Rt_service_2020, na.rm = TRUE),
+    Rt_service_2020_max = max(Rt_service_2020, na.rm = TRUE),
+    geometry = first(geometry)
   )
+
+head(cp2_joined)
+cp2_joined$fid <- as.integer(cp2_joined$fid)
+sapply(cp2_joined, class)
+
+# to separate it from the raw empty template, added this with the calculated data.
+st_write(cp2_joined,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg')
+```
+
+```{r add to the existing synthesis data} 
+#to preserve all original polygon columns: (not doing it right now but can be redone)
+sf_f <- st_read(paste0(inpath,'/', '10k_grid_ES_change_benef.gpkg'))
+
+sf_f$Rt_mean_pct_chg <- NULL
+sf_f$Rt_max_pct_chg <- NULL
+# Calculate change# CalcNULLulate change
+
+cp2 <- compute_change(cp2_joined, suffix = c("_mean", "_max"), drop_columns = TRUE, change_type = "both")
+st_write(cp2,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_chg.gpkg', append=FALSE)
 
 cp2 <- st_drop_geometry(cp2)
 # export output
@@ -171,9 +246,87 @@ sf_f <- sf_f %>% rename(
 st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
 ```
 
-# 1.2. Include Coastal Protection (Grid Level)
+
+```{python summarize points}
+import geopandas as gpd
+import pandas as pd
+from shapely import speedups
+from pathlib import Path
+from tqdm import tqdm
+
+if speedups.available:
+    speedups.enable()
+
+# Paths
+polygons_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg"
+points_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Inspring/coastal_risk_tnc_esa1992_2020_ch.gpkg"
+output_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc_py.gpkg"
+
+# Columns to summarize
+cols_to_summarize = [
+    "Rt_1992",
+    "Rt_nohab_all_1992",
+    "Rt_service_1992",
+    "Rt_2020",
+    "Rt_nohab_all_2020",
+    "Rt_service_2020"
+]
+
+
+# Load data
+grid = gpd.read_file(polygons_fp).reset_index(drop=True)
+grid["fid"] = grid.index.astype(int)
+points = gpd.read_file(points_fp)
+
+# Ensure CRS match
+if grid.crs != points.crs:
+    points = points.to_crs(grid.crs)
+
+# Build spatial index
+points_sindex = points.sindex
+
+results = []
+
+# Process polygons in chunks
+for _, poly in tqdm(grid.iterrows(), total=len(grid)):
+    possible_matches_idx = list(points_sindex.intersection(poly.geometry.bounds))
+    possible_matches = points.iloc[possible_matches_idx]
+    precise_matches = possible_matches[possible_matches.intersects(poly.geometry)]
+
+    row = {"fid": int(poly["fid"])}
+    if precise_matches.empty:
+        for col in cols_to_summarize:
+            row[f"{col}_mean"] = None
+            row[f"{col}_max"] = None
+    else:
+        for col in cols_to_summarize:
+            if col in precise_matches.columns:
+                row[f"{col}_mean"] = precise_matches[col].mean(skipna=True)
+                row[f"{col}_max"] = precise_matches[col].max(skipna=True)
+            else:
+                row[f"{col}_mean"] = None
+                row[f"{col}_max"] = None
+
+    results.append(row)
+
+summary_df = pd.DataFrame(results)
+
+# Ensure fid column exists
+if "fid" not in summary_df.columns:
+    raise ValueError("No fid column found in summary_df. Check that results were appended correctly.")
+
+# Merge back with grid
+summary_gdf = grid.merge(summary_df, on="fid", how="left", validate="1:1")
+
+# Export
+summary_gdf.to_file(output_fp, driver="GPKG")
+print(f"✓ Exported summarized file to {output_fp}")
+```
+
+
+## 1.2. Include Coastal Protection (Grid Level)
 # not working right now 
-```{r incliudeCP}
+```{r incliude CP}
 
 grid <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.shp')
 
@@ -196,10 +349,13 @@ joined <- st_join(grid, cp) %>%
 
 # 2.1 Add Updated Access Data
 
+# No need to run again, already updated the Access Data. 
 ```{r add access}
 
-sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
+sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg')) # why am I loading this? What is the purpose. This is always the final (most curtrent version). To this one is that ineed to do the adjustments, add new columns
 
+
+# This is the old output with the calculated means for services (because we want to add the new columns to this output, even if it was created sli
 sf_1 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_synth_serv_means.gpkg')
 
 sf_1 <- sf_1 %>% mutate(fid = dplyr::row_number())
@@ -370,7 +526,7 @@ hotspot_binary_matrix <- hotspot_summary %>%
 
 # ----------------------------------------------------
 # Step 5: Join with sf object
-# Only polygons that are hotspots for negative services are retained
+# Only cp2 that are hotspots for negative services are retained
 # ----------------------------------------------------
 hotspots_final <- sf_f %>%
   inner_join(hotspot_binary_matrix, by = "fid") %>%
@@ -402,5 +558,33 @@ hotspots_change <- left_join(hotspots_change, cart_corr)
 #reorder columns to keep related togetert <- 
 hotspots_change <- hotspots_change[c(1:16,38:43,17,18,19:37)]
 st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
+
+```
+
+
+
+
+# 5 Scatterplots.
+
+
+```{r pivot back}
+
+plt <- st_drop_geometry(hotspots_final)
+
+
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_chg"),
+    names_to = "service",
+    values_to = "pct_chg"
+  ) %>%
+  select(fid, service, pct_chg, all_of(socio_vars)) %>% 
+   mutate(service = str_replace(service, "_pct_chg.*", ""))
+  
+# remove infinite values 
+plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)  
+
+
+
 
 ```
