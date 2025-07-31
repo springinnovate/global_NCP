@@ -30,11 +30,86 @@ load_all()
 use_virtualenv("~/venvs/coastal_snap_env", required = TRUE)
 ```
 
+
+# Workflow Synthesis: Global Hotspots of Ecosystem Service Change
+
+## 1. Data Inputs
+
+Global 10 km grid covering terrestrial areas worldwide (polygon-based template).
+
+Coastal protection model outputs (1992 and 2020) originally as points spaced ~500 m along shorelines.
+
+Global raster datasets for nitrogen retention/export/ratio, sediment retention/export/USLE, pollination, and nature access (1992 and 2020).
+
+Country polygon dataset for spatial aggregation and attribution.
+
+## 2. Data Processing Pipeline
+
+Step 1: Coastal Protection Aggregation
+
+Calcualted three things Rt, Rt_nohab_all and Rt_nohab_all-Rt= Rt_service
+
+Computed mean and max per grid cell for each coastal protection metric (Rt_1992, Rt_2020, and related attributes).
+
+Step 2: Zonal Statistics for Other Services
+
+Used a geosharding-based pipeline (developed by Rich) to extract zonal statistics (mean or sum, depending on the service) from global raster layers to the 10 km grid.
+
+Outputs for both 1992 and 2020 were appended as new grid attributes.
+
+Step 3: Bi-temporal Change Calculation
+
+Applied compute_change() function to derive absolute and percentage changes for all variables, using consistent naming conventions (_abs_chg, _pct_chg).
+
+Step 4: Reshaping Data for Hotspot Detection
+
+Converted the dataset to long format (plt_long) with columns: fid, service, and pct_chg.
+
+Step 5: Hotspot Identification
+
+Defined loss/damage services and gain services.
+
+Identified hotspots as grid cells in the bottom 5% (losses) or top 5% (gains) per service.
+
+Step 6: Hotspot Grouping into Service Combos
+
+Created three combos for aggregated hotspot counts:
+
+count_prov_access: coastal protection (Rt_service_mean), habitat-modified coastal protection (Rt_nohab_mean), pollination, nature access.
+
+count_N: nitrogen retention, nitrogen export, nitrogen ratio.
+
+count_sed: sediment retention, sediment export, USLE.
+
+Calculated counts per combo and total hotspot count.
+
+Step 7: Final Integration and Output
+
+Generated binary columns (0/1) per service for hotspot presence.
+
+Joined hotspot attributes back to the 10 km grid sf object.
+
+Produced final geopackage file with:
+
+Per-service hotspot flags.
+
+Total hotspot count.
+
+Counts for count_prov_access, count_N, and count_sed.
+
+A column listing all hotspot services per grid cell.
+
+## 3. Outputs
+
+Final sf object containing all hotspot-related attributes for each 10 km grid cell.
+
+Ready for mapping in QGIS or for further analysis (e.g., joining with socioeconomic variables).
+
+Flexible structure allows filtering for losses only, per-service mapping, or aggregated combo-based analyses.
+
+
 # 1. Clean and Organize Synthesis Data
 
-Make sure that they are complete and correclty named)
-
-Right now, 24/04/2025 the problem is on the way the dataframe with the class colors and names is built. The process is still too manual (writing the table) and is easy to get it wrong when it should not be big deal. Ideally, there should be a dialogue box to fill this instead. This should take care of the class names, values and colors neatl Also, the order of the factors needs to be set, and new classes have to be added. Again, i don't how to do it easily. I mean, it is easy, but annoying to do and easy to get wrong.
 
 ```{r consolidate final outputs}
 
@@ -215,7 +290,7 @@ sapply(cp2_joined, class)
 st_write(cp2_joined,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg')
 ```
 
-## 1.3 Join Coastal protectio nand export again
+## 1.3 Join Coastal protection and export again
 
 ```{r add to the existing synthesis data} 
 #to preserve all original polygon columns: (not doing it right now but can be redone)
@@ -550,26 +625,68 @@ st_write(hotspots_final, file.path(inpath, "10k_grid_hotspots.gpkg"), append = F
 
 # 4. Join Country Data (improve Analysis)
 
-**I still have not been able to make sense of this shit. And it is really annoyingm anbd a huge waste of time. I absolutely need to transcend this.**
 
 
 ```{r add country data, eval=FALSE, include=FALSE}
 # load the country data (to get income level and stuff)
-hotspots_change <- st_read(paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"))
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data'
+hotspots_final <- st_read(file.path(inpath, "10k_grid_hotspots.gpkg"))
 
+grid_t <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_ES_change_benef.gpkg')
+
+grid_t <- grid_t %>% mutate(fid = dplyr::row_number())
+
+grid_t <- grid_t %>% select(fid)
 
 # oad contries correpsondence data
 cart_corr <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/cartographic_ee_ee_r264_correspondence.gpkg')
 # drop geometry
+cart_corr <- cart_corr[c(1,12,22,25,26,27,31)]
+
+
+# Assuming:
+# grid_sf =  10km grid (sf object, with column fid)
+# countries_sf = your countries/territories sf object, already subset to relevant columns
+
+# Ensure both are in the same projected CRS (important for area calculation)
+if (st_crs(grid_t) != st_crs(cart_corr)) {
+  cart_corr <- st_transform(cart_corr, st_crs(grid_t))
+}
+
+# Compute intersection
+intersection <- st_intersection(
+  grid_t %>% select(fid, geom),
+  cart_corr %>% select(id,  ee_r264_name, iso3, continent, region_un, region_wb, income_grp, geom)  # adjust column name
+)
+
+# Add intersection area
+intersection <- intersection %>%
+  mutate(intersect_area = st_area(.))
+
+# For each grid cell, keep only the country with the largest intersected area
+largest_share <- intersection %>%
+  group_by(fid) %>%
+  slice_max(order_by = intersect_area, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(fid, id,  ee_r264_name, iso3, continent, region_un, region_wb, income_grp)
+
+# Join back to grid
+grid_t <- grid_t %>%
+  left_join(largest_share, by = "fid")
+
+
+
 cart_corr <- st_drop_geometry(cart_corr)
 # Drop unnecessary columns
-cart_corr <- cart_corr[c(1,21,25,27,30,31,35)]
+
 hotspots_change <- left_join(hotspots_change, cart_corr)
 #reorder columns to keep related togetert <- 
 hotspots_change <- hotspots_change[c(1:16,38:43,17,18,19:37)]
 st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
 
 ```
+
+
 
 
 
