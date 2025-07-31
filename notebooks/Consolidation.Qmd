@@ -57,9 +57,6 @@ sf_cp <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFu
 # Define name replacements per object. Had to do it manually, there is just too much variability to automatize, did it by hand, but this is the kind of thing an LLM helps to write easily. Still, there must be a smarter, more flexible way to do it (maybe the best approach is to keep a consistent naming convention for the modeled rasters, this has been a PIA since i started this work)
 
 # Update 2. Include corrected Access Data
-
-
-
 rename_list <- list(
   c(
     usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean",
@@ -121,12 +118,14 @@ st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALS
 ```
 
 
-## 1.1 Include new columns (C.Protection)
+### 1.1.1 Include new columns (C.Protection)
 
 
 Not RUN. This is is an earlier approach that Becky told me ( i don't remember the exact reason) was not great). Rasterizing to the ESA resoluton and the using exactextractr. That's why i did not use that at the end. 
 
-```{r add c protection, eval=FALSE, include=FALSE}
+```{r add c protection}
+#| eval: false
+#| include: false
 # Update: include the coastal protection data:
 sf_cp <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/summary_pipeline_workspace/grid_10k_synth_zonal_2025_07_20_23_45_27.gpkg')
 
@@ -151,8 +150,8 @@ sf_f <- sf_f %>%
 ```
 
 
-## 1.2 Include Coastal Protection (all Columns) 
-This apprach was not great, because I did the calculation on QGIS 
+### 1.1.2 Include Coastal Protection (QGIS) 
+This approach was not great, because I did the calculation on QGIS 
 Here are the instructions:
 
 Option 2: QGIS (no coding)
@@ -175,7 +174,7 @@ Use the “Join attributes by location (summary)” tool:
 
 Quite easy, but doing this leaves no record, abd ui just wasted two days trying to remember where the hell was I, so it may be better to run it here so we have ALL the steps on. single location
 
-
+## 1.2 Include Coastal Protection (final)
 ```{r include coastal points}
 # Load grid (nothing special, just a template)
  cp2 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg')
@@ -191,7 +190,7 @@ cp_points <- st_transform(cp_points, st_crs(cp2))
 # Join and summarize
 ###### I WILL HAVE TO RUN THIS IN PYTHON BECAUSE IT IS TOO SLOW IN R. MAYBE I COULD CHUNCK HERE, BUT NO POINT OF LEANRING NEW TOOLS ON R WHNE PYTHON DOES IT FINE AND I CAN KEEP TRANSITIONING THERE 
 cp2_joined <- st_join(cp2, cp_points) %>%
-  group_by(fid) %>% # use the fid or any other unique identifier fro mthe polygon dataset.
+  group_by(fid) %>% # use the fid or any other unique identifier fro mthe polygon dataset. I should set here if i want the max or minimum.
   summarise(
     Rt_1992_mean = mean(Rt_1992, na.rm = TRUE),
     Rt_1992_max = max(Rt_1992, na.rm = TRUE),
@@ -216,12 +215,18 @@ sapply(cp2_joined, class)
 st_write(cp2_joined,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg')
 ```
 
+## 1.3 Join Coastal protectio nand export again
+
 ```{r add to the existing synthesis data} 
 #to preserve all original polygon columns: (not doing it right now but can be redone)
 sf_f <- st_read(paste0(inpath,'/', '10k_grid_ES_change_benef.gpkg'))
 
-sf_f$Rt_mean_pct_chg <- NULL
-sf_f$Rt_max_pct_chg <- NULL
+# some cleaning of older data. Not necesary anymore 
+# sf_f$Rt_mean_pct_chg <- NULL
+# sf_f$Rt_max_pct_chg <- NULL
+# sf_f$coastal_protection_Rt_abs_chg <- NULL
+# sf_f$coastal_protection_Rt_pct_chg <- NULL
+
 # Calculate change# CalcNULLulate change
 
 cp2 <- compute_change(cp2_joined, suffix = c("_mean", "_max"), drop_columns = TRUE, change_type = "both")
@@ -229,25 +234,31 @@ st_write(cp2,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,I
 
 cp2 <- st_drop_geometry(cp2)
 # export output
-sf_f <- left_join(sf_f, cp2)
+cp2 <- cp2 %>%
+  select(-contains("_max"))
+
+sf_f <- sf_f %>% mutate(fid = row_number())
+
+sf_f <- left_join(sf_f, cp2, by = 'fid')
 sf_f <- sf_f %>%
   relocate(
-    Rt_mean,
-    Rt_max,
+    Rt_mean_abs_chg,
+    Rt_mean_pct_chg,
+    Rt_nohab_mean_abs_chg,
+    Rt_nohab_mean_pct_chg,
+    Rt_service_mean_abs_chg,
+    Rt_service_mean_pct_chg,
     .before = GHS_BUILT_S_E2020_mean
   )
 sf_f$fid <- NULL
-
-sf_f <- sf_f %>% rename(
-  Rt_mean_pct_chg = Rt_mean,
-  Rt_max_pct_chg = Rt_max
-)
 
 st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
 ```
 
 
 ```{python summarize points}
+#| eval: false
+#| include: false
 import geopandas as gpd
 import pandas as pd
 from shapely import speedups
@@ -323,33 +334,9 @@ summary_gdf.to_file(output_fp, driver="GPKG")
 print(f"✓ Exported summarized file to {output_fp}")
 ```
 
+## 1.4 Add Updated Access Data
 
-## 1.2. Include Coastal Protection (Grid Level)
-# not working right now 
-```{r incliude CP}
-
-grid <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.shp')
-
-cp <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/data/Spring/Inspring/coastal_protection_Wchange.shp')
-
-grid <- grid %>% mutate(fid = as.character(fid))  # or as.integer if needed
-
-# Join and summarize
-joined <- st_join(grid, cp) %>%
-  group_by(fid) %>%  # Replace with your real polygon ID
-  summarise(
-    mean_value = mean(Rt_serv_ch, na.rm = TRUE),
-    max_value = max(Rt_serv_ch, na.rm = TRUE),
-    geometry = first(geometry)
-  )
-
-```
-
-# 2 Load Vector Data and pivot
-
-# 2.1 Add Updated Access Data
-
-# No need to run again, already updated the Access Data. 
+No need to run again, already updated the Access Data. 
 ```{r add access}
 
 sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg')) # why am I loading this? What is the purpose. This is always the final (most curtrent version). To this one is that ineed to do the adjustments, add new columns
@@ -392,6 +379,11 @@ sf_f$nature_access_pct_chg=poly1$access_pct_chg
 st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
 ```
 
+
+# 2 Load Vector Data and pivot
+
+
+
 Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. Add to the documentation , environment or however that's called the vectors to select and order the columns. This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir).
 
 ```{r pivot, eval=FALSE, include=FALSE}
@@ -400,7 +392,7 @@ Here, the spatial objects with the additional attributes are loaded and reformat
 # Most recent version of synthesis data:
 sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
 sf_f$fid <- seq_len(nrow(sf_f)) 
- plt <- st_drop_geometry(sf_f)
+plt <- st_drop_geometry(sf_f)
  
 
 # get the benef vars (all that are not "chg)
@@ -408,7 +400,6 @@ socio_vars <- names(plt)[
   names(plt) != "fid" & 
   !grepl("chg$", names(plt))
 ]
-
 
 # Pivot all columns that contain pct_ch, keeping other relevant vars
 
@@ -425,7 +416,7 @@ plt_long <- plt %>%
 plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)  
 
 # remove old coastal protection
-plt_long <- plt_long%>% filter(service != "coastal_protection_Rt") #why??
+#plt_long <- plt_long%>% filter(service != "coastal_protection_Rt") #why?? I will leave it here as one of the things one should not do. If i adjsuted the data, dp it for good, doin;'t leave it like this and then i haven o idea what is going on.
 
 
 # rename some variables (just for aesthetics)
@@ -434,8 +425,6 @@ plt_long <- plt_long%>% filter(service != "coastal_protection_Rt") #why??
    service == "sed_export" ~ "Sed_export",
    service == "n_export" ~ "N_export",
    service == "n_retention" ~ "N_retention",
-   service == "Rt_mean" ~ "Coastal_Protection_mean",
-   service == "Rt_max" ~ "Coastal_Protection_max",
    service == "nature_access" ~ "Nature_Access",
    service == "pollination" ~ "Pollination",
    service == "usle" ~ "USLE",
@@ -452,14 +441,20 @@ Need to think on an effective way to change the value (the share/quantile we wan
 
 So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. Taht wouls be awesome
 
-```{r get_hotspots}
+Add the combos
 
+```{r get_hotspots}
+ #set combos
+
+combo1 <- c("Rt_service_mean", "Rt_nohab_mean","Pollination","Nature_Access")
+combo2 <- c("N_Ret_Ratio","N_export","N_retention")
+combo3 <- c("Sed_Ret_Ratio","Sed_export", "USLE")
 # ------------------------------------------
 # Step 0: Define Parameters
 # ------------------------------------------
-loss_services <- c("Coastal_Protection_mean", "Pollination", "N_Ret_Ratio",
+loss_services <- c("Rt_service_mean", "Pollination", "N_Ret_Ratio",
                    "Sed_Ret_Ratio", "Nature_Access", "N_retention")
-gain_services <- c("Sed_export", "N_export", "USLE")
+gain_services <- c("Sed_export", "N_export", "USLE", "Rt_nohab_mean") # decide what to do wit "Rt_mean"
 pct_cutoff <- 0.05  # e.g. top/bottom 5%
 
 # ------------------------------------------
@@ -494,6 +489,7 @@ df_hotspots_negative <- df_hotspots %>%
 # ----------------------------------------------------
 # Step 3: Summarize by polygon
 # ----------------------------------------------------
+
 hotspot_summary <- df_hotspots_negative %>%
   group_by(fid) %>%
   summarise(
@@ -503,6 +499,12 @@ hotspot_summary <- df_hotspots_negative %>%
   mutate(
     hotspot_services = sapply(hotspot_services, \(x) paste(trimws(as.character(x)), collapse = ", ")),
     hotspot_services_list = strsplit(hotspot_services, ",\\s*"),
+    
+    # Compute combo counts with final column names
+    count_prov_access = sapply(hotspot_services_list, \(x) sum(x %in% combo1)),
+    count_N = sapply(hotspot_services_list, \(x) sum(x %in% combo2)),
+    count_Sed = sapply(hotspot_services_list, \(x) sum(x %in% combo3)),
+    
     hotspot_types = sapply(hotspot_services_list, function(svcs) {
       types <- sapply(svcs, function(s) {
         if (s %in% loss_services) "loss"
@@ -511,10 +513,18 @@ hotspot_summary <- df_hotspots_negative %>%
       })
       paste(na.omit(types), collapse = ", ")
     }),
-    hotspot_services_negative = hotspot_services  # since only negatives are kept
+    hotspot_services_negative = hotspot_services
   ) %>%
-  select(fid, hotspot_count, hotspot_services, hotspot_types, hotspot_services_negative)
-
+  select(
+    fid,
+    hotspot_count,
+    count_prov_access,
+    count_N,
+    count_Sed,
+    hotspot_services,
+    hotspot_types,
+    hotspot_services_negative
+  )
 # ----------------------------------------------------
 # Step 4: Pivot to wide binary matrix
 # ----------------------------------------------------
