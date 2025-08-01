@@ -640,14 +640,16 @@ st_write(ct_r, "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund
 
 # 4. Join Country Data (improve Analysis)
 
-
+## 4.1. Rasterize Country Data to the ESA LC
 
 ```{python add country data}
 #| echo: true
 import geopandas as gpd
 import rasterio
 from rasterio import features
+from rasterio.windows import Window
 import numpy as np
+from tqdm import tqdm  # <-- add this
 
 # -------------------------------------
 # CONFIG
@@ -657,7 +659,7 @@ countries_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund
 =======
 countries_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg"
 esa_raster_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/LandCovers/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif"
-output_raster_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/Raster/countries_fid_300m.tif"
+output_raster_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/Raster/countries_fid_300m_COMPRESSED.tif"
 updated_countries_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/vector/ee_r264_correspondence_fid.gpkg"
 
 # -------------------------------------
@@ -667,9 +669,10 @@ countries = gpd.read_file(countries_fp).reset_index(drop=True)
 countries["fid"] = countries.index  # Explicit integer ID
 
 # Save updated vector file for future use
-countries[["fid", *[c for c in countries.columns if c not in ["fid", "geometry"]], "geometry"]].to_file(
-    updated_countries_fp, driver="GPKG"
-)
+countries[
+    ["fid", *[c for c in countries.columns if c not in ["fid", "geometry"]], "geometry"]
+].to_file(updated_countries_fp, driver="GPKG")
+
 print(f"✓ Updated countries saved with fid column to {updated_countries_fp}")
 
 # Keep only fid + geometry for rasterization
@@ -682,7 +685,7 @@ with rasterio.open(esa_raster_fp) as ref_raster:
     meta = ref_raster.meta.copy()
     transform = ref_raster.transform
     crs = ref_raster.crs
-    shape = (ref_raster.height, ref_raster.width)
+    height, width = ref_raster.height, ref_raster.width
 
 # -------------------------------------
 # 3. Reproject countries to raster CRS
@@ -694,29 +697,95 @@ countries = countries.to_crs(crs)
 # -------------------------------------
 shapes = [(geom, int(fid)) for fid, geom in zip(countries["fid"], countries.geometry)]
 
-# -------------------------------------
-# 5. Rasterize
-# -------------------------------------
-rasterized_countries = features.rasterize(
-    shapes=shapes,
-    out_shape=shape,
-    transform=transform,
-    fill=-1,
-    dtype=np.int32
+# Update metadata to use compression
+meta.update(
+    dtype=rasterio.int32,
+    count=1,
+    nodata=-1,
+    compress="DEFLATE",  # lossless compression
+    predictor=2,         # improves compression for continuous data
+    zlevel=6             # compression level (1–9, trade-off size/speed)
 )
 
-# -------------------------------------
-# 6. Save raster
-# -------------------------------------
-meta.update(dtype=rasterio.int32, count=1, nodata=-1)
 with rasterio.open(output_raster_fp, "w", **meta) as dst:
-    dst.write(rasterized_countries, 1)
+    tile_height, tile_width = 2000, 2000  # Adjust chunk size
 
-print(f"✓ Rasterized countries saved to {output_raster_fp}")
+    for row_off in tqdm(range(0, height, tile_height)):
+        for col_off in range(0, width, tile_width):
+            win = Window(
+                col_off,
+                row_off,
+                min(tile_width, width - col_off),
+                min(tile_height, height - row_off),
+            )
+
+            win_transform = rasterio.windows.transform(win, transform)
+
+            raster_chunk = features.rasterize(
+                shapes=shapes,
+                out_shape=(win.height, win.width),
+                transform=win_transform,
+                fill=-1,
+                dtype=np.int32,
+            )
+
+            dst.write(raster_chunk, 1, window=win)
+
+print(f"✓ Compressed raster saved to {output_raster_fp}")
 
 ```
 
 
+## 4.2. Assign Country Fid to the Grid
+
+```{python assign ID}
+
+import geopandas as gpd
+from rasterstats import zonal_stats
+import pandas as pd
+from multiprocessing import Pool, cpu_count
+import numpy as np
+import rasterio
+
+# Paths
+grid_fp = "/path/to/grid_10km.gpkg"
+raster_fp = "/path/to/countries_fid_300m_COMPRESSED.tif"
+
+# Load data
+grid = gpd.read_file(grid_fp)
+
+# Function to compute stats for a subset of polygons
+def compute_stats(chunk):
+    stats = zonal_stats(
+        chunk,
+        raster_fp,
+        stats="majority",
+        geojson_out=False,
+        nodata=-1
+    )
+    return pd.DataFrame(stats)
+
+# Split grid into chunks
+n_cores = max(1, cpu_count() - 1)
+chunk_size = int(np.ceil(len(grid) / n_cores))
+chunks = [grid.iloc[i:i+chunk_size] for i in range(0, len(grid), chunk_size)]
+
+# Run in parallel
+with Pool(n_cores) as pool:
+    results = pool.map(compute_stats, chunks)
+
+# Combine results
+stats_df = pd.concat(results, ignore_index=True)
+
+# Merge back with grid
+grid_with_country = grid.copy()
+grid_with_country["country_fid"] = stats_df["majority"].astype(int)
+
+# Save result
+grid_with_country.to_file("/path/to/grid_10km_with_country.gpkg", driver="GPKG")
+print("✓ Finished with chunked parallel zonal stats")
+
+```
 
 
 
