@@ -621,68 +621,95 @@ hotspots_final <- sf_f %>%
 # ------------------------------------------
 st_write(hotspots_final, file.path(inpath, "10k_grid_hotspots.gpkg"), append = FALSE)
 
+ct_r <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Projects/Global_NCP/ee_r264_correspondence.gpkg")
+
+
+ct_r$fid <- seq_len(nrow(ct_r)) - 1 
+
+ct_r <- ct_r %>%
+  relocate(
+    fid,
+    .before = ee_r264_id
+  )
+ct_r$fid <- as.integer(ct_r$fid)
+
+ct_r <- st_make_valid(ct_r)
+
+st_write(ct_r, "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Projects/Global_NCP/ee_r264_correspondence.gpkg", append=FALSE)
 ```
 
 # 4. Join Country Data (improve Analysis)
 
 
 
-```{r add country data, eval=FALSE, include=FALSE}
-# load the country data (to get income level and stuff)
-inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data'
-hotspots_final <- st_read(file.path(inpath, "10k_grid_hotspots.gpkg"))
+```{python add country data}
+#| echo: true
+import geopandas as gpd
+import rasterio
+from rasterio import features
+import numpy as np
 
-grid_t <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_ES_change_benef.gpkg')
+# -------------------------------------
+# CONFIG
+# -------------------------------------
+countries_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Projects/Global_NCP/ee_r264_correspondence.gpkg"
+esa_raster_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/LandCovers/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif"
+output_raster_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/Raster/countries_fid_300m.tif"
+updated_countries_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/vector/ee_r264_correspondence_fid.gpkg"
 
-grid_t <- grid_t %>% mutate(fid = dplyr::row_number())
+# -------------------------------------
+# 1. Load Countries & Add fid Column
+# -------------------------------------
+countries = gpd.read_file(countries_fp).reset_index(drop=True)
+countries["fid"] = countries.index  # Explicit integer ID
 
-grid_t <- grid_t %>% select(fid)
+# Save updated vector file for future use
+countries[["fid", *[c for c in countries.columns if c not in ["fid", "geometry"]], "geometry"]].to_file(
+    updated_countries_fp, driver="GPKG"
+)
+print(f"✓ Updated countries saved with fid column to {updated_countries_fp}")
 
-# oad contries correpsondence data
-cart_corr <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/cartographic_ee_ee_r264_correspondence.gpkg')
-# drop geometry
-cart_corr <- cart_corr[c(1,12,22,25,26,27,31)]
+# Keep only fid + geometry for rasterization
+countries = countries[["fid", "geometry"]]
 
+# -------------------------------------
+# 2. Load reference raster
+# -------------------------------------
+with rasterio.open(esa_raster_fp) as ref_raster:
+    meta = ref_raster.meta.copy()
+    transform = ref_raster.transform
+    crs = ref_raster.crs
+    shape = (ref_raster.height, ref_raster.width)
 
-# Assuming:
-# grid_sf =  10km grid (sf object, with column fid)
-# countries_sf = your countries/territories sf object, already subset to relevant columns
+# -------------------------------------
+# 3. Reproject countries to raster CRS
+# -------------------------------------
+countries = countries.to_crs(crs)
 
-# Ensure both are in the same projected CRS (important for area calculation)
-if (st_crs(grid_t) != st_crs(cart_corr)) {
-  cart_corr <- st_transform(cart_corr, st_crs(grid_t))
-}
+# -------------------------------------
+# 4. Prepare shapes for rasterization
+# -------------------------------------
+shapes = [(geom, int(fid)) for fid, geom in zip(countries["fid"], countries.geometry)]
 
-# Compute intersection
-intersection <- st_intersection(
-  grid_t %>% select(fid, geom),
-  cart_corr %>% select(id,  ee_r264_name, iso3, continent, region_un, region_wb, income_grp, geom)  # adjust column name
+# -------------------------------------
+# 5. Rasterize
+# -------------------------------------
+rasterized_countries = features.rasterize(
+    shapes=shapes,
+    out_shape=shape,
+    transform=transform,
+    fill=-1,
+    dtype=np.int32
 )
 
-# Add intersection area
-intersection <- intersection %>%
-  mutate(intersect_area = st_area(.))
+# -------------------------------------
+# 6. Save raster
+# -------------------------------------
+meta.update(dtype=rasterio.int32, count=1, nodata=-1)
+with rasterio.open(output_raster_fp, "w", **meta) as dst:
+    dst.write(rasterized_countries, 1)
 
-# For each grid cell, keep only the country with the largest intersected area
-largest_share <- intersection %>%
-  group_by(fid) %>%
-  slice_max(order_by = intersect_area, n = 1, with_ties = FALSE) %>%
-  ungroup() %>%
-  select(fid, id,  ee_r264_name, iso3, continent, region_un, region_wb, income_grp)
-
-# Join back to grid
-grid_t <- grid_t %>%
-  left_join(largest_share, by = "fid")
-
-
-
-cart_corr <- st_drop_geometry(cart_corr)
-# Drop unnecessary columns
-
-hotspots_change <- left_join(hotspots_change, cart_corr)
-#reorder columns to keep related togetert <- 
-hotspots_change <- hotspots_change[c(1:16,38:43,17,18,19:37)]
-st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
+print(f"✓ Rasterized countries saved to {output_raster_fp}")
 
 ```
 
