@@ -28,6 +28,8 @@ load_all()
 #source the helper functions
 # set venv for Python
 use_virtualenv("~/venvs/coastal_snap_env", required = TRUE)
+
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data'
 ```
 
 
@@ -249,6 +251,7 @@ Use the “Join attributes by location (summary)” tool:
 
 Quite easy, but doing this leaves no record, abd ui just wasted two days trying to remember where the hell was I, so it may be better to run it here so we have ALL the steps on. single location
 
+
 ## 1.2 Include Coastal Protection (final)
 ```{r include coastal points}
 # Load grid (nothing special, just a template)
@@ -296,15 +299,10 @@ st_write(cp2_joined,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlif
 #to preserve all original polygon columns: (not doing it right now but can be redone)
 sf_f <- st_read(paste0(inpath,'/', '10k_grid_ES_change_benef.gpkg'))
 
-# some cleaning of older data. Not necesary anymore 
-# sf_f$Rt_mean_pct_chg <- NULL
-# sf_f$Rt_max_pct_chg <- NULL
-# sf_f$coastal_protection_Rt_abs_chg <- NULL
-# sf_f$coastal_protection_Rt_pct_chg <- NULL
-
-# Calculate change# CalcNULLulate change
+# Calculate change#
 
 cp2 <- compute_change(cp2_joined, suffix = c("_mean", "_max"), drop_columns = TRUE, change_type = "both")
+
 st_write(cp2,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_chg.gpkg', append=FALSE)
 
 cp2 <- st_drop_geometry(cp2)
@@ -413,6 +411,8 @@ print(f"✓ Exported summarized file to {output_fp}")
 
 No need to run again, already updated the Access Data. 
 ```{r add access}
+#| eval: false
+#| include: false
 
 sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg')) # why am I loading this? What is the purpose. This is always the final (most curtrent version). To this one is that ineed to do the adjustments, add new columns
 
@@ -461,7 +461,9 @@ st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALS
 
 Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. Add to the documentation , environment or however that's called the vectors to select and order the columns. This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir).
 
-```{r pivot, eval=FALSE, include=FALSE}
+```{r pivot}
+#| eval: false
+#| include: false
 # 
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
@@ -654,9 +656,6 @@ from tqdm import tqdm  # <-- add this
 # -------------------------------------
 # CONFIG
 # -------------------------------------
-<<<<<<< HEAD
-countries_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Projects/Global_NCP/ee_r264_correspondence.gpkg"
-=======
 countries_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg"
 esa_raster_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/input_rasters/LandCovers/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif"
 output_raster_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/Raster/countries_fid_300m_COMPRESSED.tif"
@@ -741,54 +740,120 @@ print(f"✓ Compressed raster saved to {output_raster_fp}")
 ```{python assign ID}
 
 import geopandas as gpd
-from rasterstats import zonal_stats
-import pandas as pd
-from multiprocessing import Pool, cpu_count
-import numpy as np
 import rasterio
+from rasterio import features
+from rasterio.transform import from_origin
+import numpy as np
+from pathlib import Path
 
-# Paths
-grid_fp = "/path/to/grid_10km.gpkg"
-raster_fp = "/path/to/countries_fid_300m_COMPRESSED.tif"
+# -----------------------------
+# CONFIG
+# -----------------------------
+countries_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg"
+output_raster_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/Raster/countries_fid_5km_COMPRESSED.tif"
+updated_countries_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/vector/ee_r264_correspondence_fid.gpkg"
 
-# Load data
-grid = gpd.read_file(grid_fp)
+# -----------------------------
+# 1. Load countries & add fid
+# -----------------------------
+countries = gpd.read_file(countries_fp).reset_index(drop=True)
+countries["fid"] = countries.index  # Explicit integer ID
 
-# Function to compute stats for a subset of polygons
-def compute_stats(chunk):
-    stats = zonal_stats(
-        chunk,
-        raster_fp,
-        stats="majority",
-        geojson_out=False,
-        nodata=-1
+# Save updated version (so fid is always available in future runs)
+# countries.to_file(updated_countries_fp, driver="GPKG")
+# print(f"✓ Updated countries saved with fid column to {updated_countries_fp}")
+
+# Keep only necessary columns
+countries = countries[["fid", "geometry"]]
+
+# -----------------------------
+# 2. Create 10 km reference raster (WGS84)
+# -----------------------------
+xmin, ymin, xmax, ymax = -180, -90, 180, 90
+resolution = 0.05  # ~10 km at equator
+width = int((xmax - xmin) / resolution)
+height = int((ymax - ymin) / resolution)
+
+transform = from_origin(xmin, ymax, resolution, resolution)
+
+meta = {
+    "driver": "GTiff",
+    "dtype": rasterio.int32,
+    "count": 1,
+    "width": width,
+    "height": height,
+    "crs": "EPSG:4326",
+    "transform": transform,
+    "nodata": -1,
+    "compress": "DEFLATE",  # lossless compression
+    "predictor": 2,
+    "zlevel": 6
+}
+
+# -----------------------------
+# 3. Rasterize
+# -----------------------------
+shapes = [(geom, int(fid)) for fid, geom in zip(countries["fid"], countries.geometry)]
+
+with rasterio.open(output_raster_fp, "w", **meta) as dst:
+    rasterized = features.rasterize(
+        shapes=shapes,
+        out_shape=(height, width),
+        transform=transform,
+        fill=-1,
+        dtype=np.int32
     )
-    return pd.DataFrame(stats)
+    dst.write(rasterized, 1)
 
-# Split grid into chunks
-n_cores = max(1, cpu_count() - 1)
-chunk_size = int(np.ceil(len(grid) / n_cores))
-chunks = [grid.iloc[i:i+chunk_size] for i in range(0, len(grid), chunk_size)]
+print(f"✓ Compressed 10 km raster saved to {output_raster_fp}")
 
-# Run in parallel
-with Pool(n_cores) as pool:
-    results = pool.map(compute_stats, chunks)
-
-# Combine results
-stats_df = pd.concat(results, ignore_index=True)
-
-# Merge back with grid
-grid_with_country = grid.copy()
-grid_with_country["country_fid"] = stats_df["majority"].astype(int)
-
-# Save result
-grid_with_country.to_file("/path/to/grid_10km_with_country.gpkg", driver="GPKG")
-print("✓ Finished with chunked parallel zonal stats")
 
 ```
 
 
+```{python alicate ids to grid}
 
+import geopandas as gpd
+import rasterio
+import pandas as pd
+
+# Paths
+grid_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/vector/grid10_km_c.gpkg"
+raster_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/Raster/countries_fid_5km_COMPRESSED.tif"
+output_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/vector/grid10_km_c2.gpkg"
+# Load grid
+grid = gpd.read_file(grid_fp)
+
+# Compute centroids
+grid_centroids = grid.copy()
+grid_centroids["geometry"] = grid_centroids.centroid
+
+# Open raster
+with rasterio.open(raster_fp) as src:
+    coords = [(geom.x, geom.y) for geom in grid_centroids.geometry]
+    values = list(src.sample(coords))
+    values = [int(v[0]) if v[0] != src.nodata else None for v in values]
+
+# Add country_fid column
+grid["country_fid"] = values
+
+# Save
+grid.to_file(output_fp, driver="GPKG")
+print(f"✓ Grid with country_fid saved to {output_fp}")
+```
+
+# 6. Consolidate the Grids 
+
+We are going to have thrree basivc grid geopakages: 
+-1. Two columns, grid fid + countrty fid
+-2. The same but add the groupings
+
+```{r organize/consolidate outputs with territories}
+
+
+
+
+```
 
 # 5 Scatterplots.
 
