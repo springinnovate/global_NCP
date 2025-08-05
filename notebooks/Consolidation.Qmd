@@ -195,85 +195,38 @@ st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALS
 ```
 
 
-### 1.1.1 Include new columns (C.Protection)
-
-
-Not RUN. This is is an earlier approach that Becky told me ( i don't remember the exact reason) was not great). Rasterizing to the ESA resoluton and the using exactextractr. That's why i did not use that at the end. 
-
-```{r add c protection}
-#| eval: false
-#| include: false
-# Update: include the coastal protection data:
-sf_cp <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/summary_pipeline_workspace/grid_10k_synth_zonal_2025_07_20_23_45_27.gpkg')
-
-# Define name replacements per object. Had to do it manually, there is just too much variability to automatize, did it by hand, but this is the kind of thing an LLM helps to write easily. Still, there must be a smarter, more flexible way to do it (maybe the best approach is to keep a consistent naming convention for the modeled rasters, this has been a PIA since i started this work)
-sf_cp <- sf_cp %>% mutate(fid = dplyr::row_number())
-# Calculate bitemporal change in % and absolute terms. Drop original columns
-sf_cp <- compute_variable_change(sf_cp, suffix = c("_mean"), change_type= "both", drop_columns = TRUE)
-
-sf_cp <- st_drop_geometry(sf_cp)
-# load previous version
-sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
-sf_f <-  sf_f %>% mutate(fid = dplyr::row_number()) # not sure why fid is missing. Nevermind, added here 
-sf_f <- left_join(sf_f, sf_cp)
-# reorganize columns:
-
-sf_f <- sf_f %>%
-  relocate(
-    coastal_protection_Rt_abs_chg,
-    coastal_protection_Rt_pct_chg,
-    .before = GHS_BUILT_S_E2020_mean
-  )
-```
-
-
-### 1.1.2 Include Coastal Protection (QGIS) 
-This approach was not great, because I did the calculation on QGIS 
-Here are the instructions:
-
-Option 2: QGIS (no coding)
-
-Use the “Join attributes by location (summary)” tool:
-
-    Input layer: your cp2
-
-    Join layer: your points
-
-    Geometric predicate: intersects (or within, if points are entirely inside)
-
-    Choose the column to summarize
-
-    Statistics to calculate: check Mean and Max
-
-    Run and save the result
-
-
-
-Quite easy, but doing this leaves no record, abd ui just wasted two days trying to remember where the hell was I, so it may be better to run it here so we have ALL the steps on. single location
-
 
 ## 1.2 Include Coastal Protection (final)
+
+This whole part need to be fixed at some point. The key part is to get the coastal with the right fid so we can join and add this correclty wqhen we have more data.
+Right now keep this hewre
 ```{r include coastal points}
-# Load grid (nothing special, just a template)
- cp2 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg')
-cp2 <- cp2 %>% mutate(fid = dplyr::row_number())
-cp2$fid <- as.integer(cp2$fid)
+
+
+cp2 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg')
+
+cp2 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg')
+
+st_write(cp2, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg', append=FALSE)
+
 # st_write(cp2, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg', append=FALSE)
 
 # load cleaned coastal protection data:
-cp_points <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Inspring/coastal_risk_tnc_esa1992_2020_ch.gpkg')
-
+cp_points <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_coastal_calc.gpkg')
+cp_points <- cp_points %>% rename(fid=fid_2)
 # Ensure same CRS (optional) Add a conditional here that checks before trying to reproject!
 cp_points <- st_transform(cp_points, st_crs(cp2))
 
 cp_points <- cp_points %>% mutate(Rt_ratio_1992=(Rt_nohab_all_1992-Rt_1992)/Rt_nohab_all_1992) %>%
   mutate(Rt_ratio_2020=(Rt_nohab_all_2020-Rt_2020)/Rt_nohab_all_2020)
-  
-
+ cp_points$fid <- as.integer(cp_points$fid) 
+st_write(cp_points, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Inspring/coastal_risk_tnc_esa1992_2020_ch_f.gpkg', append=FALSE)
+##########################################################
 # Join and summarize
 ###### I WILL HAVE TO RUN THIS IN PYTHON BECAUSE IT IS TOO SLOW IN R. MAYBE I COULD CHUNCK HERE, BUT NO POINT OF LEANRING NEW TOOLS ON R WHNE PYTHON DOES IT FINE AND I CAN KEEP TRANSITIONING THERE 
+#THIS MIGHT NOT EVEN BE NECESSARY ANYMORE!!!
 cp2_joined <- st_join(cp2, cp_points) %>%
-  group_by(fid) %>% 
+  group_by(fid) %>%
   summarise(
     Rt_1992_mean = mean(Rt_1992, na.rm = TRUE),
     Rt_1992_max = max(Rt_1992, na.rm = TRUE),
@@ -299,10 +252,37 @@ cp2_joined <- st_join(cp2, cp_points) %>%
 head(cp2_joined)
 cp2_joined$fid <- as.integer(cp2_joined$fid)
 sapply(cp2_joined, class)
+# 
+# # to separate it from the raw empty template, added this with the calculated data.
+ st_write(cp2_joined,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg', append=FALSE)
 
-# to separate it from the raw empty template, added this with the calculated data.
-st_write(cp2_joined,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg', append=FALSE)
 
+ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg')
+ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg')
+
+tt <- st
+```
+
+### 1.2.1 Fix Coastal protection
+
+
+```{r coastal protection consoldiation}
+# Load grid (nothing special, just a template) This one hasa tge right id_numbers. (from the original, key for joining) 
+cp2 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.shp')
+
+cp2 <- cp2 %>% mutate(fid_2 = row_number())
+
+# Already calculated
+cp_calc <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg')
+
+cp_calc <- cp_calc %>% mutate(fid_2 = row_number())
+cp_calc <- st_drop_geometry(cp_calc)
+
+
+cp_calc <- left_join(cp2,cp_calc)
+cp_calc$fid_2 <- NULL
+
+st_write(cp_calc, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_risk_1992_2020.gpkg')
 ```
 
 ## 1.3 Join Coastal protection and export again
@@ -313,18 +293,18 @@ sf_f <- st_read(paste0(inpath,'/', '10k_grid_ES_change_benef.gpkg'))
 
 # Calculate change#
 
-cp2 <- compute_change(cp2_joined, suffix = c("_mean", "_max"), drop_columns = TRUE, change_type = "both")
+cp_calc <- compute_change(cp_calc, suffix = c("_mean", "_max"), drop_columns = TRUE, change_type = "both")
 
-st_write(cp2,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_chg.gpkg', append=FALSE)
-
-cp2 <- st_drop_geometry(cp2)
+cp_calc <- st_drop_geometry(cp_calc)
 # export output
-cp2 <- cp2 %>%
+cp_calc <- cp_calc %>%
   select(-contains("_max"))
 
-sf_f <- sf_f %>% mutate(fid = row_number())
+sf_f <- sf_f %>% mutate(fid = row_number()) # make sure that the fid matches! this is key!
 
-sf_f <- left_join(sf_f, cp2, by = 'fid')
+# join the cp data:
+sf_f <- left_join(sf_f, cp_calc, by = 'fid')
+# move the columns to the right location
 sf_f <- sf_f %>%
   relocate(
     Rt_mean_abs_chg,
@@ -333,90 +313,13 @@ sf_f <- sf_f %>%
     Rt_nohab_mean_pct_chg,
     Rt_service_mean_abs_chg,
     Rt_service_mean_pct_chg,
+    Rt_ratio_mean_abs_chg,
+    Rt_ratio_mean_pct_chg,
     .before = GHS_BUILT_S_E2020_mean
   )
 sf_f$fid <- NULL
 
 st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
-```
-
-
-```{python summarize points}
-#| eval: false
-#| include: false
-import geopandas as gpd
-import pandas as pd
-from shapely import speedups
-from pathlib import Path
-from tqdm import tqdm
-
-if speedups.available:
-    speedups.enable()
-
-# Paths
-polygons_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg"
-points_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/Spring/Inspring/coastal_risk_tnc_esa1992_2020_ch.gpkg"
-output_fp = "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc_py.gpkg"
-
-# Columns to summarize
-cols_to_summarize = [
-    "Rt_1992",
-    "Rt_nohab_all_1992",
-    "Rt_service_1992",
-    "Rt_2020",
-    "Rt_nohab_all_2020",
-    "Rt_service_2020"
-]
-
-
-# Load data
-grid = gpd.read_file(polygons_fp).reset_index(drop=True)
-grid["fid"] = grid.index.astype(int)
-points = gpd.read_file(points_fp)
-
-# Ensure CRS match
-if grid.crs != points.crs:
-    points = points.to_crs(grid.crs)
-
-# Build spatial index
-points_sindex = points.sindex
-
-results = []
-
-# Process polygons in chunks
-for _, poly in tqdm(grid.iterrows(), total=len(grid)):
-    possible_matches_idx = list(points_sindex.intersection(poly.geometry.bounds))
-    possible_matches = points.iloc[possible_matches_idx]
-    precise_matches = possible_matches[possible_matches.intersects(poly.geometry)]
-
-    row = {"fid": int(poly["fid"])}
-    if precise_matches.empty:
-        for col in cols_to_summarize:
-            row[f"{col}_mean"] = None
-            row[f"{col}_max"] = None
-    else:
-        for col in cols_to_summarize:
-            if col in precise_matches.columns:
-                row[f"{col}_mean"] = precise_matches[col].mean(skipna=True)
-                row[f"{col}_max"] = precise_matches[col].max(skipna=True)
-            else:
-                row[f"{col}_mean"] = None
-                row[f"{col}_max"] = None
-
-    results.append(row)
-
-summary_df = pd.DataFrame(results)
-
-# Ensure fid column exists
-if "fid" not in summary_df.columns:
-    raise ValueError("No fid column found in summary_df. Check that results were appended correctly.")
-
-# Merge back with grid
-summary_gdf = grid.merge(summary_df, on="fid", how="left", validate="1:1")
-
-# Export
-summary_gdf.to_file(output_fp, driver="GPKG")
-print(f"✓ Exported summarized file to {output_fp}")
 ```
 
 ## 1.4 Add Updated Access Data
@@ -487,7 +390,7 @@ plt <- st_drop_geometry(sf_f)
 
 # get the benef vars (all that are not "chg")
 socio_vars <- names(plt)[
-  names(plt) != "fid" & 
+  names(plt) != c("fid", "c_fid") & 
   !grepl("chg$", names(plt))
 ]
 
@@ -500,7 +403,9 @@ plt_long <- plt %>%
     values_to = "pct_chg"
   ) %>%
   select(fid, c_fid, service, pct_chg, all_of(socio_vars)) %>% 
-   mutate(service = str_replace(service, "_pct_chg.*", ""))
+  mutate(service = str_replace(service, "_pct_chg.*", "")) %>% 
+  mutate(service = str_replace(service, "_mean.*", ""))
+  
   
 # remove infinite values 
 plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% filter(pct_chg != Inf)  
@@ -514,8 +419,10 @@ plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% fi
    service == "nature_access" ~ "Nature_Access",
    service == "pollination" ~ "Pollination",
    service == "usle" ~ "USLE",
-   service == "n_ret_ratio" ~ "N_Ret_Ratio",
-   service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
+   service == "n_ret_ratio" ~ "N_Ret_Red_Ratio",
+   service == "sed_ret_ratio" ~ "Sed_Ret_Red_Ratio",
+   service == "Rt_ratio" ~ "C_Risk_Red_Ratio",
+   service == "Rt" ~ "C_Risk",
    TRUE ~ service
    ))
   
@@ -531,42 +438,28 @@ So, we need a long table format, then define the threshold the services with gai
 Add the combos
 
 ```{r get_hotspots}
- #set combos
+# --------------------------------------------------------------------
+# Define Inputs
+# --------------------------------------------------------------------
+pct_cutoff <- 0.05  # Top/bottom % for hotspot threshold
+df <- plt_long       # Your long-format input data
 
-combo1 <- c("Rt_service_mean", "Rt_nohab_mean","Pollination","Nature_Access","Sed_export","N_export")
-combo2 <- c("Rt_service_mean", "Rt_nohab_mean","Pollination","Nature_Access","Sed_export","N_export") 
-  c("N_Ret_Ratio",,"N_retention")
-combo3 <- c("Sed_Ret_Ratio",, "USLE")
-# ------------------------------------------
-# Step 0: Define Parameters
-# ------------------------------------------
-loss_services <- c("Rt_service_mean", "Pollination", "N_Ret_Ratio",
-                   "Sed_Ret_Ratio", "Nature_Access", "N_retention")
-gain_services <- c("Sed_export", "N_export", "USLE", "Rt_nohab_mean") # decide what to do wit "Rt_mean"
-pct_cutoff <- 0.05  # top/bottom 5%
+# Optional filtering
+# df <- df %>% filter(income_grp == "5. Low income")
 
+# Define service directionality
+loss_services <- c("Nature_Access", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "C_Risk_Red_Ratio")
+gain_services <- c("Sed_export", "N_export", "C_Risk")
 
-# add object with the country data:
+# Define flexible combos as a *named list*:
+combos <- list(
+  combo_1 = c("Nature_Access","Pollination","N_export", "Sed_export", "C_Risk"),
+  combo_2 = c("Nature_Access","Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "C_Risk_Red_Ratio")
+)
 
-
-grid1 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/Ref_Data/vector/grid_10km_f.gpkg')
-
-grid1 <- grid1 %>% 
-  st_drop_geometry(grid1) %>% 
-  distinct(c_fid, .keep_all = TRUE)
- 
-# join the additional columns (that's necessary if we want to run the analysis by subregion, specific countries!!!!, just apply syuited filters)
-
-plt_long <- left_join(plt_long, grid1, by= "c_fid")
-
-df <- plt_long
-# Optional. Filter by country /other types
-#df <- plt_long %>% filter(income_grp == "5. Low income")
-
-
-# ------------------------------------------
-# Step 1: Identify Top/Bottom Hotspots per Service
-# ------------------------------------------
+# --------------------------------------------------------------------
+# STEP 1: Identify top/bottom hotspots
+# --------------------------------------------------------------------
 df_hotspots <- df %>%
   group_by(service) %>%
   mutate(
@@ -583,9 +476,9 @@ df_hotspots <- df %>%
   ) %>%
   ungroup()
 
-# ----------------------------------------------------
-# Step 2: Keep only NEGATIVE hotspot services
-# ----------------------------------------------------
+# --------------------------------------------------------------------
+# STEP 2: Filter to relevant hotspot directions
+# --------------------------------------------------------------------
 df_hotspots_negative <- df_hotspots %>%
   filter(
     hotspot_binary,
@@ -593,26 +486,38 @@ df_hotspots_negative <- df_hotspots %>%
     (service %in% gain_services & hotspot_flag == "high")
   )
 
-# ----------------------------------------------------
-# Step 3: Summarize by polygon
-# ----------------------------------------------------
+# ----------------------------------------------
+# Step 3 (Debugged version, with intermediate steps)
+# ----------------------------------------------
 
+# Base summarise (same as before)
 hotspot_summary <- df_hotspots_negative %>%
   group_by(fid) %>%
   summarise(
-  c_fid = first(c_fid),  # bring c_fid along with fid
-  hotspot_count = n(),
-  hotspot_services = list(unique(service))
-  ) %>%
+    c_fid = first(c_fid),
+    hotspot_count = n(),
+    hotspot_services_list = list(unique(service))
+  )
+
+# Step 3.1 - Add flattened string of services
+hotspot_summary <- hotspot_summary %>%
   mutate(
-    hotspot_services = sapply(hotspot_services, \(x) paste(trimws(as.character(x)), collapse = ", ")),
-    hotspot_services_list = strsplit(hotspot_services, ",\\s*"),
-    
-    # Compute combo counts with final column names
-    count_prov_access = sapply(hotspot_services_list, \(x) sum(x %in% combo1)),
-    count_N = sapply(hotspot_services_list, \(x) sum(x %in% combo2)),
-    count_Sed = sapply(hotspot_services_list, \(x) sum(x %in% combo3)),
-    
+    hotspot_services = sapply(hotspot_services_list, function(x) paste(trimws(as.character(x)), collapse = ", "))
+  )
+
+# Step 3.2 - Compute dynamic combo counts outside mutate
+combo_counts <- lapply(names(combos), function(combo_name) {
+  combo_svcs <- combos[[combo_name]]
+  sapply(hotspot_summary$hotspot_services_list, function(x) sum(x %in% combo_svcs))
+})
+names(combo_counts) <- paste0("count_", names(combos))
+
+# Step 3.3 - Bind the combo columns to the summary object
+hotspot_summary <- bind_cols(hotspot_summary, as_tibble(combo_counts))
+
+# Step 3.4 - Add types
+hotspot_summary <- hotspot_summary %>%
+  mutate(
     hotspot_types = sapply(hotspot_services_list, function(svcs) {
       types <- sapply(svcs, function(s) {
         if (s %in% loss_services) "loss"
@@ -622,37 +527,27 @@ hotspot_summary <- df_hotspots_negative %>%
       paste(na.omit(types), collapse = ", ")
     }),
     hotspot_services_negative = hotspot_services
-  ) %>%
-  select(
-    fid,
-    c_fid,
-    hotspot_count,
-    count_prov_access,
-    count_N,
-    count_Sed,
-    hotspot_services,
-    hotspot_types,
-    hotspot_services_negative
   )
-# ----------------------------------------------------
-# Step 4: Pivot to wide binary matrix
-# ----------------------------------------------------
+
+# --------------------------------------------------------------------
+# STEP 4: Create binary matrix (wide format)
+# --------------------------------------------------------------------
 hotspot_binary_matrix <- hotspot_summary %>%
   select(fid, hotspot_services) %>%
-  separate_rows(hotspot_services, sep = ",\\s*") %>%
+  separate_rows(hotspot_services, sep = ",\\s*") %>%  # Fix: double escape "\\s*"
   mutate(is_hotspot = 1L) %>%
   pivot_wider(names_from = hotspot_services, values_from = is_hotspot, values_fill = 0)
 
-# ----------------------------------------------------
-# Step 5: Join with sf object
-# Only cp2 that are hotspots for negative services are retained
-# ----------------------------------------------------
+# --------------------------------------------------------------------
+# STEP 5: Join with SF object
+# --------------------------------------------------------------------
 hotspots_final <- sf_f %>%
   inner_join(hotspot_binary_matrix, by = "fid") %>%
-  left_join(hotspot_summary, by = "fid")
-# ------------------------------------------
-# Step 6: Export to file
-# ------------------------------------------
+  left_join(hotspot_summary %>% select(-hotspot_services_list), by = "fid")
+
+# --------------------------------------------------------------------
+# STEP 6: Export (optional)
+# --------------------------------------------------------------------
 st_write(hotspots_final, file.path(inpath, "10k_grid_hotspots_global.gpkg"), append = FALSE)
 
 
