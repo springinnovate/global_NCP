@@ -256,7 +256,8 @@ Quite easy, but doing this leaves no record, abd ui just wasted two days trying 
 ```{r include coastal points}
 # Load grid (nothing special, just a template)
  cp2 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg')
- cp2$fid <- as.integer(cp2$fid)
+cp2 <- cp2 %>% mutate(fid = dplyr::row_number())
+cp2$fid <- as.integer(cp2$fid)
 # st_write(cp2, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg', append=FALSE)
 
 # load cleaned coastal protection data:
@@ -265,10 +266,14 @@ cp_points <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildli
 # Ensure same CRS (optional) Add a conditional here that checks before trying to reproject!
 cp_points <- st_transform(cp_points, st_crs(cp2))
 
+cp_points <- cp_points %>% mutate(Rt_ratio_1992=(Rt_nohab_all_1992-Rt_1992)/Rt_nohab_all_1992) %>%
+  mutate(Rt_ratio_2020=(Rt_nohab_all_2020-Rt_2020)/Rt_nohab_all_2020)
+  
+
 # Join and summarize
 ###### I WILL HAVE TO RUN THIS IN PYTHON BECAUSE IT IS TOO SLOW IN R. MAYBE I COULD CHUNCK HERE, BUT NO POINT OF LEANRING NEW TOOLS ON R WHNE PYTHON DOES IT FINE AND I CAN KEEP TRANSITIONING THERE 
 cp2_joined <- st_join(cp2, cp_points) %>%
-  group_by(fid) %>% # use the fid or any other unique identifier fro mthe polygon dataset. I should set here if i want the max or minimum.
+  group_by(fid) %>% 
   summarise(
     Rt_1992_mean = mean(Rt_1992, na.rm = TRUE),
     Rt_1992_max = max(Rt_1992, na.rm = TRUE),
@@ -276,13 +281,19 @@ cp2_joined <- st_join(cp2, cp_points) %>%
     Rt_nohab_1992_max = max(Rt_nohab_all_1992, na.rm = TRUE),
     Rt_service_1992_mean = mean(Rt_service_1992, na.rm = TRUE),
     Rt_service_1992_max = max(Rt_service_1992, na.rm = TRUE),
+    Rt_service_1992_mean = mean(Rt_service_1992, na.rm = TRUE),
+    Rt_service_1992_max = max(Rt_service_1992, na.rm = TRUE),
+    Rt_ratio_1992_mean = mean(Rt_ratio_1992, na.rm=TRUE),
+    Rt_ratio_1992_max = max(Rt_ratio_1992, na.rm=TRUE),
     Rt_2020_mean = mean(Rt_2020, na.rm = TRUE),
     Rt_2020_max = max(Rt_2020, na.rm = TRUE),
     Rt_nohab_2020_mean = mean(Rt_nohab_all_2020, na.rm = TRUE),
     Rt_nohab_2020_max = max(Rt_nohab_all_2020, na.rm = TRUE),
     Rt_service_2020_mean = mean(Rt_service_2020, na.rm = TRUE),
     Rt_service_2020_max = max(Rt_service_2020, na.rm = TRUE),
-    geometry = first(geometry)
+    Rt_ratio_2020_mean = mean(Rt_ratio_2020, na.rm=TRUE),
+    Rt_ratio_2020_max = max(Rt_ratio_2020, na.rm=TRUE),
+    geometry = first(geom)
   )
 
 head(cp2_joined)
@@ -290,7 +301,8 @@ cp2_joined$fid <- as.integer(cp2_joined$fid)
 sapply(cp2_joined, class)
 
 # to separate it from the raw empty template, added this with the calculated data.
-st_write(cp2_joined,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg')
+st_write(cp2_joined,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg', append=FALSE)
+
 ```
 
 ## 1.3 Join Coastal protection and export again
@@ -473,7 +485,7 @@ sf_f$fid <- seq_len(nrow(sf_f))
 plt <- st_drop_geometry(sf_f)
  
 
-# get the benef vars (all that are not "chg)
+# get the benef vars (all that are not "chg")
 socio_vars <- names(plt)[
   names(plt) != "fid" & 
   !grepl("chg$", names(plt))
@@ -521,9 +533,10 @@ Add the combos
 ```{r get_hotspots}
  #set combos
 
-combo1 <- c("Rt_service_mean", "Rt_nohab_mean","Pollination","Nature_Access")
-combo2 <- c("N_Ret_Ratio","N_export","N_retention")
-combo3 <- c("Sed_Ret_Ratio","Sed_export", "USLE")
+combo1 <- c("Rt_service_mean", "Rt_nohab_mean","Pollination","Nature_Access","Sed_export","N_export")
+combo2 <- c("Rt_service_mean", "Rt_nohab_mean","Pollination","Nature_Access","Sed_export","N_export") 
+  c("N_Ret_Ratio",,"N_retention")
+combo3 <- c("Sed_Ret_Ratio",, "USLE")
 # ------------------------------------------
 # Step 0: Define Parameters
 # ------------------------------------------
@@ -651,7 +664,9 @@ st_write(hotspots_final, file.path(inpath, "10k_grid_hotspots_global.gpkg"), app
 # 5 Scatterplots.
 
 
-```{r pivot back}
+```{r pivot hotspot data and prepare for plotting}
+
+#socio_vars <- socio_vars[-8]
 
 plt <- st_drop_geometry(hotspots_final)
 
@@ -662,13 +677,259 @@ plt_long <- plt %>%
     names_to = "service",
     values_to = "pct_chg"
   ) %>%
-  select(fid, service, pct_chg, all_of(socio_vars)) %>% 
+  select(fid, c_fid.x, service, pct_chg, all_of(socio_vars)) %>% 
    mutate(service = str_replace(service, "_pct_chg.*", ""))
   
 # remove infinite values 
 plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)  
 
 
+# ---------------------------------------------------------
+# STEP 2: Set Service Order and Colors
+
+# ---------------------------------------------------------
+
+plt_long <- plt_long %>% mutate(service = case_when(
+   service == "sed_export" ~ "Sed_export",
+   service == "n_export" ~ "N_export",
+   service == "n_retention" ~ "N_retention",
+   service == "nature_access" ~ "Nature_Access",
+   service == "pollination" ~ "Pollination",
+   service == "usle" ~ "USLE",
+   service == "n_ret_ratio" ~ "N_Ret_Ratio",
+   service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
+   service == "Rt_service_mean" ~ "C_Protection",
+   service == "Rt_nohab_mean" ~ "C_Risk",
+   TRUE ~ service
+   ))
+  
+
+service_levels <- c("Nature_Access", "N_Ret_Ratio", "N_export", "N_retention", "Sed_Ret_Ratio", "Sed_export", "USLE", "Pollination",
+                    "C_Protection", "C_Risk", "Rt_mean")
 
 
+plt_long <- plt_long %>% mutate(service = factor(service, levels = service_levels))
+```
+
+
+```{r adjust hotspots}
+
+plt <- st_drop_geometry(hotspots_final)
+# --- Step 1: Identify the binary indicator columns in `plt` ---
+
+
+# Step 1: Extract service indicator (binary hotspot) columns from `plt`
+hotspot_cols <- c("Rt_nohab_mean", "Rt_service_mean", "Sed_Ret_Ratio", "Sed_export", "USLE",
+                  "N_retention", "Nature_Access", "N_export", "N_Ret_Ratio", "Pollination")
+
+binary_long <- plt %>%
+  select(fid, c_fid.x, all_of(hotspot_cols)) %>%
+  pivot_longer(
+    cols = -c(fid, c_fid.x),
+    names_to = "service",
+    values_to = "hotspot_binary"
+  )
+
+# Step 2: Normalize service names to match `plt_long`
+binary_long <- binary_long %>%
+  mutate(service = case_when(
+    service == "Rt_service_mean" ~ "C_Protection",
+    service == "Rt_nohab_mean" ~ "C_Risk",
+    TRUE ~ service
+  ))
+
+# Step 3: Pivot long the pct_chg values and normalize service names
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_chg$"),
+    names_to = "service",
+    values_to = "pct_chg"
+  ) %>%
+  select(fid, c_fid.x, service, pct_chg, all_of(socio_vars)) %>%
+  filter(!is.na(pct_chg), is.finite(pct_chg)) %>%
+  mutate(service = str_replace(service, "_pct_chg$", "")) %>%
+  mutate(service = case_when(
+    service == "sed_export" ~ "Sed_export",
+    service == "n_export" ~ "N_export",
+    service == "n_retention" ~ "N_retention",
+    service == "nature_access" ~ "Nature_Access",
+    service == "pollination" ~ "Pollination",
+    service == "usle" ~ "USLE",
+    service == "n_ret_ratio" ~ "N_Ret_Ratio",
+    service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
+    service == "Rt_service_mean" ~ "C_Protection",
+    service == "Rt_nohab_mean" ~ "C_Risk",
+    TRUE ~ service
+  )) %>%
+  mutate(service = factor(service, levels = c(
+    "Nature_Access", "N_Ret_Ratio", "N_export", "N_retention", "Sed_Ret_Ratio",
+    "Sed_export", "USLE", "Pollination", "C_Protection", "C_Risk", "Rt_mean"
+  )))
+
+# Step 4: Join hotspot binary column
+plt_long <- left_join(plt_long, binary_long, by = c("fid", "c_fid.x", "service"))
+
+# Step 5: Filter to keep only hotspot points
+plt_long <- filter(plt_long, hotspot_binary == 1)
+
+
+```
+
+
+
+
+```{r scatterplot,fig.height=7, fig.width=7, warning=FALSE}
+
+socio_labels <- c(
+  "GHS_BUILT_S_E2020_mean" = "Built Area",
+  "fields_mehrabi_2017_mean" = "Field Size",
+  "hdi_raster_predictions_2020_mean" = "HDI",
+  "rast_adm1_gini_disp_2020_mean" = "Income Inequality",
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "GDP (Total)",
+  "GHS_POP_E2020_GLOBE_sum" = "Population (GHS)",
+  "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
+)
+
+plt_long_socio <- plt_long %>%
+  pivot_longer(
+    cols = all_of(socio_vars),
+    names_to = "socio_var",
+    values_to = "socio_val"
+  ) %>% filter(!is.na(socio_val))
+
+
+# Step 2: Trim out top and bottom 2% of pct_chg within each service
+ # plt_long_socio<- plt_long_socio %>%
+ #  group_by(service) %>%
+ #  mutate(
+ #    pct_low = quantile(pct_chg, 0.01, na.rm = TRUE),
+ #    pct_high = quantile(pct_chg, 0.99, na.rm = TRUE)
+ #  ) %>%
+ #  ungroup() %>%
+ #  filter(pct_chg >= pct_low, pct_chg <= pct_high)
+
+# Step 2: Loop over each service and generate faceted scatterplots
+unique_services <- unique(plt_long_socio$service)
+
+for (svc in unique_services) {
+  plot_data <- filter(plt_long_socio, service == svc)
+  plot_data <- plot_data %>%
+  mutate(socio_label = socio_labels[socio_var])
+
+  p <- ggplot(plot_data, aes(x = pct_chg, y = socio_val)) +
+    geom_hex(bins = 60) +
+    scale_fill_viridis_c(option = "D", direction = 1) +
+    facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
+    labs(
+      title = paste("Ecosystem Service:", svc),
+      x = "Ecosystem Service % Change",
+      y = "Socioeconomic Variable Value",
+      fill = "Density"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p)
+}
+
+```
+
+
+```{r scatterplot,fig.height=7, fig.width=7, warning=FALSE}
+
+#socio_vars <- socio_vars[-8]
+
+plt <- st_drop_geometry(sf_f)
+
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_chg"),
+    names_to = "service",
+    values_to = "pct_chg"
+  ) %>%
+  select(fid, c_fid, service, pct_chg, all_of(socio_vars)) %>% 
+   mutate(service = str_replace(service, "_pct_chg.*", ""))
+  
+# remove infinite values 
+plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)  
+
+
+# ---------------------------------------------------------
+# STEP 2: Set Service Order and Colors
+
+# ---------------------------------------------------------
+
+plt_long <- plt_long %>% mutate(service = case_when(
+   service == "sed_export" ~ "Sed_export",
+   service == "n_export" ~ "N_export",
+   service == "n_retention" ~ "N_retention",
+   service == "nature_access" ~ "Nature_Access",
+   service == "pollination" ~ "Pollination",
+   service == "usle" ~ "USLE",
+   service == "n_ret_ratio" ~ "N_Ret_Ratio",
+   service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
+   service == "Rt_service_mean" ~ "C_Protection",
+   service == "Rt_nohab_mean" ~ "C_Risk",
+   TRUE ~ service
+   ))
+  
+
+service_levels <- c("Nature_Access", "N_Ret_Ratio", "N_export", "N_retention", "Sed_Ret_Ratio", "Sed_export", "USLE", "Pollination",
+                    "C_Protection", "C_Risk", "Rt_mean")
+
+
+plt_long <- plt_long %>% mutate(service = factor(service, levels = service_levels))
+```
+
+
+```{r plot 2}
+plt_long_socio <- plt_long %>%
+  pivot_longer(
+    cols = all_of(socio_vars),
+    names_to = "socio_var",
+    values_to = "socio_val"
+  ) %>% filter(!is.na(socio_val))
+
+
+# Step 2: Trim out top and bottom 2% of pct_chg within each service
+ plt_long_socio<- plt_long_socio %>%
+  group_by(service) %>%
+  mutate(
+    pct_low = quantile(pct_chg, 0.01, na.rm = TRUE),
+    pct_high = quantile(pct_chg, 0.99, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  filter(pct_chg >= pct_low, pct_chg <= pct_high)
+
+# Step 2: Loop over each service and generate faceted scatterplots
+unique_services <- unique(plt_long_socio$service)
+
+for (svc in unique_services) {
+  plot_data <- filter(plt_long_socio, service == svc)
+  plot_data <- plot_data %>%
+  mutate(socio_label = socio_labels[socio_var])
+
+  p <- ggplot(plot_data, aes(x = pct_chg, y = socio_val)) +
+    geom_hex(bins = 30) +
+    scale_fill_viridis_c(option = "D", direction = 1) +
+    facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
+    labs(
+      title = paste("Ecosystem Service:", svc),
+      x = "Ecosystem Service % Change",
+      y = "Socioeconomic Variable Value",
+      fill = "Density"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+
+  print(p)
+}
 ```
