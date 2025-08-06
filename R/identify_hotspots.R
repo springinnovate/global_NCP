@@ -20,10 +20,10 @@
 #'
 #' @export
 identify_hotspots <- function(df,
-                              fid_col = "fid",
-                              c_fid_col = "c_fid",
+                              fid_col = "fid", # this can be null
+                              c_fid_col = "c_fid", # this can be null
                               service_col = "service",
-                              value_col = "pct_chg",
+                              value_col = "pct_chg", # this could be absolute also
                               combos = list(),
                               loss_services = character(),
                               gain_services = character(),
