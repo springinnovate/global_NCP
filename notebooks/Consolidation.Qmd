@@ -45,47 +45,52 @@ Global raster datasets for nitrogen retention/export/ratio, sediment retention/e
 
 Country polygon dataset for spatial aggregation and attribution.
 
+Additonally: 10km grid on;y on the shoreline for coasstal prtection and facilitate calculation
+
+Rasterized country data (*pyramids*) to speed up/help adding country daa/groupings to the dataset. 
+
 ## 2. Data Processing Pipeline
 
-Step 1: Coastal Protection Aggregation
+### 2.1  Coastal Protection Aggregation
+This data set comes originally as a vector
+Included three variables for each year: *convert into math notation*
+- Rt: Actual Risk Level)
+- Rt_nohab: Potential Risk Level if no ecosystem (expected to remain constant, but necessary to calculate the next ones)
+- Rt_nohab - Rt= Rt_service: This difference is the actual value of the service provided (the potential-the observed) = Provided service
+- (Rt_nohab-Rt)/Rt: Coastal risk reduction ratio
 
-Calcualted three things Rt, Rt_nohab_all and Rt_nohab_all-Rt= Rt_service.
+Computed mean and max per grid cell for each coastal protection metric.
 
-Computed mean and max per grid cell for each coastal protection metric (Rt_1992, Rt_2020, and related attributes).
+### 2.2: Zonal Statistics for Gridded ES Services
 
-Step 2: Zonal Statistics for Other Services
 
-Used a geosharding-based pipeline to extract zonal statistics (mean or sum, depending on the service) from global raster layers to the 10 km grid. (also for the hydrosheds) 
+Geosharding-based pipeline to extract zonal statistics (mean or sum, depending on the service) from modeled global ES raster layers for two  years (1992-2020) to the 10 km grid (or any poygon vector file).  Values are labeled and appended as new column in an output vector ddataset (gpkg)  
 
-Outputs for both 1992 and 2020 were appended as new grid attributes.
-
-Step 3: Bi-temporal Change Calculation
+### 2.3: Bi-temporal Change Calculation
 
 Applied compute_change() function to derive absolute and percentage changes for all variables, using consistent naming conventions (_abs_chg, _pct_chg).
 
-Step 4: Reshaping Data for Hotspot Detection
+### 2.4:  Reshaping Data for Hotspot Detection
 
 Converted the dataset to long format (plt_long) with columns: fid, service, and pct_chg.
 
-Step 5: Hotspot Identification
+### 2.4  Hotspot Identification
 
 Defined loss/damage services and gain services.
 
 Identified hotspots as grid cells in the bottom 5% (losses) or top 5% (gains) per service.
 
-Step 6: Hotspot Grouping into Service Combos
+### 2.5: Hotspot Grouping into Service Combos
 
-Created three combos for aggregated hotspot counts:
+Created  combos for aggregated hotspot counts:
 
-count_prov_access: coastal protection (Rt_service_mean), habitat-modified coastal protection (Rt_nohab_mean), pollination, nature access.
+  combo_1 = c("Nature_Access","Pollination","N_export", "Sed_export", "C_Risk"),
+  combo_2 = c("Nature_Access","Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "C_Risk_Red_Ratio")
 
-count_N: nitrogen retention, nitrogen export, nitrogen ratio.
-
-count_sed: sediment retention, sediment export, USLE.
 
 Calculated counts per combo and total hotspot count.
 
-Step 7: Final Integration and Output
+### 2.6: Final Integration and Output
 
 Generated binary columns (0/1) per service for hotspot presence.
 
@@ -97,22 +102,23 @@ Per-service hotspot flags.
 
 Total hotspot count.
 
-Counts for count_prov_access, count_N, and count_sed.
+Counts for each combo
 
 A column listing all hotspot services per grid cell.
 
 ## 3. Outputs
 
-Final sf object containing all hotspot-related attributes for each 10 km grid cell.
+Final gpkg with the summary stats for each year for all variables plus sio economic data 
+Final gpkg object containing all hotspot-related attributes for each 10 km grid cell.
 
-Ready for mapping in QGIS or for further analysis (e.g., joining with socioeconomic variables).
+Map outputs prepardi nqgis (one for the hotspots for each variable )
 
 Flexible structure allows filtering for losses only, per-service mapping, or aggregated combo-based analyses.
 
 
 # 1. Clean and Organize Synthesis Data
 
-
+There is an issue with the naming of the variables that has been giving me a lot of trouble 
 ```{r consolidate final outputs}
 
 #Builds a list of files in the vector directory
