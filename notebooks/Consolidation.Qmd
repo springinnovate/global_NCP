@@ -419,8 +419,8 @@ plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% fi
    service == "nature_access" ~ "Nature_Access",
    service == "pollination" ~ "Pollination",
    service == "usle" ~ "USLE",
-   service == "n_ret_ratio" ~ "N_Ret_Red_Ratio",
-   service == "sed_ret_ratio" ~ "Sed_Ret_Red_Ratio",
+   service == "n_ret_ratio" ~ "N_Ret_Ratio",
+   service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
    service == "Rt_ratio" ~ "C_Risk_Red_Ratio",
    service == "Rt" ~ "C_Risk",
    TRUE ~ service
@@ -431,9 +431,7 @@ plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% fi
 # 3. Get Hotspots
 
 Need to think on an effective way to change the value (the share/quantile we want to extract and also filter by group!!!!)
-
-
-So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. Taht wouls be awesome
+So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. That would be awesome
 
 Add the combos
 
@@ -554,17 +552,53 @@ st_write(hotspots_final, file.path(inpath, "10k_grid_hotspots_global.gpkg"), app
 ```
 
 
-
-
 # 5 Scatterplots.
 
 
 ```{r pivot hotspot data and prepare for plotting}
 
-#socio_vars <- socio_vars[-8]
-
 plt <- st_drop_geometry(hotspots_final)
+# --- Step 1: Identify the binary indicator columns in `plt` ---
 
+
+# Step 1: Extract service indicator (binary hotspot) columns from `plt`
+hotspot_cols <- c("C_Risk", "C_Risk_Red_Ratio", "Sed_Ret_Ratio", "Sed_export",
+                  "Nature_Access", "N_export", "N_Ret_Ratio", "Pollination")
+
+
+binary_long <- plt %>%
+  select(fid, c_fid.x, all_of(hotspot_cols)) %>%
+  pivot_longer(
+    cols = -c(fid, c_fid.x),
+    names_to = "service",
+    values_to = "hotspot_binary"
+  )
+
+# Step 3: Pivot long the pct_chg values and normalize service names
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_chg$"),
+    names_to = "service",
+    values_to = "pct_chg"
+  ) #%>%
+  select(fid, c_fid.x, service, pct_chg, all_of(socio_vars)) %>%
+  filter(!is.na(pct_chg), is.finite(pct_chg)) %>%
+  mutate(service = str_replace(service, "_pct_chg$", "")) %>%
+   plt_long <- plt_long %>% mutate(service = case_when(
+   service == "sed_export" ~ "Sed_export",
+   service == "n_export" ~ "N_export",
+   service == "n_retention" ~ "N_retention",
+   service == "nature_access" ~ "Nature_Access",
+   service == "pollination" ~ "Pollination",
+   service == "usle" ~ "USLE",
+   service == "n_ret_ratio" ~ "N_Ret_Ratio",
+   service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
+   service == "Rt_ratio" ~ "C_Risk_Red_Ratio",
+   service == "Rt" ~ "C_Risk",
+   TRUE ~ service
+  )) %>%
+  mutate(service = factor(service, levels = c("Nature_Access", "N_Ret_Ratio", "N_export", "Sed_Ret_Ratio", "Sed_export",  "Pollination",
+                    "C_Risk_Red_Ratio", "C_Risk")))
 
 plt_long <- plt %>%
   pivot_longer(
@@ -573,7 +607,8 @@ plt_long <- plt %>%
     values_to = "pct_chg"
   ) %>%
   select(fid, c_fid.x, service, pct_chg, all_of(socio_vars)) %>% 
-   mutate(service = str_replace(service, "_pct_chg.*", ""))
+  mutate(service = str_replace(service, "_pct_chg.*", "")) %>% 
+  mutate(service = str_replace(service, "_mean.*", ""))
   
 # remove infinite values 
 plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)  
@@ -584,7 +619,7 @@ plt_long <- plt_long%>% filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf)
 
 # ---------------------------------------------------------
 
-plt_long <- plt_long %>% mutate(service = case_when(
+  plt_long <- plt_long %>% mutate(service = case_when(
    service == "sed_export" ~ "Sed_export",
    service == "n_export" ~ "N_export",
    service == "n_retention" ~ "N_retention",
@@ -593,19 +628,22 @@ plt_long <- plt_long %>% mutate(service = case_when(
    service == "usle" ~ "USLE",
    service == "n_ret_ratio" ~ "N_Ret_Ratio",
    service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
-   service == "Rt_service_mean" ~ "C_Protection",
-   service == "Rt_nohab_mean" ~ "C_Risk",
+   service == "Rt_ratio" ~ "C_Risk_Red_Ratio",
+   service == "Rt" ~ "C_Risk",
    TRUE ~ service
    ))
   
 
-service_levels <- c("Nature_Access", "N_Ret_Ratio", "N_export", "N_retention", "Sed_Ret_Ratio", "Sed_export", "USLE", "Pollination",
-                    "C_Protection", "C_Risk", "Rt_mean")
+service_levels <- c("Nature_Access", "N_Ret_Ratio", "N_export", "Sed_Ret_Ratio", "Sed_export",  "Pollination",
+                    "C_Risk_Red_Ratio", "C_Risk")
 
+
+plt_long <- plt_long%>% filter(service %in% service_levels)
 
 plt_long <- plt_long %>% mutate(service = factor(service, levels = service_levels))
 ```
 
+What the fuck is this?
 
 ```{r adjust hotspots}
 
@@ -614,8 +652,8 @@ plt <- st_drop_geometry(hotspots_final)
 
 
 # Step 1: Extract service indicator (binary hotspot) columns from `plt`
-hotspot_cols <- c("Rt_nohab_mean", "Rt_service_mean", "Sed_Ret_Ratio", "Sed_export", "USLE",
-                  "N_retention", "Nature_Access", "N_export", "N_Ret_Ratio", "Pollination")
+hotspot_cols <- c("C_Risk", "C_Risk_Red_Ratio", "Sed_Ret_Ratio", "Sed_export",
+                  "Nature_Access", "N_export", "N_Ret_Ratio", "Pollination")
 
 binary_long <- plt %>%
   select(fid, c_fid.x, all_of(hotspot_cols)) %>%
@@ -674,7 +712,7 @@ plt_long <- filter(plt_long, hotspot_binary == 1)
 
 
 ```{r scatterplot,fig.height=7, fig.width=7, warning=FALSE}
-
+# Make names shorter
 socio_labels <- c(
   "GHS_BUILT_S_E2020_mean" = "Built Area",
   "fields_mehrabi_2017_mean" = "Field Size",
