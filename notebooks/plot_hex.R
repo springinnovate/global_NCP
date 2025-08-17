@@ -1,11 +1,11 @@
-
-# --- prerequisites (safe to re-run) ---
 suppressPackageStartupMessages({
-  library(dplyr); library(tidyr); library(ggplot2); library(viridisLite)
+library(dplyr);
+  library(tidyr);
+  library(ggplot2); 
+  library(viridisLite)
 })
 if (!requireNamespace("hexbin", quietly = TRUE)) install.packages("hexbin")
 
-# --- labels ---
 socio_labels <- c(
   "GHS_BUILT_S_E2020_mean" = "Built Area",
   "fields_mehrabi_2017_mean" = "Field Size",
@@ -16,7 +16,6 @@ socio_labels <- c(
   "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
 )
 
-# --- long data, sanitize numerics & finites ---
 plt_long_socio <- plt_long %>%
   tidyr::pivot_longer(cols = all_of(socio_vars),
                       names_to = "socio_var", values_to = "socio_val") %>%
@@ -33,20 +32,18 @@ plt_long_socio <- plt_long %>%
   dplyr::ungroup() %>%
   dplyr::filter(pct_chg >= pct_low, pct_chg <= pct_high)
 
-# --- output folders ---
 out_dir <- file.path("outputs", "plots", "hex")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
-# --- helper to make safe filenames from service names ---
 safe_name <- function(x) {
   x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
   gsub("_+", "_", x)
 }
 
-# --- loop services; save PNGs; also build a multi-page PDF ---
 services <- sort(unique(plt_long_socio$service))
 
-pdf(file.path(out_dir, "hex_all_services.pdf"), width = 10, height = 6)
+# Open a multi-page PDF once (Cairo, white background)
+cairo_pdf(file.path(out_dir, "hex_all_services.pdf"), width = 10, height = 6, onefile = TRUE, bg = "white")
 on.exit(dev.off(), add = TRUE)
 
 for (svc in services) {
@@ -80,11 +77,12 @@ for (svc in services) {
       axis.text  = element_text(size = 9)
     )
 
-  # write a page in the combined PDF
+  # write a page into the PDF
   print(p)
 
-  # also write a PNG for quick look / sharing
+  # also save a PNG with white background
   png_file <- file.path(out_dir, paste0("hex_", safe_name(svc), ".png"))
-  ggsave(filename = png_file, plot = p, width = 10, height = 6, dpi = 300)
+  ggsave(filename = png_file, plot = p, width = 10, height = 6, dpi = 300, bg = "white")
 }
-message("Saved to: ", out_dir)
+
+message("Saved PNGs and multi-page PDF to: ", out_dir)
