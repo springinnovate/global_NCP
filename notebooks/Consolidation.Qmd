@@ -268,7 +268,7 @@ sapply(cp2_joined, class)
  st_write(cp2_joined,'/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg', append=FALSE)
 
 
-ly <- st_layers(here("data","vector", "grid_10k_coastal.gpkg")
+ly <- st_layers(here("data","vector", "grid_10k_coastal.gpkg"))
 ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg')
 
 ```
@@ -278,12 +278,12 @@ ly <- st_layers('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFun
 
 ```{r coastal protection consoldiation}
 # Load grid (nothing special, just a template) This one hasa tge right id_numbers. (from the original, key for joining) 
-cp2 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.shp')
+cp2 <- st_read(here("data_NCP", "vector", "grid_10k_coastal.shp"))
 
 cp2 <- cp2 %>% mutate(fid_2 = row_number())
 
 # Already calculated
-cp_calc <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg')
+cp_calc <- st_read(here("data_NCP", "vector",'grid_10k_coastal_calc.gpkg'))
 
 cp_calc <- cp_calc %>% mutate(fid_2 = row_number())
 cp_calc <- st_drop_geometry(cp_calc)
@@ -292,7 +292,7 @@ cp_calc <- st_drop_geometry(cp_calc)
 cp_calc <- left_join(cp2,cp_calc)
 cp_calc$fid_2 <- NULL
 
-st_write(cp_calc, '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_risk_1992_2020.gpkg')
+st_write(cp_calc, here("data_NCP", "vector",'grid_10k_coastal_risk_1992_2020.gpkg'))
 ```
 
 ## 1.3 Join Coastal protection and export again
@@ -415,7 +415,7 @@ plt_long <- plt %>%
   select(fid, c_fid, service, pct_chg, all_of(socio_vars)) %>% 
   mutate(service = str_replace(service, "_pct_chg.*", "")) %>% 
   mutate(service = str_replace(service, "_mean.*", "")) %>% 
-  filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% filter(pct_chg != Inf)  # remove infinite values 
+  filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% filter(pct_chg != Inf)  # remove infinite values and thoser whihc Country is NA
   
   
 # rename some variables (just for aesthetics)
@@ -434,6 +434,12 @@ plt_long <- plt %>%
    service == "Rt_service" ~ "C_Prot_service",
    TRUE ~ service
    ))
+  
+  
+  
+
+service_levels <- c("Nature_Access", "N_Ret_Ratio", "N_export", "N_retention", "Sed_Ret_Ratio", "Sed_export", "USLE", "Pollination",
+                    "C_Protection", "C_Risk", "Rt_mean")  
 ```
 
 # 3. Get Hotspots
@@ -442,6 +448,33 @@ Need to think on an effective way to change the value (the share/quantile we wan
 So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. That would be awesome
 
 Add the combos
+**Need to retain the original fid (from the whole dataset for eventuqal filtering later, it gets lost somewhere here...)**
+
+```{r get histposts function}
+
+res <- extract_hotspots(
+  df = plt_long,
+  value_col = "pct_chg",
+  pct_cutoff = 0.05,
+  threshold_mode = "percent",
+  rule_mode = "vectors",
+  loss_services = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
+  gain_services = c("Sed_export","N_export","C_Risk"),
+  combos = list(
+    combo_1 = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
+    combo_2 = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+  ),
+  id_cols = c("c_fid"),
+  sf_obj = sf_f
+)
+
+hotspots_sf <- res$hotspots_sf
+summary_df  <- res$summary_df
+inverse_df  <- res$non_hotspots_df
+```
+
+
+
 
 ```{r get_hotspots}
 # --------------------------------------------------------------------
@@ -562,7 +595,9 @@ st_write(hotspots_final, file.path(inpath, "10k_grid_hotspots_global.gpkg"), app
 
 # 5 Scatterplots.
 
+## 5.1 Hotspots
 
+### 5.1.1 Prepare data for plotting
 ```{r pivot hotspot data and prepare for plotting}
 inpath <- here("output_data")
 hotspots_final <- st_read(paste0(inpath, '/',"10k_grid_hotspots_global.gpkg"))
@@ -610,23 +645,30 @@ plt_long <- plt %>%
       service == "Rt" ~ "C_Risk",
       service == "Rt_service" ~ "C_Prot_service",
       TRUE ~ service
-      )) %>%
-  mutate(service = factor(service, levels = c("Nature_Access", "N_Ret_Ratio", "N_export", "Sed_Ret_Ratio", "Sed_export",  "Pollination","C_Risk", "C_Risk_Red_Ratio", "C_Prot_service"))) %>% 
-  filter(!is.na(service)) %>% # thisis one of these annpying lines that is too hardcoded inside this thing. it convertsi not a factor but, if some value is not included then the row is dropped. I should set this earlier, not here. i kept it in case i might need it
+      )) %>% 
+  filter(!is.na(service)) %>% # this is one of these annpying lines that is too hardcoded inside this thing. it convertsi not a factor but, if some value is not included then the row is dropped. I should set this earlier, not here. i kept it in case i might need it
   filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf) 
   
 plt_long <- left_join(plt_long, binary_long, by = c("fid", "c_fid.x", "service")) 
 
 
+# Set service levesl one single time and for all. Don't drop some varaibles here, filter afterwards, it can be difficult/annpying to recover!!!
+service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Sed_export", "USLE", "Sed_Ret_Ratio", "Rt_nohab","C_Risk",
+                    "C_Prot_service", "C_Risk_Red_Ratio", "Pollination")
+
+plt_long <- plt_long %>% mutate(service = factor(service, levels = service_levels))
+
 # Step 5: Filter to keep only hotspot points
 plt_long <- filter(plt_long, hotspot_binary == 1)
+# get a filter with only the services for which i assess hotspots 
+service_filter <- unique(plt_long$service)
 ```
 
 
 
 
 
-```{r scatterplot}
+```{r scatterplot, fig.height=7, fig.width=12, warning=FALSE}
 # Make names shorter
 socio_labels <- c(
   "GHS_BUILT_S_E2020_mean" = "Built Area",
@@ -657,9 +699,16 @@ plt_long_socio <- plt_long_socio %>%
   ) %>%
   ungroup() %>%
   filter(pct_chg >= pct_low, pct_chg <= pct_high)
+safe_name <- function(x) {
+  x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
+  gsub("_+", "_", x)
+}
 
 # Step 2: Loop over each service and generate faceted scatterplots
 unique_services <- unique(plt_long_socio$service)
+
+out_dir <- file.path("outputs", "plots", "hex")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 for (svc in unique_services) {
   plot_data <- plt_long_socio %>%
@@ -675,11 +724,11 @@ for (svc in unique_services) {
   if (nrow(plot_data) == 0) next  # nothing to draw
 
   p <- ggplot(plot_data, aes(x = pct_chg, y = socio_val)) +
-    geom_hex(bins = 60, na.rm = TRUE) +
+    geom_hex(bins = 30, na.rm = TRUE) +
     scale_fill_viridis_c(option = "D", direction = 1) +
     facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
     labs(
-      title = paste("Ecosystem Service:", svc),
+      title = paste("Hotspot:", svc),
       x = "Ecosystem Service % Change",
       y = "Socioeconomic Variable Value",
       fill = "Density"
@@ -690,17 +739,18 @@ for (svc in unique_services) {
       plot.title  = element_text(hjust = 0.5),
       axis.text   = element_text(size = 9)
     )
-
+   # also save a PNG with white background
+  png_file <- paste0(here("output_charts"),"/", safe_name(svc),".png")
+  ggsave(filename = png_file, plot = p, width = 10, height = 6, dpi = 300, bg = "white")
   print(p)
 }
 
 ```
 # Next the chart for the whole thing
-Noit just hotspots.
+Not just hotspots.
 
 ```{r scatterplot,fig.height=7, fig.width=7, warning=FALSE}
-##Now here for the whole thing!!!!! 
-#socio_vars <- socio_vars[-8]
+##Now here for the whole thin
 
 plt <- st_drop_geometry(sf_f)
 
@@ -737,15 +787,17 @@ plt_long <- plt_long %>% mutate(service = case_when(
    ))
   
 
-service_levels <- c("Nature_Access", "N_Ret_Ratio", "N_export", "N_retention", "Sed_Ret_Ratio", "Sed_export", "USLE", "Pollination",
-                    "C_Protection", "C_Risk", "Rt_mean")
+service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Sed_export", "USLE", "Sed_Ret_Ratio", "Rt_nohab","C_Risk",
+                    "C_Prot_service", "C_Risk_Red_Ratio", "Pollination")
+
 
 
 plt_long <- plt_long %>% mutate(service = factor(service, levels = service_levels))
+plt_long <- plt_long %>% filter(service %in% service_filter)
 ```
 
 
-```{r plot 2}
+```{r plot 2, fig.height=7, fig.width=12, warning=FALSE}
 plt_long_socio <- plt_long %>%
   pivot_longer(
     cols = all_of(socio_vars),
@@ -788,7 +840,8 @@ for (svc in unique_services) {
       plot.title = element_text(hjust = 0.5),
       axis.text = element_text(size = 9)
     )
-
+   png_file <- paste0(here("output_charts"),"/", safe_name(svc),"_all.png")
+   ggsave(filename = png_file, plot = p, width = 10, height = 6, dpi = 300, bg = "white")
   print(p)
 }
 ```
