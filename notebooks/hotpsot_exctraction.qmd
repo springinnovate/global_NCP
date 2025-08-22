@@ -26,6 +26,8 @@ library(devtools)
 library(reticulate)
 library(exactextractr)
 library(httpgd)
+library(ggnewscale)   # allows multiple fill scales
+library(viridisLite)
 load_all()
 
 #source the helper functions
@@ -55,7 +57,6 @@ sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
 # add fid
 sf_f$fid <- seq_len(nrow(sf_f)) 
 plt <- st_drop_geometry(sf_f)
- 
 
 # get the benef vars (all that are not "chg")
 socio_vars <- names(plt)[
@@ -130,6 +131,7 @@ inverse_df  <- res$non_hotspots_df
 all <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio","Sed_export","N_export","C_Risk")
 
 inverse_df <- inverse_df %>% filter(service %in% all)
+rm(res, sf_f)
 
 ```
 
@@ -197,7 +199,7 @@ for (svc in unique_services) {
   if (nrow(plot_data) == 0) next  # nothing to draw
 
   p <- ggplot(plot_data, aes(x = pct_chg, y = socio_val)) +
-    geom_hex(bins = 30, na.rm = TRUE) +
+    geom_hex(bins = 50, na.rm = TRUE) +
     scale_fill_viridis_c(option = "D", direction = 1) +
     facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
     labs(
@@ -220,22 +222,13 @@ for (svc in unique_services) {
 
 ```
 
-
+## 2.2 Non- Hotpots
 ```{r plot 2, fig.height=7, fig.width=12, warning=FALSE}
 
-# # Make names shorter
-# socio_labels <- c(
-#   "GHS_BUILT_S_E2020_mean" = "Built Area",
-#   "fields_mehrabi_2017_mean" = "Field Size",
-#   "hdi_raster_predictions_2020_mean" = "HDI",
-#   "rast_adm1_gini_disp_2020_mean" = "Income Inequality",
-#   "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "GDP (Total)",
-#   "GHS_POP_E2020_GLOBE_sum" = "Population (GHS)",
-#   "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
-# )
-inverse_df1 <- inverse_df %>% filter(!service %in% c("Rt_nohab"))
 
-plt_long_socio <- inverse_df1%>%
+inverse_df <- inverse_df %>% filter(!service %in% c("Rt_nohab"))
+
+plt_long_socio <- inverse_df%>%
   pivot_longer(
     cols = all_of(socio_vars),
     names_to = "socio_var",
@@ -289,3 +282,146 @@ for (svc in unique_services) {
 }
 
 ```
+## 2.3 Hotspot-Not Hotspot Overlay. 
+
+```{r scatterplot 3, lot,fig.height=7, fig.width=12, warning=FALSE}
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(here)
+library(ggnewscale)   # allows multiple fill scales
+library(viridisLite)
+
+# ---- Tunables ---------------------------------------------------------
+bg_bins        <- 80     # number of bins for non-hotspots
+hs_bins        <- 50     # number of bins for hotspots (can be lower)
+bg_alpha       <- 0.85   # opacity for non-hotspot heatmap
+hs_alpha       <- 0.90   # opacity for hotspot heatmap
+bg_trans       <- "sqrt" # sqrt stretch improves visibility of low densities
+hs_trans       <- "sqrt"
+# palettes
+bg_palette <- viridisLite::viridis(9, option = "C")           # cool viridis
+hs_palette <- c("#FFE9E9", "#FFA3A3", "#FF5B5B", "#D40000")   # light->deep red
+# ----------------------------------------------------------------------
+
+# assumes socio_labels defined; plt_long (hotspots) and inverse_df (non-hotspots) exist
+
+socio_labels <- c(
+  "GHS_BUILT_S_E2020_mean" = "Built Area",
+  "fields_mehrabi_2017_mean" = "Field Size",
+  "hdi_raster_predictions_2020_mean" = "HDI",
+  "rast_adm1_gini_disp_2020_mean" = "Income Inequality",
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "GDP (Total)",
+  "GHS_POP_E2020_GLOBE_sum" = "Population (GHS)",
+  "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
+)
+ocio_vars <- names(socio_labels)
+
+# optional: drop services you don't want from inverse_df
+inverse_df <- inverse_df %>% filter(!service %in% c("Rt_nohab"))
+
+# tag and combine
+hot_df  <- plt_long   %>% mutate(hotspot_flag = 1L)
+non_df  <- inverse_df %>% mutate(hotspot_flag = 0L)
+both_df <- bind_rows(hot_df, non_df)
+
+# pivot, numeric coercion, common trim per service, label facets
+both_long <- both_df %>%
+  pivot_longer(
+    cols = all_of(socio_vars),
+    names_to = "socio_var",
+    values_to = "socio_val"
+  ) %>%
+  mutate(
+    pct_chg      = as.numeric(pct_chg),
+    socio_val    = as.numeric(socio_val),
+    hotspot_flag = factor(hotspot_flag, levels = c(0, 1),
+                          labels = c("Non-hotspot", "Hotspot"))
+  ) %>%
+  filter(is.finite(pct_chg), is.finite(socio_val)) %>%
+  group_by(service) %>%
+  mutate(
+    pct_low  = quantile(pct_chg, 0.01, na.rm = TRUE),
+    pct_high = quantile(pct_chg, 0.99, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  filter(pct_chg >= pct_low, pct_chg <= pct_high) %>%
+  mutate(socio_label = socio_labels[as.character(socio_var)])
+
+# drop facets with too little variation (avoids degenerate panels)
+drop_flat_facets <- function(df) {
+  df %>%
+    group_by(socio_label) %>%
+    filter(n() > 1,
+           dplyr::n_distinct(pct_chg)   > 1,
+           dplyr::n_distinct(socio_val) > 1) %>%
+    ungroup()
+}
+
+safe_name <- function(x) {
+  x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
+  gsub("_+", "_", x)
+}
+
+out_dir <- here("output_charts")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+unique_services <- unique(both_long$service)
+
+for (svc in unique_services) {
+  plot_data <- both_long %>% filter(service == svc) %>% drop_flat_facets()
+  if (nrow(plot_data) == 0) next
+
+  bg_data <- plot_data %>% filter(hotspot_flag == "Non-hotspot")
+  fg_data <- plot_data %>% filter(hotspot_flag == "Hotspot")
+
+  p <- ggplot(NULL, aes(x = pct_chg, y = socio_val)) +
+    # layer 1: non-hotspots heatmap
+    stat_bin2d(
+      data  = bg_data,
+      bins  = bg_bins,
+      aes(fill = after_stat(count)),
+      alpha = bg_alpha,
+      na.rm = TRUE
+    ) +
+    scale_fill_gradientn(
+      colors = bg_palette,
+      trans  = bg_trans,
+      name   = "Non-hotspot density"
+    ) +
+    # start a NEW fill scale for hotspots
+    ggnewscale::new_scale_fill() +
+    # layer 2: hotspots heatmap (on top)
+    stat_bin2d(
+      data  = fg_data,
+      bins  = hs_bins,
+      aes(fill = after_stat(count)),
+      alpha = hs_alpha,
+      na.rm = TRUE
+    ) +
+    scale_fill_gradientn(
+      colors = hs_palette,
+      trans  = hs_trans,
+      name   = "Hotspot density"
+    ) +
+    facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
+    labs(
+      title = paste("Hotspot vs non-hotspot density:", svc),
+      x = "Ecosystem service % change",
+      y = "Socioeconomic variable"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text      = element_text(face = "bold"),
+      plot.title      = element_text(hjust = 0.5),
+      axis.text       = element_text(size = 9),
+      legend.position = "right"
+    )
+
+  png_file <- file.path(out_dir, paste0(safe_name(svc), "_two_scales_bin2d.png"))
+  ggsave(filename = png_file, plot = p, width = 10, height = 6, dpi = 300, bg = "white")
+  print(p)
+}
+```
+
