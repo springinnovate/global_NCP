@@ -425,3 +425,89 @@ for (svc in unique_services) {
 }
 ```
 
+
+
+```{r runh plot}
+
+# runner.R — execute the density overlay with your current settings
+
+# 0) make sure the function is sourced
+# source("plot_hotspot_density_bin2d.R")  # uncomment if you saved it to a file
+
+# 1) labels (adjust if needed)
+socio_labels <- c(
+  "GHS_BUILT_S_E2020_mean"           = "Built Area",
+  "fields_mehrabi_2017_mean"         = "Field Size",
+  "hdi_raster_predictions_2020_mean" = "HDI",
+  "rast_adm1_gini_disp_2020_mean"    = "Income Inequality",
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "GDP (Total)",
+  "GHS_POP_E2020_GLOBE_sum"          = "Population (GHS)",
+  "GlobPOP_Count_30arc_2020_sum"     = "Population (Global)"
+)
+
+# 2) baseline run — global/service stretch, 2–98% quantiles
+files_baseline <- plot_hotspot_density_bin2d(
+  plt_long         = plt_long,         # hotspots
+  inverse_df       = inverse_df,       # non-hotspots (complement)
+  socio_labels     = socio_labels,
+  drop_services    = "Rt_nohab",
+  trim_p           = c(0.01, 0.99),    # x-trim for pct_chg per service
+  bg_bins          = 80,
+  hs_bins          = 50,
+  bg_alpha         = 0.85,
+  hs_alpha         = 0.90,
+  bg_trans         = "sqrt",
+  hs_trans         = "sqrt",
+  bg_fill_limits   = c(0.02, 0.98),    # stretch non-hotspot density by quantiles
+  hs_fill_limits   = c(0.02, 0.98),    # stretch hotspot density by quantiles
+  limits_mode      = "quantile",
+  per_facet_stretch = FALSE,           # service-wide (global) stretch
+  out_dir          = "output_charts",
+  filename_suffix  = "_two_scales_bin2d.png",
+  run_id           = "q02_098_service",# human-readable tag; avoids digest dependency
+  overwrite        = FALSE,
+  width            = 10,
+  height           = 6,
+  dpi              = 300,
+  use_ragg         = TRUE,             # reliable PNG device
+  hide_inline      = TRUE,             # avoid RStudio inline device
+  print_interactive = TRUE
+)
+
+# 3) optional comparison — per-facet stretch using the same quantiles
+#    (each panel scales its own density to its 2–98% range)
+files_facet <- plot_hotspot_density_bin2d(
+  plt_long         = plt_long,
+  inverse_df       = inverse_df,
+  socio_labels     = socio_labels,
+  drop_services    = "Rt_nohab",
+  trim_p           = c(0.01, 0.99),
+  bg_bins          = 80,
+  hs_bins          = 50,
+  bg_alpha         = 0.85,
+  hs_alpha         = 0.90,
+  bg_trans         = "sqrt",
+  hs_trans         = "sqrt",
+  bg_fill_limits   = c(0.02, 0.98),
+  hs_fill_limits   = c(0.02, 0.98),
+  limits_mode      = "quantile",
+  per_facet_stretch = TRUE,            # local stretch per panel
+  out_dir          = "output_charts",
+  filename_suffix  = "_two_scales_bin2d.png",
+  run_id           = "q02_098_facet",
+  overwrite        = FALSE,
+  width            = 10,
+  height           = 6,
+  dpi              = 300,
+  use_ragg         = TRUE,
+  hide_inline      = TRUE,
+  print_interactive = TRUE
+)
+
+# 4) light cleanup for memory
+gc()
+
+
+
+
+```
