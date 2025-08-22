@@ -123,7 +123,14 @@ res <- extract_hotspots(
 
 hotspots_sf <- res$hotspots_sf
 plt_long <- res$hotspots_df
+
+
 inverse_df  <- res$non_hotspots_df
+
+all <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio","Sed_export","N_export","C_Risk")
+
+inverse_df <- inverse_df %>% filter(service %in% all)
+
 ```
 
 
@@ -154,7 +161,7 @@ plt_long_socio <- plt_long %>%
   filter(is.finite(pct_chg), is.finite(socio_val))
 
 
-# Step 2: Trim out top and bottom 2% of pct_chg within each service
+#Step 2: Trim out top and bottom 2% of pct_chg within each service
 plt_long_socio <- plt_long_socio %>%
   group_by(service) %>%
   mutate(
@@ -163,6 +170,8 @@ plt_long_socio <- plt_long_socio %>%
   ) %>%
   ungroup() %>%
   filter(pct_chg >= pct_low, pct_chg <= pct_high)
+
+
 safe_name <- function(x) {
   x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
   gsub("_+", "_", x)
@@ -259,7 +268,7 @@ for (svc in unique_services) {
   mutate(socio_label = socio_labels[socio_var])
 
   p <- ggplot(plot_data, aes(x = pct_chg, y = socio_val)) +
-    geom_hex(bins = 20) +
+    geom_hex(bins = 100) +
     scale_fill_viridis_c(option = "D", direction = 1) +
     facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
     labs(
