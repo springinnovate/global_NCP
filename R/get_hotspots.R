@@ -210,7 +210,7 @@ extract_hotspots <- function(
     
     summary_sf <- sf_obj %>%
       dplyr::left_join(
-        hotspot_summary %>% dplyr::select(-.data$hotspot_services_list),
+        hotspot_summary %>% dplyr::select(-hotspot_services_list),
         by = "fid"
       )
     

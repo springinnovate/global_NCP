@@ -1,0 +1,282 @@
+---
+title: "Hotpot Extraction"
+format: html
+editor: visual
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(tidytext)
+library(rlang)
+library(tidyr)
+library(forcats)
+library(scales)
+library(RColorBrewer)
+library(htmltools)
+library(leaflet)
+library(devtools)
+library(reticulate)
+library(exactextractr)
+library(httpgd)
+load_all()
+
+#source the helper functions
+# set venv focr Python
+use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
+#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data'
+
+```
+####################### START HERE ##########################
+
+# 1 Hotspot Extraction 
+
+## 1.1 Prepare Date for Analysis
+
+
+
+Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. Add to the documentation , environment or however that's called the vectors to select and order the columns. This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir).
+
+```{r pivot}
+
+#| eval: true
+#| include: true
+ inpath <- here("output_data")
+#  get pct as standalone data to add to the table
+# Most recent version of synthesis data:
+sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
+# add fid
+sf_f$fid <- seq_len(nrow(sf_f)) 
+plt <- st_drop_geometry(sf_f)
+ 
+
+# get the benef vars (all that are not "chg")
+socio_vars <- names(plt)[
+  names(plt) != c("fid", "c_fid") & 
+  !grepl("chg$", names(plt))
+]
+
+# Pivot all columns that contain pct_ch, keeping other relevant vars
+
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_chg"),
+    names_to = "service",
+    values_to = "pct_chg"
+  ) %>%
+  select(fid, c_fid, service, pct_chg, all_of(socio_vars)) %>% 
+  mutate(service = str_replace(service, "_pct_chg.*", "")) %>% 
+  mutate(service = str_replace(service, "_mean.*", "")) %>% 
+  filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% filter(pct_chg != Inf)  # remove infinite values and those for which Country Id is NA
+  
+  
+# rename some variables (just for aesthetics)
+
+  plt_long <- plt_long %>% mutate(service = case_when(
+   service == "sed_export" ~ "Sed_export",
+   service == "n_export" ~ "N_export",
+   service == "n_retention" ~ "N_retention",
+   service == "nature_access" ~ "Nature_Access",
+   service == "pollination" ~ "Pollination",
+   service == "usle" ~ "USLE",
+   service == "n_ret_ratio" ~ "N_Ret_Ratio",
+   service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
+   service == "Rt_ratio" ~ "C_Risk_Red_Ratio",
+   service == "Rt" ~ "C_Risk",
+   service == "Rt_service" ~ "C_Prot_service",
+   TRUE ~ service
+   ))
+  
+  
+ 
+# Set service levesl one single time and for all. Don't drop some varaibles here, filter afterwards, it can be difficult/annpying to recover!!!
+service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Sed_export", "USLE", "Sed_Ret_Ratio", "Rt_nohab","C_Risk","C_Prot_service", "C_Risk_Red_Ratio", "Pollination") 
+
+```
+
+## 1.2 Get Hotspots
+
+
+```{r run get hotsposts function}
+loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+gain <- c("Sed_export","N_export","C_Risk")
+
+res <- extract_hotspots(
+  df = plt_long,
+  value_col = "pct_chg",
+  pct_cutoff = 0.05,
+  threshold_mode = "percent",
+  rule_mode = "vectors",
+  loss_services = loss,
+  gain_services = gain,
+  #side = "both",
+  id_cols = "c_fid",
+  sf_obj = sf_f
+)
+
+hotspots_sf <- res$hotspots_sf
+plt_long <- res$hotspots_df
+inverse_df  <- res$non_hotspots_df
+```
+
+
+# 2 Proeduce Scatterplots.
+
+## 2.1 Hotspots
+
+
+```{r scatterplot, fig.height=7, fig.width=12, warning=FALSE}
+# Make names shorter
+socio_labels <- c(
+  "GHS_BUILT_S_E2020_mean" = "Built Area",
+  "fields_mehrabi_2017_mean" = "Field Size",
+  "hdi_raster_predictions_2020_mean" = "HDI",
+  "rast_adm1_gini_disp_2020_mean" = "Income Inequality",
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "GDP (Total)",
+  "GHS_POP_E2020_GLOBE_sum" = "Population (GHS)",
+  "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
+)
+
+plt_long_socio <- plt_long %>%
+  pivot_longer(cols = all_of(socio_vars),
+               names_to = "socio_var", values_to = "socio_val") %>%
+  mutate(
+    pct_chg   = as.numeric(pct_chg),
+    socio_val = as.numeric(socio_val)
+  ) %>%
+  filter(is.finite(pct_chg), is.finite(socio_val))
+
+
+# Step 2: Trim out top and bottom 2% of pct_chg within each service
+plt_long_socio <- plt_long_socio %>%
+  group_by(service) %>%
+  mutate(
+    pct_low  = quantile(pct_chg, 0.01, na.rm = TRUE),
+    pct_high = quantile(pct_chg, 0.99, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  filter(pct_chg >= pct_low, pct_chg <= pct_high)
+safe_name <- function(x) {
+  x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
+  gsub("_+", "_", x)
+}
+
+# Step 2: Loop over each service and generate faceted scatterplots
+unique_services <- unique(plt_long_socio$service)
+
+out_dir <- file.path("outputs", "plots", "hex")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+for (svc in unique_services) {
+  plot_data <- plt_long_socio %>%
+    filter(service == svc) %>%
+    mutate(socio_label = socio_labels[as.character(socio_var)]) %>%
+    # drop facets with too few distinct values (hexbin needs ranges)
+    group_by(socio_label) %>%
+    filter(n() > 1,
+           n_distinct(pct_chg)   > 1,
+           n_distinct(socio_val) > 1) %>%
+    ungroup()
+
+  if (nrow(plot_data) == 0) next  # nothing to draw
+
+  p <- ggplot(plot_data, aes(x = pct_chg, y = socio_val)) +
+    geom_hex(bins = 30, na.rm = TRUE) +
+    scale_fill_viridis_c(option = "D", direction = 1) +
+    facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
+    labs(
+      title = paste("Hotspot:", svc),
+      x = "Ecosystem Service % Change",
+      y = "Socioeconomic Variable Value",
+      fill = "Density"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text  = element_text(face = "bold"),
+      plot.title  = element_text(hjust = 0.5),
+      axis.text   = element_text(size = 9)
+    )
+   # also save a PNG with white background
+  png_file <- paste0(here("output_charts"),"/", safe_name(svc),".png")
+  ggsave(filename = png_file, plot = p, width = 10, height = 6, dpi = 300, bg = "white")
+  print(p)
+}
+
+```
+
+
+```{r plot 2, fig.height=7, fig.width=12, warning=FALSE}
+
+# # Make names shorter
+# socio_labels <- c(
+#   "GHS_BUILT_S_E2020_mean" = "Built Area",
+#   "fields_mehrabi_2017_mean" = "Field Size",
+#   "hdi_raster_predictions_2020_mean" = "HDI",
+#   "rast_adm1_gini_disp_2020_mean" = "Income Inequality",
+#   "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "GDP (Total)",
+#   "GHS_POP_E2020_GLOBE_sum" = "Population (GHS)",
+#   "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
+# )
+inverse_df1 <- inverse_df %>% filter(!service %in% c("Rt_nohab"))
+
+plt_long_socio <- inverse_df1%>%
+  pivot_longer(
+    cols = all_of(socio_vars),
+    names_to = "socio_var",
+    values_to = "socio_val"
+  ) %>% filter(!is.na(socio_val))
+
+
+# Step 2: Trim out top and bottom 2% of pct_chg within each service
+# Comment /descomment this to set the stretch
+ plt_long_socio<- plt_long_socio %>%
+  group_by(service) %>%
+  mutate(
+    pct_low = quantile(pct_chg, 0.01, na.rm = TRUE),
+    pct_high = quantile(pct_chg, 0.99, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  filter(pct_chg >= pct_low, pct_chg <= pct_high)
+ 
+ safe_name <- function(x) {
+  x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
+  gsub("_+", "_", x)
+}
+
+# Step 2: Loop over each service and generate faceted scatterplots
+unique_services <- unique(plt_long_socio$service)
+
+for (svc in unique_services) {
+  plot_data <- filter(plt_long_socio, service == svc)
+  plot_data <- plot_data %>%
+  mutate(socio_label = socio_labels[socio_var])
+
+  p <- ggplot(plot_data, aes(x = pct_chg, y = socio_val)) +
+    geom_hex(bins = 20) +
+    scale_fill_viridis_c(option = "D", direction = 1) +
+    facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
+    labs(
+      title = paste("Not Hotspot:", svc),
+      x = "Ecosystem Service % Change",
+      y = "Socioeconomic Variable Value",
+      fill = "Density"
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text = element_text(face = "bold"),
+      plot.title = element_text(hjust = 0.5),
+      axis.text = element_text(size = 9)
+    )
+   png_file <- paste0(here("output_charts"),"/", safe_name(svc),"_all.png")
+   ggsave(filename = png_file, plot = p, width = 10, height = 6, dpi = 300, bg = "white")
+  print(p)
+}
+
+```
