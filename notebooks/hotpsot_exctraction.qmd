@@ -136,9 +136,11 @@ rm(res, sf_f)
 ```
 
 
-# 2 Proeduce Scatterplots.
+# 2 Produce Scatterplots.
 
 ## 2.1 Hotspots
+
+
 
 
 ```{r scatterplot, fig.height=7, fig.width=12, warning=FALSE}
@@ -284,7 +286,7 @@ for (svc in unique_services) {
 ```
 ## 2.3 Hotspot-Not Hotspot Overlay. 
 
-```{r scatterplot 3, lot,fig.height=7, fig.width=12, warning=FALSE}
+```{r scatterplot 3,fig.height=7, fig.width=12, warning=FALSE}
 
 library(dplyr)
 library(tidyr)
@@ -295,8 +297,8 @@ library(viridisLite)
 
 # ---- Tunables ---------------------------------------------------------
 bg_bins        <- 80     # number of bins for non-hotspots
-hs_bins        <- 50     # number of bins for hotspots (can be lower)
-bg_alpha       <- 0.85   # opacity for non-hotspot heatmap
+hs_bins        <- 60     # number of bins for hotspots (can be lower)
+bg_alpha       <- 0.70   # opacity for non-hotspot heatmap
 hs_alpha       <- 0.90   # opacity for hotspot heatmap
 bg_trans       <- "sqrt" # sqrt stretch improves visibility of low densities
 hs_trans       <- "sqrt"
@@ -316,7 +318,7 @@ socio_labels <- c(
   "GHS_POP_E2020_GLOBE_sum" = "Population (GHS)",
   "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
 )
-ocio_vars <- names(socio_labels)
+socio_vars <- names(socio_labels)
 
 # optional: drop services you don't want from inverse_df
 inverse_df <- inverse_df %>% filter(!service %in% c("Rt_nohab"))
@@ -427,9 +429,7 @@ for (svc in unique_services) {
 
 
 
-```{r runh plot}
-
-# runner.R — execute the density overlay with your current settings
+```{r runh plot, fig.height=7, fig.width=12, warning=FALSE}
 
 # 0) make sure the function is sourced
 # source("plot_hotspot_density_bin2d.R")  # uncomment if you saved it to a file
@@ -455,7 +455,7 @@ files_baseline <- plot_hotspot_density_bin2d(
   bg_bins          = 80,
   hs_bins          = 50,
   bg_alpha         = 0.85,
-  hs_alpha         = 0.90,
+  hs_alpha         = 0.75,
   bg_trans         = "sqrt",
   hs_trans         = "sqrt",
   bg_fill_limits   = c(0.02, 0.98),    # stretch non-hotspot density by quantiles
@@ -473,6 +473,12 @@ files_baseline <- plot_hotspot_density_bin2d(
   hide_inline      = TRUE,             # avoid RStudio inline device
   print_interactive = TRUE
 )
+gc()
+
+
+
+```
+```{r plot again, fig.height=7, fig.width=12, warning=FALSE}
 
 # 3) optional comparison — per-facet stretch using the same quantiles
 #    (each panel scales its own density to its 2–98% range)
@@ -506,8 +512,3 @@ files_facet <- plot_hotspot_density_bin2d(
 
 # 4) light cleanup for memory
 gc()
-
-
-
-
-```
