@@ -154,279 +154,42 @@ socio_labels <- c(
   "GHS_POP_E2020_GLOBE_sum" = "Population (GHS)",
   "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
 )
-
-plt_long_socio <- plt_long %>%
-  pivot_longer(cols = all_of(socio_vars),
-               names_to = "socio_var", values_to = "socio_val") %>%
-  mutate(
-    pct_chg   = as.numeric(pct_chg),
-    socio_val = as.numeric(socio_val)
-  ) %>%
-  filter(is.finite(pct_chg), is.finite(socio_val))
-
-
-#Step 2: Trim out top and bottom 2% of pct_chg within each service
-plt_long_socio <- plt_long_socio %>%
-  group_by(service) %>%
-  mutate(
-    pct_low  = quantile(pct_chg, 0.01, na.rm = TRUE),
-    pct_high = quantile(pct_chg, 0.99, na.rm = TRUE)
-  ) %>%
-  ungroup() %>%
-  filter(pct_chg >= pct_low, pct_chg <= pct_high)
-
-
-safe_name <- function(x) {
-  x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
-  gsub("_+", "_", x)
-}
-
-# Step 2: Loop over each service and generate faceted scatterplots
-unique_services <- unique(plt_long_socio$service)
-
-out_dir <- file.path("outputs", "plots", "hex")
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-
-for (svc in unique_services) {
-  plot_data <- plt_long_socio %>%
-    filter(service == svc) %>%
-    mutate(socio_label = socio_labels[as.character(socio_var)]) %>%
-    # drop facets with too few distinct values (hexbin needs ranges)
-    group_by(socio_label) %>%
-    filter(n() > 1,
-           n_distinct(pct_chg)   > 1,
-           n_distinct(socio_val) > 1) %>%
-    ungroup()
-
-  if (nrow(plot_data) == 0) next  # nothing to draw
-
-  p <- ggplot(plot_data, aes(x = pct_chg, y = socio_val)) +
-    geom_hex(bins = 50, na.rm = TRUE) +
-    scale_fill_viridis_c(option = "D", direction = 1) +
-    facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
-    labs(
-      title = paste("Hotspot:", svc),
-      x = "Ecosystem Service % Change",
-      y = "Socioeconomic Variable Value",
-      fill = "Density"
-    ) +
-    theme_minimal() +
-    theme(
-      strip.text  = element_text(face = "bold"),
-      plot.title  = element_text(hjust = 0.5),
-      axis.text   = element_text(size = 9)
-    )
-   # also save a PNG with white background
-  png_file <- paste0(here("output_charts"),"/", safe_name(svc),".png")
-  ggsave(filename = png_file, plot = p, width = 10, height = 6, dpi = 300, bg = "white")
-  print(p)
-}
+files_hot_only <- plot_hotspot_density_bin2d(
+  plt_long, inverse_df,
+  socio_labels = socio_labels,
+  which_layers = "hotspots",
+  drop_services = "Rt_nohab",
+  trim_p = c(0.01, 0.99),
+  y_trim_p = c(0.01, 0.99),          # optional; helps if y is very skewed
+  single_fill_limits = c(0.02, 0.98),
+  single_limits_mode = "quantile",
+  per_facet_stretch = FALSE,         # try TRUE to maximize local contrast
+  run_id = "hot_only_q02_098_facet_stretch",
+  out_dir = "output_charts",
+  filename_suffix = "_bin2d.png"
+)
 
 ```
 
 ## 2.2 Non- Hotpots
 ```{r plot 2, fig.height=7, fig.width=12, warning=FALSE}
 
-
-inverse_df <- inverse_df %>% filter(!service %in% c("Rt_nohab"))
-
-plt_long_socio <- inverse_df%>%
-  pivot_longer(
-    cols = all_of(socio_vars),
-    names_to = "socio_var",
-    values_to = "socio_val"
-  ) %>% filter(!is.na(socio_val))
-
-
-# Step 2: Trim out top and bottom 2% of pct_chg within each service
-# Comment /descomment this to set the stretch
- plt_long_socio<- plt_long_socio %>%
-  group_by(service) %>%
-  mutate(
-    pct_low = quantile(pct_chg, 0.01, na.rm = TRUE),
-    pct_high = quantile(pct_chg, 0.99, na.rm = TRUE)
-  ) %>%
-  ungroup() %>%
-  filter(pct_chg >= pct_low, pct_chg <= pct_high)
- 
- safe_name <- function(x) {
-  x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
-  gsub("_+", "_", x)
-}
-
-# Step 2: Loop over each service and generate faceted scatterplots
-unique_services <- unique(plt_long_socio$service)
-
-for (svc in unique_services) {
-  plot_data <- filter(plt_long_socio, service == svc)
-  plot_data <- plot_data %>%
-  mutate(socio_label = socio_labels[socio_var])
-
-  p <- ggplot(plot_data, aes(x = pct_chg, y = socio_val)) +
-    geom_hex(bins = 50) +
-    scale_fill_viridis_c(option = "D", direction = 1) +
-    facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
-    labs(
-      title = paste("Not Hotspot:", svc),
-      x = "Ecosystem Service % Change",
-      y = "Socioeconomic Variable Value",
-      fill = "Density"
-    ) +
-    theme_minimal() +
-    theme(
-      strip.text = element_text(face = "bold"),
-      plot.title = element_text(hjust = 0.5),
-      axis.text = element_text(size = 9)
-    )
-   png_file <- paste0(here("output_charts"),"/", safe_name(svc),"_all.png")
-   ggsave(filename = png_file, plot = p, width = 10, height = 6, dpi = 300, bg = "white")
-  print(p)
-}
+files_bg_only <- plot_hotspot_density_bin2d(
+  plt_long, inverse_df,
+  socio_labels = socio_labels,
+  which_layers = "nonhotspots",
+  drop_services = "Rt_nohab",
+  trim_p = c(0.01, 0.99),
+  y_trim_p = c(0.01, 0.99),
+  single_fill_limits = c(0.02, 0.98),
+  single_limits_mode = "quantile",
+  run_id = "nonhot_only_q02_098",
+  out_dir = "output_charts",
+  filename_suffix = "_bin2d.png"
+)
 
 ```
 ## 2.3 Hotspot-Not Hotspot Overlay. 
-
-```{r scatterplot 3,fig.height=7, fig.width=12, warning=FALSE}
-
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(here)
-library(ggnewscale)   # allows multiple fill scales
-library(viridisLite)
-
-# ---- Tunables ---------------------------------------------------------
-bg_bins        <- 80     # number of bins for non-hotspots
-hs_bins        <- 60     # number of bins for hotspots (can be lower)
-bg_alpha       <- 0.70   # opacity for non-hotspot heatmap
-hs_alpha       <- 0.90   # opacity for hotspot heatmap
-bg_trans       <- "sqrt" # sqrt stretch improves visibility of low densities
-hs_trans       <- "sqrt"
-# palettes
-bg_palette <- viridisLite::viridis(9, option = "C")           # cool viridis
-hs_palette <- c("#FFE9E9", "#FFA3A3", "#FF5B5B", "#D40000")   # light->deep red
-# ----------------------------------------------------------------------
-
-# assumes socio_labels defined; plt_long (hotspots) and inverse_df (non-hotspots) exist
-
-socio_labels <- c(
-  "GHS_BUILT_S_E2020_mean" = "Built Area",
-  "fields_mehrabi_2017_mean" = "Field Size",
-  "hdi_raster_predictions_2020_mean" = "HDI",
-  "rast_adm1_gini_disp_2020_mean" = "Income Inequality",
-  "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "GDP (Total)",
-  "GHS_POP_E2020_GLOBE_sum" = "Population (GHS)",
-  "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
-)
-socio_vars <- names(socio_labels)
-
-# optional: drop services you don't want from inverse_df
-inverse_df <- inverse_df %>% filter(!service %in% c("Rt_nohab"))
-
-# tag and combine
-hot_df  <- plt_long   %>% mutate(hotspot_flag = 1L)
-non_df  <- inverse_df %>% mutate(hotspot_flag = 0L)
-both_df <- bind_rows(hot_df, non_df)
-
-# pivot, numeric coercion, common trim per service, label facets
-both_long <- both_df %>%
-  pivot_longer(
-    cols = all_of(socio_vars),
-    names_to = "socio_var",
-    values_to = "socio_val"
-  ) %>%
-  mutate(
-    pct_chg      = as.numeric(pct_chg),
-    socio_val    = as.numeric(socio_val),
-    hotspot_flag = factor(hotspot_flag, levels = c(0, 1),
-                          labels = c("Non-hotspot", "Hotspot"))
-  ) %>%
-  filter(is.finite(pct_chg), is.finite(socio_val)) %>%
-  group_by(service) %>%
-  mutate(
-    pct_low  = quantile(pct_chg, 0.01, na.rm = TRUE),
-    pct_high = quantile(pct_chg, 0.99, na.rm = TRUE)
-  ) %>%
-  ungroup() %>%
-  filter(pct_chg >= pct_low, pct_chg <= pct_high) %>%
-  mutate(socio_label = socio_labels[as.character(socio_var)])
-
-# drop facets with too little variation (avoids degenerate panels)
-drop_flat_facets <- function(df) {
-  df %>%
-    group_by(socio_label) %>%
-    filter(n() > 1,
-           dplyr::n_distinct(pct_chg)   > 1,
-           dplyr::n_distinct(socio_val) > 1) %>%
-    ungroup()
-}
-
-safe_name <- function(x) {
-  x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
-  gsub("_+", "_", x)
-}
-
-out_dir <- here("output_charts")
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-
-unique_services <- unique(both_long$service)
-
-for (svc in unique_services) {
-  plot_data <- both_long %>% filter(service == svc) %>% drop_flat_facets()
-  if (nrow(plot_data) == 0) next
-
-  bg_data <- plot_data %>% filter(hotspot_flag == "Non-hotspot")
-  fg_data <- plot_data %>% filter(hotspot_flag == "Hotspot")
-
-  p <- ggplot(NULL, aes(x = pct_chg, y = socio_val)) +
-    # layer 1: non-hotspots heatmap
-    stat_bin2d(
-      data  = bg_data,
-      bins  = bg_bins,
-      aes(fill = after_stat(count)),
-      alpha = bg_alpha,
-      na.rm = TRUE
-    ) +
-    scale_fill_gradientn(
-      colors = bg_palette,
-      trans  = bg_trans,
-      name   = "Non-hotspot density"
-    ) +
-    # start a NEW fill scale for hotspots
-    ggnewscale::new_scale_fill() +
-    # layer 2: hotspots heatmap (on top)
-    stat_bin2d(
-      data  = fg_data,
-      bins  = hs_bins,
-      aes(fill = after_stat(count)),
-      alpha = hs_alpha,
-      na.rm = TRUE
-    ) +
-    scale_fill_gradientn(
-      colors = hs_palette,
-      trans  = hs_trans,
-      name   = "Hotspot density"
-    ) +
-    facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
-    labs(
-      title = paste("Hotspot vs non-hotspot density:", svc),
-      x = "Ecosystem service % change",
-      y = "Socioeconomic variable"
-    ) +
-    theme_minimal() +
-    theme(
-      strip.text      = element_text(face = "bold"),
-      plot.title      = element_text(hjust = 0.5),
-      axis.text       = element_text(size = 9),
-      legend.position = "right"
-    )
-
-  png_file <- file.path(out_dir, paste0(safe_name(svc), "_two_scales_bin2d.png"))
-  ggsave(filename = png_file, plot = p, width = 10, height = 6, dpi = 300, bg = "white")
-  print(p)
-}
-```
-
 
 
 ```{r runh plot, fig.height=7, fig.width=12, warning=FALSE}
@@ -455,16 +218,16 @@ files_baseline <- plot_hotspot_density_bin2d(
   bg_bins          = 80,
   hs_bins          = 50,
   bg_alpha         = 0.85,
-  hs_alpha         = 0.75,
+  hs_alpha         = 0.90,
   bg_trans         = "sqrt",
   hs_trans         = "sqrt",
-  bg_fill_limits   = c(0.02, 0.98),    # stretch non-hotspot density by quantiles
-  hs_fill_limits   = c(0.02, 0.98),    # stretch hotspot density by quantiles
+  bg_fill_limits   = c(0.05, 0.95),    # stretch non-hotspot density by quantiles
+  hs_fill_limits   = c(0.05, 0.95),    # stretch hotspot density by quantiles
   limits_mode      = "quantile",
   per_facet_stretch = FALSE,           # service-wide (global) stretch
   out_dir          = "output_charts",
   filename_suffix  = "_two_scales_bin2d.png",
-  run_id           = "q02_098_service",# human-readable tag; avoids digest dependency
+  run_id           = "q05_098_service",# human-readable tag; avoids digest dependency
   overwrite        = FALSE,
   width            = 10,
   height           = 6,
@@ -478,37 +241,5 @@ gc()
 
 
 ```
-```{r plot again, fig.height=7, fig.width=12, warning=FALSE}
 
-# 3) optional comparison — per-facet stretch using the same quantiles
-#    (each panel scales its own density to its 2–98% range)
-files_facet <- plot_hotspot_density_bin2d(
-  plt_long         = plt_long,
-  inverse_df       = inverse_df,
-  socio_labels     = socio_labels,
-  drop_services    = "Rt_nohab",
-  trim_p           = c(0.01, 0.99),
-  bg_bins          = 80,
-  hs_bins          = 50,
-  bg_alpha         = 0.85,
-  hs_alpha         = 0.90,
-  bg_trans         = "sqrt",
-  hs_trans         = "sqrt",
-  bg_fill_limits   = c(0.02, 0.98),
-  hs_fill_limits   = c(0.02, 0.98),
-  limits_mode      = "quantile",
-  per_facet_stretch = TRUE,            # local stretch per panel
-  out_dir          = "output_charts",
-  filename_suffix  = "_two_scales_bin2d.png",
-  run_id           = "q02_098_facet",
-  overwrite        = FALSE,
-  width            = 10,
-  height           = 6,
-  dpi              = 300,
-  use_ragg         = TRUE,
-  hide_inline      = TRUE,
-  print_interactive = TRUE
-)
 
-# 4) light cleanup for memory
-gc()
