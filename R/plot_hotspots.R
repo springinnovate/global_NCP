@@ -48,7 +48,7 @@ plot_hotspot_density_bin2d <- function(
     bg_alpha = 0.85, hs_alpha = 0.90,
     bg_trans = "sqrt", hs_trans = "sqrt",
     bg_palette = viridisLite::viridis(9, option = "C"),
-    hs_palette = c("#FFE9E9", "#FFA3A3", "#FF5B5B", "#D40000"),
+    hs_palette = c("#2166AC","#F7F7F7","#B2182B"),#c("#FFE9E9", "#FFA3A3", "#FF5B5B", "#D40000"),
     bg_fill_limits = c(0.02, 0.98),
     hs_fill_limits = c(0.02, 0.98),
     single_palette = c("#2166AC","#F7F7F7","#B2182B"), # diverging look (blue-white-red)
@@ -76,7 +76,20 @@ plot_hotspot_density_bin2d <- function(
   if (!is.null(drop_services) && length(drop_services)) {
     inverse_df <- dplyr::filter(inverse_df, !.data$service %in% drop_services)
   }
-  
+  save_png_safe <- function(file, plot, width, height, dpi, bg = "white", use_ragg = TRUE) {
+    ok <- FALSE
+    if (use_ragg && requireNamespace("ragg", quietly = TRUE)) {
+      try({
+        ggplot2::ggsave(file, plot, width = width, height = height, dpi = dpi, bg = bg,
+                        device = ragg::agg_png)
+        ok <- TRUE
+      }, silent = TRUE)
+    }
+    if (!ok) {
+      ggplot2::ggsave(file, plot, width = width, height = height, dpi = dpi, bg = bg,
+                      device = "png")
+    }
+  }
   # tag & combine
   hot_df  <- dplyr::mutate(plt_long,   hotspot_flag = 1L)
   non_df  <- dplyr::mutate(inverse_df, hotspot_flag = 0L)
@@ -342,12 +355,8 @@ plot_hotspot_density_bin2d <- function(
     png_file <- file.path(out_dir, paste0(safe_name(svc), "_", tag, filename_suffix))
     png_file <- make_unique_path(png_file)
     
-    if (use_ragg) {
-      ggplot2::ggsave(png_file, p, width=width, height=height, dpi=dpi, bg="white",
-                      device = ragg::agg_png)
-    } else {
-      ggplot2::ggsave(png_file, p, width=width, height=height, dpi=dpi, bg="white")
-    }
+    save_png_safe(png_file, p, width = width, height = height, dpi = dpi, bg = "white", use_ragg = use_ragg)
+
     if (print_interactive && interactive() && !isTRUE(getOption("knitr.in.progress"))) print(p)
     out_files <- c(out_files, png_file)
     rm(p); gc()
