@@ -28,6 +28,7 @@ library(exactextractr)
 library(httpgd)
 library(ggnewscale)   # allows multiple fill scales
 library(viridisLite)
+library(ragg)
 load_all()
 
 #source the helper functions
@@ -124,20 +125,33 @@ res <- extract_hotspots(
 
 hotspots_sf <- res$hotspots_sf
 plt_long <- res$hotspots_df
-
-
 inverse_df  <- res$non_hotspots_df
 
 all <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio","Sed_export","N_export","C_Risk")
 
 inverse_df <- inverse_df %>% filter(service %in% all)
-rm(res, sf_f)
+#rm(res, sf_f)
 
 ```
 
 
 # 2 Produce Scatterplots.
 
+
+### 2.1.1 Load Data
+
+```{r load_plotting data res}
+
+load(here("output_data", "res_hs_5.RData"))
+
+plt_long <- res$hotspots_df
+inverse_df  <- res$non_hotspots_df
+
+all <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio","Sed_export","N_export","C_Risk")
+
+inverse_df <- inverse_df %>% filter(service %in% all)
+rm(res)
+``` 
 ## 2.1 Hotspots
 
 
@@ -164,7 +178,7 @@ files_hot_only <- plot_hotspot_density_bin2d(
   single_fill_limits = c(0.02, 0.98),
   single_limits_mode = "quantile",
   per_facet_stretch = FALSE,         # try TRUE to maximize local contrast
-  run_id = "hot_only_q02_098_facet_stretch",
+  run_id = "hot_only_q02_098",
   out_dir = "output_charts",
   filename_suffix = "_bin2d.png"
 )
