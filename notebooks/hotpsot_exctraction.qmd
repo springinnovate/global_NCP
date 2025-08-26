@@ -52,6 +52,7 @@ Here, the spatial objects with the additional attributes are loaded and reformat
 #| eval: true
 #| include: true
  inpath <- here("output_data")
+ inpath <- '/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs'
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
 sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
@@ -118,17 +119,28 @@ res <- extract_hotspots(
   rule_mode = "vectors",
   loss_services = loss,
   gain_services = gain,
+  combos = list(
+    combo_1 = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
+    combo_2 = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+  ),
   #side = "both",
   id_cols = "c_fid",
   sf_obj = sf_f
 )
 
-hotspots_sf <- res$hotspots_sf
+#hotspots_sf <- res$hotspots_sf
 plt_long <- res$hotspots_df
 inverse_df  <- res$non_hotspots_df
 
-all <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio","Sed_export","N_export","C_Risk")
 
+
+# check if summary sf worked (has all the values correctly identified)
+hp2 <- res$summary_sf
+hp2$c_fid.y <- NULL 
+hp2$hotspot_services <- NULL
+hp2 <- hp2 %>% filter(!is.na(hotspot_count)) # this should be INSIDE of the function, will take care of this later.
+
+st_write(hp2, here("output_data", "hotspots_5_final.gpkg"), append=FALSE)
 inverse_df <- inverse_df %>% filter(service %in% all)
 #rm(res, sf_f)
 
