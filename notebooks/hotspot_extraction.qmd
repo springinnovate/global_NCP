@@ -1,0 +1,271 @@
+---
+title: "Hotpot Extraction"
+format: html
+editor: visual
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(tidytext)
+library(rlang)
+library(tidyr)
+library(forcats)
+library(scales)
+library(RColorBrewer)
+library(htmltools)
+library(leaflet)
+library(devtools)
+library(reticulate)
+library(exactextractr)
+library(httpgd)
+library(ggnewscale)   # allows multiple fill scales
+library(viridisLite)
+library(ragg)
+load_all()
+
+#source the helper functions
+# set venv focr Python
+use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
+#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data'
+
+```
+####################### START HERE ##########################
+
+# 1 Hotspot Extraction 
+
+## 1.1 Prepare Date for Analysis
+
+
+
+Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. Add to the documentation , environment or however that's called the vectors to select and order the columns. This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir).
+
+```{r pivot}
+
+#| eval: true
+#| include: true
+ inpath <- here("output_data")
+ inpath <- '/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs'
+#  get pct as standalone data to add to the table
+# Most recent version of synthesis data:
+sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
+# add fid
+sf_f$fid <- seq_len(nrow(sf_f)) 
+plt <- st_drop_geometry(sf_f)
+
+# get the benef vars (all that are not "chg")
+socio_vars <- names(plt)[
+  names(plt) != c("fid", "c_fid") & 
+  !grepl("chg$", names(plt))
+]
+
+# Pivot all columns that contain pct_ch, keeping other relevant vars
+
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_chg"),
+    names_to = "service",
+    values_to = "pct_chg"
+  ) %>%
+  select(fid, c_fid, service, pct_chg, all_of(socio_vars)) %>% 
+  mutate(service = str_replace(service, "_pct_chg.*", "")) %>% 
+  mutate(service = str_replace(service, "_mean.*", "")) %>% 
+  filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% filter(pct_chg != Inf)  # remove infinite values and those for which Country Id is NA
+  
+  
+# rename some variables (just for aesthetics)
+
+  plt_long <- plt_long %>% mutate(service = case_when(
+   service == "sed_export" ~ "Sed_export",
+   service == "n_export" ~ "N_export",
+   service == "n_retention" ~ "N_retention",
+   service == "nature_access" ~ "Nature_Access",
+   service == "pollination" ~ "Pollination",
+   service == "usle" ~ "USLE",
+   service == "n_ret_ratio" ~ "N_Ret_Ratio",
+   service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
+   service == "Rt_ratio" ~ "C_Risk_Red_Ratio",
+   service == "Rt" ~ "C_Risk",
+   service == "Rt_service" ~ "C_Prot_service",
+   TRUE ~ service
+   ))
+  
+  
+ 
+# Set service levesl one single time and for all. Don't drop some varaibles here, filter afterwards, it can be difficult/annpying to recover!!!
+service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Sed_export", "USLE", "Sed_Ret_Ratio", "Rt_nohab","C_Risk","C_Prot_service", "C_Risk_Red_Ratio", "Pollination") 
+
+```
+
+## 1.2 Get Hotspots
+
+
+```{r run get hotsposts function}
+loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+gain <- c("Sed_export","N_export","C_Risk")
+
+res <- extract_hotspots(
+  df = plt_long,
+  value_col = "pct_chg",
+  pct_cutoff = 0.05,
+  threshold_mode = "percent",
+  rule_mode = "vectors",
+  loss_services = loss,
+  gain_services = gain,
+  combos = list(
+    combo_1 = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
+    combo_2 = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+  ),
+  #side = "both",
+  id_cols = "c_fid",
+  sf_obj = sf_f
+)
+
+#hotspots_sf <- res$hotspots_sf
+plt_long <- res$hotspots_df
+inverse_df  <- res$non_hotspots_df
+
+
+
+# check if summary sf worked (has all the values correctly identified)
+hp2 <- res$summary_sf
+hp2$c_fid.y <- NULL 
+hp2$hotspot_services <- NULL
+hp2 <- hp2 %>% filter(!is.na(hotspot_count)) # this should be INSIDE of the function, will take care of this later.
+
+st_write(hp2, here("output_data", "hotspots_5_final.gpkg"), append=FALSE)
+inverse_df <- inverse_df %>% filter(service %in% all)
+#rm(res, sf_f)
+
+```
+
+
+# 2 Produce Scatterplots.
+
+
+### 2.1.1 Load Data
+
+```{r load_plotting data res}
+
+load(here("output_data", "res_hs_5.RData"))
+
+plt_long <- res$hotspots_df
+inverse_df  <- res$non_hotspots_df
+
+all <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio","Sed_export","N_export","C_Risk")
+
+inverse_df <- inverse_df %>% filter(service %in% all)
+rm(res)
+``` 
+## 2.1 Hotspots
+
+
+
+
+```{r scatterplot, fig.height=7, fig.width=12, warning=FALSE}
+# Make names shorter
+socio_labels <- c(
+  "GHS_BUILT_S_E2020_mean" = "Built Area",
+  "fields_mehrabi_2017_mean" = "Field Size",
+  "hdi_raster_predictions_2020_mean" = "HDI",
+  "rast_adm1_gini_disp_2020_mean" = "Income Inequality",
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "GDP (Total)",
+  "GHS_POP_E2020_GLOBE_sum" = "Population (GHS)",
+  "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
+)
+files_hot_only <- plot_hotspot_density_bin2d(
+  plt_long, inverse_df,
+  socio_labels = socio_labels,
+  which_layers = "hotspots",
+  drop_services = "Rt_nohab",
+  trim_p = c(0.01, 0.99),
+  y_trim_p = c(0.01, 0.99),          # optional; helps if y is very skewed
+  single_fill_limits = c(0.02, 0.98),
+  single_limits_mode = "quantile",
+  per_facet_stretch = FALSE,         # try TRUE to maximize local contrast
+  run_id = "hot_only_q02_098",
+  out_dir = "output_charts",
+  filename_suffix = "_bin2d.png"
+)
+
+```
+
+## 2.2 Non- Hotpots
+```{r plot 2, fig.height=7, fig.width=12, warning=FALSE}
+
+files_bg_only <- plot_hotspot_density_bin2d(
+  plt_long, inverse_df,
+  socio_labels = socio_labels,
+  which_layers = "nonhotspots",
+  drop_services = "Rt_nohab",
+  trim_p = c(0.01, 0.99),
+  y_trim_p = c(0.01, 0.99),
+  single_fill_limits = c(0.02, 0.98),
+  single_limits_mode = "quantile",
+  run_id = "nonhot_only_q02_098",
+  out_dir = "output_charts",
+  filename_suffix = "_bin2d.png"
+)
+
+```
+## 2.3 Hotspot-Not Hotspot Overlay. 
+
+
+```{r runh plot, fig.height=7, fig.width=12, warning=FALSE}
+
+# 0) make sure the function is sourced
+# source("plot_hotspot_density_bin2d.R")  # uncomment if you saved it to a file
+
+# 1) labels (adjust if needed)
+socio_labels <- c(
+  "GHS_BUILT_S_E2020_mean"           = "Built Area",
+  "fields_mehrabi_2017_mean"         = "Field Size",
+  "hdi_raster_predictions_2020_mean" = "HDI",
+  "rast_adm1_gini_disp_2020_mean"    = "Income Inequality",
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "GDP (Total)",
+  "GHS_POP_E2020_GLOBE_sum"          = "Population (GHS)",
+  "GlobPOP_Count_30arc_2020_sum"     = "Population (Global)"
+)
+
+# 2) baseline run — global/service stretch, 2–98% quantiles
+files_baseline <- plot_hotspot_density_bin2d(
+  plt_long         = plt_long,         # hotspots
+  inverse_df       = inverse_df,       # non-hotspots (complement)
+  socio_labels     = socio_labels,
+  drop_services    = "Rt_nohab",
+  trim_p           = c(0.01, 0.99),    # x-trim for pct_chg per service
+  bg_bins          = 80,
+  hs_bins          = 50,
+  bg_alpha         = 0.85,
+  hs_alpha         = 0.90,
+  bg_trans         = "sqrt",
+  hs_trans         = "sqrt",
+  bg_fill_limits   = c(0.05, 0.95),    # stretch non-hotspot density by quantiles
+  hs_fill_limits   = c(0.05, 0.95),    # stretch hotspot density by quantiles
+  limits_mode      = "quantile",
+  per_facet_stretch = FALSE,           # service-wide (global) stretch
+  out_dir          = "output_charts",
+  filename_suffix  = "_two_scales_bin2d.png",
+  run_id           = "q05_098_service",# human-readable tag; avoids digest dependency
+  overwrite        = FALSE,
+  width            = 10,
+  height           = 6,
+  dpi              = 300,
+  use_ragg         = TRUE,             # reliable PNG device
+  hide_inline      = TRUE,             # avoid RStudio inline device
+  print_interactive = TRUE
+)
+gc()
+
+
+
+```
+
+
