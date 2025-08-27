@@ -48,7 +48,6 @@ Global raster datasets for nitrogen retention/export/ratio, sediment retention/e
 Country polygon dataset for spatial aggregation and attribution.
 
 
-Rasterized country data (*pyramids*) to speed up/help adding country data/groupings to the dataset. 
 
 ## 2. Data Processing Pipeline
 
@@ -64,7 +63,6 @@ Included in this analysis three key variables for each year: *convert into math 
 Computed mean and max per grid cell for each coastal protection metric.
 
 ### 2.2: Zonal Statistics for Gridded ES Services
-
 
 Geosharding-based pipeline to extract zonal statistics (mean or sum, depending on the service) from modeled global ES raster layers for two  years (1992-2020) to the 10 km grid (or any poygon vector file).  Values are labeled and appended as new columns in an output vector dataset (gpkg)  
 
@@ -132,6 +130,54 @@ Assemble final gridded Change/beneficiary data set
 #Builds a list of files in the vector directory
 #inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data'
 sets <- file.path(inpath, list.files(inpath, pattern = "gpkg$"))
+# Beneficiaries:
+
+# Af thi, moe tis o arciv, we do;t ned this anymore
+B_sums <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/archive/hydrosheds_lv6_synth_benef_sums.gpkg")
+B_means <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/archive/10k_grid_synth_benef_means.gpkg")
+
+B_sums <- B_sums %>% mutate(fid = dplyr::row_number())
+B_means <- B_means %>% mutate(fid = dplyr::row_number())
+B_means <- st_drop_geometry(B_means)
+
+B_sums <- left_join(B_sums, B_means)
+B_sums["fid"] <- NULL
+
+st_write(B_sums, ("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_benef.gpkg"))
+
+nams <- names(B_sums)
+nams <- cbind(nams,nams)
+write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/benef.csv")
+
+
+################################
+# Services (from Rasters):
+
+S_means <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_synth_serv_means.gpkg")
+S_sums <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/archive/10k_grid_synth_serv_sums.gpkg")
+
+
+S_sums <- S_sums %>% mutate(fid = dplyr::row_number())
+S_means <- S_means %>% mutate(fid = dplyr::row_number())
+
+S_means <- st_drop_geometry(S_means)
+
+S_sums <- left_join(S_sums, S_means)
+S_sums["fid"] <- NULL
+
+st_write(S_sums, "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_services.gpkg")
+
+nams <- names(S_sums)
+nams <- cbind(nams,nams)
+write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/serv.csv")
+
+
+
+c_prot <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data_NCP/vector/grid_10k_coastal_calc.gpkg')
+nams <- names(c_prot)
+nams <- cbind(nams,nams)
+write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/cp.csv")
+
 # Set and select an index to load the desired dastaset
 ##########################################
 sets1 <- sets[c(5,6)] # 10 km grid, zonals stats for ES services 1992, 2020), sums and means
@@ -275,6 +321,8 @@ sapply(cp2_joined, class)
 ### 3.2.1 Fix Coastal protection
 
 ```{r coastal protection consoldiation}
+#| eval: false
+#| include: false
 # Load grid (nothing special, just a template) This one has the right id_numbers. (from the original, key for joining) 
 cp2 <- st_read(here("data_NCP", "vector", "grid_10k_coastal.shp"))
 
@@ -290,12 +338,14 @@ cp_calc <- st_drop_geometry(cp_calc)
 cp_calc <- left_join(cp2,cp_calc)
 cp_calc$fid_2 <- NULL
 
-st_write(cp_calc, here("data_NCP", "vector",'grid_10k_coastal_risk_1992_2020.gpkg'))
+st_write(cp_calc, here("data_NCP", "vector",'grid_10k_coastal_risk_1992_2020.gpkg')) # not needed anymore. The calc already has the second fid
 ```
 
 ## 2.3 Join Coastal protection and export again
 
-```{r add to the existing synthesis data} 
+```{r add to the existing synthesis data}
+#| eval: false
+#| include: false
 #to preserve all original polygon columns: (not doing it right now but can be redone)
 sf_f <- st_read(paste0(inpath,'/', '10k_grid_ES_change_benef.gpkg'))
 
@@ -375,6 +425,26 @@ names(sf_f)
 sf_f$nature_access_abs_chg=poly1$nature_access_abs_chg
 sf_f$nature_access_pct_chg=poly1$access_pct_chg
 st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
+ch <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_ES_change_benef.gpkg')
+
+nams <- names(ch)
+
+nams <- cbind(nams, nams)
+write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/ch.csv")
+
+
+
+hp <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/hotspots_5_final-lilling-safeBackup-0001.gpkg')
+
+
+nams <- names(hp)
+nams <- cbind(nams, nams)
+
+write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/hp.csv")
+
 ```
+
+
+
 
 
