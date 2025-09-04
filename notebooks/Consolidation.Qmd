@@ -41,53 +41,48 @@ inpath <- here("output_data")
 
 Global 10 km grid covering terrestrial areas worldwide (polygon-based template).
 
-Coastal protection model outputs (1992 and 2020) originally as points spaced ~500 m along shorelines.
+Coastal protection model outputs (1992 and 2020) originally as points spaced \~500 m along shorelines.
 
 Global raster datasets for nitrogen retention/export/ratio, sediment retention/export/USLE, pollination, and nature access (1992 and 2020).
 
 Country polygon dataset for spatial aggregation and attribution.
 
-
-
 ## 2. Data Processing Pipeline
 
-### 2.1  Coastal Protection Aggregation
-This data set comes originally as a vector
-Included in this analysis three key variables for each year: *convert into math notation*
+### 2.1 Coastal Protection Aggregation
 
-- Rt: Actual Risk Level
-- Rt_nohab: Potential Risk Level if no ecosystem (expected to remain constant iver time, but necessary to calculate the next ones)
-- Rt_nohab - Rt = Rt_service: This difference is the actual value of the service provided (the potential-the observed) = Provided service
-- (Rt_nohab-Rt)/Rt: Coastal risk reduction ratio
+This data set comes originally as a vector Included in this analysis three key variables for each year: *convert into math notation*
+
+-   Rt: Actual Risk Level
+-   Rt_nohab: Potential Risk Level if no ecosystem (expected to remain constant over time, but necessary to calculate the next ones)
+-   Rt_nohab - Rt = Rt_service: This difference is the actual value of the service provided (the potential-the observed Risk) = Provided service
+-   (Rt_nohab-Rt)/Rt: Coastal risk reduction ratio
 
 Computed mean and max per grid cell for each coastal protection metric.
 
 ### 2.2: Zonal Statistics for Gridded ES Services
 
-Geosharding-based pipeline to extract zonal statistics (mean or sum, depending on the service) from modeled global ES raster layers for two  years (1992-2020) to the 10 km grid (or any poygon vector file).  Values are labeled and appended as new columns in an output vector dataset (gpkg)  
+Geosharding-based pipeline to extract zonal statistics (mean or sum, depending on the service) from modeled global ES raster layers for two years (1992-2020) to the 10 km grid (or any poygon vector file). Values are labeled and appended as new columns in an output vector dataset (gpkg)
 
 ### 2.3: Bi-temporal Change Calculation
 
-Applied compute_change() function to derive absolute and percentage changes for all variables, using consistent naming conventions (_abs_chg, _pct_chg).
+Applied compute_change() function to derive absolute and percentage changes for all variables, using consistent naming conventions (\_abs_chg, \_pct_chg).
 
-### 2.4:  Reshaping Data for Hotspot Detection
+### 2.4: Reshaping Data for Hotspot Detection
 
 Converted the dataset to long format (plt_long) with columns: fid, c_fid, service, and pct_chg.
 
-### 2.4  Hotspot Identification
+### 2.4 Hotspot Identification
 
 Defined loss/damage services and gain services.
 
-Identified hotspots as grid cells in the bottom 5% (losses) or top 5% (gains) per service.
-The develoiped function can exttract any threshold, and the inverses. We can also define the variables for which an increase is an improvement (goods) to which an increase is a deterioriation (damage)
+Identified hotspots as grid cells in the bottom 5% (losses) or top 5% (gains) per service. The developed function can extract any threshold, and the inverses. It is also posssible to set the variables for which an increase is an improvement (goods) to which an increase is a deterioration (damage), and set groups of variables, aka *combos* to count the number of variables for which a cell is a hotspot. ( Binary columns explicitly indicating whether a cell is a hotpot for each variable analized is included, as well as columns indicating the type of hotpot (damage/service loss).
 
 ### 2.5: Hotspot Grouping into Service Combos
 
-Created  combos for aggregated hotspot counts:
+Created combos for aggregated hotspot counts:
 
-  combo_1 = c("Nature_Access","Pollination","N_export", "Sed_export", "C_Risk"),
-  combo_2 = c("Nature_Access","Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "C_Risk_Red_Ratio")
-
+combo_1 = c("Nature_Access","Pollination","N_export", "Sed_export", "C_Risk"), combo_2 = c("Nature_Access","Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "C_Risk_Red_Ratio")
 
 Calculated counts per combo and total hotspot count.
 
@@ -109,17 +104,17 @@ A column listing all hotspot services per grid cell.
 
 ### 2.7. Outputs
 
-Final gpkg with the summary stats for each year for all variables plus socio economic data.
-Final gpkg object containing all hotspot-related attributes for each 10 km grid cell.
+Final gpkg with the summary stats for each year for all variables plus socio economic data. Final gpkg object containing all hotspot-related attributes for each 10 km grid cell.
 
 Map outputs prepared in Qis (one for the hotspots for each variable) and for the *conmbos*
 
 Flexible structure allows filtering for losses only, per-service mapping, or aggregated combo-based analyses.
 
 # Data processing
+
 ## 3. Consolidate Synthesis Data
 
-There is an issue with the naming of the variables that has been giving me a lot of trouble. I will need to clean and review thos, and remove the unncesary data. Doing this based on the indexs is definitively not a good think, each change/new dataset shifs thewhole thing and it is hard to follow effectively. Will need to think on a better way to do this.
+There is an issue with the naming of the variables that has been giving me a lot of trouble. I will need to clean and review this, remove remaining unnecesary data. Doing this based on the index is definitively not a good think, each change/new dataset shifts the whole thing and it is hard to follow effectively.
 
 Assemble final gridded Change/beneficiary data set
 
@@ -255,11 +250,10 @@ rm(sf_benf)
 st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
 ```
 
-
 ## 3.2 Include Coastal Protection (final)
 
-This whole part need to be fixed at some point. The key part is to get the coastal with the right fid so we can join and add this correclty wqhen we have more data.
-Right now keep this hewre
+This whole part need to be fixed at some point. The key part is to get the coastal with the right fid so we can join and add this correclty wqhen we have more data. Right now keep this hewre
+
 ```{r include coastal points}
 #| eval: false
 #| include: false
@@ -382,7 +376,8 @@ st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALS
 
 ## 2.4 Add Updated Access Data
 
-No need to run again, already updated the Access Data. 
+No need to run again, already updated the Access Data.
+
 ```{r add access}
 #| eval: false
 #| include: false
@@ -436,8 +431,9 @@ write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildl
 
 hp <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/hotspots_5_final-lilling-safeBackup-0001.gpkg')
 
-
 nams <- names(hp)
+
+
 nams <- cbind(nams, nams)
 
 write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/hp.csv")
@@ -447,4 +443,28 @@ write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildl
 
 
 
+```{r get names}
 
+hp <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
+
+nams <- names(hp)
+
+nams1 <- nams[c(2,4,6,10,14,16,18,24)]
+
+nams2 <- nams[c(43,41,39,42,44,40,37,38)] 
+
+
+library(dplyr)
+
+# assuming `nams1` and `nams2` are defined and ordered
+for (i in seq_along(nams1)) {
+  val_col <- nams1[i]
+  bin_col <- nams2[i]
+  masked_col <- paste0(val_col, "_masked")
+  
+  hp[[masked_col]] <- ifelse(hp[[bin_col]] == 1, hp[[val_col]], NA)
+}
+
+st_write(hp, '/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final_mskd.gpkg')
+
+```
