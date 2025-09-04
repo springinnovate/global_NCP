@@ -80,7 +80,7 @@ plt_long <- plt %>%
   filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% filter(pct_chg != Inf)  # remove infinite values and those for which Country Id is NA
   
   
-# rename some variables (just for aesthetics)
+# rename some variables (just for aesthetics) Eventually there must be an easier way to deal with it. Most of my struggles have been about this issue. 
 
   plt_long <- plt_long %>% mutate(service = case_when(
    service == "sed_export" ~ "Sed_export",
@@ -128,17 +128,20 @@ res <- extract_hotspots(
   sf_obj = sf_f
 )
 
-#hotspots_sf <- res$hotspots_sf
+hotspots_sf <- res$hotspots_sf
 plt_long <- res$hotspots_df
 inverse_df  <- res$non_hotspots_df
 
-
+hotspots_sf <- hotspots_sf %>% select(c(fid, C_Risk,C_Risk_Red_Ratio, Sed_Ret_Ratio, Sed_export, Nature_Access, N_export, N_Ret_Ratio, Pollination))
+hotspots_sf <- st_drop_geometry(hotspots_sf)
 
 # check if summary sf worked (has all the values correctly identified)
 hp2 <- res$summary_sf
 hp2$c_fid.y <- NULL 
 hp2$hotspot_services <- NULL
-hp2 <- hp2 %>% filter(!is.na(hotspot_count)) # this should be INSIDE of the function, will take care of this later.
+hp2 <- hp2 %>% filter(!is.na(hotspot_count)) # this should be INSIDE of the function, will take care of this later
+hp2 <- left_join(hp2, hotspots_sf, by = 'fid')
+
 
 st_write(hp2, here("output_data", "hotspots_5_final.gpkg"), append=FALSE)
 inverse_df <- inverse_df %>% filter(service %in% all)
