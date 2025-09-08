@@ -388,7 +388,6 @@ ks_res <- run_ks_hot_vs_non(
 ks_res
 ```
 
-
 ```{r ECD overlay}
 
 plot_ecdf_hot_vs_non <- function(plt_long, inverse_df, service_id, var) {
@@ -407,8 +406,6 @@ plot_ecdf_hot_vs_non <- function(plt_long, inverse_df, service_id, var) {
     theme_minimal()
 }
 ```
-
-
 
 ```{r aubmrnt + plots}
 
@@ -600,12 +597,12 @@ ggsave(here("output_charts","ecdf_gdp.png"), p_ecdf_gdp, width = 10, height = 7,
 p_ecdf_pop <- plot_ecdf_grid(plt_long, inverse_df,
                              "GHS_POP_E2020_GLOBE_sum",
                              top_k = 6, transform = "log1p")
-ggsave("output_charts/ks/ecdf_pop.png", p_ecdf_pop, width = 10, height = 7, dpi = 300, bg = "white")
+ggsave(here("output_charts","ecdf_pop.png"), p_ecdf_pop, width = 10, height = 7, dpi = 300, bg = "white")
 
 # 5) Mountain plot for a specific service × variable (pick a “big D”)
 p_mtn <- plot_ks_mountain(plt_long, inverse_df,
                           service_id = "Pollination",
                           var_id = "rast_gdpTot_1990_2020_30arcsec_2020_sum",
                           transform = "log1p")
-ggsave(here("output_charts", /ks/mountain_pollination_gdp.png", p_mtn, width = 8, height = 5, dpi = 300, bg = "white")
+ggsave(here("output_charts","mountain_pollination_gdp.png"), p_mtn, width = 8, height = 5, dpi = 300, bg = "white")
 ```
