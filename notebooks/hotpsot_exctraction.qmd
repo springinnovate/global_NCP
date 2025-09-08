@@ -1,5 +1,5 @@
 ---
-title: "Hotpot Extraction"
+title: "Hotspot Extraction"
 format: html
 editor: visual
 ---
@@ -37,18 +37,16 @@ use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 #inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data'
 
 ```
-####################### START HERE ##########################
 
-# 1 Hotspot Extraction 
+####################### START HERE
+
+# 1 Hotspot Extraction
 
 ## 1.1 Prepare Date for Analysis
 
-
-
-Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. Add to the documentation , environment or however that's called the vectors to select and order the columns. This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir).
+The spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation, that requires to **pivot** the input vector files into the long format, with one  row per service/cell combination.
 
 ```{r pivot}
-
 #| eval: true
 #| include: true
  inpath <- here("output_data")
@@ -79,7 +77,6 @@ plt_long <- plt %>%
   mutate(service = str_replace(service, "_mean.*", "")) %>% 
   filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% filter(pct_chg != Inf)  # remove infinite values and those for which Country Id is NA
   
-  
 # rename some variables (just for aesthetics)
 
   plt_long <- plt_long %>% mutate(service = case_when(
@@ -98,16 +95,16 @@ plt_long <- plt %>%
    ))
   
   
- 
-# Set service levesl one single time and for all. Don't drop some varaibles here, filter afterwards, it can be difficult/annpying to recover!!!
+
+# Set service levels one single time and for all. Don't drop some variables here, filter afterwards, it can be difficult/annoying to recover!!!
 service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Sed_export", "USLE", "Sed_Ret_Ratio", "Rt_nohab","C_Risk","C_Prot_service", "C_Risk_Red_Ratio", "Pollination") 
 
 ```
 
 ## 1.2 Get Hotspots
 
-
 ```{r run get hotsposts function}
+# Define the intended direction of change (service loss/increased damage)
 loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
 gain <- c("Sed_export","N_export","C_Risk")
 
@@ -146,7 +143,6 @@ inverse_df <- inverse_df %>% filter(service %in% all)
 
 ```
 
-
 # 2 Produce Scatterplots.
 
 
@@ -165,9 +161,6 @@ inverse_df <- inverse_df %>% filter(service %in% all)
 rm(res)
 ``` 
 ## 2.1 Hotspots
-
-
-
 
 ```{r scatterplot, fig.height=7, fig.width=12, warning=FALSE}
 # Make names shorter
@@ -194,10 +187,10 @@ files_hot_only <- plot_hotspot_density_bin2d(
   out_dir = "output_charts",
   filename_suffix = "_bin2d.png"
 )
-
 ```
 
 ## 2.2 Non- Hotpots
+
 ```{r plot 2, fig.height=7, fig.width=12, warning=FALSE}
 
 files_bg_only <- plot_hotspot_density_bin2d(
@@ -215,8 +208,8 @@ files_bg_only <- plot_hotspot_density_bin2d(
 )
 
 ```
-## 2.3 Hotspot-Not Hotspot Overlay. 
 
+## 2.3 Hotspot-Not Hotspot Overlay.
 
 ```{r runh plot, fig.height=7, fig.width=12, warning=FALSE}
 
@@ -263,9 +256,4 @@ files_baseline <- plot_hotspot_density_bin2d(
   print_interactive = TRUE
 )
 gc()
-
-
-
 ```
-
-
