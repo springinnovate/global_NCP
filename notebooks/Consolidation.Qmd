@@ -121,13 +121,12 @@ Assemble final gridded Change/beneficiary data set
 ```{r consolidate final outputs}
 #| eval: false
 #| include: false
-#
+inpath <- '/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs'
 #Builds a list of files in the vector directory
 #inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data'
 sets <- file.path(inpath, list.files(inpath, pattern = "gpkg$"))
 # Beneficiaries:
 
-# Af thi, moe tis o arciv, we do;t ned this anymore
 B_sums <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/archive/hydrosheds_lv6_synth_benef_sums.gpkg")
 B_means <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/archive/10k_grid_synth_benef_means.gpkg")
 
@@ -257,10 +256,10 @@ This whole part need to be fixed at some point. The key part is to get the coast
 ```{r include coastal points}
 #| eval: false
 #| include: false
-
+inpath <- '/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs'
 #cp2 <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal.gpkg')
 # load grid only coastal (need to recall where did i get it from)
-cp2 <- st_read(here("data","vector", "grid_10k_coastal.gpkg"))
+cp2 <- st_read(paste0(inpath,"/", "grid_10k_coastal.gpkg"))
 
 # load cleaned coastal protection data:
 cp_points <- st_read(here("output_data", "10k_grid_coastal_calc.gpkg"))
@@ -323,7 +322,7 @@ cp2 <- st_read(here("data_NCP", "vector", "grid_10k_coastal.shp"))
 cp2 <- cp2 %>% mutate(fid_2 = row_number())
 
 # Already calculated
-cp_calc <- st_read(here("data_NCP", "vector",'grid_10k_coastal_calc.gpkg'))
+cp_calc <- st_read(paste0(inpath, '/', 'grid_10k_coastal_calc.gpkg'))
 
 cp_calc <- cp_calc %>% mutate(fid_2 = row_number())
 cp_calc <- st_drop_geometry(cp_calc)
@@ -340,22 +339,32 @@ st_write(cp_calc, here("data_NCP", "vector",'grid_10k_coastal_risk_1992_2020.gpk
 ```{r add to the existing synthesis data}
 #| eval: false
 #| include: false
+
+inpath <- '/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs'
 #to preserve all original polygon columns: (not doing it right now but can be redone)
-sf_f <- st_read(paste0(inpath,'/', '10k_grid_ES_change_benef.gpkg'))
+sf_f <- st_read(paste0(inpath,'/', '10k_grid_ES_change_benef-Cumaribo.gpkg'))
 
-# Calculate change#
-
-cp_calc <- compute_change(cp_calc, suffix = c("_mean", "_max"), drop_columns = TRUE, change_type = "both")
-
-cp_calc <- st_drop_geometry(cp_calc)
-# export output
-cp_calc <- cp_calc %>%
-  select(-contains("_max"))
+sf_f <- sf_f %>%
+  select(-starts_with("Rt_")) 
 
 sf_f <- sf_f %>% mutate(fid = row_number()) # make sure that the fid matches! this is key!
 
+
+ly_c <- st_layers(paste0(inpath,'/', 'grid_10k_coastal_calc.gpkg'))
+cp_calc <- st_read(paste0(inpath,'/', 'grid_10k_coastal_calc.gpkg'), layer = "10k_grid_coastal_calc__joined_layer")
+
+# Calculate change#
+
+# Here, i calcualtes max and mean value, but we only need the first one (mean)
+cp_calc <- compute_change(cp_calc, suffix = c("_mean"), drop_columns = F, change_type = "both")
+
+
+cp_calc <- cp_calc %>%
+  select(-contains("_max")) %>% select(-contains("1992")) %>% select(-contains("2020")) %>% mutate(fid_3=fid_2) %>% st_drop_geometry(cp_calc)
+
+
 # join the cp data:
-sf_f <- left_join(sf_f, cp_calc, by = 'fid')
+sf_f <- left_join(sf_f, cp_calc, by = join_by(fid==fid_2))
 # move the columns to the right location
 sf_f <- sf_f %>%
   relocate(
@@ -371,7 +380,11 @@ sf_f <- sf_f %>%
   )
 sf_f$fid <- NULL
 
-st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'), append=FALSE)
+st_write(sf_f, paste0(inpath, '/', '10k_grid_ES_change_benef_f.gpkg'), append=FALSE)
+
+
+
+# i had to fix the coastal protection. 3 days wasted!!!!
 ```
 
 ## 2.4 Add Updated Access Data
@@ -441,30 +454,3 @@ write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildl
 ```
 
 
-
-
-```{r get names}
-
-hp <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
-
-nams <- names(hp)
-
-nams1 <- nams[c(2,4,6,10,14,16,18,24)]
-
-nams2 <- nams[c(43,41,39,42,44,40,37,38)] 
-
-
-library(dplyr)
-
-# assuming `nams1` and `nams2` are defined and ordered
-for (i in seq_along(nams1)) {
-  val_col <- nams1[i]
-  bin_col <- nams2[i]
-  masked_col <- paste0(val_col, "_masked")
-  
-  hp[[masked_col]] <- ifelse(hp[[bin_col]] == 1, hp[[val_col]], NA)
-}
-
-st_write(hp, '/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final_mskd.gpkg')
-
-```
