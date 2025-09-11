@@ -53,14 +53,18 @@ The spatial objects with the additional attributes are loaded and reformatted fo
  inpath <- '/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs'
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
-sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef_f.gpkg'))
-# add fid
+#sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef_f.gpkg'))
+lyr_sf <- st_layers("/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs/10k_change_calc.gpkg")
+sf_f <- st_read("/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs/10k_change_calc.gpkg") 
+#this as cbackup, remove as soon as possible.
+#sf_f <- sf_f %>% mutate(fid=fid_2)
+# add fid # THIS DOOES NOT WORK LIKE THIS!!!!!! DO NOT USE!!!
 sf_f$fid <- seq_len(nrow(sf_f)) 
 plt <- st_drop_geometry(sf_f)
 
 # get the benef vars (all that are not "chg")
 socio_vars <- names(plt)[
-  names(plt) != c("fid", "c_fid, fid_3") & 
+  names(plt) != c("fid", "c_fid") & 
   !grepl("chg$", names(plt))
 ]
 
@@ -121,135 +125,67 @@ res <- extract_hotspots(
     combo_2 = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
   ),
   #side = "both",
-  id_cols = "c_fid",
+  id_cols = "c_fid", # rename this to "other cols" needs to accept a vector. 
   sf_obj = sf_f
 )
 
-#hotspots_sf <- res$hotspots_sf
+hotspots_sf <- res$hotspots_sf#
+
+
+hotspots_sf <- hotspots_sf %>% mutate(fid_2=fid)
+hotspots_sf$fid <- NULL
+
+st_write(hotspots_sf, here("output_data", "hotspots_5_final.gpkg"), append=FALSE)
+
+sf_f_2 <- sf_f %>% filter(fid %in% hotspots_sf$fid)
+
+
 plt_long <- res$hotspots_df
 inverse_df  <- res$non_hotspots_df
 all <- unique(plt_long$service)
 
 
-# check if summary sf worked (has all the values correctly identified)
-hp2 <- res$summary_sf
-hp2$c_fid.y <- NULL 
-hp2$hotspot_services <- NULL
-hp2 <- hp2 %>% filter(!is.na(hotspot_count)) # this should be INSIDE of the function, will take care of this later.
-
-st_write(hp2, here("output_data", "hotspots_5_final.gpkg"), append=FALSE)
-inverse_df <- inverse_df %>% filter(service %in% all)
-rm(res, sf_f)
-
 ```
 
 
-## Freaking Coastal protection
 
-```{r pivot}
-#| eval: true
-#| include: true
- inpath <- here("output_data")
- inpath <- '/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs'
-
-cp_calc <- st_read(paste0(inpath,'/', 'grid_10k_coastal_calc.gpkg'), layer = "10k_grid_coastal_calc__joined_layer")
+```{r hotpots 2}
+# after running:
 
 
-cp_calc <- compute_change(cp_calc, suffix = c("_mean"), drop_columns = F, change_type = "both")
-cp_calc <- cp_calc %>%
-  select(-contains("_max")) %>% select(-contains("1992")) %>% select(-contains("2020")) %>% mutate(fid_3=fid_2)# %>% st_drop_geometry(cp_calc)
- 
-plt <- st_drop_geometry(cp_calc)
+# reuse the KS helper I gave you earlier
+vars_to_test <- c("rast_gdpTot_1990_2020_30arcsec_2020_sum",
+                  "GHS_POP_E2020_GLOBE_sum",
+                  "GlobPOP_Count_30arc_2020_sum")
 
-# get the benef vars (all that are not "chg")
-socio_vars <- names(plt)[
-  names(plt) != c("fid", "c_fid, fid_3") & 
-  !grepl("chg$", names(plt))
-]
-
-# Pivot all columns that contain pct_ch, keeping other relevant vars
-
-plt_long <- plt %>%
-  pivot_longer(
-    cols = matches("pct_chg"),
-    names_to = "service",
-    values_to = "pct_chg"
-  ) %>%
-  select(fid_2, fid_3, service, pct_chg, all_of(socio_vars)) %>% 
-  mutate(service = str_replace(service, "_pct_chg.*", "")) %>% 
-  mutate(service = str_replace(service, "_mean.*", "")) %>% 
-  filter(!is.na(pct_chg)) %>% filter(pct_chg != Inf) %>% filter(service!="Rt_nohab")  # remove infinite values and those for which Country Id is NA. I need to make sure this is correct. There are sopme locations that have no country values (because it is outside. I am dropping that, but need tto reconsider this)
-  
-# rename some variables (just for aesthetics)
-
-  plt_long <- plt_long %>% mutate(service = case_when(
-   service == "sed_export" ~ "Sed_export",
-   service == "n_export" ~ "N_export",
-   service == "n_retention" ~ "N_retention",
-   service == "nature_access" ~ "Nature_Access",
-   service == "pollination" ~ "Pollination",
-   service == "usle" ~ "USLE",
-   service == "n_ret_ratio" ~ "N_Ret_Ratio",
-   service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
-   service == "Rt_ratio" ~ "C_Risk_Red_Ratio",
-   service == "Rt" ~ "C_Risk",
-   service == "Rt_service" ~ "C_Prot_service",
-   TRUE ~ service
-   ))
-  
-  
-plt_long <- plt_long %>% mutate(fid=fid_2)
-# Set service levels one single time and for all. Don't drop some variables here, filter afterwards, it can be difficult/annoying to recover!!!
-service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Sed_export", "USLE", "Sed_Ret_Ratio", "Rt_nohab","C_Risk","C_Prot_service", "C_Risk_Red_Ratio", "Pollination") 
-
-```
-
-## 1.2 Get Hotspots
-
-```{r run get hotsposts function}
-# Define the intended direction of change (service loss/increased damage)
-loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
-gain <- c("Sed_export","N_export","C_Risk")
-
-cp_calc <- cp_calc %>% mutate(fid=fid_2)
-
-
-res <- extract_hotspots(
-  df = plt_long,
-  value_col = "pct_chg",
-  pct_cutoff = 0.05,
-  threshold_mode = "percent",
-  rule_mode = "vectors",
-  loss_services = loss,
-  gain_services = gain,
-  combos = list(
-    combo_1 = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
-    combo_2 = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
-  ),
-  #side = "both",
-  id_cols = "c_fid", # optional
-  sf_obj = cp_calc
+ks_res <- run_ks_hot_vs_non(
+  plt_long   = res$hotspots_df,
+  inverse_df = res$non_hotspots_df,
+  vars = vars_to_test,
+  adjust_method = "BH",
+  permute_n = 0,
+  out_csv = "output_charts/ks_results_hot_vs_non.csv"
 )
 
-#hotspots_sf <- res$hotspots_sf
-plt_long <- res$hotspots_df
-inverse_df  <- res$non_hotspots_df
-all <- unique(plt_long$service)
+```
 
 
 # check if summary sf worked (has all the values correctly identified)
 hp2 <- res$summary_sf
+hp2 <- hp2 %>% filter(fid %in% hotspots_sf$fid)
 hp2$c_fid.y <- NULL 
-hp2$hotspot_services <- NULL
-hp2 <- hp2 %>% filter(!is.na(hotspot_count)) # this should be INSIDE of the function, will take care of this later.
+hp2$hotspot_services <- NULL # i think this is not necessary to begin with )
 
-hp2$fid <- NULL
+hp <- coalesced_left_join(hotspots_sf,hp2, by= "fid")
 
-st_write(hp2, here("output_data", "hotspots_5_cp.gpkg"), append=FALSE)
+
+hp$fid <- NULL #Remove fid because it won't write
+st_write(hp, here("output_data", "hotspots_5_final.gpkg"), append=FALSE)
 inverse_df <- inverse_df %>% filter(service %in% all)
-rm(res, sf_f)
+#rm(res, sf_f)
 
 ```
+
 
 Get values to plot
 
@@ -257,7 +193,7 @@ Get values to plot
 
 hp <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
 
-nams <- names(hp)
+nams <- names(hp2)
 
 nams1 <- nams[c(2,4,6,10,14,16,18,24)]
 
@@ -277,7 +213,6 @@ for (i in seq_along(nams1)) {
 
 st_write(hp, '/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final_mskd.gpkg')
 
-```
 ```
 
 # 2 Produce Scatterplots.
