@@ -351,7 +351,7 @@ sf_f <- sf_f %>% mutate(fid = row_number()) # make sure that the fid matches! th
 
 
 ly_c <- st_layers(paste0(inpath,'/', 'grid_10k_coastal_calc.gpkg'))
-cp_calc <- st_read(paste0(inpath,'/', 'grid_10k_coastal_calc.gpkg'), layer = "10k_grid_coastal_calc__joined_layer")
+cp_calc <- st_read(paste0(inpath,'/', 'grid_10k_coastal_calc.gpkg'), layer = "Coastal_Protection")
 
 # Calculate change#
 
@@ -360,11 +360,13 @@ cp_calc <- compute_change(cp_calc, suffix = c("_mean"), drop_columns = F, change
 
 
 cp_calc <- cp_calc %>%
-  select(-contains("_max")) %>% select(-contains("1992")) %>% select(-contains("2020")) %>% mutate(fid_3=fid_2) %>% st_drop_geometry(cp_calc)
+  select(-contains("_max")) %>% select(-contains("1992")) %>% select(-contains("2020")) #%>% st_drop_geometry(cp_calc)
+
+st_write(cp_calc, paste0(inpath, '/', 'grid_10k_coastal_ch.gpkg'), append=FALSE)
 
 
 # join the cp data:
-sf_f <- left_join(sf_f, cp_calc, by = join_by(fid==fid_2))
+sf_f <- left_join(sf_f, cp_calc, by = join_by(fid==fid_3))
 # move the columns to the right location
 sf_f <- sf_f %>%
   relocate(
