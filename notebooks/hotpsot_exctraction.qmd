@@ -56,6 +56,9 @@ The spatial objects with the additional attributes are loaded and reformatted fo
 #sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef_f.gpkg'))
 lyr_sf <- st_layers("/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs/10k_change_calc.gpkg")
 sf_f <- st_read("/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs/10k_change_calc.gpkg") 
+
+sf_f <- sf_f %>% relocate(starts_with("Rt_"), .before = GHS_BUILT_S_E2020_mean)
+#change na,mes here (homogenize) 
 #this as cbackup, remove as soon as possible.
 #sf_f <- sf_f %>% mutate(fid=fid_2)
 # add fid # THIS DOOES NOT WORK LIKE THIS!!!!!! DO NOT USE!!!
@@ -105,6 +108,135 @@ service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Se
 
 ```
 
+
+
+```{r hotpots 2}
+# after running:
+hs <- extract_hotspots(
+  df = plt_long,
+  value_col = "pct_chg",
+  pct_cutoff = 0.05,
+  threshold_mode = "percent",
+  rule_mode = "vectors",
+  loss_services = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
+  gain_services = c("Sed_export","N_export","C_Risk"),
+  combos = list(
+    deg_combo = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
+    rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+  ),
+  id_cols = c("c_fid"),
+  sf_obj = sf_f,                                       # your sf with fid
+  write_sf_path = "output_data/hotspots3.gpkg",       # or "output_charts/hotspots.shp"
+  write_driver  = "GPKG",                              # or "ESRI Shapefile"
+  clean_names   = TRUE,
+  fid_alias     = "fid_2",                             # duplicate fid only for the file
+  drop_fid_on_write = TRUE                             # drop original fid on disk (keep in memory)
+)
+
+# hotspots_sf <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
+hp_sf <- hs$hotspots_sf
+hp_sf <- hp_sf %>% select(-ends_with("_abs_chg"))
+```
+
+
+
+```{r prelim fixing names}
+
+
+mask_pct_change_by_hotspot <- function(hp_sf,
+                                       services_keep = c("Nature_Access","N_export","N_retention",
+                                                         "N_Ret_Ratio","Sed_export","USLE",
+                                                         "Sed_Ret_Ratio","Rt_nohab",
+                                                         "C_Risk","C_Prot_service",
+                                                         "C_Risk_Red_Ratio","Pollination"),
+                                       value_suffix_re = "(?:_pct_?chg)$",   # _pct_chg or _pctchg
+                                       masked_suffix   = "_masked",
+                                       verbose = TRUE) {
+  stopifnot(inherits(hp_sf, "sf"))
+
+  nm <- names(hp_sf)
+
+  # find *_pct_chg / *_pctchg (case-insensitive)
+  val_cols <- nm[str_detect(nm, regex(value_suffix_re, ignore_case = TRUE))]
+  if (length(val_cols) == 0L) {
+    if (verbose) message("No percent-change columns found. Nothing to mask.")
+    return(hp_sf)
+  }
+
+  # stems (drop suffix; case-insensitive)
+  stems <- tolower(str_remove(val_cols, regex(value_suffix_re, ignore_case = TRUE)))
+  stems_nomean <- str_remove(stems, "_mean$")
+
+  # map stems -> hotspot binary service names
+  service_map <- c(
+    "nature_access"   = "Nature_Access",
+    "n_export"        = "N_export",
+    "n_retention"     = "N_retention",
+    "n_ret_ratio"     = "N_Ret_Ratio",
+    "sed_export"      = "Sed_export",
+    "usle"            = "USLE",
+    "sed_ret_ratio"   = "Sed_Ret_Ratio",
+    "pollination"     = "Pollination",
+    "rt_nohab_mean"   = "Rt_nohab",
+    "rt_nohab"        = "Rt_nohab",
+    "rt_ratio_mean"   = "C_Risk_Red_Ratio",
+    "rt_ratio"        = "C_Risk_Red_Ratio",
+    "rt_service_mean" = "C_Prot_service",
+    "rt_service"      = "C_Prot_service",
+    "rt_mean"         = "C_Risk",
+    "rt"              = "C_Risk"
+  )
+
+  svc_from_stem <- function(st) {
+    if (!is.na(service_map[st])) as.character(service_map[st])
+    else if (!is.na(service_map[str_remove(st, "_mean$")])) as.character(service_map[str_remove(st, "_mean$")])
+    else NA_character_
+  }
+  services <- vapply(stems, svc_from_stem, FUN.VALUE = character(1))
+
+  map_tbl <- tibble(
+    val_col = val_cols,
+    stem    = stems,
+    service = services,
+    bin_col = services  # binary cols named by service
+  ) %>%
+    filter(!is.na(service)) %>%
+    { if (is.null(services_keep)) . else filter(., service %in% services_keep) } %>%
+    filter(val_col %in% nm, bin_col %in% nm)
+
+  if (nrow(map_tbl) == 0L) {
+    if (verbose) message("No value↔binary pairs found to mask.")
+    return(hp_sf)
+  }
+
+  for (i in seq_len(nrow(map_tbl))) {
+    v   <- map_tbl$val_col[i]
+    b   <- map_tbl$bin_col[i]
+    out <- paste0(v, masked_suffix)
+
+    hp_sf[[out]] <- ifelse(hp_sf[[b]] == 1L, as.numeric(hp_sf[[v]]), NA_real_)
+    hp_sf <- hp_sf %>% relocate(all_of(out), .after = all_of(v))
+  }
+
+  if (verbose) message("Masked ", nrow(map_tbl), " layer(s): ", paste0(map_tbl$service, collapse = ", "))
+  hp_sf
+}
+
+
+hp_sf <- mask_pct_change_by_hotspot(hp_sf)
+
+# sanity check: see the new *_masked columns
+names(hp_sf)[str_detect(names(hp_sf), "_pct_?chg_masked$")]
+st_write(hp_sf, paste0(inpath, '/', 'hotspots_5_final_mskd.gpkg'))
+         
+```
+ nams <- names(hp_sf)
+
+nams1 <- nams[c(2,4,6,10,14,16,18,24)]
+
+nams2 <- nams[c(43,41,39,42,44,40,37,38)]
+
+hotspots_sf <- hotspo
 ## 1.2 Get Hotspots
 
 ```{r run get hotsposts function}
@@ -130,91 +262,53 @@ res <- extract_hotspots(
 )
 
 hotspots_sf <- res$hotspots_sf#
-
-
 hotspots_sf <- hotspots_sf %>% mutate(fid_2=fid)
 hotspots_sf$fid <- NULL
 
-st_write(hotspots_sf, here("output_data", "hotspots_5_final.gpkg"), append=FALSE)
-
-sf_f_2 <- sf_f %>% filter(fid %in% hotspots_sf$fid)
-
-
-plt_long <- res$hotspots_df
-inverse_df  <- res$non_hotspots_df
-all <- unique(plt_long$service)
-
 
 ```
 
 
-
-```{r hotpots 2}
-# after running:
-
-
-# reuse the KS helper I gave you earlier
-vars_to_test <- c("rast_gdpTot_1990_2020_30arcsec_2020_sum",
-                  "GHS_POP_E2020_GLOBE_sum",
-                  "GlobPOP_Count_30arc_2020_sum")
-
-ks_res <- run_ks_hot_vs_non(
-  plt_long   = res$hotspots_df,
-  inverse_df = res$non_hotspots_df,
-  vars = vars_to_test,
-  adjust_method = "BH",
-  permute_n = 0,
-  out_csv = "output_charts/ks_results_hot_vs_non.csv"
-)
-
-```
-
-
-# check if summary sf worked (has all the values correctly identified)
-hp2 <- res$summary_sf
-hp2 <- hp2 %>% filter(fid %in% hotspots_sf$fid)
-hp2$c_fid.y <- NULL 
-hp2$hotspot_services <- NULL # i think this is not necessary to begin with )
-
-hp <- coalesced_left_join(hotspots_sf,hp2, by= "fid")
-
-
-hp$fid <- NULL #Remove fid because it won't write
-st_write(hp, here("output_data", "hotspots_5_final.gpkg"), append=FALSE)
-inverse_df <- inverse_df %>% filter(service %in% all)
-#rm(res, sf_f)
-
-```
-
-
-Get values to plot
-
-```{r get names}
-
-hp <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
-
-nams <- names(hp2)
-
-nams1 <- nams[c(2,4,6,10,14,16,18,24)]
-
-nams2 <- nams[c(43,41,39,42,44,40,37,38)] 
-
-
-library(dplyr)
 
 # assuming `nams1` and `nams2` are defined and ordered
 for (i in seq_along(nams1)) {
   val_col <- nams1[i]
   bin_col <- nams2[i]
   masked_col <- paste0(val_col, "_masked")
-  
-  hp[[masked_col]] <- ifelse(hp[[bin_col]] == 1, hp[[val_col]], NA)
+
+  hp_sf[[masked_col]] <- ifelse(hp_sf[[bin_col]] == 1, hp[[val_col]], NA)
 }
 
-st_write(hp, '/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final_mskd.gpkg')
+# st_write(hp, '/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final_mskd.gpkg')
 
 ```
 
+
+
+
+```{r kolmogorv}
+# # reuse the KS helper I gave you earlier
+# vars_to_test <- c("rast_gdpTot_1990_2020_30arcsec_2020_sum",
+#                   "GHS_POP_E2020_GLOBE_sum",
+#                   "GlobPOP_Count_30arc_2020_sum")
+# 
+# ks_res <- run_ks_hot_vs_non(
+#   plt_long   = res$hotspots_df,
+#   inverse_df = res$non_hotspots_df,
+#   vars = vars_to_test,
+#   adjust_method = "BH",
+#   permute_n = 0,
+#   out_csv = "output_charts/ks_results_hot_vs_non.csv"
+# )
+# 
+# ```
+# 
+# 
+# 
+# Get values to plot
+# 
+# ```{r get names}
+# 
 # 2 Produce Scatterplots.
 
 
