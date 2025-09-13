@@ -111,6 +111,16 @@ service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Se
 
 
 ```{r hotpots 2}
+
+# Adjust This. Set the variables outside as they shou;d:
+## Define the intended direction of change (service loss/increased damage)
+loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+gain <- c("Sed_export","N_export","C_Risk")
+
+ combos = list(
+    combo_1 = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
+    combo_2 = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+  ),
 # after running:
 hs <- extract_hotspots(
   df = plt_long,
@@ -138,7 +148,8 @@ hp_sf <- hs$hotspots_sf
 hp_sf <- hp_sf %>% select(-ends_with("_abs_chg"))
 ```
 
-
+# Masking
+Whathappens here is  that i mask each one of the outputs, and fix the names to try to get this to make morr sense, be more replicable/consitent and facilitate the plottting (already done), by masking each binary with the value for plotting. Nevertheless, i think there is a smarter way to do this and i should aske for advice.
 
 ```{r prelim fixing names}
 
@@ -230,19 +241,12 @@ names(hp_sf)[str_detect(names(hp_sf), "_pct_?chg_masked$")]
 st_write(hp_sf, paste0(inpath, '/', 'hotspots_5_final_mskd.gpkg'))
          
 ```
- nams <- names(hp_sf)
 
-nams1 <- nams[c(2,4,6,10,14,16,18,24)]
 
-nams2 <- nams[c(43,41,39,42,44,40,37,38)]
-
-hotspots_sf <- hotspo
 ## 1.2 Get Hotspots
 
 ```{r run get hotsposts function}
-# Define the intended direction of change (service loss/increased damage)
-loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
-gain <- c("Sed_export","N_export","C_Risk")
+
 
 res <- extract_hotspots(
   df = plt_long,
