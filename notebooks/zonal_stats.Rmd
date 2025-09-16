@@ -88,7 +88,13 @@ This assumes that the polygon files are stored in the same working directory. Fe
 
 ```{r load polygons, eval=FALSE, include=FALSE}
 # Read spatial polygon dataset
+<<<<<<< HEAD
 
+=======
+# Set attribute column for analysis
+ 
+# By Continent
+>>>>>>> ebc1866 (sending to temote. Lilling is acting funny again...)
 #set <- 'Continent.gpkg' 
 # By Subregion
 #set <- 'subregion.gpkg'
@@ -97,6 +103,7 @@ set <- "Income_Group.gpkg"
 
 # By individual territory; "Country" 
 #set <- 'Country.gpkg'
+#set <- "Income_Group.gpkg"
 # By WWF biome
  set <- 'Biome.gpkg' 
 # by WB Region
@@ -120,6 +127,7 @@ poly <- poly[1]
 #col <- "id"
 col <- "WWF_biome"
 #col <- 'continent'
+<<<<<<< HEAD
 #col <- "WWF_biome"
 #col <- 'continent'
 col <- "income_grp"
@@ -129,6 +137,16 @@ cols <- col
 ```
 
 ## 2.2 Load Global ES as Raster Data**
+=======
+#col <- 'subregion'
+#col <- 'region_wb'
+#col <- "income_grp"
+#col <- 'id'
+cols <- col
+```
+
+## **4. Load Global ES as Raster Data**
+>>>>>>> ebc1866 (sending to temote. Lilling is acting funny again...)
 
 service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination")
 ```{r load raster es, include=FALSE}
@@ -403,7 +421,10 @@ results_list <- lapply(rast_list, function(r) {
 # Iterate function over the rasters
 num.cores <- length(rasters_list)
 results_list <- lapply(rasters_list, function(r) {
+<<<<<<< HEAD
 >>>>>>> ef89561 (finish sync)
+=======
+>>>>>>> ebc1866 (sending to temote. Lilling is acting funny again...)
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -414,11 +435,15 @@ results_list <- lapply(rasters_list, function(r) {
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
 <<<<<<< HEAD
+<<<<<<< HEAD
   return(res)})
 #},mc.cores = num.cores)
 =======
   return(res)})#,mc.cores = num.cores)
 >>>>>>> ef89561 (finish sync)
+=======
+  return(res)})#,mc.cores = num.cores)
+>>>>>>> ebc1866 (sending to temote. Lilling is acting funny again...)
 
 # Combine results from all rasters into one data frame
 zonal_df_diff <- do.call(rbind, results_list)
