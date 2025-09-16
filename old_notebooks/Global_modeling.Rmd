@@ -315,3 +315,67 @@ results <- process_raster(tiffes, poly, nam, outpath)
 
 ```
 
+<<<<<<< HEAD:old_notebooks/Global_modeling.Rmd
+=======
+
+# Get Change Maps 
+
+```{r calculate change maps}
+
+inpath <- '~/Documents/MN_Applied_Economics/Global_ES_mapping/ESA_LC'
+tiffes <- file.path(here(inpath), list.files(paste0(here(inpath)),pattern= '.tif$'))
+
+es <- lapply(tiffes, rast)
+ch <- ch_mapR(es)
+```
+# Get Sankey Diagrams
+
+```{r Sankey Diagram}
+classes <- c("Cultivated", "Forests", "Grasses/shrubs", "Sparse", "Mangroves", "Urban", "Bare", "Water")
+groupColor <- c("#dcf064","#00b809","#8ca000","#ffebaf",'#009678', "#c31400", "#fff5d7", "#0046c8")
+
+years <- c(1992,2020)
+
+
+nodeInfo <- nodeInfoR(years, classes, groupColor)
+
+NodeCols<- sort(unique(nodeInfo$nodeCol))
+
+#create paths to the rasters/bands
+num_bands <- length(NodeCols)
+tf <- list.files(wd, pattern= "Rec")
+tf <- file.path(wd,tf)
+fileInfo <- tibble(
+  nodeCol = seq_along(tf),
+  rast = tf,
+  rasterBand = 1
+)
+
+# join path strings to nodeInfo
+nodeInfo <- dplyr::left_join(nodeInfo, fileInfo, by='nodeCol') 
+linkInfo <- linkInfoR(NodeCols, nodeInfo)
+
+
+fontSize <- 0.5
+nodeWidth <-30
+fontFamily <- "sans-serif"
+colorScaleJS <- sprintf("d3.scaleOrdinal().domain(%s).range(%s)",
+                        jsonlite::toJSON(unique(nodeInfo$nodeGroup)),
+                        jsonlite::toJSON(unique(nodeInfo$groupColor)))
+
+
+sankeyNetwork(Links = linkInfo, Nodes = nodeInfo,
+              Source = "source",
+              Target = "target",
+              Value = "value",
+              NodeID = "nodeName",
+              NodeGroup = "nodeGroup",
+              LinkGroup = "LinkGroup",
+              fontSize = fontSize,
+              fontFamily = fontFamily,
+              nodePadding = 10,
+              margin=1,
+              nodeWidth = nodeWidth,
+              colourScale = JS(colorScaleJS))
+```
+>>>>>>> 5c52666 (update to current state):notebooks/Global_modeling.Rmd
