@@ -13,11 +13,22 @@ output:
 3.	Create faceted bar plots (using ggplot2) for each raster statistic.
 4.	Generate choropleth maps (using ggplot2 and sf) to visualize spatial distributions.
 
+<<<<<<< HEAD
 Compute mean and median for each polygon. Evaluate other metrics
+=======
+## 1. Objectives
+1. Extract zonal statistics from ES global raster datasets using the `exactextractr` package.
+2. Integrate extracted statistics as attributes to spatial polygon datasets.
+3. Generate visualizations (bar plots, maps) for spatial representation of results.
+>>>>>>> ef89561 (finish sync)
 
 At a country level, this was done using the *fids* for the polygons. Using country names is problematic because of geopolitics.
 Pending to do: Think how to deal with the dependencies and complex cases (GB, France, others), but i will take care of this at a later point.
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> ef89561 (finish sync)
 ```{r setup, include=FALSE}
 # Load required libraries
 library(sf)             # For reading and working with vector data
@@ -30,6 +41,7 @@ library(tidytext)
 library(here)
 library(patchwork)
 library(tidyr)
+<<<<<<< HEAD
 library(parallel)
 ```
 
@@ -62,19 +74,118 @@ rasters_list <- lapply(tiffes, rast)
 service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each=2)
 filename<- as_tibble(cbind(service,filename))
 print(filename)
+=======
+library(parallel)       # Parallel computing
+library(purrr)
+```
+
+# 2. Prepare Input data
+
+## 2.1. Load Polygon Data
+
+
+This assumes that the polygon files are stored in the same working directory. Feel free to change it if necessary.  The different subsets except for biomes are obtained from the dataset provided by Justin to which a "dissolve by attribute" operation has been performed. This is better done in Python/QGis/ArcGis, R is not great at that. 
+
+```{r load polygons, eval=FALSE, include=FALSE}
+# Read spatial polygon dataset
+
+#set <- 'Continent.gpkg' 
+# By Subregion
+#set <- 'subregion.gpkg'
+# By Income Group
+set <- "Income_Group.gpkg"
+
+# By individual territory; "Country" 
+#set <- 'Country.gpkg'
+# By WWF biome
+ set <- 'Biome.gpkg' 
+# by WB Region
+#set <- "World_Bank_Region.gpkg"
+# load polygons
+poly <- st_read(here('vector', set)) 
+<<<<<<< HEAD
+# Set the column with the attribute to group 
+# Test this, it might be possible that it is not necesary to dissolve and create the individual vector files in advance, but just change the column. However, i need to check how would it work when joining the new results as attributes. 
+# There would be two things to consider here:
+# 1. how would it actually look when displaying on a GIS (all the original polygons will be maintained). This is manageable. Waht would this imply for the subsequent analyisis.
+# 2. Practicality considerations. The final output, with all services, grouping, metrics, years can end up having too many columns at at some point that can become hard to manage. Just naming columns can be a hassle. 
+
+col <- "id"
+col <- 'continent'
+#col <- 'id'
+
+poly <- poly[1]
+
+# select column with the asttribute to iterate through.
+#col <- "id"
+col <- "WWF_biome"
+#col <- 'continent'
+#col <- "WWF_biome"
+#col <- 'continent'
+col <- "income_grp"
+#col <- 'subregion'
+#col <- 'region_wb'
+cols <- col
+```
+
+## 2.2 Load Global ES as Raster Data**
+
+service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination")
+```{r load raster es, include=FALSE}
+inpath <- here('input_ES')
+
+inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES"
+tiffes <- file.path(inpath, list.files(inpath, pattern= 'tif$'))
+filename <- basename(tiffes)
+raster_name <- gsub(".tif$", "", filename)
+
+# Load raster files
+rasters_list <- lapply(tiffes, rast)
+# Define service names and colors
+service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination"), each=2)
+year <- rep(c(1992,2020), 6)
+filename <- as_tibble(cbind(service, raster_name, year))
+
+# create a table with the content to fill the table
+color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#A57C00", "#dd1c77"), each=2)
+cd <- as_tibble(cbind(filename, color))
+rm(filename)
+cd
+>>>>>>> ef89561 (finish sync)
 ```
 
 # 3. Calcualte Differences (check with original) 
 
+<<<<<<< HEAD
  This has been already done, no need to do again.
+=======
+
+# 3. Calcualte Differences 
+
+The difference in the values between both yars is calculatd with a simple substraction and the results are exported to and target destination.
+
+
+
+## **5. Compute Differences**
+
+
+# 3. Extract Zonal Statis per Saptila Unit
+
+Compute Zonal Statistics for each target raster/year 
+
+>>>>>>> ef89561 (finish sync)
 ```{r get differences, eval=FALSE, include=FALSE}
 outpath <- here("input_ES")
 m_index <- length(rasters_list) %/% 2
 lab <- unique(service)
+lab <- gsub(" ", "_", lab)
+
+
 l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
 l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
  # test with future_map2 next time to get this to run faster. 
 
+<<<<<<< HEAD
 diffs <- map2(l1,l2, function(l1,l2){
   return(l1-l2)
 })
@@ -82,10 +193,88 @@ map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'c
 ```
 
 ## 3. Compute Zonal Statistics with exactextractr for each one
+=======
+pot_sed_ret92 <- (l1[[2]]-l1[[1]])/l1[[2]]
+pot_sed_ret20 <- (l2[[2]]-l2[[1]])/l2[[2]]
+
+lab <- unique(filename$service)
+## **5. Compute Raster Differences**
+```{r get differences, eval=FALSE, include=FALSE}
+outpath <- here("input_ES")
+l1 <- rasters_list[seq(1, length(rasters_list), by=2)]
+l2 <- rasters_list[seq(2, length(rasters_list), by=2)]
+
+diffs <- map2(l1, l2, ~ .x - .y)
+
+# Export difference rasters
+map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/change_calc/", lab[x], '_diff.tif'),overwrite=TRUE))
+```
+
+
+# Prepare Potential of N retention data.
+
+
+## **6. Compute Zonal Statistics for Each Year**
+
+### 6.1  Prepare Potential of N retention data.
+
+
+```{r getpotential N retention , eval=FALSE, include=FALSE}
+
+inpath <- here("input_ES", "Pot_Sed_retention")
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+filename<- basename(tiffes)
+# Use terra::rast() to load each file as a SpatRaster object
+
+
+rasters_list <- lapply(tiffes, rast) # why am i doingthis? There is a good reasoner, but now i don't know anymore 
+rcl <- matrix(c(
+  -Inf, 0, NA   # Any value from 0 to Infinity becomes 1
+), ncol = 3, byrow = TRUE)
+
+rasters_list <- lapply(rasters_list, function(r){
+  r <- classify(r,rcl, right=FALSE)
+})
+
+m_index <- length(rasters_list) %/% 2
+#lab <- unique(service)
+l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
+l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
+ # test with future_map2 next time to get this to run faster. 
+
+pot_SedRet1 <- (l1[[2]]-l1[[1]])/l1[[2]]
+
+
+pot_SedRet2 <- (l2[[2]]-l2[[1]])/l2[[2]]
+
+psr_92 <- classify(pot_SedRet1,rcl, right=FALSE)
+psr_20 <- classify(pot_SedRet2,rcl, right=FALSE)
+
+writeRaster(psr_92, paste0(inpath, '/', 'pot_SedRet_92.tif'), overwrite=TRUE)
+writeRaster(psr_20, paste0(inpath, '/', 'pot_SedRet_20.tif'), overwrite=TRUE)
+diff <- psr_92 - psr_20
+writeRaster(diff, paste0(inpath, '/', 'pot_Sed_r_diff.tif'), overwrite)
+
+```
+
+
+## 7 Prepare the yearly summary data
+
+### 7.1 Compute Zonal Statistics for each target raster/year 
+
+## 3.1 Global ES for 1992 and 2020
+
+
+**Note:** Although Exact exactextractr is used  here ot obtain zonal summary statistics, in this case the mean value for each polygon, it can also return a list of dataframes, one per feature with the cell values from the input raster. This can be very useful for further analysis. 
+Besides, it is also possible to include user-defined functions (something that i am going to use for the USLE analysis).
+
+## **6. Compute Zonal Statistics for Each Year**
+>>>>>>> ef89561 (finish sync)
 
 ```{r compute stats 1, eval=FALSE, include=FALSE}
 #load the data (this assumes 'tiffs' is the list of paths to the files, and that they are in the desired order. Make sure tha the dc dataframe with the labels matches) There is room for improvement here. 
 
+<<<<<<< HEAD
 # Initially, compute mean and median.
 target_stats <- c("mean", "median")
 # this is the column in the vector file taqht we are going to use. 
@@ -96,6 +285,13 @@ num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated
 # Somehow using multicore seems to be prblematicic. 
 num.cores <- 4
 #performance as much as it should. In fact, for the differences, performance is quite poor.
+=======
+
+```{r compute stats 1, message=TRUE, include=FALSE}
+target_stats <- c("mean")
+
+num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  sequentially, and there is no progress bar available 
+>>>>>>> ef89561 (finish sync)
 # here, set a way to change the input poly and columns externally instead of editing inside of the functions. That is cumbersome and prone to errors. 
 results_list <- lapply(rasters_list, function(r) {
   # Perform exact extraction
@@ -111,16 +307,24 @@ results_list <- lapply(rasters_list, function(r) {
 # Combine results from all rasters into one data frame
 zonal_df <- do.call(rbind, results_list)
 
+<<<<<<< HEAD
 raster_name <- unique(zonal_df$raster_name)
 service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each = 2)
 color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=2)
 cd <- as_tibble(cbind(raster_name, service, color))
 
 zonal_df <- left_join(zonal_df,cd)
+=======
+# add color and service columns
+zonal_df <- left_join(zonal_df,cd)
+# Add the year. this uses the original filenames to extract the year, but might be too hardcoded for generalization 
+
+>>>>>>> ef89561 (finish sync)
 zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 
                           1992, 
                           ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
 
+<<<<<<< HEAD
 # if the original polygons
 poly_df <- st_drop_geometry(poly) %>% select(id, ee_r264_name,iso3,continent,region_wb,income_grp,name_long)  
  # if merged 
@@ -140,24 +344,66 @@ Not Run
 poly <- st_read(here('vector', 'global_poly_means.gpkg')) 
 inpath <- paste0(inpath, "/", 'Change_calc')
 
+=======
+
+zonal_wide <- pivot_wider(zonal_df, id_cols=all_of(col), names_from=c(service, year), values_from = mean)
+# adjust column names #
+
+######### HERE: Include a way/convention to adjust the column names autmatically. Saves work and keeps consistency. I had to do this in Stpe 6, but this is not organized. should +be done herer bedore exporting
+
+poly <- left_join(poly, zonal_wide, by= col)
+st_write(poly, here('vector', set), append = FALSE) 
+write.csv(zonal_df, here('output_data', paste0('zonal_df_',col, '.csv')))
+
+```
+
+
+### 3.2. Zonal stats for the differences.  
+
+In theory, i could get everything done on a single run together but it somehow gets too complicated. The names of the input rasters don't always follow the same sequence, and sometiomes need to be rearranged. 
+There are two main cases: dealing with two or more different  sets of layers (eg one for each year). The second a case with on;ly one set (dealing wit the differneces for example). This is somethign that is really not that complicated and could be organized/simplified here, but needs some work that is not priority right now.
+
+I will have to review this part. Ideally, i should get everything done together but the year issue made it tricky. Easier to do each on its owrn, the problem is that there is still too much manual handling. Eventually this should be generalized.
+
+```{r compute stats diff, message=TRUE, include=FALSE}
+
+# set the path and load the rasters with the differences that we calcualted in step 3
+#build paths to files
+#inpath <- here('input_ES')
+inpath <- paste0(inpath, "/", 'change_calc')
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/input_ES/change_calc'
+>>>>>>> ef89561 (finish sync)
 # load the rasters with the calculated differences 
 tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
 filename<- basename(tiffes)
 
+<<<<<<< HEAD
 # Use terra::rast() to load each file as a SpatRaster object
 rast_list <- lapply(tiffes, rast)
 service <- c("Coastal Protection", "Nature Access","Nitrogen Export","Pollination","Sediment Export")
+=======
+rasters_list <- lapply(tiffes, rast)
+service <- c("Coastal Protection", "Nature Access","Nitrogen Export","Pollination","Sediment Export", "Usle")
+service <- gsub(" ", "_", service)
+
+>>>>>>> ef89561 (finish sync)
 filename<- as_tibble(cbind(service,filename))
 #colnames(prod) <- c("Service", "Filename")
 print(filename)
 # We'll compute mean and median as an example
 target_stats <- c("mean", "median")
 
+<<<<<<< HEAD
 # exact_extract can append columns from the polygon layer;
 # Number of CPU cores to use
 num.cores <- detectCores() - 2  # Leave 4 cores free. Adjust depending on available resources. 
 
 results_list <- lapply(rast_list, function(r) {
+=======
+# Iterate function over the rasters
+num.cores <- length(rasters_list)
+results_list <- lapply(rasters_list, function(r) {
+>>>>>>> ef89561 (finish sync)
   # Perform exact extraction
   # - append_cols = "country" retains the country identifier with each result
   res <- exact_extract(r, poly,
@@ -167,12 +413,19 @@ results_list <- lapply(rast_list, function(r) {
 
   # Add a column labeling which raster these results are from
   res$raster_name <- r_name
+<<<<<<< HEAD
   return(res)})
 #},mc.cores = num.cores)
+=======
+  return(res)})#,mc.cores = num.cores)
+>>>>>>> ef89561 (finish sync)
 
 # Combine results from all rasters into one data frame
-zonal_df <- do.call(rbind, results_list)
+zonal_df_diff <- do.call(rbind, results_list)
+#Adjust column so i can assemble the whole thing (yearly and difference values) in the same dataframe
+cd <- cd %>% mutate(year='diff')
 
+<<<<<<< HEAD
 raster_name <- unique(zonal_df$raster_name)
 service <- rep(c("Coastal Protection", "Nature Access","Nitrogen Export", "Pollination","Sediment Export"), each = 1)
 color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=1)
@@ -182,9 +435,17 @@ cd <- as_tibble(cbind(raster_name, service, color))
 zonal_df <- left_join(zonal_df,cd)
 zonal_df <- zonal_df[-c(4,6)]
 zonal_wide <- pivot_wider(zonal_df, id_cols=id, names_from=c(service), values_from = c(mean, median))
+=======
+zonal_df_diff <- left_join(zonal_df_diff,cd)
+#zonal_df <- zonal_df[-c(4,6)]
+zonal_wide <- pivot_wider(zonal_df_diff, id_cols=all_of(cols), names_from=c(service), values_from = mean)
+# adjust column names 
+colnames(zonal_wide)[colnames(zonal_wide) != cols] <- paste0(colnames(zonal_wide)[colnames(zonal_wide) != cols], "_diff")
+>>>>>>> ef89561 (finish sync)
 
 colnames(zonal_wide)[colnames(zonal_wide) != "id"] <- paste0(colnames(zonal_wide)[colnames(zonal_wide) != "id"], "_diff")
 
+<<<<<<< HEAD
 poly <- left_join(poly, zonal_wide, by= "id")
 st_write(poly, here('vector', 'global_poly_means.gpkg', append = FALSE) 
 
@@ -437,3 +698,79 @@ Take care of the beneficiaries.
 
 
 
+=======
+zonal_df <- rbind(zonal_df, zonal_df_diff)
+write.csv(zonal_df, here('output_data', paste0('zonal_df_', col, '.csv')))
+```
+
+
+
+### 3.3 get change in terms of % (do at the end)
+
+
+
+This is a WIP. I need to be able to add the numbers as columns at the end....nooo
+easier. We are going to calculate them dikrectly fro mthe filtered zonal_df dataframe, but not now. We need to think about the differences calculated and the % of difference. anyway i already have that piece of data. 
+
+```{r extract change in %}
+
+# Function to compute percentage change for all relevant variables in an sf object
+calculate_percentage_change <- function(sf_obj) {
+  # Identify all variables that exist in both 1992 and 2020
+  base_vars <- service#c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination")
+  
+  # Iterate through each variable to compute percentage change
+  for (var in base_vars) {
+    col_1992 <- paste0(var, "_1992")  # Column name for 1992
+    col_2020 <- paste0(var, "_2020")  # Column name for 2020
+    col_pct  <- paste0(var, "_pct_ch")   # New percentage change column
+    
+    # Check if the required columns exist in the sf object
+    if (all(c(col_1992, col_2020) %in% names(sf_obj))) {
+      sf_obj <- sf_obj %>%
+        mutate(!!col_pct := ((!!sym(col_2020) - !!sym(col_1992)) / !!sym(col_1992)) * 100)
+    }
+  }
+  return(sf_obj)
+}
+
+# Apply function to all sf objects in the list
+#pols <- lapply(poly, calculate_percentage_change)
+poly <- calculate_percentage_change(poly)
+# Check the updated column names
+
+# get pct as standalone data to add to the table
+plt <- st_drop_geometry(poly)
+plt  <- plt %>%
+  select(1, contains("pct"))
+
+write.csv(plt, here('output_data', paste0('pct_chg_',cols, '.csv')))
+
+<<<<<<< HEAD
+# Save each sf object in pols as a GPKG file
+lapply(seq_along(pols), function(i) {
+  filepath <- file.path(output_dir, paste0(filename$grp[i], ".gpkg"))
+  st_write(pols[[i]], filepath, delete_layer = TRUE)
+
+results_list <- lapply(rasters_list, function(r) {
+  res <- exact_extract(r, poly, fun = target_stats, append_cols = cols)
+  res$raster_name <- names(r)
+  return(res)
+})
+
+# Combine results
+zonal_df <- do.call(rbind, results_list)
+zonal_df <- left_join(zonal_df, filename)
+
+# Add year information
+zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name), 1992, 2020)
+st_write(poly, here('vector', set), append = FALSE) 
+
+
+#st_write(poly, here('vector', set), append = FALSE) 
+=======
+st_write(poly, here('vector', set), append = FALSE) 
+>>>>>>> 4b23e44 (some rebase because of course)
+```
+
+>>>>>>> ef89561 (finish sync)
