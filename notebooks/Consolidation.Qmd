@@ -455,4 +455,32 @@ write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildl
 
 ```
 
+<<<<<<< HEAD
 
+=======
+```{r get names}
+
+hp <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
+
+nams <- names(hp)
+
+nams1 <- nams[c(2,4,6,10,14,16,18,24)]
+
+nams2 <- nams[c(43,41,39,42,44,40,37,38)] 
+
+
+library(dplyr)
+
+# assuming `nams1` and `nams2` are defined and ordered
+for (i in seq_along(nams1)) {
+  val_col <- nams1[i]
+  bin_col <- nams2[i]
+  masked_col <- paste0(val_col, "_masked")
+  
+  hp[[masked_col]] <- ifelse(hp[[bin_col]] == 1, hp[[val_col]], NA)
+}
+
+st_write(hp, '/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final_mskd.gpkg')
+
+```
+>>>>>>> 29a2da3 (Fixin fid coastal protection)
