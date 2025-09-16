@@ -303,10 +303,10 @@ files_hot_only <- plot_hotspot_density_bin2d(
   y_trim_p = c(0.01, 0.99),          # optional; helps if y is very skewed
   single_fill_limits = c(0.02, 0.98),
   single_limits_mode = "quantile",
-  per_facet_stretch = FALSE,         # try TRUE to maximize local contrast
+  per_facet_stretch = TRUE,         # try TRUE to maximize local contrast
   run_id = "hot_only_q02_098",
   out_dir = "output_charts2",
-  filename_suffix = "_bin2d_s_stretch.png"
+  filename_suffix = "_bin2d_f_stretch.png"
 )
 ```
 
@@ -348,32 +348,56 @@ socio_labels <- c(
 )
 
 files_hot_only <- plot_hotspot_density_bin2d(
-  df_hotspots  = hotspots_df,
+  hotspots_df  = hotspots_df,
+  inverse_df   = inverse_df,
+  socio_labels = socio_labels,
+  which_layers = "both",
+  drop_services = "Rt_nohab",
+  bg_bins = 80, hs_bins = 80,
+  bg_alpha = 0.8, hs_alpha = 0.8,
+  single_fill_limits = c(0.02, 0.98),
+  single_limits_mode = "quantile",
+  bg_palette = viridisLite::viridis(256, option = "C", begin = 0.1, end = 0.95),
+  hs_palette = viridisLite::viridis(256, option = "B", begin = 0.2, end = 0.9),
+  per_facet_stretch = FALSE,
+  hs_contours = TRUE,                # <- try this
+  run_id = "hot_only_q02_098",
+  out_dir = "output_charts2",
+  filename_suffix = "_bin2d_2scales.png"
+)
+
+```
+```{r preset 2}
+
+socio_labels <- c(
+  "GHS_BUILT_S_E2020_mean" = "Built Area",
+  "fields_mehrabi_2017_mean" = "Field Size",
+  "hdi_raster_predictions_2020_mean" = "HDI",
+  "rast_adm1_gini_disp_2020_mean" = "Income Inequality",
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "GDP (Total)",
+  "GHS_POP_E2020_GLOBE_sum" = "Population (GHS)",
+  "GlobPOP_Count_30arc_2020_sum" = "Population (Global)"
+)
+
+  files_hot_only <- plot_hotspot_density_bin2d(
+  hotspots_df  = hotspots_df,
   inverse_df   = inverse_df,
   socio_labels = socio_labels,
   which_layers = "both",
   drop_services = "Rt_nohab",
   trim_p = c(0.01, 0.99),
   y_trim_p = c(0.01, 0.99),
+  bg_bins = 100, hs_bins = 75,
+  bg_alpha = 0.6, hs_alpha = 0.95,
   single_fill_limits = c(0.02, 0.98),
   single_limits_mode = "quantile",
+  bg_palette = viridisLite::viridis(256, option = "C", begin = 0.1, end = 0.95),
+  hs_palette = viridisLite::viridis(256, option = "B", begin = 0.2, end = 0.9),
   per_facet_stretch = FALSE,
   hs_contours = TRUE,                # <- try this
   run_id = "hot_only_q02_098",
-  out_dir = "output_charts",
-  filename_suffix = "_bin2d_2scales.png"
+  out_dir = "output_charts2",
+  filename_suffix = "_bin2d_2scales_facet.png"
 )
 
-```
-```{r preset 2}
-plot_hotspot_density_bin2d(
-  hotspots_df, inverse_df, socio_labels,
-  which_layers = "both",
-  bg_bins = 50, hs_bins = 100,
-  bg_alpha = 0.6, hs_alpha = 0.95,
-  bg_palette = viridisLite::viridis(256, option = "C", begin = 0.1, end = 0.95),
-  hs_palette = viridisLite::viridis(256, option = "B", begin = 0.2, end = 0.9),
-  hs_contours = TRUE,
-  run_id = "both_contrast"
-)
 ```

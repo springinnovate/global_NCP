@@ -8,129 +8,285 @@ editor: visual
 # 3. Run Tests
 
 ```{r ks test}
-
-load(here("output_data", "res_hs_5.RData"))
-
-hotspots_dg <- res$hotspots_df
-inverse_df  <- res$non_hotspots_df
-
-
-# check if summary sf worked (has all the values correctly identified)
-hp2 <- res$summary_sf
-hp2$c_fid.y <- NULL 
-hp2$hotspot_services <- NULL
-hp2 <- hp2 %>% filter(!is.na(hotspot_count)) # this should be INSIDE of the function, will take care of this later
-hp2 <- left_join(hp2, hotspots_sf, by = 'fid')
-
-all <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio","Sed_export","N_export","C_Risk")
-st_write(hp2, here("output_data", "hotspots_5_final.gpkg"), append=FALSE)
-inverse_df <- inverse_df %>% filter(service %in% all)
-rm(res, sf_f)
+# load(here("output_data", "hotspots_5.RData"))
+# 
+# hotspots_df <- hs$hotspots_df
+# inverse_df  <- hs$non_hotspots_df
 
 
-# Run KS tests: hotspots vs non-hotspots per service for selected variables
-run_ks_hot_vs_non <- function(
-  plt_long, inverse_df,
-  vars = c("rast_gdpTot_1990_2020_30arcsec_2020_sum",
-           "GHS_POP_E2020_GLOBE_sum", "GlobPOP_Count_30arc_2020_sum"),
-  services = NULL,
-  adjust_method = "BH",
-  permute_n = 0,              # >0 to compute permutation p-values
-  seed = 42,
-  out_csv = "output_charts/ks_results_hot_vs_non.csv"
-) {
-  set.seed(seed)
-
-  # tag groups and combine
-  df <- bind_rows(
-    plt_long   %>% mutate(group = "hotspot"),
-    inverse_df %>% mutate(group = "nonhotspot")
-  )
-
-  # subset services if provided
-  if (!is.null(services)) {
-    df <- df %>% filter(service %in% services)
-  }
-
-  # helper: one KS (and optional permutation) for one service/variable
-  ks_one <- function(d, v, permute_n = 0) {
-    x <- d %>% filter(group == "hotspot")    %>% pull(.data[[v]])
-    y <- d %>% filter(group == "nonhotspot") %>% pull(.data[[v]])
-    x <- as.numeric(x); y <- as.numeric(y)
-    x <- x[is.finite(x)]; y <- y[is.finite(y)]
-    n_hot <- length(x); n_non <- length(y)
-
-    if (n_hot < 2 || n_non < 2) {
-      return(tibble(D = NA_real_, p_value = NA_real_, p_perm = NA_real_,
-                    n_hot = n_hot, n_non = n_non))
-    }
-
-    # KS (asymptotic p; ties -> approximate)
-    kt <- suppressWarnings(stats::ks.test(x, y, alternative = "two.sided", exact = FALSE))
-    D_obs <- as.numeric(kt$statistic)
-    p_asym <- kt$p.value
-
-    # Optional permutation p-value (label shuffle within service)
-    p_perm <- NA_real_
-    if (permute_n > 0) {
-      z <- c(x, y)
-      g <- c(rep(1L, n_hot), rep(0L, n_non))
-      D_perm <- numeric(permute_n)
-      for (i in seq_len(permute_n)) {
-        g_shuf <- sample(g)
-        D_perm[i] <- suppressWarnings(as.numeric(
-          stats::ks.test(z[g_shuf == 1L], z[g_shuf == 0L], exact = FALSE)$statistic
-        ))
-      }
-      p_perm <- mean(D_perm >= D_obs)
-    }
-
-    tibble(D = D_obs, p_value = p_asym, p_perm = p_perm,
-           n_hot = n_hot, n_non = n_non)
-  }
-
-  # run per var × service
-  results <- map_dfr(vars, function(v) {
-    df %>%
-      select(service, group, val = .data[[v]]) %>%
-      filter(!is.na(val)) %>%
-      group_by(service) %>%
-      group_modify(~ ks_one(.x %>% mutate(!!v := val, .keep="unused"), v, permute_n)) %>%
-      ungroup() %>%
-      mutate(var = v, .before = 1)
-  }) %>%
-    group_by(var) %>%
-    mutate(p_adj = p.adjust(p_value, method = adjust_method)) %>%
-    ungroup() %>%
-    arrange(var, service)
-
-  # write results
-  dir.create(dirname(out_csv), recursive = TRUE, showWarnings = FALSE)
-  readr::write_csv(results, out_csv)
-  results
-}
-
-```
-
-```{r run KS}
 vars_to_test <- c("rast_gdpTot_1990_2020_30arcsec_2020_sum",
                   "GHS_POP_E2020_GLOBE_sum","GlobPOP_Count_30arc_2020_sum", "GHS_BUILT_S_E2020_mean", "fields_mehrabi_2017_mean","hdi_raster_predictions_2020_mean", "rast_adm1_gini_disp_2020_mean" )
 ks_res <- run_ks_hot_vs_non(
-  plt_long, inverse_df,
-  vars         = vars_to_test,
-  adjust_method = "BH",
-  permute_n     = 0,   # set to, say, 2000 for permutation p-values (slower)
-  out_csv       = here("output_data", "ks_results_hot_vs_non.csv")
+  hotspots_df = hotspots_df,
+  inverse_df  = inverse_df,
+  vars = vars_to_test,
+  sampling = "match_hot",          # <- helps with huge complements
+  permute_n = 0,                   # set >0 for permutation p
+  compute_one_sided = TRUE,
+  add_summaries = TRUE,
+  out_csv = "output_charts/ks_results_hot_vs_non.csv"
 )
 
 ks_res
 ```
+| Column              | Meaning                                                                                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `service`           | Ecosystem service for the comparison (row group).                                                                                                                                             |
+| `var`               | Socioeconomic variable being tested (e.g., GDP total, population).                                                                                                                            |
+| `D`                 | Kolmogorov–Smirnov statistic; maximum vertical gap between hotspot and non-hotspot ECDFs (unsigned). Larger ⇒ stronger distributional difference.                                             |
+| `p_value`           | Two-sided KS p-value (asymptotic). Small values indicate the two distributions differ.                                                                                                        |
+| `p_perm`            | Optional permutation p-value (label shuffle within a service). `NA` if permutations were not requested.                                                                                       |
+| `n_hot`             | Sample size of the hotspot group used in the test.                                                                                                                                            |
+| `n_non`             | Sample size of the non-hotspot group used in the test.                                                                                                                                        |
+| `mean_hot`          | Mean of `var` in the hotspot group.                                                                                                                                                           |
+| `mean_non`          | Mean of `var` in the non-hotspot group.                                                                                                                                                       |
+| `median_hot`        | Median of `var` in the hotspot group.                                                                                                                                                         |
+| `median_non`        | Median of `var` in the non-hotspot group.                                                                                                                                                     |
+| `q10_hot`           | 10th percentile of `var` in the hotspot group.                                                                                                                                                |
+| `q90_hot`           | 90th percentile of `var` in the hotspot group.                                                                                                                                                |
+| `q10_non`           | 10th percentile of `var` in the non-hotspot group.                                                                                                                                            |
+| `q90_non`           | 90th percentile of `var` in the non-hotspot group.                                                                                                                                            |
+| `median_delta`      | `median_hot − median_non`. Positive ⇒ hotspots typically have larger values.                                                                                                                  |
+| `mean_delta`        | `mean_hot − mean_non`. Positive ⇒ hotspots typically have larger values.                                                                                                                      |
+| `auc`               | Probability of superiority (AUC; equivalent to normalized Mann–Whitney U): P(value\_hotspot > value\_nonhotspot). 0.5 ⇒ no tendency; >0.5 ⇒ hotspots tend higher; <0.5 ⇒ hotspots tend lower. |
+| `cliffs_delta`      | Nonparametric effect size on \[−1, 1], computed as `2*auc − 1`. Rule-of-thumb magnitude: \~0.15 negligible, \~0.33 small, \~0.47 medium, ≥0.47 large (use absolute value for magnitude).      |
+| `p_hot_greater`     | One-sided KS p-value testing whether hotspots are stochastically greater than non-hotspots.                                                                                                   |
+| `p_hot_less`        | One-sided KS p-value testing whether hotspots are stochastically smaller than non-hotspots.                                                                                                   |
+| `p_adj`             | Benjamini–Hochberg FDR-adjusted version of `p_value` (adjusted within each `var` across services).                                                                                            |
+| `p_hot_greater_adj` | BH-adjusted version of `p_hot_greater` (adjusted within `var`).                                                                                                                               |
+| `p_hot_less_adj`    | BH-adjusted version of `p_hot_less` (adjusted within `var`).                                                                                                                                  |
+
+
+```{r ks plott}
+vars_to_test <- c(
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum",
+  "GHS_POP_E2020_GLOBE_sum",
+  "GlobPOP_Count_30arc_2020_sum",
+  "GHS_BUILT_S_E2020_mean",
+  "fields_mehrabi_2017_mean",
+  "hdi_raster_predictions_2020_mean",
+  "rast_adm1_gini_disp_2020_mean"
+)
+
+transform_by_var <- c(
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "log1p",
+  "GHS_POP_E2020_GLOBE_sum"                 = "log1p",
+  "GlobPOP_Count_30arc_2020_sum"            = "log1p"
+)
+
+files <- save_ecdf_grids(
+  hotspots_df, inverse_df,
+  vars = vars_to_test,
+  ks_res = ks_res,             # reuse precomputed D to select top services
+  top_k = 8,
+  transform_default = "auto",
+  transform_by_var = transform_by_var,
+  out_dir = "output_charts/ecdf",
+  prefix = "ecdf",
+  width = 10, height = 7, dpi = 300,
+  use_ragg = TRUE
+)
+```
+```{r Ks plot 2}
+files_all <- save_ecdf_grids(
+  hotspots_df, inverse_df,
+  vars = vars_to_test,
+  ks_res = ks_res,
+  service_selection = "all",
+  transform_default = "auto",
+  transform_by_var = transform_by_var,
+  out_dir = "output_charts/ecdf_all",
+  prefix = "ecdf_all"
+)
+```
+
+
+
+```{r plot final}
+save_ecdf_grids <- function(
+  hotspots_df, inverse_df,
+  vars,
+  ks_res = NULL,                 # optional: use to pick top services by D
+  top_k = 6,
+  transform_default = c("auto","identity","log1p")[1],
+  transform_by_var = NULL,       # named chr vec: c(var_name = "log1p", ...)
+  line_size = 0.9,
+  out_dir = "output_charts/ecdf",
+  prefix = "ecdf",
+  width = 10, height = 7, dpi = 300,
+  use_ragg = TRUE,
+  verbose = TRUE
+) {
+  transform_default <- match.arg(transform_default)
+
+  safe_name <- function(x) {
+    x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
+    gsub("_+", "_", x)
+  }
+
+  save_png_safe <- function(file, plot, width, height, dpi, bg = "white", use_ragg = TRUE) {
+    ok <- FALSE
+    if (use_ragg && requireNamespace("ragg", quietly = TRUE)) {
+      try({
+        ggplot2::ggsave(file, plot, width = width, height = height, dpi = dpi, bg = bg,
+                        device = ragg::agg_png)
+        ok <- TRUE
+      }, silent = TRUE)
+    }
+    if (!ok) {
+      ggplot2::ggsave(file, plot, width = width, height = height, dpi = dpi, bg = bg,
+                      device = "png")
+    }
+  }
+
+  # optional: precompute top services per var from ks_res
+  top_by_var <- NULL
+  if (!is.null(ks_res)) {
+    top_by_var <- ks_res |>
+      dplyr::arrange(.data$var, dplyr::desc(.data$D)) |>
+      dplyr::group_by(.data$var) |>
+      dplyr::slice_head(n = top_k) |>
+      dplyr::summarise(services = list(unique(.data$service)), .groups = "drop")
+  }
+
+  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  out_files <- character(0)
+
+  # small helper to decide transform when "auto"
+  decide_transform <- function(v) {
+    if (!is.null(transform_by_var) && v %in% names(transform_by_var)) {
+      return(match.arg(transform_by_var[[v]], c("identity","log1p")))
+    }
+    if (transform_default != "auto") return(transform_default)
+
+    # auto heuristic: log1p for typical skewed, nonnegative totals/counts
+    looks_skewed <- grepl("gdp|pop|count|sum|_sum$|_E2020_", v, ignore.case = TRUE)
+    if (looks_skewed) return("log1p")
+
+    # fallback: quick peek to decide
+    vv <- dplyr::bind_rows(
+      dplyr::transmute(hotspots_df, val = as.numeric(.data[[v]])),
+      dplyr::transmute(inverse_df,  val = as.numeric(.data[[v]]))
+    )$val
+    vv <- vv[is.finite(vv)]
+    if (length(vv) > 1000) vv <- vv[sample.int(length(vv), 1000)] # light sample
+    if (all(vv >= 0, na.rm = TRUE) && stats::quantile(vv, 0.99, na.rm = TRUE) > 1000) {
+      "log1p" else "identity"
+    }
+  }
+
+  for (v in vars) {
+    tfm <- decide_transform(v)
+
+    # choose top services from ks_res if provided
+    ts <- NULL
+    if (!is.null(top_by_var)) {
+      hit <- top_by_var$services[top_by_var$var == v]
+      if (length(hit)) ts <- hit[[1]]
+    }
+
+    p <- plot_ecdf_grid(
+      hotspots_df, inverse_df,
+      var_id = v, top_k = top_k,
+      transform = tfm,
+      line_size = line_size,
+      top_services = ts
+    )
+
+    suffix <- if (tfm == "log1p") "_log1p" else ""
+    file <- file.path(out_dir, paste0(prefix, "_", safe_name(v), suffix, ".png"))
+
+    save_png_safe(file, p, width = width, height = height, dpi = dpi, use_ragg = use_ragg)
+    if (isTRUE(verbose)) message("Saved: ", file)
+    out_files <- c(out_files, file)
+  }
+
+  invisible(out_files)
+}
+```
+
+```{r plot ks}
+
+# 1) Augment KS table with direction summaries
+vars_to_test <-  c("rast_gdpTot_1990_2020_30arcsec_2020_sum",
+                  "GHS_POP_E2020_GLOBE_sum",
+                  "GlobPOP_Count_30arc_2020_sum", 
+                  "GHS_BUILT_S_E2020_mean",
+                  "fields_mehrabi_2017_mean",
+                  "hdi_raster_predictions_2020_mean",
+                  "rast_adm1_gini_disp_2020_mean" )
+
+
+# 2) Heatmap of D with direction arrows
+p_heat <- plot_ks_heatmap(ks_res)
+ggsave(here("output_charts", "ks_heatmap.png"), p_heat, width = 10, height = 6, dpi = 300, bg = "white")
+
+# 3) Bars by variable
+dir.create("output_charts/ks", showWarnings = FALSE, recursive = TRUE)#
+for (v in vars_to_test) {
+  p_bar <- plot_ks_bars(ks_res, v, top_k = 12)
+  ggsave(file.path(here("output_charts"), paste0("ks_bars_", v, ".png")),
+         p_bar, width = 8, height = 6, dpi = 300, bg = "white")
+}
+
+# 4) ECDF overlays for top services (log1p scale works well for GDP/pop)
+p_ecdf_gdp <- plot_ecdf_grid(hotspots_df, inverse_df,
+                             "rast_gdpTot_1990_2020_30arcsec_2020_sum",
+                             top_k = 6, transform = "log1p")
+ggsave(here("output_charts","ecdf_gdp.png"), p_ecdf_gdp, width = 10, height = 7, dpi = 300, bg = "white")
+
+p_ecdf_pop <- plot_ecdf_grid(hotspots_df, inverse_df,
+                             "GHS_POP_E2020_GLOBE_sum",
+                             top_k = 6, transform = "log1p")
+ggsave(here("output_charts","ecdf_pop.png"), p_ecdf_pop, width = 10, height = 7, dpi = 300, bg = "white")
+
+# 5) Mountain plot for a specific service × variable (pick a “big D”)
+p_mtn <- plot_ks_mountain(hotspots_df, inverse_df,
+                          service_id = "Pollination",
+                          var_id = "rast_gdpTot_1990_2020_30arcsec_2020_sum",
+                          transform = "log1p")
+ggsave(here("output_charts","mountain_pollination_gdp.png"), p_mtn, width = 8, height = 5, dpi = 300, bg = "white")
+```
+
+```{r plts}
+# After you run run_ks_hot_vs_non(...)
+ks_aug <- augment_ks_with_direction(
+  hotspots_df = hotspots_df,   # your long hotspot table
+  inverse_df  = inverse_df,    # long non-hotspot table
+  ks_res      = ks_res,        # from run_ks_hot_vs_non
+  vars = vars_to_test,
+  compute_one_sided = TRUE
+)
+
+# Heatmap + arrows
+p_heat <- plot_ks_heatmap(ks_aug, fill_limits = c(0, NA))
+ggplot2::ggsave(here::here("output_charts","ks_heatmap.png"), p_heat, width=10, height=6, dpi=300, bg="white")
+
+# Bars for a variable
+p_bar <- plot_ks_bars(ks_aug, "rast_gdpTot_1990_2020_30arcsec_2020_sum", top_k = 12)
+ggplot2::ggsave(here::here("output_charts","ks_bars_gdp.png"), p_bar, width=8, height=6, dpi=300, bg="white")
+
+# ECDF grid (nice with log1p for skewed vars)
+p_ecdf <- plot_ecdf_grid(hotspots_df, inverse_df, "GHS_POP_E2020_GLOBE_sum", top_k = 6, transform = "log1p")
+ggplot2::ggsave(here::here("output_charts","ecdf_pop.png"), p_ecdf, width=10, height=7, dpi=300, bg="white")
+
+# Mountain plot for one pair
+p_mtn <- plot_ks_mountain(hotspots_df, inverse_df, service_id="Pollination",
+                          var_id="rast_gdpTot_1990_2020_30arcsec_2020_sum",
+                          transform="log1p")
+ggplot2::ggsave(here::here("output_charts","mountain_pollination_gdp.png"), p_mtn, width=8, height=5, dpi=300, bg="white")
+
+```
+
+
+
 
 ```{r ECD overlay}
 
-plot_ecdf_hot_vs_non <- function(plt_long, inverse_df, service_id, var) {
+plot_ecdf_hot_vs_non <- function(hotspots_df, inverse_df, service_id, var) {
   dd <- bind_rows(
-    plt_long   %>% mutate(group = "hotspot"),
+    hotspots_df   %>% mutate(group = "hotspot"),
     inverse_df %>% mutate(group = "nonhotspot")
   ) %>%
     filter(service == service_id) %>%
@@ -149,10 +305,10 @@ plot_ecdf_hot_vs_non <- function(plt_long, inverse_df, service_id, var) {
 
 
 # ----(1) Augment KS with direction: median difference + AUC (MW-based) ----
-augment_ks_with_direction <- function(plt_long, inverse_df, ks_res, vars) {
+augment_ks_with_direction <- function(hotspots_df, inverse_df, ks_res, vars) {
   # bind groups
   base <- bind_rows(
-    plt_long   %>% mutate(group = "hotspot"),
+    hotspots_df   %>% mutate(group = "hotspot"),
     inverse_df %>% mutate(group = "nonhotspot")
   ) %>%
     select(service, group, all_of(vars))
@@ -300,53 +456,3 @@ plot_ks_mountain <- function(plt_long, inverse_df, service_id, var_id, transform
     theme_minimal(base_size = 11)
 }
 ```
-
-```{r plot ks}
-
-# 1) Augment KS table with direction summaries
-vars_to_test <-  c("rast_gdpTot_1990_2020_30arcsec_2020_sum",
-                  "GHS_POP_E2020_GLOBE_sum",
-                  "GlobPOP_Count_30arc_2020_sum", 
-                  "GHS_BUILT_S_E2020_mean",
-                  "fields_mehrabi_2017_mean",
-                  "hdi_raster_predictions_2020_mean",
-                  "rast_adm1_gini_disp_2020_mean" )
-
-ks_aug <- augment_ks_with_direction(plt_long, inverse_df, ks_res, vars_to_test)
-
-# 2) Heatmap of D with direction arrows
-p_heat <- plot_ks_heatmap(ks_aug)
-ggsave(here("output_charts", "ks_heatmap.png"), p_heat, width = 10, height = 6, dpi = 300, bg = "white")
-
-# 3) Bars by variable
-dir.create("output_charts/ks", showWarnings = FALSE, recursive = TRUE)#
-for (v in vars_to_test) {
-  p_bar <- plot_ks_bars(ks_aug, v, top_k = 12)
-  ggsave(file.path(here("output_charts"), paste0("ks_bars_", v, ".png")),
-         p_bar, width = 8, height = 6, dpi = 300, bg = "white")
-}
-
-# 4) ECDF overlays for top services (log1p scale works well for GDP/pop)
-p_ecdf_gdp <- plot_ecdf_grid(plt_long, inverse_df,
-                             "rast_gdpTot_1990_2020_30arcsec_2020_sum",
-                             top_k = 6, transform = "log1p")
-ggsave(here("output_charts","ecdf_gdp.png"), p_ecdf_gdp, width = 10, height = 7, dpi = 300, bg = "white")
-
-p_ecdf_pop <- plot_ecdf_grid(plt_long, inverse_df,
-                             "GHS_POP_E2020_GLOBE_sum",
-                             top_k = 6, transform = "log1p")
-ggsave(here("output_charts","ecdf_pop.png"), p_ecdf_pop, width = 10, height = 7, dpi = 300, bg = "white")
-
-# 5) Mountain plot for a specific service × variable (pick a “big D”)
-p_mtn <- plot_ks_mountain(plt_long, inverse_df,
-                          service_id = "Pollination",
-                          var_id = "rast_gdpTot_1990_2020_30arcsec_2020_sum",
-                          transform = "log1p")
-ggsave(here("output_charts","mountain_pollination_gdp.png"), p_mtn, width = 8, height = 5, dpi = 300, bg = "white")
-```
-
-```{#| echo: false}
-2 * 2
-```
-
-The `echo: false` option disables the printing of code (only output is displayed).
