@@ -283,7 +283,7 @@ all <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red
 
 inverse_df <- inverse_df %>% filter(service %in% all)
 ``` 
-=======
+
 ```{r run get hotsposts function}
 # Define the intended direction of change (service loss/increased damage)
 loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
@@ -313,21 +313,7 @@ hotspots_sf$fid <- NULL
 
 ```
 
-# assuming `nams1` and `nams2` are defined and ordered
 
-for (i in seq_along(nams1)) { val_col \<- nams1\[i\] bin_col \<- nams2\[i\] masked_col \<- paste0(val_col, "\_masked")
-
-hp_sf\[\[masked_col\]\] \<- ifelse(hp_sf\[\[bin_col\]\] == 1, hp\[\[val_col\]\], NA) }
-
-# st_write(hp, '/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final_mskd.gpkg')
-
-```         
-
-
-
-```
-
->>>>>>> f15f93e (commit from Cumaribo, last update with Costal)
 ## 2.1 Hotspots
 
 ```{r scatterplot, fig.height=7, fig.width=12, warning=FALSE}
@@ -400,7 +386,7 @@ files_hot_only <- plot_hotspot_density_bin2d(
   socio_labels = socio_labels,
   which_layers = "both",
   drop_services = "Rt_nohab",
-  bg_bins = 80, hs_bins = 80,
+  bg_bins = 100, hs_bins = 100,
   bg_alpha = 0.8, hs_alpha = 0.8,
   single_fill_limits = c(0.02, 0.98),
   single_limits_mode = "quantile",
@@ -434,7 +420,7 @@ socio_labels <- c(
   drop_services = "Rt_nohab",
   trim_p = c(0.01, 0.99),
   y_trim_p = c(0.01, 0.99),
-  bg_bins = 100, hs_bins = 75,
+  bg_bins = 100, hs_bins = 100,
   bg_alpha = 0.6, hs_alpha = 0.95,
   single_fill_limits = c(0.02, 0.98),
   single_limits_mode = "quantile",
