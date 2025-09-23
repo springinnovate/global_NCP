@@ -8,10 +8,10 @@ editor: visual
 # 3. Run Tests
 
 ```{r ks test}
-# load(here("output_data", "hotspots_5.RData"))
+ load(here("output_data", "hotspots_5.RData"))
 # 
-# hotspots_df <- hs$hotspots_df
-# inverse_df  <- hs$non_hotspots_df
+ hotspots_df <- hs$hotspots_df
+ inverse_df  <- hs$non_hotspots_df
 
 
 vars_to_test <- c("rast_gdpTot_1990_2020_30arcsec_2020_sum",
@@ -57,6 +57,26 @@ ks_res
 | `p_hot_less_adj`    | BH-adjusted version of `p_hot_less` (adjusted within `var`).                                                                                                                                  |
 
 
+# Not currently working
+```{r kolmogorv}
+
+# Need to find the helper function, do it later, to also remermber waht the point was 
+# # reuse the KS helper I gave you earlier
+vars_to_test <- c("rast_gdpTot_1990_2020_30arcsec_2020_sum",
+                  "GHS_POP_E2020_GLOBE_sum",
+                  "GlobPOP_Count_30arc_2020_sum")
+
+ks_res <- run_ks_hot_vs_non(
+  hotspots_df   = hs$hotspots_df,
+  inverse_df = hs$non_hotspots_df,
+  vars = vars_to_test,
+  adjust_method = "BH",
+  permute_n = 0,
+  out_csv = "output_charts/ks_results_hot_vs_non.csv"
+)
+# 
+```
+
 ```{r ks plott}
 vars_to_test <- c(
   "rast_gdpTot_1990_2020_30arcsec_2020_sum",
@@ -87,17 +107,22 @@ files <- save_ecdf_grids(
   use_ragg = TRUE
 )
 ```
+
 ```{r Ks plot 2}
-files_all <- save_ecdf_grids(
+files <- save_ecdf_grids(
   hotspots_df, inverse_df,
   vars = vars_to_test,
-  ks_res = ks_res,
-  service_selection = "all",
-  transform_default = "auto",
-  transform_by_var = transform_by_var,
-  out_dir = "output_charts/ecdf_all",
-  prefix = "ecdf_all"
+  ks_res = ks_res,                  # reuse precomputed D
+  service_selection = "top_k",
+  top_k = 8,                        # show 8 services per variable
+  transform_default = "log1p",      # <- force log1p for ALL vars
+  transform_by_var = NULL,          # (not needed when forcing)
+  out_dir = "output_charts/ecdf",
+  prefix = "ecdf",
+  width = 10, height = 7, dpi = 300,
+  use_ragg = TRUE
 )
+
 ```
 
 
