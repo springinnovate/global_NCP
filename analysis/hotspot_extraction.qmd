@@ -42,7 +42,7 @@ use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 
 # 1 Hotspot Extraction
 
-## 1.1 Prepare Date for Analysis
+## 1.1 Prepare Data for Analysis
 
 The spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation, that requires to **pivot** the input vector files into the long format, with one  row per service/cell combination.
 
@@ -54,10 +54,9 @@ The spatial objects with the additional attributes are loaded and reformatted fo
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
 #sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef_f.gpkg'))
-lyr_sf <- st_layers("/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs/10k_change_calc.gpkg")
-sf_f <- st_read("/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs/10k_change_calc.gpkg") 
+lyr_sf <- st_layers("/home/jeronimo/OneDrive/global_NCP/data/processed/10k_change_calc.gpkg")
+sf_f <- st_read("/home/jeronimo/OneDrive/global_NCP/data/processed/10k_change_calc.gpkg") 
 
-sf_f <- sf_f %>% relocate(starts_with("Rt_"), .before = GHS_BUILT_S_E2020_mean)
 #change na,mes here (homogenize) 
 #this as cbackup, remove as soon as possible.
 #sf_f <- sf_f %>% mutate(fid=fid_2)
@@ -135,16 +134,16 @@ hs <- extract_hotspots(
     rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
   ),
   id_cols = c("c_fid"),
-  sf_obj = sf_f,                                       # your sf with fid
-  write_sf_path = "output_data/hotspots3.gpkg",       # or "output_charts/hotspots.shp"
-  write_driver  = "GPKG",                              # or "ESRI Shapefile"
+  sf_obj = sf_f,                                       # sf with fid
+  write_sf_path = "output_data/hotspots3.gpkg",       
+  write_driver  = "GPKG",                              
   clean_names   = TRUE,
   fid_alias     = "fid_2",                             # duplicate fid only for the file
   drop_fid_on_write = TRUE                             # drop original fid on disk (keep in memory)
 )
 
- 
-save(hs, file=here("output_data", "hotspots_5.RData")) 
+
+#save(hs, file=here("output_data", "hotspots_5.RData")) 
 # hotspots_sf <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
 hp_sf <- hs$hotspots_sf
 hp_sf <- hp_sf %>% select(-ends_with("_abs_chg"))
