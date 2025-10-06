@@ -44,7 +44,7 @@ use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 
 ## 1.1 Prepare Data for Analysis
 
-The spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation, that requires to **pivot** the input vector files into the long format, with one  row per service/cell combination.
+The spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation, that requires to **pivot** the input vector files into the long format, with one row per service/cell combination.
 
 ```{r pivot}
 #| eval: true
@@ -107,8 +107,6 @@ service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Se
 
 ```
 
-
-
 ```{r hotpots 2}
 
 # Adjust This. Set the variables outside as they shou;d:
@@ -150,7 +148,8 @@ hp_sf <- hp_sf %>% select(-ends_with("_abs_chg"))
 ```
 
 # Masking
-Whathappens here is  that i mask each one of the outputs, and fix the names to try to get this to make morr sense, be more replicable/consitent and facilitate the plottting (already done), by masking each binary with the value for plotting. Nevertheless, i think there is a smarter way to do this and i should aske for advice.
+
+Whathappens here is that i mask each one of the outputs, and fix the names to try to get this to make morr sense, be more replicable/consitent and facilitate the plottting (already done), by masking each binary with the value for plotting. Nevertheless, i think there is a smarter way to do this and i should aske for advice.
 
 ```{r prelim fixing names}
 
@@ -243,7 +242,6 @@ st_write(hp_sf, paste0(inpath, '/', 'hotspots_5_final_mskd.gpkg'))
          
 ```
 
-
 ### 2.1.1 Load Data
 
 ```{r load_plotting data res}
@@ -256,7 +254,8 @@ inverse_df  <- hs$non_hotspots_df
 all <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio","Sed_export","N_export","C_Risk")
 
 inverse_df <- inverse_df %>% filter(service %in% all)
-``` 
+```
+
 ## 2.1 Hotspots
 
 ```{r scatterplot, fig.height=7, fig.width=12, warning=FALSE}
@@ -287,7 +286,9 @@ files_hot_only <- plot_hotspot_density_bin2d(
 ```
 
 ## 2.2 Non- Hotpots
+
 Not necessary to redo !!!!!
+
 ```{r plot 2, fig.height=7, fig.width=12, warning=FALSE}
 
 files_bg_only <- plot_hotspot_density_bin2d(
@@ -343,6 +344,7 @@ files_hot_only <- plot_hotspot_density_bin2d(
 )
 
 ```
+
 ```{r preset 2}
 
 socio_labels <- c(

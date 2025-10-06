@@ -29,35 +29,36 @@ ks_res <- run_ks_hot_vs_non(
 
 ks_res
 ```
-| Column              | Meaning                                                                                                                                                                                       |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `service`           | Ecosystem service for the comparison (row group).                                                                                                                                             |
-| `var`               | Socioeconomic variable being tested (e.g., GDP total, population).                                                                                                                            |
-| `D`                 | Kolmogorov–Smirnov statistic; maximum vertical gap between hotspot and non-hotspot ECDFs (unsigned). Larger ⇒ stronger distributional difference.                                             |
-| `p_value`           | Two-sided KS p-value (asymptotic). Small values indicate the two distributions differ.                                                                                                        |
-| `p_perm`            | Optional permutation p-value (label shuffle within a service). `NA` if permutations were not requested.                                                                                       |
-| `n_hot`             | Sample size of the hotspot group used in the test.                                                                                                                                            |
-| `n_non`             | Sample size of the non-hotspot group used in the test.                                                                                                                                        |
-| `mean_hot`          | Mean of `var` in the hotspot group.                                                                                                                                                           |
-| `mean_non`          | Mean of `var` in the non-hotspot group.                                                                                                                                                       |
-| `median_hot`        | Median of `var` in the hotspot group.                                                                                                                                                         |
-| `median_non`        | Median of `var` in the non-hotspot group.                                                                                                                                                     |
-| `q10_hot`           | 10th percentile of `var` in the hotspot group.                                                                                                                                                |
-| `q90_hot`           | 90th percentile of `var` in the hotspot group.                                                                                                                                                |
-| `q10_non`           | 10th percentile of `var` in the non-hotspot group.                                                                                                                                            |
-| `q90_non`           | 90th percentile of `var` in the non-hotspot group.                                                                                                                                            |
-| `median_delta`      | `median_hot − median_non`. Positive ⇒ hotspots typically have larger values.                                                                                                                  |
-| `mean_delta`        | `mean_hot − mean_non`. Positive ⇒ hotspots typically have larger values.                                                                                                                      |
-| `auc`               | Probability of superiority (AUC; equivalent to normalized Mann–Whitney U): P(value\_hotspot > value\_nonhotspot). 0.5 ⇒ no tendency; >0.5 ⇒ hotspots tend higher; <0.5 ⇒ hotspots tend lower. |
-| `cliffs_delta`      | Nonparametric effect size on \[−1, 1], computed as `2*auc − 1`. Rule-of-thumb magnitude: \~0.15 negligible, \~0.33 small, \~0.47 medium, ≥0.47 large (use absolute value for magnitude).      |
-| `p_hot_greater`     | One-sided KS p-value testing whether hotspots are stochastically greater than non-hotspots.                                                                                                   |
-| `p_hot_less`        | One-sided KS p-value testing whether hotspots are stochastically smaller than non-hotspots.                                                                                                   |
-| `p_adj`             | Benjamini–Hochberg FDR-adjusted version of `p_value` (adjusted within each `var` across services).                                                                                            |
-| `p_hot_greater_adj` | BH-adjusted version of `p_hot_greater` (adjusted within `var`).                                                                                                                               |
-| `p_hot_less_adj`    | BH-adjusted version of `p_hot_less` (adjusted within `var`).                                                                                                                                  |
 
+| Column | Meaning |
+|----|----|
+| `service` | Ecosystem service for the comparison (row group). |
+| `var` | Socioeconomic variable being tested (e.g., GDP total, population). |
+| `D` | Kolmogorov–Smirnov statistic; maximum vertical gap between hotspot and non-hotspot ECDFs (unsigned). Larger ⇒ stronger distributional difference. |
+| `p_value` | Two-sided KS p-value (asymptotic). Small values indicate the two distributions differ. |
+| `p_perm` | Optional permutation p-value (label shuffle within a service). `NA` if permutations were not requested. |
+| `n_hot` | Sample size of the hotspot group used in the test. |
+| `n_non` | Sample size of the non-hotspot group used in the test. |
+| `mean_hot` | Mean of `var` in the hotspot group. |
+| `mean_non` | Mean of `var` in the non-hotspot group. |
+| `median_hot` | Median of `var` in the hotspot group. |
+| `median_non` | Median of `var` in the non-hotspot group. |
+| `q10_hot` | 10th percentile of `var` in the hotspot group. |
+| `q90_hot` | 90th percentile of `var` in the hotspot group. |
+| `q10_non` | 10th percentile of `var` in the non-hotspot group. |
+| `q90_non` | 90th percentile of `var` in the non-hotspot group. |
+| `median_delta` | `median_hot − median_non`. Positive ⇒ hotspots typically have larger values. |
+| `mean_delta` | `mean_hot − mean_non`. Positive ⇒ hotspots typically have larger values. |
+| `auc` | Probability of superiority (AUC; equivalent to normalized Mann–Whitney U): P(value_hotspot \> value_nonhotspot). 0.5 ⇒ no tendency; \>0.5 ⇒ hotspots tend higher; \<0.5 ⇒ hotspots tend lower. |
+| `cliffs_delta` | Nonparametric effect size on \[−1, 1\], computed as `2*auc − 1`. Rule-of-thumb magnitude: \~0.15 negligible, \~0.33 small, \~0.47 medium, ≥0.47 large (use absolute value for magnitude). |
+| `p_hot_greater` | One-sided KS p-value testing whether hotspots are stochastically greater than non-hotspots. |
+| `p_hot_less` | One-sided KS p-value testing whether hotspots are stochastically smaller than non-hotspots. |
+| `p_adj` | Benjamini–Hochberg FDR-adjusted version of `p_value` (adjusted within each `var` across services). |
+| `p_hot_greater_adj` | BH-adjusted version of `p_hot_greater` (adjusted within `var`). |
+| `p_hot_less_adj` | BH-adjusted version of `p_hot_less` (adjusted within `var`). |
 
 # Not currently working
+
 ```{r kolmogorv}
 
 # Need to find the helper function, do it later, to also remermber waht the point was 
@@ -124,8 +125,6 @@ files <- save_ecdf_grids(
 )
 
 ```
-
-
 
 ```{r plot final}
 save_ecdf_grids <- function(
@@ -303,9 +302,6 @@ p_mtn <- plot_ks_mountain(hotspots_df, inverse_df, service_id="Pollination",
 ggplot2::ggsave(here::here("output_charts","mountain_pollination_gdp.png"), p_mtn, width=8, height=5, dpi=300, bg="white")
 
 ```
-
-
-
 
 ```{r ECD overlay}
 
