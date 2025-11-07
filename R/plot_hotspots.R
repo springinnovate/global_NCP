@@ -363,13 +363,13 @@ plot_hotspot_density_bin2d <- function(
       " | stretch=", if (per_facet_stretch) "facet" else "service",
       " | bins=", if (which_layers %in% c("both","nonhotspots")) bg_bins else hs_bins
     )
-    
     p <- p +
       ggplot2::facet_wrap(~ socio_label, scales = "free_y", nrow = 2) +
       ggplot2::labs(
         title = paste(
           c("Non-hotspots","Hotspots","Hotspot vs non-hotspot density")
-          [match(which_layers, c("nonhotspots","hotspots","both"))], ":", svc
+          [match(which_layers, c("nonhotspots","hotspots","both"))],
+          ":", svc
         ),
         x = "Ecosystem service % change",
         y = "Socioeconomic variable",

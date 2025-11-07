@@ -79,7 +79,7 @@ plt_long <- plt %>%
     values_to = "pct_chg"
   ) %>%
   select(fid, c_fid, service, pct_chg, all_of(socio_vars)) %>% 
-  mutate(service = str_replace(service, "_pct_chg.*", "")) %>% 
+  mutate(service = str_replace(service, "_abs_chg.*", "")) %>% 
   mutate(service = str_replace(service, "_mean.*", "")) %>% 
   filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% filter(pct_chg != Inf)  # remove infinite values and those for which Country Id is NA. I need to make sure this is correct. There are sopme locations that have no country values (because it is outside. I am dropping that, but need tto reconsider this)
   
@@ -107,7 +107,48 @@ service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Se
 
 ```
 
-```{r hotpots 2}
+
+```{r hotpots pct}
+
+# Adjust This. Set the variables outside as they shou;d:
+## Define the intended direction of change (service loss/increased damage)
+loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+gain <- c("Sed_export","N_export","C_Risk")
+
+ combos = list(
+    combo_1 = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
+    combo_2 = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+  )
+# after running:
+hs <- extract_hotspots(
+  df = plt_long,
+  value_col = "abs_chg",
+  pct_cutoff = 0.05,
+  threshold_mode = "percent",
+  rule_mode = "vectors",
+  loss_services = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
+  gain_services = c("Sed_export","N_export","C_Risk"),
+  combos = list(
+    deg_combo = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
+    rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+  ),
+  id_cols = c("c_fid"),
+  sf_obj = sf_f,                                       # sf with fid
+  write_sf_path = "output_data/hotspots_abs_ch.gpkg",       
+  write_driver  = "GPKG",                              
+  clean_names   = TRUE,
+  fid_alias     = "fid_2",                             # duplicate fid only for the file
+  drop_fid_on_write = TRUE                             # drop original fid on disk (keep in memory)
+)
+
+
+#save(hs, file=here("output_data", "hotspots_5.RData")) 
+# hotspots_sf <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
+hp_sf <- hs$hotspots_sf
+hp_sf <- hp_sf %>% select(-ends_with("_abs_chg"))
+```
+
+```{r hotpots abs}
 
 # Adjust This. Set the variables outside as they shou;d:
 ## Define the intended direction of change (service loss/increased damage)
@@ -133,7 +174,7 @@ hs <- extract_hotspots(
   ),
   id_cols = c("c_fid"),
   sf_obj = sf_f,                                       # sf with fid
-  write_sf_path = "output_data/hotspots3.gpkg",       
+  write_sf_path = "output_data/hotspots_abs_ch.gpkg",       
   write_driver  = "GPKG",                              
   clean_names   = TRUE,
   fid_alias     = "fid_2",                             # duplicate fid only for the file
@@ -144,7 +185,7 @@ hs <- extract_hotspots(
 #save(hs, file=here("output_data", "hotspots_5.RData")) 
 # hotspots_sf <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
 hp_sf <- hs$hotspots_sf
-hp_sf <- hp_sf %>% select(-ends_with("_abs_chg"))
+hp_sf <- hp_sf %>% select(-ends_with("_pct_chg"))
 ```
 
 # Masking
@@ -160,7 +201,7 @@ mask_pct_change_by_hotspot <- function(hp_sf,
                                                          "Sed_Ret_Ratio","Rt_nohab",
                                                          "C_Risk","C_Prot_service",
                                                          "C_Risk_Red_Ratio","Pollination"),
-                                       value_suffix_re = "(?:_pct_?chg)$",   # _pct_chg or _pctchg
+                                       value_suffix_re = "(?:_abs_?chg)$",   # _pct_chg or _pctchg
                                        masked_suffix   = "_masked",
                                        verbose = TRUE) {
   stopifnot(inherits(hp_sf, "sf"))
@@ -237,8 +278,8 @@ mask_pct_change_by_hotspot <- function(hp_sf,
 hp_sf <- mask_pct_change_by_hotspot(hp_sf)
 
 # sanity check: see the new *_masked columns
-names(hp_sf)[str_detect(names(hp_sf), "_pct_?chg_masked$")]
-st_write(hp_sf, paste0(inpath, '/', 'hotspots_5_final_mskd.gpkg'))
+names(hp_sf)[str_detect(names(hp_sf), "_abs_?chg_masked$")]
+st_write(hp_sf, paste0(inpath, '/', 'hotspots_5_abs_mskd.gpkg'), append = FALSE)
          
 ```
 

@@ -13,22 +13,20 @@ output:
 3.	Create faceted bar plots (using ggplot2) for each raster statistic.
 4.	Generate choropleth maps (using ggplot2 and sf) to visualize spatial distributions.
 
-<<<<<<< HEAD
+
 Compute mean and median for each polygon. Evaluate other metrics
-=======
+
 ## 1. Objectives
 1. Extract zonal statistics from ES global raster datasets using the `exactextractr` package.
 2. Integrate extracted statistics as attributes to spatial polygon datasets.
 3. Generate visualizations (bar plots, maps) for spatial representation of results.
->>>>>>> ef89561 (finish sync)
+
 
 At a country level, this was done using the *fids* for the polygons. Using country names is problematic because of geopolitics.
 Pending to do: Think how to deal with the dependencies and complex cases (GB, France, others), but i will take care of this at a later point.
 
-<<<<<<< HEAD
-=======
 
->>>>>>> ef89561 (finish sync)
+
 ```{r setup, include=FALSE}
 # Load required libraries
 library(sf)             # For reading and working with vector data
@@ -41,7 +39,6 @@ library(tidytext)
 library(here)
 library(patchwork)
 library(tidyr)
-<<<<<<< HEAD
 library(parallel)
 ```
 
@@ -74,9 +71,6 @@ rasters_list <- lapply(tiffes, rast)
 service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each=2)
 filename<- as_tibble(cbind(service,filename))
 print(filename)
-=======
-library(parallel)       # Parallel computing
-library(purrr)
 ```
 
 # 2. Prepare Input data
@@ -88,13 +82,10 @@ This assumes that the polygon files are stored in the same working directory. Fe
 
 ```{r load polygons, eval=FALSE, include=FALSE}
 # Read spatial polygon dataset
-<<<<<<< HEAD
 
-=======
 # Set attribute column for analysis
  
 # By Continent
->>>>>>> ebc1866 (sending to temote. Lilling is acting funny again...)
 #set <- 'Continent.gpkg' 
 # By Subregion
 #set <- 'subregion.gpkg'
@@ -110,7 +101,7 @@ set <- "Income_Group.gpkg"
 #set <- "World_Bank_Region.gpkg"
 # load polygons
 poly <- st_read(here('vector', set)) 
-<<<<<<< HEAD
+
 # Set the column with the attribute to group 
 # Test this, it might be possible that it is not necesary to dissolve and create the individual vector files in advance, but just change the column. However, i need to check how would it work when joining the new results as attributes. 
 # There would be two things to consider here:
@@ -127,7 +118,6 @@ poly <- poly[1]
 #col <- "id"
 col <- "WWF_biome"
 #col <- 'continent'
-<<<<<<< HEAD
 #col <- "WWF_biome"
 #col <- 'continent'
 col <- "income_grp"
@@ -137,16 +127,9 @@ cols <- col
 ```
 
 ## 2.2 Load Global ES as Raster Data**
-=======
-#col <- 'subregion'
-#col <- 'region_wb'
-#col <- "income_grp"
-#col <- 'id'
-cols <- col
-```
+
 
 ## **4. Load Global ES as Raster Data**
->>>>>>> ebc1866 (sending to temote. Lilling is acting funny again...)
 
 service <- rep(c("Coastal_Protection", "Nitrogen_Export", "Sediment_Export", "Usle", "Nature_Access", "Pollination")
 ```{r load raster es, include=FALSE}
@@ -169,14 +152,12 @@ color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#17c0ff", "#A57C00", "#dd1c77")
 cd <- as_tibble(cbind(filename, color))
 rm(filename)
 cd
->>>>>>> ef89561 (finish sync)
 ```
 
 # 3. Calcualte Differences (check with original) 
 
-<<<<<<< HEAD
  This has been already done, no need to do again.
-=======
+
 
 # 3. Calcualte Differences 
 
@@ -203,7 +184,6 @@ l1 <- rasters_list[seq(1,length(rasters_list), by=2)]
 l2 <- rasters_list[seq(2,length(rasters_list), by=2)]
  # test with future_map2 next time to get this to run faster. 
 
-<<<<<<< HEAD
 diffs <- map2(l1,l2, function(l1,l2){
   return(l1-l2)
 })
@@ -211,7 +191,7 @@ map(1:length(diffs), function(x) writeRaster(diffs[[x]], paste0(outpath, "/", 'c
 ```
 
 ## 3. Compute Zonal Statistics with exactextractr for each one
-=======
+
 pot_sed_ret92 <- (l1[[2]]-l1[[1]])/l1[[2]]
 pot_sed_ret20 <- (l2[[2]]-l2[[1]])/l2[[2]]
 
