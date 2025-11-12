@@ -108,9 +108,59 @@ service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Se
 ```
 
 
+# Load country data
+Load the data and select. 
+```{r load country gpkg}
+ct <- st_read("/home/jeronimo/data/global_ncp/vectors/cartographic_ee_ee_r264_correspondence.gpkg")
+# spliot by: $ continent, income_grp, 
+ct <- ct %>% select(id, ee_r264_name, iso3, continent, income_grp, region_un,region_wb, subregion)
+
+
+ct <- st_drop_geometry(ct)
+
+biomes <- st_read("/home/jeronimo/data/global_ncp/vectors/Biome.gpkg")
+biomes <- biomes[c(1,2)]
+
+
+
+
+sf_template <- sf_f %>% select(fid, c_fid)
+
+
+pts <- st_point_on_surface(sf_template)
+pts_ct <- st_join(pts, ct, left=TRUE)
+pts_biome <- st_join(pts, biomes, left=TRUE)
+
+pts_ctdf <- st_drop_geometry(pts_ct)
+pts_bmdf <- st_drop_geometry(pts_biome)
+
+
+out <- pts_ctdf %>%
+  left_join(pts_bmdf, by = "fid", suffix = c("", "_biome"))
+
+
+pts_f <- left_join(pts, out)
+
+pts_f <-st_drop_geometry(pts_f)
+
+sf_f <- left_join(sf_f, pts_f, by= "fid")
+
+st_write(sf_f, "~/data/global_ncp/processed/10k_change_calc.gpkg", append = FALSE)
+
+```
+
+
+# Perform Spatial Joins
+
+```{r Spatial join}
+
+
+
+```
+
 ```{r hotpots pct}
 
-# Adjust This. Set the variables outside as they shou;d:
+# Adjust This. Set the variables outside as they should:
 ## Define the intended direction of change (service loss/increased damage)
 loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
 gain <- c("Sed_export","N_export","C_Risk")
