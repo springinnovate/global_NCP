@@ -56,9 +56,12 @@ The spatial objects with the additional attributes are loaded and reformatted fo
 #sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef_f.gpkg'))
 lyr_sf <- st_layers("~/data/global_ncp/processed/10k_change_calc.gpkg")
 sf_f <- st_read("~/data/global_ncp/processed/10k_change_calc.gpkg") 
+sf_f <- sf_f[-33]
+# rename column because, fixz later
+sf_f <-sf_f %>% rename(c_fid=c_fid.x) 
 
-#change na,mes here (homogenize) 
-#this as cbackup, remove as soon as possible.
+#change names here (homogenize) 
+#this as backup, remove as soon as possible.
 #sf_f <- sf_f %>% mutate(fid=fid_2)
 # add fid # THIS DOOES NOT WORK LIKE THIS!!!!!! DO NOT USE!!!
 sf_f$fid <- seq_len(nrow(sf_f)) 
@@ -70,20 +73,55 @@ socio_vars <- names(plt)[
   !grepl("chg$", names(plt))
 ]
 
+
 # Pivot all columns that contain pct_ch, keeping other relevant vars
 
+library(dplyr)
+library(tidyr)
+library(stringr)
+
+# socio variables to carry through (adjust to your set)
+socio_vars <- c(
+  "GHS_BUILT_S_E2020_mean",
+  "fields_mehrabi_2017_mean",
+  "hdi_raster_predictions_2020_mean",
+  "rast_adm1_gini_disp_2020_mean",
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum",
+  "GHS_POP_E2020_GLOBE_sum",
+  "GlobPOP_Count_30arc_2020_sum",
+  "iso3","continent","income_grp","region_un","region_wb","subregion","BIOME","WWF_biome"
+)
+
 plt_long <- plt %>%
+  # 1) Long pivot on *_abs_chg / *_pct_chg columns
   pivot_longer(
-    cols = matches("pct_chg"),
-    names_to = "service",
-    values_to = "pct_chg"
+    cols = matches("_(abs|pct)_chg$"),
+    names_to = c("service", "chg_type"),
+    names_pattern = "^(.*)_(abs|pct)_chg$",
+    values_to = "chg_value"
   ) %>%
-  select(fid, c_fid, service, pct_chg, all_of(socio_vars)) %>% 
-  mutate(service = str_replace(service, "_abs_chg.*", "")) %>% 
-  mutate(service = str_replace(service, "_mean.*", "")) %>% 
-  filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% filter(pct_chg != Inf)  # remove infinite values and those for which Country Id is NA. I need to make sure this is correct. There are sopme locations that have no country values (because it is outside. I am dropping that, but need tto reconsider this)
-  
-# rename some variables (just for aesthetics)
+  # OPTIONAL: normalize service labels if you want to drop a trailing "_mean"
+  mutate(service = str_remove(service, "_mean$")) %>%
+  # 2) Go wide so we get two columns: abs_chg, pct_chg
+  pivot_wider(
+    names_from = chg_type,
+    values_from = chg_value,
+    names_vary = "slowest"
+  ) %>%
+  # after pivot_wider we have columns "abs" and "pct" -> rename
+  rename(abs_chg = abs, pct_chg = pct) %>%
+  # 3) Reorder/select the columns you need
+  select(
+    fid, c_fid, service, abs_chg, pct_chg,
+    any_of(socio_vars)
+  ) %>%
+  # 4) Filters (tweak as needed)
+  filter(!is.na(c_fid), !is.na(iso3), !is.na(BIOME)) %>%
+  filter(!(is.infinite(pct_chg) | is.infinite(abs_chg))) %>%
+  # keep rows where at least one metric exists
+  filter(!is.na(pct_chg) | !is.na(abs_chg))
+
+# this should be updated on an earlier stage when i extract the data, not here)
 
   plt_long <- plt_long %>% mutate(service = case_when(
    service == "sed_export" ~ "Sed_export",
@@ -107,58 +145,85 @@ service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Se
 
 ```
 
-
 # Load country data
-Load the data and select. 
+
+Load the data and select.
+
 ```{r load country gpkg}
-ct <- st_read("/home/jeronimo/data/global_ncp/vectors/cartographic_ee_ee_r264_correspondence.gpkg")
-# spliot by: $ continent, income_grp, 
-ct <- ct %>% select(id, ee_r264_name, iso3, continent, income_grp, region_un,region_wb, subregion)
 
+# (0) Preconditions: `sf_f` is already in memory and cleaned
+#     It must contain at least: fid (unique id), c_fid, and geometry (polygons)
+stopifnot(inherits(sf_f, "sf"))
+stopifnot(all(c("fid", "c_fid") %in% names(sf_f)))
 
-ct <- st_drop_geometry(ct)
+# (1) Read country polygons (keep only needed columns)
+ct <- st_read(
+  "/home/jeronimo/data/global_ncp/vectors/cartographic_ee_ee_r264_correspondence.gpkg",
+  quiet = TRUE
+) |>
+  select(id, ee_r264_name, iso3, continent, income_grp, region_un, region_wb, subregion)
 
-biomes <- st_read("/home/jeronimo/data/global_ncp/vectors/Biome.gpkg")
-biomes <- biomes[c(1,2)]
+# (2) Read biomes (WWF biomes), keep id & label columns only
+biomes <- st_read(
+  "/home/jeronimo/data/global_ncp/vectors/Biome.gpkg",
+  quiet = TRUE
+) |>
+  select(BIOME, WWF_biome)
 
+# (3) Harmonize CRS (transform both polygon layers to match the grid CRS)
+crs_grid <- st_crs(sf_f)
+if (st_crs(ct) != crs_grid)     ct     <- st_transform(ct, crs_grid)
+if (st_crs(biomes) != crs_grid) biomes <- st_transform(biomes, crs_grid)
 
+# (4) Build a lightweight template from the grid (only keys you need)
+sf_template <- sf_f |>
+  select(fid, c_fid) # keeps geometry (grid cells)
 
-
-sf_template <- sf_f %>% select(fid, c_fid)
-
-
+# (5) One representative point per cell (robust for concave polygons)
+#     This is much faster/safer than polygon-on-polygon joins for attribution.
 pts <- st_point_on_surface(sf_template)
-pts_ct <- st_join(pts, ct, left=TRUE)
-pts_biome <- st_join(pts, biomes, left=TRUE)
 
-pts_ctdf <- st_drop_geometry(pts_ct)
-pts_bmdf <- st_drop_geometry(pts_biome)
+# (6) Spatial join attributes onto points
+#     NOTE: DO NOT drop geometry on `ct`/`biomes` before this step.
+#     Keep defaults: left = TRUE (keeps all pts), largest = FALSE (strict within).
+#     If you want "closest polygon" behavior, use `st_join(..., join = st_nearest_feature)`
+pts_ct    <- st_join(pts, ct,     left = TRUE)
+pts_biome <- st_join(pts, biomes, left = TRUE)
 
+# (7) Drop point geometry to get a pure attribute table keyed by fid
+pts_ctdf <- pts_ct    |> st_drop_geometry()
+pts_bmdf <- pts_biome |> st_drop_geometry()
 
-out <- pts_ctdf %>%
+# (8) Merge country + biome attributes (both are 1 row per fid)
+#     Keep suffixes clean in case of name collisions.
+out_attrs <- pts_ctdf |>
   left_join(pts_bmdf, by = "fid", suffix = c("", "_biome"))
 
+# (Optional) sanity: ensure uniqueness by `fid`
+if (any(duplicated(out_attrs$fid))) {
+  # If duplicates ever appear, collapse to first occurrence
+  out_attrs <- out_attrs |>
+    arrange(fid) |>
+    distinct(fid, .keep_all = TRUE)
+}
 
-pts_f <- left_join(pts, out)
+# (9) Bring attributes back to the original grid (preserve grid geometry)
+sf_f_joined <- sf_f |>
+  left_join(out_attrs, by = "fid")
 
-pts_f <-st_drop_geometry(pts_f)
+# (10) Quick checks
+stopifnot(nrow(sf_f_joined) == nrow(sf_f))
+stopifnot(inherits(sf_f_joined, "sf"))
 
-sf_f <- left_join(sf_f, pts_f, by= "fid")
-
-st_write(sf_f, "~/data/global_ncp/processed/10k_change_calc.gpkg", append = FALSE)
-
-```
-
-
-# Perform Spatial Joins
-
-```{r Spatial join}
-
-
+# (11) Write result (overwrite safely)
+out_path <- "~/data/global_ncp/processed/10k_change_calc.gpkg"
+if (file.exists(out_path)) file.remove(out_path)
+st_write(sf_f_joined, out_path, quiet = TRUE)
 
 ```
 
 ```{r hotpots pct}
+
 
 # Adjust This. Set the variables outside as they should:
 ## Define the intended direction of change (service loss/increased damage)
@@ -176,8 +241,8 @@ hs <- extract_hotspots(
   pct_cutoff = 0.05,
   threshold_mode = "percent",
   rule_mode = "vectors",
-  loss_services = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
-  gain_services = c("Sed_export","N_export","C_Risk"),
+  loss_services = loss,
+  gain_services = gain,
   combos = list(
     deg_combo = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
     rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
