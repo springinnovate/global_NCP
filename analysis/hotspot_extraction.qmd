@@ -5,115 +5,157 @@ editor: visual
 ---
 
 ```{r setup, message=FALSE, warning=FALSE}
-library(terra)
-library(sf)
+#| label: setup
+#| message: false
+#| warning: false
+
+# Core tidy + spatial
 library(dplyr)
-library(ggplot2)
 library(tidyr)
 library(purrr)
-library(diffeR)
-library(here)
 library(stringr)
-library(tidytext)
-library(rlang)
-library(tidyr)
 library(forcats)
+library(ggplot2)
 library(scales)
-library(RColorBrewer)
-library(htmltools)
-library(leaflet)
-library(devtools)
-library(reticulate)
+library(sf)
+library(terra)
 library(exactextractr)
-library(httpgd)
-library(ggnewscale)   # allows multiple fill scales
-library(viridisLite)
-library(ragg)
-load_all()
 
-#source the helper functions
-# set venv focr Python
-use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
-#inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data'
+# Plot helpers
+library(viridisLite)
+library(ggnewscale)
+library(ragg)
+
+# Dev/project helpers
+library(devtools)   # for load_all()
+
+# Optional viewers (enable only if you use them)
+# library(httpgd)
+# library(leaflet)
+# library(htmltools)
+
+# ---- Global options / performance ---------------------------------------
+options(dplyr.summarise.inform = FALSE)
+sf::sf_use_s2(TRUE)
+Sys.setenv(GDAL_NUM_THREADS = "ALL_CPUS", PROJ_NETWORK = "ON")
+terraOptions(tempdir = file.path(tempdir(), "terra_tmp"))
+
+set.seed(1)
+
+# ---- Project wiring ------------------------------------------------------
+# Load package-style functions from R/ (if this is a package-ish repo)
+devtools::load_all(quiet = TRUE)
+
+# Paths helper (set GLOBAL_NCP_DATA in ~/.Renviron first)
+source("../R/paths.R")
+
+# ---- Python (enable when needed) ----------------------------------------
+# library(reticulate)
+# use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 
 ```
 
-# Load country data
+# Append countryand biome data to the sytnesiss vector for subregional analysis 
 
-Add the key columns to identify the countries and get the groupings done 
-(already did this, but we need to be sure it is working correctly). All thjoinms performed here are based either on the c_fid or in fid or are spatial joins, we need to make sure it is crrect. I don´t remember exactly how we did it, and will have to re do this part, but we had the sf dataset already with the countr id and fid. It was some work and i should have documented that better , but neverrtheless, you get theidea) 
 
-```{r load country gpkg}
+```{r load country gpkg, eval = FALSE}
+# ---- Purpose --------------------------------------------------------------
 
-# (0) Preconditions: `sf_f` is already in memory and cleaned
-#     It must contain at least: fid (unique id), c_fid, and geometry (polygons)
+# Attach country & biome attributes to the 10 km grid (sf_f) so we can group
+
+# hotspots by subregions (income_grp, region_wb, BIOME, etc.).
+
+# NOTE: We’ll test/execute this later once paths are finalized. For now,
+
+# this chunk documents the exact steps and makes paths configurable.
+
+# ---- Preconditions --------------------------------------------------------
+
+# 1) sf_f (grid polygons) already in memory with at least: fid, c_fid, geometry
+
+# 2) paths.R is sourced earlier, providing a function data_dir() that points to
+
+# ~/data/global_ncp (or your chosen location via GLOBAL_NCP_DATA env var).
+
 stopifnot(inherits(sf_f, "sf"))
 stopifnot(all(c("fid", "c_fid") %in% names(sf_f)))
 
-# (1) Read country polygons (keep only needed columns)
-ct <- st_read(
-  "/home/jeronimo/data/global_ncp/vectors/cartographic_ee_ee_r264_correspondence.gpkg",
-  quiet = TRUE
-) |>
-  select(id, ee_r264_name, iso3, continent, income_grp, region_un, region_wb, subregion)
+# Optional: make polygon ops consistent/correct on the sphere
 
-# (2) Read biomes (WWF biomes), keep id & label columns only
-biomes <- st_read(
-  "/home/jeronimo/data/global_ncp/vectors/Biome.gpkg",
-  quiet = TRUE
-) |>
-  select(BIOME, WWF_biome)
+# options(sf_use_s2 = TRUE)
 
-# (3) Harmonize CRS (transform both polygon layers to match the grid CRS)
-crs_grid <- st_crs(sf_f)
-if (st_crs(ct) != crs_grid)     ct     <- st_transform(ct, crs_grid)
-if (st_crs(biomes) != crs_grid) biomes <- st_transform(biomes, crs_grid)
+# ---- Inputs ---------------------------------------------------------------
 
-# (4) Build a lightweight template from the grid (only keys you need)
+ct_path  <- file.path(data_dir(), "vectors", "cartographic_ee_ee_r264_correspondence.gpkg")
+bio_path <- file.path(data_dir(), "vectors", "Biome.gpkg")
+
+stopifnot(file.exists(ct_path), file.exists(bio_path))
+
+ct <- sf::st_read(ct_path, quiet = TRUE) |>
+dplyr::select(id, ee_r264_name, iso3, continent, income_grp, region_un, region_wb, subregion)
+
+biomes <- sf::st_read(bio_path, quiet = TRUE) |>
+dplyr::select(BIOME, WWF_biome)
+
+# ---- CRS harmonization ----------------------------------------------------
+
+crs_grid <- sf::st_crs(sf_f)
+if (!sf::st_crs(ct) == crs_grid)     ct     <- sf::st_transform(ct, crs_grid)
+if (!sf::st_crs(biomes) == crs_grid) biomes <- sf::st_transform(biomes, crs_grid)
+
+# ---- Lightweight template (keeps geometry) --------------------------------
+
 sf_template <- sf_f |>
-  select(fid, c_fid) # keeps geometry (grid cells)
+dplyr::select(fid, c_fid)  # <— only keys + geometry
 
-# (5) One representative point per cell (robust for concave polygons)
-#     This is much faster/safer than polygon-on-polygon joins for attribution.
-pts <- st_point_on_surface(sf_template)
+# ---- Representative point per cell (faster/robust attr join) --------------
 
-# (6) Spatial join attributes onto points
-#     NOTE: DO NOT drop geometry on `ct`/`biomes` before this step.
-#     Keep defaults: left = TRUE (keeps all pts), largest = FALSE (strict within).
-#     If you want "closest polygon" behavior, use `st_join(..., join = st_nearest_feature)`
-pts_ct    <- st_join(pts, ct,     left = TRUE)
-pts_biome <- st_join(pts, biomes, left = TRUE)
+# Prefer point-on-surface over centroid for oddly-shaped cells.
 
-# (7) Drop point geometry to get a pure attribute table keyed by fid
-pts_ctdf <- pts_ct    |> st_drop_geometry()
-pts_bmdf <- pts_biome |> st_drop_geometry()
+pts <- sf::st_point_on_surface(sf_template)
 
-# (8) Merge country + biome attributes (both are 1 row per fid)
-#     Keep suffixes clean in case of name collisions.
+# ---- Spatial joins --------------------------------------------------------
+
+# If you ever need "nearest polygon" instead of "within", use:
+
+# pts_ct <- sf::st_join(pts, ct, join = st_nearest_feature)
+
+pts_ct    <- sf::st_join(pts, ct,     left = TRUE)
+pts_biome <- sf::st_join(pts, biomes, left = TRUE)
+
+# ---- Drop geometry and merge attrs by fid ---------------------------------
+
+pts_ctdf <- sf::st_drop_geometry(pts_ct)
+pts_bmdf <- sf::st_drop_geometry(pts_biome)
+
 out_attrs <- pts_ctdf |>
-  left_join(pts_bmdf, by = "fid", suffix = c("", "_biome"))
+dplyr::left_join(pts_bmdf, by = "fid", suffix = c("", "_biome"))
 
-# (Optional) sanity: ensure uniqueness by `fid`
-if (any(duplicated(out_attrs$fid))) {
-  # If duplicates ever appear, collapse to first occurrence
-  out_attrs <- out_attrs |>
-    arrange(fid) |>
-    distinct(fid, .keep_all = TRUE)
+# Sanity: enforce uniqueness by fid (defensive; should already be 1:1)
+
+if (anyDuplicated(out_attrs$fid)) {
+out_attrs <- out_attrs |>
+dplyr::arrange(fid) |>
+dplyr::distinct(fid, .keep_all = TRUE)
 }
 
-# (9) Bring attributes back to the original grid (preserve grid geometry)
+# ---- Bring attributes back to the grid ------------------------------------
+
 sf_f_joined <- sf_f |>
-  left_join(out_attrs, by = "fid")
+dplyr::left_join(out_attrs, by = "fid")
 
-# (10) Quick checks
-stopifnot(nrow(sf_f_joined) == nrow(sf_f))
-stopifnot(inherits(sf_f_joined, "sf"))
+stopifnot(nrow(sf_f_joined) == nrow(sf_f), inherits(sf_f_joined, "sf"))
 
-# (11) Write result (overwrite safely)
-out_path <- "~/data/global_ncp/processed/10k_change_calc.gpkg"
-if (file.exists(out_path)) file.remove(out_path)
-st_write(sf_f_joined, out_path, quiet = TRUE)
+# ---- Output (idempotent write) --------------------------------------------
 
+out_gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+dir.create(dirname(out_gpkg), recursive = TRUE, showWarnings = FALSE)
+if (file.exists(out_gpkg)) file.remove(out_gpkg)
+sf::st_write(sf_f_joined, out_gpkg, quiet = TRUE)
+
+# TODO (later): benchmark polygon-on-polygon join for QA; verify sample cells
+
+# visually in QGIS; confirm iso3/income_grp/BIOME coverage stats.
 ```
 
 ####################### START HERE
