@@ -1,3 +1,136 @@
+# ---- Config you already used (keep) -------------------------------------
+
+loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+gain <- c("Sed_export","N_export","C_Risk")
+
+# Target facet order
+
+facet_core <- c(
+  "C_Risk","N_export","Sed_export",
+  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+  "Pollination","Nature_Access"
+)
+
+# Helper: run wrapper and produce ONE mixed-metric violin per grouping
+
+run_mixed_violin_by <- function(group_col,
+                                out_stub,
+                                upper_cut = 0.999,  # 99.9% trim
+                                plot_n   = 300000L   # sampling cap for speed
+){
+  stopifnot(group_col %in% names(plt_long))
+  
+  message("==> Mixed-metric violins by: ", group_col)
+  
+  # 1) Run hotspots for ABS & PCT once
+  
+  by_abs <- extract_hotspots_by(plt_long, group_col, loss, gain, value_col = "abs_chg")
+  by_pct <- extract_hotspots_by(plt_long, group_col, loss, gain, value_col = "pct_chg")
+  
+  # 2) Tidy value tables (fid × service × group)
+  
+  abs_vals <- by_abs |>
+    dplyr::transmute(
+      !!group_col := .data[[group_col]],
+      vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, abs_chg))
+    ) |>
+    tidyr::unnest(vals)
+  
+  pct_vals <- by_pct |>
+    dplyr::transmute(
+      !!group_col := .data[[group_col]],
+      vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, pct_chg))
+    ) |>
+    tidyr::unnest(vals)
+  
+  # 3) Join measures so each (fid,service,group) can pick its metric
+  
+  vals <- dplyr::full_join(
+    abs_vals, pct_vals,
+    by = c(group_col, "fid", "service")
+  )
+  
+  # 4) Build chosen metric:
+  
+  # - Nature_Access -> use pct_chg
+  
+  # - others        -> use abs_chg
+  
+  vals <- vals |>
+    dplyr::mutate(
+      metric    = dplyr::if_else(service == "Nature_Access", "pct", "abs"),
+      y         = dplyr::if_else(metric == "pct", pct_chg, abs_chg),
+      # nice facet label (only rename Access)
+      service_lab = dplyr::if_else(service == "Nature_Access", "Access", as.character(service)),
+      # keep group factor stable
+      !!group_col := as.factor(.data[[group_col]])
+    ) |>
+    dplyr::filter(!is.na(.data[[group_col]]), !is.na(y), y != 0)
+  
+  # 5) Trim outliers per-service (upper quantile)
+  
+  vals <- vals |>
+    dplyr::group_by(service) |>
+    dplyr::mutate(y_upper = stats::quantile(y, probs = upper_cut, na.rm = TRUE)) |>
+    dplyr::ungroup() |>
+    dplyr::filter(y <= y_upper)
+  
+  # 6) Optional sampling to keep render fast
+  
+  if (nrow(vals) > plot_n) {
+    vals <- dplyr::slice_sample(vals, n = plot_n)
+  }
+  
+  # 7) Facet order: core list first, all others afterward
+  
+  all_services <- unique(vals$service)
+  extra <- setdiff(all_services, facet_core)
+  facet_levels <- c(facet_core, extra)
+  vals <- vals |>
+    dplyr::mutate(
+      service = forcats::fct_relevel(service, !!!facet_levels, after = 0L),
+      # ensure label vector matches the same order
+      service_lab = factor(service_lab,
+                           levels = dplyr::recode(facet_levels,
+                                                  "Nature_Access" = "Access", .default = facet_levels))
+    )
+  
+  # 8) Plot: violins only (no boxplots), same styling as before
+  
+  p <- ggplot2::ggplot(vals, ggplot2::aes(x = y, y = .data[[group_col]])) +
+    ggplot2::geom_violin(trim = TRUE, scale = "width") +
+    ggplot2::coord_flip() +
+    ggplot2::facet_wrap(~ service_lab, ncol = 3, scales = "free_x") +
+    ggplot2::labs(
+      title    = paste0("Hotspot change by ", group_col),
+      subtitle = "Metric rule: absolute change for all services except Access (percent change).\nValues trimmed at the 99.9th percentile; zeros and NAs removed.",
+      x        = NULL,
+      y        = NULL
+    ) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1),
+      panel.grid.minor = ggplot2::element_blank()
+    )
+  
+  # 9) Save inside repo
+  
+  out_dir <- file.path("outputs", "plots")
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+  out_path <- file.path(out_dir, paste0(out_stub, "_mixed_metric_violins.png"))
+  ggplot2::ggsave(out_path, p, width = 12, height = 8, dpi = 300)
+  
+  message("   saved: ", out_path)
+  invisible(out_path)
+}
+
+# ---- Run for each grouping you care about --------------------------------
+
+run_mixed_violin_by("region_wb", "regionwb")
+run_mixed_violin_by("BIOME",     "biome")
+run_mixed_violin_by("continent", "continent")
+run_mixed_violin_by("region_un", "regionun")
+run_mixed_violin_by("income_grp","incomegrp")
 #' Extract hotspots from long-format service-change data
 #'
 #' Identifies hotspots per service using percentile or fixed-count thresholds.
