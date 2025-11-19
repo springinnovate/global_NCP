@@ -169,84 +169,84 @@ The spatial objects with the anecessary  attributes are loaded and reformatted f
 ```{r pivot}
 #| eval: true
 #| include: true
-lyr_sf <- st_layers("~/data/global_ncp/processed/10k_change_calc.gpkg")
-sf_f <- st_read("~/data/global_ncp/processed/10k_change_calc.gpkg") 
-# Read change data (finqal summaries) Eventually herer i will need to set up the correct viariabñle names here!  
-#add fid a
-sf_f$fid <- seq_len(nrow(sf_f)) 
-plt <- st_drop_geometry(sf_f)
+# ---- Produce plt_long once (skip if already present) ---------------- ----
 
-# get the vars to perform analysis (all that are not "chg"). These are used or the group/subregionaal analyisis and to compare extract the SK testsby demographic/socioeocnomic variable4
-socio_vars <- names(plt)[
-  names(plt) != c("fid", "c_fid") & 
-  !grepl("chg$", names(plt))
-]
+if (!exists("plt_long", inherits = TRUE)) {
 
-# Pivot all columns that contain pct_ch, keeping other relevant vars
+gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+stopifnot(file.exists(gpkg))
 
+sf_f <- sf::st_read(gpkg, quiet = TRUE)
 
-# socio variables to carry through (adjust to your set) There should b a smarter /more autm,ated way to do this!
-socio_vars <- c(
-  "GHS_BUILT_S_E2020_mean",
-  "fields_mehrabi_2017_mean",
-  "hdi_raster_predictions_2020_mean",
-  "rast_adm1_gini_disp_2020_mean",
-  "rast_gdpTot_1990_2020_30arcsec_2020_sum",
-  "GHS_POP_E2020_GLOBE_sum",
-  "GlobPOP_Count_30arc_2020_sum",
-  "iso3","continent","income_grp","region_un","region_wb","subregion","BIOME","WWF_biome"
+# Ensure fid exists (idempotent)
+
+if (!"fid" %in% names(sf_f)) {
+sf_f$fid <- seq_len(nrow(sf_f))
+}
+
+plt <- sf::st_drop_geometry(sf_f)
+
+# IDs + change columns
+
+id_cols  <- c("fid", "c_fid")
+chg_cols <- grep("_(abs|pct)_chg$", names(plt), value = TRUE)
+
+# Socio/grouping columns = everything else
+
+socio_vars <- setdiff(names(plt), c(id_cols, chg_cols))
+
+# Long -> Wide (abs_chg / pct_chg)
+
+plt_long <- plt |>
+tidyr::pivot_longer(
+cols = tidyselect::all_of(chg_cols),
+names_to = c("service", "chg_type"),
+names_pattern = "^(.*)_(abs|pct)_chg$",
+values_to = "chg_value"
+) |>
+dplyr::mutate(service = stringr::str_remove(service, "_mean$")) |>
+tidyr::pivot_wider(
+names_from  = chg_type,
+values_from = chg_value,
+names_vary  = "slowest"
+) |>
+dplyr::rename(abs_chg = abs, pct_chg = pct) |>
+dplyr::select(fid, c_fid, service, abs_chg, pct_chg, dplyr::any_of(socio_vars)) |>
+dplyr::filter(!is.na(c_fid)) |>
+dplyr::filter(!(is.infinite(abs_chg) | is.infinite(pct_chg))) |>
+dplyr::filter(!is.na(abs_chg) | !is.na(pct_chg))
+
+# Service renaming via lookup (easy to extend)
+
+service_lookup <- c(
+sed_export     = "Sed_export",
+n_export       = "N_export",
+n_retention    = "N_retention",
+nature_access  = "Nature_Access",
+pollination    = "Pollination",
+usle           = "USLE",
+n_ret_ratio    = "N_Ret_Ratio",
+sed_ret_ratio  = "Sed_Ret_Ratio",
+Rt_ratio       = "C_Risk_Red_Ratio",
+Rt             = "C_Risk",
+Rt_service     = "C_Prot_service",
+Rt_nohab       = "Rt_nohab"
 )
+plt_long <- plt_long |>
+dplyr::mutate(service = dplyr::recode(service, !!!service_lookup, .default = service))
 
-plt_long <- plt %>%
-  # 1) Long pivot on *_abs_chg / *_pct_chg columns
-  pivot_longer(
-    cols = matches("_(abs|pct)_chg$"),
-    names_to = c("service", "chg_type"),
-    names_pattern = "^(.*)_(abs|pct)_chg$",
-    values_to = "chg_value"
-  ) %>%
-  # OPTIONAL: normalize service labels if you want to drop a trailing "_mean"
-  mutate(service = str_remove(service, "_mean$")) %>%
-  # 2) Go wide to get two columns: abs_chg, pct_chg
-  pivot_wider(
-    names_from = chg_type,
-    values_from = chg_value,
-    names_vary = "slowest"
-  ) %>%
-  # after pivot_wider we have columns "abs" and "pct" -> rename
-  rename(abs_chg = abs, pct_chg = pct) %>%
-  # 3) Reorder/select the columns you need
-  select(
-    fid, c_fid, service, abs_chg, pct_chg,
-    any_of(socio_vars)
-  ) %>%
-  # 4) Filters (tweak as neededs)
-  filter(!is.na(c_fid), !is.na(iso3), !is.na(BIOME)) %>%
-  filter(!(is.infinite(pct_chg) | is.infinite(abs_chg))) %>%
-  # keep rows where at least one metric exists
-  filter(!is.na(pct_chg) | !is.na(abs_chg))
+# Canonical ordering (don’t drop anything here)
 
-# this should be updated on an earlier stage when i extract the data, not here). I am not sure how to deal with this. But enterimghthe names manually isnot very prasctival, too hardcoded and limits flexibility. 
+service_levels <- c(
+"Nature_Access","N_export","N_retention","N_Ret_Ratio",
+"Sed_export","USLE","Sed_Ret_Ratio","Rt_nohab",
+"C_Risk","C_Prot_service","C_Risk_Red_Ratio","Pollination"
+)
+plt_long <- plt_long |>
+dplyr::mutate(service = forcats::fct_relevel(service, !!!service_levels, after = Inf))
 
-  plt_long <- plt_long %>% mutate(service = case_when(
-   service == "sed_export" ~ "Sed_export",
-   service == "n_export" ~ "N_export",
-   service == "n_retention" ~ "N_retention",
-   service == "nature_access" ~ "Nature_Access",
-   service == "pollination" ~ "Pollination",
-   service == "usle" ~ "USLE",
-   service == "n_ret_ratio" ~ "N_Ret_Ratio",
-   service == "sed_ret_ratio" ~ "Sed_Ret_Ratio",
-   service == "Rt_ratio" ~ "C_Risk_Red_Ratio",
-   service == "Rt" ~ "C_Risk",
-   service == "Rt_service" ~ "C_Prot_service",
-   TRUE ~ service
-   ))
-  
-  
-
-# Set service levels one single time and for all. Don't drop some variables here, filter afterwards, it can be difficult/annoying to recover!!!
-service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Sed_export", "USLE", "Sed_Ret_Ratio", "Rt_nohab","C_Risk","C_Prot_service", "C_Risk_Red_Ratio", "Pollination") 
+message(glue::glue("plt_long ready: {nrow(plt_long)} rows across {dplyr::n_distinct(plt_long$service)} services"))
+}
 
 ```
 
@@ -294,6 +294,27 @@ extract_hotspots_by <- function(df_long, group_cols,
 }
 
 
+```
+
+
+# Sanity Vheck Pivoted Data
+
+
+```{r sanity chek}
+# ---- Quick sanity --------------------------------------------------------
+
+stopifnot(exists("plt_long"))
+
+# Peek a few rows & structure
+
+dplyr::glimpse(head(plt_long, 5), width = 80)
+
+# Counts per service (helps spot weird sparsity)
+
+plt_long |>
+dplyr::count(service, name = "rows") |>
+dplyr::arrange(dplyr::desc(rows)) |>
+print(n = 50)
 ```
 
 ```{r run wrapper}
