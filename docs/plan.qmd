@@ -18,22 +18,22 @@ editor: visual
 
 ## 1. Purpose & scope
 
-This document is the living plan to (1) refactor the current repository in-place (to preserve history and contributions), (2) make the pipeline reproducible and configurable, and (3) deliver a publishable Quarto presentation for coauthors. 
+This document is the living plan to (1) refactor the current repository in-place (to preserve history and contributions), (2) make the pipeline reproducible and configurable, and (3) deliver a publishable Quarto presentation for coauthors.
 
-**Immediate goals **
+**Immediate goals**
 
-- Freeze a minimal analysis pack (KS results CSV + 4–6 key figures).
-- Render a clean **Quarto revealjs deck** that pulls those artifacts.
-- Frame results with effect sizes (KS _D_, AUC, Cliff’s δ) and clear takeaways.
+-   Freeze a minimal analysis pack (KS results CSV + 4–6 key figures).
+-   Render a clean **Quarto revealjs deck** that pulls those artifacts.
+-   Frame results with effect sizes (KS *D*, AUC, Cliff’s δ) and clear takeaways.
 
-**Near-term goals (next ~1 week)**
+**Near-term goals (next \~1 week)**
 
-- Externalize configuration (names, thresholds, variables).
-- Consolidate core code into documented functions under `R/`.
-- Add light tests + dependency lock (`renv`) for reproducibility.
-- Rerun pipeline end-to-end and update deck from `outputs/...`.
+-   Externalize configuration (names, thresholds, variables).
+-   Consolidate core code into documented functions under `R/`.
+-   Add light tests + dependency lock (`renv`) for reproducibility.
+-   Rerun pipeline end-to-end and update deck from `outputs/...`.
 
----
+------------------------------------------------------------------------
 
 ## 2. Repo reset (refactor **in-place**)
 
@@ -41,12 +41,13 @@ We’ll keep history and contributions. First, declutter the root and add a clea
 
 ### 2.1 Create folders
 
-```bash
+``` bash
 mkdir -p R analysis config data/{raw,interim,processed} outputs/{plots,tables,logs} presentation tests/testthat
 touch data/interim/.gitkeep data/processed/.gitkeep
 ```
 
 This cell is in theory not necessary, it should have loaded with the "package"
+
 ```{r}
 install.packages("renv")
 renv::init()
@@ -62,12 +63,12 @@ renv::snapshot()
 
 Place these YAMLs under config/. Adjust values as needed.
 
-- 3.1 config/services.yml
-- 3.2 Config/variables.yml
-- 3.3 config/thresholds.yml
-- 3.4 config/paths.yml
-- 3.5 Config loader helper (R/config.R)
- 
+-   3.1 config/services.yml
+-   3.2 Config/variables.yml
+-   3.3 config/thresholds.yml
+-   3.4 config/paths.yml
+-   3.5 Config loader helper (R/config.R)
+
 ## 4. Core functions (move code into R/)
 
 Create these files and paste your latest, documented functions (you already have most):
@@ -96,7 +97,7 @@ coalesce_left_join_sf() and any name-cleaners/masking helpers
 
 R/utils.R
 
-safe_name(), save_png_safe() (tries ragg::agg_png), palettes, %||%
+safe_name(), save_png_safe() (tries ragg::agg_png), palettes, %\|\|%
 
 Keep roxygen headers on public functions; run devtools::document() if you convert to a package later.
 
@@ -128,39 +129,25 @@ Call save_ecdf_grids() for GDP, POP, etc., using cfg$vars$transforms.
 
 Files saved under outputs/plots/ecdf/.
 
-Keep each script ~50–100 lines and call functions; no inline heavy logic.
+Keep each script \~50–100 lines and call functions; no inline heavy logic.
 
 ## 6. Tests (light but real)
 
 Create tests/testthat/test-hotspots.R:
 
-```{r test_that("extract_hotspots respects modes", {
-  set.seed(1)
-  df <- tibble::tibble(
-    fid = 1:200,
-    service = rep(c("A","B"), each=100),
-    pct_chg = rnorm(200)
-  )
-  out <- extract_hotspots(
-    df, value_col="pct_chg", threshold_mode="count", n_cut=5,
-    rule_mode="vectors", loss_services="A", gain_services="B"
-  )
-  expect_true(nrow(out$hotspots_df) > 0)
-  expect_true(all(c("hotspot_count","hotspot_services") %in% names(out$summary_df)))
-})
-``` 
+`{r test_that("extract_hotspots respects modes", {   set.seed(1)   df <- tibble::tibble(     fid = 1:200,     service = rep(c("A","B"), each=100),     pct_chg = rnorm(200)   )   out <- extract_hotspots(     df, value_col="pct_chg", threshold_mode="count", n_cut=5,     rule_mode="vectors", loss_services="A", gain_services="B"   )   expect_true(nrow(out$hotspots_df) > 0)   expect_true(all(c("hotspot_count","hotspot_services") %in% names(out$summary_df))) })`
 
-## 7. igures & tables for  meeting 
+## 7. igures & tables for meeting
 
-- outputs/tables/ks_results_hot_vs_non.csv
+-   outputs/tables/ks_results_hot_vs_non.csv
 
-- outputs/plots/ks_heatmap.png (D by service × variable, arrow direction)
+-   outputs/plots/ks_heatmap.png (D by service × variable, arrow direction)
 
-- outputs/plots/ecdf/ecdf_*_log1p.png (GDP, GHS POP; top 6–8 services)
+-   outputs/plots/ecdf/ecdf\_\*\_log1p.png (GDP, GHS POP; top 6–8 services)
 
-- outputs/plots/density/*.png (1–2 clear contrasts, optional)
+-   outputs/plots/density/\*.png (1–2 clear contrasts, optional)
 
-- (Optional) 1 “mountain plot” for a big-Δ pair
+-   (Optional) 1 “mountain plot” for a big-Δ pair
 
 Keep captions short; highlight effect sizes over p-values.
 
@@ -178,39 +165,40 @@ quarto::quarto_render("presentation/update.qmd")
 ```
 
 ### 8.1 Share the HTML or publish (Quarto Pub / GitHub Pages).
+
 Iterate as outputs update.
 
 ## 9. Performance & memory notes
 
-- Store big frames as parquet (arrow) or **fst`; avoid giant RDS in Git.
+-   Store big frames as parquet (arrow) or \*\*fst\`; avoid giant RDS in Git.
 
-- For plotting, sample (seeded) to ~1e5 rows when needed; keep full data for stats.
+-   For plotting, sample (seeded) to \~1e5 rows when needed; keep full data for stats.
 
-- Free memory between plots (rm(p); gc()); prefer ragg::agg_png().
+-   Free memory between plots (rm(p); gc()); prefer ragg::agg_png().
 
 ## 10. Interpretation frame (for slides & paper)
 
-- With large N, p-values will be tiny; emphasize effect sizes (KS D, AUC, Cliff’s δ).
+-   With large N, p-values will be tiny; emphasize effect sizes (KS D, AUC, Cliff’s δ).
 
-- Consistent pattern: retention/access/risk hotspots cluster nearer people/economy; pollination hotspots skew rural/natural.
+-   Consistent pattern: retention/access/risk hotspots cluster nearer people/economy; pollination hotspots skew rural/natural.
 
-- Associations ≠ causality; propose plausible mechanisms; note limitations.
+-   Associations ≠ causality; propose plausible mechanisms; note limitations.
 
-- Plan robustness checks: thresholds, alternate socio vars, per-region stratification.
+-   Plan robustness checks: thresholds, alternate socio vars, per-region stratification.
 
 ## 11. Next steps & timeline
 
 ### Today
 
-- Copy 4–6 figures + KS CSV into outputs/....
+-   Copy 4–6 figures + KS CSV into outputs/....
 
-- Render presentation/update.qmd and share.
+-   Render presentation/update.qmd and share.
 
 ### Next 2–3 days
 
-- Move functions into R/, configs into config/.
+-   Move functions into R/, configs into config/.
 
-- Run analysis/02_hotspots.qmd → 03_ks.qmd → 04_ecdf.qmd.
+-   Run analysis/02_hotspots.qmd → 03_ks.qmd → 04_ecdf.qmd.
 
 renv::snapshot().
 

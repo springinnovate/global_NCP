@@ -38,6 +38,83 @@ use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 
 ```
 
+# Load country data
+
+Add the key columns to identify the countries and get the groupings done 
+
+```{r load country gpkg}
+
+# (0) Preconditions: `sf_f` is already in memory and cleaned
+#     It must contain at least: fid (unique id), c_fid, and geometry (polygons)
+stopifnot(inherits(sf_f, "sf"))
+stopifnot(all(c("fid", "c_fid") %in% names(sf_f)))
+
+# (1) Read country polygons (keep only needed columns)
+ct <- st_read(
+  "/home/jeronimo/data/global_ncp/vectors/cartographic_ee_ee_r264_correspondence.gpkg",
+  quiet = TRUE
+) |>
+  select(id, ee_r264_name, iso3, continent, income_grp, region_un, region_wb, subregion)
+
+# (2) Read biomes (WWF biomes), keep id & label columns only
+biomes <- st_read(
+  "/home/jeronimo/data/global_ncp/vectors/Biome.gpkg",
+  quiet = TRUE
+) |>
+  select(BIOME, WWF_biome)
+
+# (3) Harmonize CRS (transform both polygon layers to match the grid CRS)
+crs_grid <- st_crs(sf_f)
+if (st_crs(ct) != crs_grid)     ct     <- st_transform(ct, crs_grid)
+if (st_crs(biomes) != crs_grid) biomes <- st_transform(biomes, crs_grid)
+
+# (4) Build a lightweight template from the grid (only keys you need)
+sf_template <- sf_f |>
+  select(fid, c_fid) # keeps geometry (grid cells)
+
+# (5) One representative point per cell (robust for concave polygons)
+#     This is much faster/safer than polygon-on-polygon joins for attribution.
+pts <- st_point_on_surface(sf_template)
+
+# (6) Spatial join attributes onto points
+#     NOTE: DO NOT drop geometry on `ct`/`biomes` before this step.
+#     Keep defaults: left = TRUE (keeps all pts), largest = FALSE (strict within).
+#     If you want "closest polygon" behavior, use `st_join(..., join = st_nearest_feature)`
+pts_ct    <- st_join(pts, ct,     left = TRUE)
+pts_biome <- st_join(pts, biomes, left = TRUE)
+
+# (7) Drop point geometry to get a pure attribute table keyed by fid
+pts_ctdf <- pts_ct    |> st_drop_geometry()
+pts_bmdf <- pts_biome |> st_drop_geometry()
+
+# (8) Merge country + biome attributes (both are 1 row per fid)
+#     Keep suffixes clean in case of name collisions.
+out_attrs <- pts_ctdf |>
+  left_join(pts_bmdf, by = "fid", suffix = c("", "_biome"))
+
+# (Optional) sanity: ensure uniqueness by `fid`
+if (any(duplicated(out_attrs$fid))) {
+  # If duplicates ever appear, collapse to first occurrence
+  out_attrs <- out_attrs |>
+    arrange(fid) |>
+    distinct(fid, .keep_all = TRUE)
+}
+
+# (9) Bring attributes back to the original grid (preserve grid geometry)
+sf_f_joined <- sf_f |>
+  left_join(out_attrs, by = "fid")
+
+# (10) Quick checks
+stopifnot(nrow(sf_f_joined) == nrow(sf_f))
+stopifnot(inherits(sf_f_joined, "sf"))
+
+# (11) Write result (overwrite safely)
+out_path <- "~/data/global_ncp/processed/10k_change_calc.gpkg"
+if (file.exists(out_path)) file.remove(out_path)
+st_write(sf_f_joined, out_path, quiet = TRUE)
+
+```
+
 ####################### START HERE
 
 # 1 Hotspot Extraction
@@ -54,11 +131,12 @@ The spatial objects with the additional attributes are loaded and reformatted fo
 #  get pct as standalone data to add to the table
 # Most recent version of synthesis data:
 #sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef_f.gpkg'))
-lyr_sf <- st_layers("/home/jeronimo/OneDrive/global_NCP/data/processed/10k_change_calc.gpkg")
-sf_f <- st_read("/home/jeronimo/OneDrive/global_NCP/data/processed/10k_change_calc.gpkg") 
+lyr_sf <- st_layers("~/data/global_ncp/processed/10k_change_calc.gpkg")
+sf_f <- st_read("~/data/global_ncp/processed/10k_change_calc.gpkg") 
+sf_f <- sf_f[-33]
 
-#change na,mes here (homogenize) 
-#this as cbackup, remove as soon as possible.
+#change names here (homogenize) 
+#this as backup, remove as soon as possible.
 #sf_f <- sf_f %>% mutate(fid=fid_2)
 # add fid # THIS DOOES NOT WORK LIKE THIS!!!!!! DO NOT USE!!!
 sf_f$fid <- seq_len(nrow(sf_f)) 
@@ -70,21 +148,56 @@ socio_vars <- names(plt)[
   !grepl("chg$", names(plt))
 ]
 
+
 # Pivot all columns that contain pct_ch, keeping other relevant vars
 
-plt_long <- plt %>%
-  pivot_longer(
-    cols = matches("pct_chg"),
-    names_to = "service",
-    values_to = "pct_chg"
-  ) %>%
-  select(fid, c_fid, service, pct_chg, all_of(socio_vars)) %>% 
-  mutate(service = str_replace(service, "_pct_chg.*", "")) %>% 
-  mutate(service = str_replace(service, "_mean.*", "")) %>% 
-  filter(!is.na(pct_chg)) %>% filter(!is.na(c_fid)) %>% filter(pct_chg != Inf)  # remove infinite values and those for which Country Id is NA. I need to make sure this is correct. There are sopme locations that have no country values (because it is outside. I am dropping that, but need tto reconsider this)
-  
-# rename some variables (just for aesthetics)
+library(dplyr)
+library(tidyr)
+library(stringr)
 
+# socio variables to carry through (adjust to your set)
+socio_vars <- c(
+  "GHS_BUILT_S_E2020_mean",
+  "fields_mehrabi_2017_mean",
+  "hdi_raster_predictions_2020_mean",
+  "rast_adm1_gini_disp_2020_mean",
+  "rast_gdpTot_1990_2020_30arcsec_2020_sum",
+  "GHS_POP_E2020_GLOBE_sum",
+  "GlobPOP_Count_30arc_2020_sum",
+  "iso3","continent","income_grp","region_un","region_wb","subregion","BIOME","WWF_biome"
+)
+
+plt_long <- plt %>%
+  # 1) Long pivot on *_abs_chg / *_pct_chg columns
+  pivot_longer(
+    cols = matches("_(abs|pct)_chg$"),
+    names_to = c("service", "chg_type"),
+    names_pattern = "^(.*)_(abs|pct)_chg$",
+    values_to = "chg_value"
+  ) %>%
+  # OPTIONAL: normalize service labels if you want to drop a trailing "_mean"
+  mutate(service = str_remove(service, "_mean$")) %>%
+  # 2) Go wide so we get two columns: abs_chg, pct_chg
+  pivot_wider(
+    names_from = chg_type,
+    values_from = chg_value,
+    names_vary = "slowest"
+  ) %>%
+  # after pivot_wider we have columns "abs" and "pct" -> rename
+  rename(abs_chg = abs, pct_chg = pct) %>%
+  # 3) Reorder/select the columns you need
+  select(
+    fid, c_fid, service, abs_chg, pct_chg,
+    any_of(socio_vars)
+  ) %>%
+  # 4) Filters (tweak as neededs)
+  filter(!is.na(c_fid), !is.na(iso3), !is.na(BIOME)) %>%
+  filter(!(is.infinite(pct_chg) | is.infinite(abs_chg))) %>%
+  # keep rows where at least one metric exists
+  filter(!is.na(pct_chg) | !is.na(abs_chg))
+
+# this should be updated on an earlier stage when i extract the data, not here)
+s
   plt_long <- plt_long %>% mutate(service = case_when(
    service == "sed_export" ~ "Sed_export",
    service == "n_export" ~ "N_export",
@@ -107,7 +220,479 @@ service_levels <- c("Nature_Access","N_export","N_retention", "N_Ret_Ratio", "Se
 
 ```
 
-```{r hotpots 2}
+
+# Wrapper: extract hotpots per group 
+
+
+```{r extract hotposts_group}
+
+# group_cols is a character vector like c("income_grp") or c("region_wb")
+extract_hotspots_by <- function(df_long, group_cols,
+                                loss, gain,
+                                value_col = "abs_chg",
+                                pct_cutoff = 0.05,
+                                threshold_mode = "percent") {
+
+  stopifnot(all(group_cols %in% names(df_long)))
+
+  df_long %>%
+    select(fid, service, all_of(group_cols), all_of(value_col), c_fid) %>%
+    rename(.value = {{ value_col }}) %>%  # standardize name for mapping
+    nest(data = -all_of(group_cols)) %>%
+    mutate(
+      res = map(
+        data,
+        ~ extract_hotspots(
+            df            = rename(.x, !!value_col := .value),
+            value_col     = value_col,
+            pct_cutoff    = pct_cutoff,
+            threshold_mode= threshold_mode,
+            rule_mode     = "vectors",
+            loss_services = loss,
+            gain_services = gain,
+            id_cols       = c("c_fid")      # carry c_fid to summaries
+          )
+      )
+    ) %>%
+    transmute(
+      !!!syms(group_cols),
+      hotspots_df     = map(res, "hotspots_df"),
+      non_hotspots_df = map(res, "non_hotspots_df"),
+      summary_df      = map(res, "summary_df"),
+      binary_matrix   = map(res, "binary_matrix")
+    )
+}
+
+
+```
+
+
+# Run Wrapper subregional
+```{r run subregional abs}
+
+
+loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+gain <- c("Sed_export","N_export","C_Risk")
+
+abs_by_income  <- extract_hotspots_by(plt_long, "income_grp", loss, gain, value_col = "abs_chg")
+abs_by_wb_region  <- extract_hotspots_by(plt_long, "region_wb", loss, gain, value_col = "abs_chg")
+
+rel_by_income  <- extract_hotspots_by(plt_long, "income_grp", loss, gain, value_col = "pct_chg")
+rel_by_wb_region  <- extract_hotspots_by(plt_long, "region_wb", loss, gain, value_col = "pct_chg")
+
+
+
+```
+
+
+
+
+
+# Absolute and relqative change side by side
+
+```{r wrapper abs and rel change}
+
+# plt_long, loss, gain
+
+# ---- 1) Run the wrapper per grouping & metric ----
+by_income_abs    <- extract_hotspots_by(plt_long, "income_grp", loss, gain, value_col = "abs_chg")
+by_income_pct    <- extract_hotspots_by(plt_long, "income_grp", loss, gain, value_col = "pct_chg")
+by_wb_region_abs    <- extract_hotspots_by(plt_long, "region_wb", loss, gain, value_col = "abs_chg")
+by_wb_region_pct    <- extract_hotspots_by(plt_long, "region_wb", loss, gain, value_col = "pct_chg")
+
+by_un_region_abs    <- extract_hotspots_by(plt_long, "region_un", loss, gain, value_col = "abs_chg")
+by_un_region_pct    <- extract_hotspots_by(plt_long, "region_un", loss, gain, value_col = "pct_chg")
+
+by_biome_abs    <- extract_hotspots_by(plt_long, "BIOME", loss, gain, value_col = "abs_chg")
+by_biome_pct    <- extract_hotspots_by(plt_long, "BIOME", loss, gain, value_col = "pct_chg")
+
+
+by_continent_abs    <- extract_hotspots_by(plt_long, "continent", loss, gain, value_col = "abs_chg")
+by_continent_pct    <- extract_hotspots_by(plt_long, "continent", loss, gain, value_col = "pct_chg")
+
+
+
+# ---- 2) Helper to unpack the nested summary_df and suffix the hotspot columns ----
+unpack_summary <- function(nested_tbl, group_col, suffix) {
+  nested_tbl %>%
+    select({{ group_col }}, summary_df) %>%
+    tidyr::unnest(summary_df) %>%        # brings fid, hotspot_count, hotspot_services, hotspot_types, ...
+    rename(
+      !!paste0("hotspot_count", suffix)   := hotspot_count,
+      !!paste0("hotspot_services", suffix):= hotspot_services,
+      !!paste0("hotspot_types", suffix)   := hotspot_types
+    )
+}
+
+# Income group
+
+# 1) Build per-fid summaries for ABS
+inc_abs <- by_income_abs %>%
+  transmute(
+    income_grp,
+    abs_summ = map(
+      hotspots_df,
+      ~ .x %>%
+        group_by(fid) %>%
+        summarise(
+          hotspot_count_abs    = n(),                              # you already had this, but recompute here
+          abs_services_list    = list(unique(service)),
+          abs_abschg_mean      = mean(abs_chg, na.rm = TRUE),
+          abs_abschg_median    = median(abs_chg, na.rm = TRUE),
+          abs_abschg_max       = max(abs_chg, na.rm = TRUE),
+          .groups = "drop"
+        ) %>%
+        mutate(
+          hotspot_services_abs = sapply(abs_services_list, \(v) paste(v, collapse = ", ")),
+          .keep = "unused"
+        )
+    )
+  ) %>%
+  unnest(abs_summ)
+
+# 2) Build per-fid summaries for PCT
+inc_pct <- by_income_pct %>%
+  transmute(
+    income_grp,
+    pct_summ = map(
+      hotspots_df,
+      ~ .x %>%
+        group_by(fid) %>%
+        summarise(
+          hotspot_count_pct    = n(),
+          pct_services_list    = list(unique(service)),
+          pct_pctchg_mean      = mean(pct_chg, na.rm = TRUE),
+          pct_pctchg_median    = median(pct_chg, na.rm = TRUE),
+          pct_pctchg_min       = min(pct_chg, na.rm = TRUE),
+          pct_pctchg_max       = max(pct_chg, na.rm = TRUE),
+          .groups = "drop"
+        ) %>%
+        mutate(
+          hotspot_services_pct = sapply(pct_services_list, \(v) paste(v, collapse = ", ")),
+          .keep = "unused"
+        )
+    )
+  ) %>%
+  unnest(pct_summ)
+
+# 3) Join ABS + PCT summaries to your flags view
+income_joined <- full_join(
+  inc_abs %>% select(fid, income_grp,
+                     hotspot_count_abs, hotspot_services_abs,
+                     abs_abschg_mean, abs_abschg_median, abs_abschg_max),
+  inc_pct %>% select(fid, income_grp,
+                     hotspot_count_pct, hotspot_services_pct,
+                     pct_pctchg_mean, pct_pctchg_median, pct_pctchg_min, pct_pctchg_max),
+  by = c("fid","income_grp")
+) %>%
+  mutate(
+    hotspot_abs_flag = !is.na(hotspot_count_abs) & hotspot_count_abs > 0,
+    hotspot_pct_flag = !is.na(hotspot_count_pct) & hotspot_count_pct > 0,
+    hotspot_cat = case_when(
+      hotspot_abs_flag &  hotspot_pct_flag ~ "Both (abs & pct)",
+      hotspot_abs_flag & !hotspot_pct_flag ~ "Absolute only",
+      !hotspot_abs_flag & hotspot_pct_flag ~ "Percent only",
+      TRUE ~ "Neither"
+    )
+  )
+
+# plot_share(region_share, "region_wb")
+```
+```{r plotting and export absolute }
+
+
+# --------------------------------------------------
+# 0) Assumptions already in your session
+# - by_income_abs, by_income_pct (outputs of extract_hotspots_by(...))
+# - sf_f (grid polygons with 'fid' and geometry)
+# - outputs/ exists (or will be created)
+# --------------------------------------------------
+
+set.seed(1)
+
+# 1) Tidy value tables (one row per fid x service x income_grp)
+inc_abs_vals <- by_income_abs %>%
+  transmute(income_grp,
+            vals = map(hotspots_df, ~ select(.x, fid, service, abs_chg))) %>%
+  unnest(vals)
+
+inc_pct_vals <- by_income_pct %>%
+  transmute(income_grp,
+            vals = map(hotspots_df, ~ select(.x, fid, service, pct_chg))) %>%
+  unnest(vals)
+
+# 2) Join the measures so we can compare (some rows may be NA in one column)
+vals_joined <- full_join(
+  inc_abs_vals, inc_pct_vals,
+  by = c("income_grp","fid","service")
+)
+
+# 3) (Optional) Keep a focused set of services to avoid overplotting in the meeting
+focus_services <- c("Nature_Access","N_export","N_retention","Sed_export",
+                    "N_Ret_Ratio","Sed_Ret_Ratio","C_Risk","C_Risk_Red_Ratio","Pollination","USLE")
+
+vals_focus <- vals_joined %>%
+  filter(service %in% focus_services)
+
+# 4) Sample for plotting (keeps visuals responsive; analysis tables remain complete)
+plot_n <- 300000L
+vals_sample <- vals_focus %>%
+  drop_na(income_grp) %>%
+  mutate(income_grp = factor(income_grp)) %>%
+  { if (nrow(.) > plot_n) slice_sample(., n = plot_n) else . }
+
+# 5) Violin + box for ABSOLUTE change (by income group, faceted by service)
+p_abs <- ggplot(vals_sample, aes(x = abs_chg, y = income_grp)) +
+  geom_violin(trim = TRUE, scale = "width") +
+  geom_boxplot(width = 0.15, outlier.alpha = 0.15) +
+  coord_flip() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(title = "Absolute change in hotspots by income group",
+       x = NULL, y = "Absolute change (service units)") +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x = element_text(size = 8, angle = 45, hjust = 1)  # rotate bottom labels
+  )
+
+```
+
+# Plot and export pct 
+
+```{r plot and export pct}
+# 5b) Violin + box for PERCENT change (by income group, faceted by service)
+p_pct <- ggplot(vals_sample %>% drop_na(pct_chg),
+                aes(x = pct_chg, y = income_grp)) +
+  geom_violin(trim = TRUE, scale = "width") +
+  geom_boxplot(width = 0.15, outlier.alpha = 0.15) +
+  coord_flip() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(title = "Percent change in hotspots by income group",
+       x = NULL, y = "Percent change (%)") +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x = element_text(size = 8, angle = 45, hjust = 1)
+  )
+
+# Save both
+ggsave("/home/jeronimo/OneDrive/global_NCP/outputs/plots/abs_change_violins_by_income.png", p_abs, width = 12, height = 8, dpi = 300)
+ggsave("/home/jeronimo/OneDrive/global_NCP/outputs/plots/pct_change_violins_by_income.png", p_pct, width = 12, height = 8, dpi = 300)
+
+# (Optional) side-by-side composite (needs patchwork)
+# install.packages("patchwork")  # if not installed
+library(patchwork)
+p_side <- p_abs + p_pct
+ggsave("outputs/plots/abs_vs_pct_violins_by_income_side_by_side.png", p_side,
+       width = 24, height = 8, dpi = 300)
+
+```
+```{r export gpkg hotpots}
+library(dplyr)
+library(tidyr)
+library(sf)
+dir.create("outputs/gis", recursive = TRUE, showWarnings = FALSE)
+
+# -------------------------------
+# 1) Summary layer (one row per fid)
+# -------------------------------
+summary_df <- income_joined %>%
+  filter(hotspot_abs_flag | hotspot_pct_flag) %>%           # only hotspot fids
+  select(
+    fid, income_grp,
+    hotspot_cat,                     # Both / Absolute only / Percent only / Neither
+    hotspot_count_abs, hotspot_services_abs,                 # counts & service list (abs)
+    abs_abschg_mean, abs_abschg_median, abs_abschg_max,     # quick stats (abs)
+    hotspot_count_pct, hotspot_services_pct,                 # counts & service list (pct)
+    pct_pctchg_mean, pct_pctchg_median, pct_pctchg_min, pct_pctchg_max,
+    hotspot_abs_flag, hotspot_pct_flag
+  )
+
+sf_sum <- sf_f %>%
+  inner_join(summary_df, by = "fid")                        # keep only hotspot geometries
+
+# -------------------------------
+# 2) Detail layer (fid × service with values)
+#    (limit to hotspot fids and keep whichever metric exists)
+# -------------------------------
+hot_fids <- summary_df %>% pull(fid)
+
+detail_vals <- full_join(
+  inc_abs_vals,          # columns: income_grp, fid, service, abs_chg
+  inc_pct_vals,          # columns: income_grp, fid, service, pct_chg
+  by = c("income_grp","fid","service")
+) %>%
+  filter(fid %in% hot_fids) %>%
+  # keep rows where at least one metric is present
+  filter(!is.na(abs_chg) | !is.na(pct_chg))
+
+sf_detail <- sf_f %>%
+  select(fid, geom) %>%
+  inner_join(detail_vals, by = "fid")
+
+# -------------------------------
+# 3) Write a single GPKG with two layers
+# -------------------------------
+gpkg_path <- "/home/jeronimo/OneDrive/global_NCP/outputs/plots/hotspots_income.gpkg"
+
+# Overwrite file if it exists
+if (file.exists(gpkg_path)) file.remove(gpkg_path)
+
+st_write(sf_sum,    gpkg_path, layer = "hotspots_income_summary", quiet = TRUE)
+st_write(sf_detail, gpkg_path, layer = "hotspots_income_detail",  quiet = TRUE)
+
+message("Wrote: ", gpkg_path)
+
+
+
+
+```
+
+# Optional: put income groups in a sensible order
+vals_sample <- vals_sample %>%
+  dplyr::mutate(
+    income_grp = forcats::fct_relevel(
+      income_grp,
+      "5. Low income",
+      "4. Lower middle income",
+      "3. Upper middle income",
+      "2. High income: nonOECD",
+      "1. High income: OECD"
+    )
+  )
+
+p_abs2 <- ggplot(vals_sample, aes(x = abs_chg, y = income_grp, fill = income_grp)) +
+  # smooth violins with color per group
+  geom_violin(trim = TRUE, scale = "width", color = NA, alpha = 0.8) +
+  # slim boxplot overlay; keep outline neutral so color comes from violins
+  geom_boxplot(width = 0.12, outlier.alpha = 0.15, fill = "white", color = "grey20") +
+  coord_flip() +
+  facet_wrap(~ service, scales = "free_x") +
+  scale_fill_viridis_d(option = "C", end = 0.9) +
+  labs(
+    title = "Absolute change in hotspots by income group",
+    x = "Absolute change (service units)",
+    y = NULL,
+    fill = "Income group"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position = "bottom",
+    axis.text = element_text(size = 5),
+    axis.text.x = element_text(hjust = 1),  # after coord_flip: numeric axis
+    strip.text = element_text(face = "bold")
+  )
+
+ggsave("outputs/plots/abs_change_violins_by_income.png", p_abs, width = 12, height = 8, dpi = 300)
+
+# 6) Violin + box for PERCENT change (by income group, faceted by service)
+p_pct <- ggplot(vals_sample, aes(x = pct_chg, y = income_grp)) +
+  geom_violin(trim = TRUE, scale = "width") +
+  geom_boxplot(width = 0.15, outlier.alpha = 0.15) +
+  coord_flip() +
+  facet_wrap(~ service, scales = "free_y") +
+  labs(title = "Percent change in hotspots by income group",
+       x = NULL, y = "Percent change (%)") +
+  theme_minimal(base_size = 11)
+
+ggsave("outputs/plots/pct_change_violins_by_income.png", p_pct, width = 12, height = 8, dpi = 300)
+
+# 7) (Nice to show) bar: share of hotspot fids per income group (across services)
+#    Compute distinct fids that are hotspots in either abs or pct; denominator = all fids per income_grp
+#    Build denominator from your earlier income_joined (already per fid); if not present, derive here:
+denom <- vals_joined %>%
+  distinct(income_grp, fid) %>%
+  count(income_grp, name = "n_cells")
+
+hot_any <- vals_joined %>%
+  filter(!is.na(abs_chg) | !is.na(pct_chg)) %>%
+  distinct(income_grp, fid) %>%
+  count(income_grp, name = "n_hotspot_cells")
+
+share_df <- left_join(denom, hot_any, by = "income_grp") %>%
+  mutate(n_hotspot_cells = coalesce(n_hotspot_cells, 0L),
+         share_hotspot = n_hotspot_cells / n_cells)
+
+p_share <- ggplot(share_df, aes(x = reorder(income_grp, share_hotspot), y = share_hotspot)) +
+  geom_col() +
+  coord_flip() +
+  scales::percent_format() %+replace% NULL # keep defaults
+p_share <- p_share +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Share of grid cells that are hotspots (any service)",
+       x = NULL, y = "Share of cells (%)") +
+  theme_minimal(base_size = 11)
+
+ggsave("outputs/plots/share_hotspots_by_income.png", p_share, width = 8, height = 5, dpi = 300)
+
+# 8) QGIS export: write hotspots as layers with values + income group
+#    (Per fid x service rows, joined back to geometry. Two layers: abs & pct.)
+abs_sf <- vals_focus %>%
+  filter(!is.na(abs_chg)) %>%
+  select(fid, income_grp, service, abs_chg) %>%
+  left_join(sf_f %>% st_drop_geometry() %>% select(fid), by = "fid") %>% # ensure unique fid column
+  distinct(fid, income_grp, service, .keep_all = TRUE) %>%               # avoid dup rows if any
+  left_join(sf_f, by = "fid") %>%
+  st_as_sf()
+
+pct_sf <- vals_focus %>%
+  filter(!is.na(pct_chg)) %>%
+  select(fid, income_grp, service, pct_chg) %>%
+  left_join(sf_f %>% st_drop_geometry() %>% select(fid), by = "fid") %>%
+  distinct(fid, income_grp, service, .keep_all = TRUE) %>%
+  left_join(sf_f, by = "fid") %>%
+  st_as_sf()
+
+out_gpkg <- "outputs/hotspots_income.gpkg"
+if (file.exists(out_gpkg)) file.remove(out_gpkg)
+st_write(abs_sf, out_gpkg, layer = "hotspots_abs", delete_dsn = TRUE, quiet = TRUE)
+st_write(pct_sf, out_gpkg, layer = "hotspots_pct", append = TRUE, quiet = TRUE)
+
+message("Wrote plots in outputs/plots/ and layers to ", out_gpkg)
+
+```
+
+
+```{r hotpots pct}
+
+
+# Adjust This. Set the variables outside as they should:
+## Define the intended direction of change (service loss/increased damage)
+loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+gain <- c("Sed_export","N_export","C_Risk")
+
+ combos = list(
+    combo_1 = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
+    combo_2 = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+  )
+# after running:
+hs <- extract_hotspots(
+  df = plt_long,
+  value_col = "abs_chg",
+  pct_cutoff = 0.05,
+  threshold_mode = "percent",
+  rule_mode = "vectors",
+  loss_services = loss,
+  gain_services = gain,
+  combos = list(
+    deg_combo = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
+    rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+  ),
+  id_cols = c("c_fid"),
+  sf_obj = sf_f,                                       # sf with fid
+  write_sf_path = "output_data/hotspots_abs_ch.gpkg",       
+  write_driver  = "GPKG",                              
+  clean_names   = TRUE,
+  fid_alias     = "fid_2",                             # duplicate fid only for the file
+  drop_fid_on_write = TRUE                             # drop original fid on disk (keep in memory)
+)
+
+
+#save(hs, file=here("output_data", "hotspots_5.RData")) 
+# hotspots_sf <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
+hp_sf <- hs$hotspots_sf
+hp_sf <- hp_sf %>% select(-ends_with("_abs_chg"))
+```
+
+```{r hotpots abs}
 
 # Adjust This. Set the variables outside as they shou;d:
 ## Define the intended direction of change (service loss/increased damage)
@@ -133,7 +718,7 @@ hs <- extract_hotspots(
   ),
   id_cols = c("c_fid"),
   sf_obj = sf_f,                                       # sf with fid
-  write_sf_path = "output_data/hotspots3.gpkg",       
+  write_sf_path = "output_data/hotspots_abs_ch.gpkg",       
   write_driver  = "GPKG",                              
   clean_names   = TRUE,
   fid_alias     = "fid_2",                             # duplicate fid only for the file
@@ -144,7 +729,7 @@ hs <- extract_hotspots(
 #save(hs, file=here("output_data", "hotspots_5.RData")) 
 # hotspots_sf <- st_read('/Users/rodriguez/OneDrive - World Wildlife Fund, Inc/global_NCP/output_data/hotspots_5_final.gpkg')
 hp_sf <- hs$hotspots_sf
-hp_sf <- hp_sf %>% select(-ends_with("_abs_chg"))
+hp_sf <- hp_sf %>% select(-ends_with("_pct_chg"))
 ```
 
 # Masking
@@ -160,7 +745,7 @@ mask_pct_change_by_hotspot <- function(hp_sf,
                                                          "Sed_Ret_Ratio","Rt_nohab",
                                                          "C_Risk","C_Prot_service",
                                                          "C_Risk_Red_Ratio","Pollination"),
-                                       value_suffix_re = "(?:_pct_?chg)$",   # _pct_chg or _pctchg
+                                       value_suffix_re = "(?:_abs_?chg)$",   # _pct_chg or _pctchg
                                        masked_suffix   = "_masked",
                                        verbose = TRUE) {
   stopifnot(inherits(hp_sf, "sf"))
@@ -237,8 +822,8 @@ mask_pct_change_by_hotspot <- function(hp_sf,
 hp_sf <- mask_pct_change_by_hotspot(hp_sf)
 
 # sanity check: see the new *_masked columns
-names(hp_sf)[str_detect(names(hp_sf), "_pct_?chg_masked$")]
-st_write(hp_sf, paste0(inpath, '/', 'hotspots_5_final_mskd.gpkg'))
+names(hp_sf)[str_detect(names(hp_sf), "_abs_?chg_masked$")]
+st_write(hp_sf, paste0(inpath, '/', 'hotspots_5_abs_mskd.gpkg'), append = FALSE)
          
 ```
 
