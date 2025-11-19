@@ -318,158 +318,230 @@ print(n = 50)
 ```
 
 ```{r run wrapper}
-# ---- Config you already used (keep) -------------------------------------
-# ------------------------------------------------------------
-# Hotspot violins by grouping (ABS & PCT), with outlier capping
-# ------------------------------------------------------------
+# -----------------------------------------------
+# Faceted violins (VERTICAL) with fixed service order (3 cols)
+# - ABS and PCT plotted separately
+# - Free y scales per facet
+# - Removes NA/0 and trims 0.1%–99.9% per service
+# -----------------------------------------------
+run_hotspot_violins_by <- function(group_col, out_stub,
+                                   svc_order = c("C_Risk","N_export","Sed_export",
+                                                 "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+                                                 "Pollination","Nature_Access"),
+                                   cut_q = 0.999,
+                                   plot_n = 300000L,
+                                   out_dir = "outputs/plots") {
 
-# 0) Assumes: plt_long exists with columns:
-#    fid, service, abs_chg, pct_chg, and grouping columns
-#    You already defined `loss`, `gain`, `focus_services`, `plot_n`
-#    and have extract_hotspots_by() available.
-# ------------------------------------------------------------
+  message("==> Violins by: ", group_col)
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Helper: cap extremes at upper quantile per service
-cap_upper_by_service <- function(df, value_col, p = 0.999) {
-  stopifnot(value_col %in% names(df))
-  df %>%
-    group_by(service) %>%
-    mutate(
-      .upper = suppressWarnings(quantile(.data[[value_col]],
-                                         probs = p,
-                                         na.rm = TRUE, names = FALSE)),
-      .val   = pmin(.data[[value_col]], .upper)
-    ) %>%
-    ungroup() %>%
-    mutate(!!value_col := .val) %>%
-    select(-.upper, -.val)
-}
-
-# Wrapper you already had (unchanged, just here for completeness)
-extract_hotspots_by <- function(df_long, group_cols,
-                                loss, gain,
-                                value_col = "abs_chg",
-                                pct_cutoff = 0.05,
-                                threshold_mode = "percent") {
-
-  stopifnot(all(group_cols %in% names(df_long)))
-
-  df_long %>%
-    dplyr::select(fid, service, dplyr::all_of(group_cols), dplyr::all_of(value_col), c_fid) %>%
-    dplyr::rename(.value = {{ value_col }}) %>%
-    tidyr::nest(data = -dplyr::all_of(group_cols)) %>%
-    dplyr::mutate(
-      res = purrr::map(
-        data,
-        ~ extract_hotspots(
-            df             = dplyr::rename(.x, !!value_col := .value),
-            value_col      = value_col,
-            pct_cutoff     = pct_cutoff,
-            threshold_mode = threshold_mode,
-            rule_mode      = "vectors",
-            loss_services  = loss,
-            gain_services  = gain,
-            id_cols        = c("c_fid")
-          )
-      )
-    ) %>%
-    dplyr::transmute(
-      !!!rlang::syms(group_cols),
-      hotspots_df     = purrr::map(res, "hotspots_df"),
-      non_hotspots_df = purrr::map(res, "non_hotspots_df"),
-      summary_df      = purrr::map(res, "summary_df"),
-      binary_matrix   = purrr::map(res, "binary_matrix")
-    )
-}
-
-# ---- Config you already used ----
-focus_services <- c(
-  "Nature_Access","N_export","N_retention","Sed_export",
-  "N_Ret_Ratio","Sed_Ret_Ratio","C_Risk","C_Risk_Red_Ratio",
-  "Pollination","USLE"
-)
-plot_n <- 300000L
-
-# Generic runner for ONE grouping column
-run_hotspot_plots_by <- function(group_col, out_stub, upper_p = 0.999) {
-  message("==> Running plots by: ", group_col)
-
-  # 1) Run wrapper once for ABS and once for PCT
+  # Run hotspot wrapper once for ABS and once for PCT
   by_abs <- extract_hotspots_by(plt_long, group_col, loss, gain, value_col = "abs_chg")
   by_pct <- extract_hotspots_by(plt_long, group_col, loss, gain, value_col = "pct_chg")
 
-  # 2) Tidy value tables (fid × service × group)
+  # Long value tables (fid × service × group)
   abs_vals <- by_abs %>%
-    dplyr::transmute(
-      !!group_col := .data[[group_col]],
-      vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, abs_chg))
-    ) %>%
+    dplyr::transmute(!!group_col := .data[[group_col]],
+                     vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, abs_chg))) %>%
     tidyr::unnest(vals)
 
   pct_vals <- by_pct %>%
-    dplyr::transmute(
-      !!group_col := .data[[group_col]],
-      vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, pct_chg))
-    ) %>%
+    dplyr::transmute(!!group_col := .data[[group_col]],
+                     vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, pct_chg))) %>%
     tidyr::unnest(vals)
 
-  # 3) Join so each (fid, service, group) may have abs &/or pct
-  vals_joined <- dplyr::full_join(
-    abs_vals, pct_vals,
-    by = c(group_col, "fid", "service")
-  )
+  # Join for alignment; keep only desired services and sample for plotting speed
+  vals <- dplyr::full_join(abs_vals, pct_vals, by = c(group_col, "fid", "service")) %>%
+    dplyr::filter(service %in% svc_order) %>%
+    dplyr::mutate(service = factor(service, levels = svc_order)) %>%
+    dplyr::filter(!is.na(.data[[group_col]])) %>%
+    { if (nrow(.) > plot_n) dplyr::slice_sample(., n = plot_n) else . } %>%
+    dplyr::mutate(!!group_col := as.factor(.data[[group_col]]))
 
-  # 4) Focus services + drop NA/zero + cap extremes (per service)
-  vals_clean <- vals_joined %>%
-    dplyr::filter(service %in% focus_services) %>%
-    dplyr::filter(!is.na(.data[[group_col]]))
-
-  # Absolute: drop NA/zero; cap upper tail per service
-  abs_for_plot <- vals_clean %>%
+  # ---- ABS (vertical violins) ----
+  abs_trim <- vals %>%
     dplyr::filter(!is.na(abs_chg), abs_chg != 0) %>%
-    cap_upper_by_service("abs_chg", p = upper_p)
+    dplyr::group_by(service) %>%
+    dplyr::mutate(
+      lo = stats::quantile(abs_chg, 1 - cut_q, na.rm = TRUE),
+      hi = stats::quantile(abs_chg, cut_q,     na.rm = TRUE)
+    ) %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(abs_chg >= lo, abs_chg <= hi)
 
-  # Percent: drop NA/zero; cap upper tail per service
-  pct_for_plot <- vals_clean %>%
-    dplyr::filter(!is.na(pct_chg), pct_chg != 0) %>%
-    cap_upper_by_service("pct_chg", p = upper_p)
+  p_abs <- ggplot2::ggplot(abs_trim, ggplot2::aes(x = .data[[group_col]], y = abs_chg)) +
+    ggplot2::geom_violin(trim = TRUE, scale = "width") +
+    ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
+    ggplot2::labs(title = paste0("Absolute change in hotspots by ", group_col),
+                  subtitle = "Violins only; NA/0 removed; per-service 99.9% trim",
+                  x = NULL, y = "Absolute change (service units)") +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
 
-  # 5a) ABS violins ONLY (no boxplot), horizontal with coord_flip(),
-  #     and free_y so each facet has its own value axis
-  p_abs <- ggplot(abs_for_plot, aes(x = abs_chg, y = .data[[group_col]])) +
-    geom_violin(trim = TRUE, scale = "width") +
-    coord_flip() +
-    facet_wrap(~ service, scales = "free_y") +
-    labs(title = paste0("Absolute change in hotspots by ", group_col),
-         x = NULL, y = "Absolute change (service units)") +
-    theme_minimal(base_size = 11) +
-    theme(axis.text.x = element_text(size = 8, angle = 45, hjust = 1))
+  ggplot2::ggsave(file.path(out_dir, paste0(out_stub, "_abs_change_violins.png")),
+                  p_abs, width = 12, height = 8, dpi = 300)
 
-  # 5b) PCT violins ONLY (same style)
-  p_pct <- ggplot(pct_for_plot, aes(x = pct_chg, y = .data[[group_col]])) +
-    geom_violin(trim = TRUE, scale = "width") +
-    coord_flip() +
-    facet_wrap(~ service, scales = "free_y") +
-    labs(title = paste0("Percent change in hotspots by ", group_col),
-         x = NULL, y = "Percent change (%)") +
-    theme_minimal(base_size = 11) +
-    theme(axis.text.x = element_text(size = 8, angle = 45, hjust = 1))
+  # ---- PCT (vertical violins) ----
+  pct_trim <- vals %>%
+    tidyr::drop_na(pct_chg) %>%
+    dplyr::filter(pct_chg != 0) %>%
+    dplyr::group_by(service) %>%
+    dplyr::mutate(
+      lo = stats::quantile(pct_chg, 1 - cut_q, na.rm = TRUE),
+      hi = stats::quantile(pct_chg, cut_q,     na.rm = TRUE)
+    ) %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(pct_chg >= lo, pct_chg <= hi)
 
-  # 6) Save inside repo
-  dir.create("outputs/plots", recursive = TRUE, showWarnings = FALSE)
-  ggsave(file.path("outputs/plots", paste0(out_stub, "_abs_change_violins.png")),
-         p_abs, width = 12, height = 8, dpi = 300)
-  ggsave(file.path("outputs/plots", paste0(out_stub, "_pct_change_violins.png")),
-         p_pct, width = 12, height = 8, dpi = 300)
+  p_pct <- ggplot2::ggplot(pct_trim, ggplot2::aes(x = .data[[group_col]], y = pct_chg)) +
+    ggplot2::geom_violin(trim = TRUE, scale = "width") +
+    ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
+    ggplot2::labs(title = paste0("Percent change in hotspots by ", group_col),
+                  subtitle = "Violins only; NA/0 removed; per-service 99.9% trim",
+                  x = NULL, y = "Percent change (%)") +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
+
+  ggplot2::ggsave(file.path(out_dir, paste0(out_stub, "_pct_change_violins.png")),
+                  p_pct, width = 12, height = 8, dpi = 300)
 
   invisible(list(abs_plot = p_abs, pct_plot = p_pct))
 }
 
-# ---- Run for each grouping ----
-run_hotspot_plots_by("region_wb",  "regionwb")   # World Bank regions
-run_hotspot_plots_by("WWF_biome",      "biome")      # WWF biomes
-run_hotspot_plots_by("continent",  "continent")  # Continents
-#run_hotspot_plots_by("region_un",  "regionun")   # UN regions
-run_hotspot_plots_by("income_grp", "incomegrp")  # Income groups
+# Facet order (row-wise fill with ncol = 3)
+svc_order <- c(
+  "C_Risk","N_export","Sed_export",
+  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+  "Pollination","Nature_Access"
+)
+
+# Run
+loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+gain <- c("Sed_export","N_export","C_Risk")
+
+run_hotspot_violins_by("region_wb", "regionwb",  svc_order = svc_order)
+run_hotspot_violins_by("WWF_biome", "biome",     svc_order = svc_order)
+run_hotspot_violins_by("continent", "continent", svc_order = svc_order)
+#run_hotspot_violins_by("region_un",  "regionun",  svc_order = svc_order)
+run_hotspot_violins_by("income_grp", "incomegrp", svc_order = svc_order)
+
+
+
+```
+```{r global run}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(forcats)
+library(tidytext)  # reorder_within, scale_x_reordered
+
+svc_order_default <- c(
+  "C_Risk","N_export","Sed_export",
+  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+  "Pollination","Nature_Access"
+)
+
+aggregate_change_simple <- function(plt_long, group_col,
+                                    cut_q = 0.999,
+                                    drop_zeros = TRUE,
+                                    svc_order = NULL,
+                                    add_global = TRUE) {
+  if (is.null(svc_order)) svc_order <- svc_order_default
+  stopifnot(group_col %in% names(plt_long))
+
+  df <- plt_long %>%
+    filter(!is.na(.data[[group_col]]),
+           service %in% svc_order) %>%
+    mutate(service = factor(service, levels = svc_order))
+
+  # winsorize on |value| per service, then use mean(|value|)
+  dfw <- df %>%
+    group_by(service) %>%
+    mutate(
+      abs_cap = quantile(abs(abs_chg), cut_q, na.rm = TRUE),
+      pct_cap = quantile(abs(pct_chg), cut_q, na.rm = TRUE),
+      abs_m   = pmin(abs(abs_chg), abs_cap),
+      pct_m   = pmin(abs(pct_chg),  pct_cap)
+    ) %>%
+    ungroup()
+
+  if (drop_zeros) {
+    dfw <- dfw %>% filter((!is.na(abs_m) & abs_m > 0) | (!is.na(pct_m) & pct_m > 0))
+  }
+
+  regs <- dfw %>%
+    group_by(.data[[group_col]], service) %>%
+    summarise(
+      n_cells = n(),
+      abs_mean = mean(abs_m, na.rm = TRUE),
+      pct_mean = mean(pct_m, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    rename(group = {{ group_col }})
+
+  if (add_global) {
+    globals <- dfw %>%
+      group_by(service) %>%
+      summarise(
+        n_cells = n(),
+        abs_mean = mean(abs_m, na.rm = TRUE),
+        pct_mean = mean(pct_m, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(group = "Global")
+    regs <- bind_rows(globals, regs)
+  }
+
+  regs
+}
+
+plot_change_bars <- function(regs, value_col, title, ylab, out_file) {
+  # reorder regions within each facet by the chosen value
+  pdat <- regs %>%
+    filter(!is.na(.data[[value_col]]), is.finite(.data[[value_col]])) %>%
+    mutate(group = as.character(group),
+           x_lab = reorder_within(group, .data[[value_col]], service))
+
+  p <- ggplot(pdat, aes(x = x_lab, y = .data[[value_col]])) +
+    geom_col() +
+    scale_x_reordered() +
+    facet_wrap(~ service, ncol = 3, scales = "free_y") +
+    labs(title = title,
+         subtitle = "Mean |change| per 10×10 km cell; per-service 99.9% winsorization; 0/NA dropped",
+         x = NULL, y = ylab) +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(size = 8, angle = 45, hjust = 1))
+
+  dir.create(dirname(out_file), recursive = TRUE, showWarnings = FALSE)
+  ggsave(out_file, p, width = 12, height = 8, dpi = 300)
+  p
+}
+
+run_change_bars_simple <- function(group_col, out_stub, out_dir = "outputs/plots") {
+  regs <- aggregate_change_simple(plt_long, group_col, add_global = TRUE)
+
+  p_abs <- plot_change_bars(
+    regs, value_col = "abs_mean",
+    title = paste0("Magnitude of change (absolute units) by ", group_col, " (incl. Global)"),
+    ylab  = "Mean |absolute change| per cell",
+    out_file = file.path(out_dir, paste0("simple_abs_change_by_", out_stub, "_with_global.png"))
+  )
+
+  p_pct <- plot_change_bars(
+    regs, value_col = "pct_mean",
+    title = paste0("Magnitude of change (percent) by ", group_col, " (incl. Global)"),
+    ylab  = "Mean |percent change| per cell",
+    out_file = file.path(out_dir, paste0("simple_pct_change_by_", out_stub, "_with_global.png"))
+  )
+
+  invisible(list(abs_plot = p_abs, pct_plot = p_pct, table = regs))
+}
+
+# Run for your groupings (Global bar included in each figure)
+res_regionwb <- run_change_bars_simple("region_wb",  "regionwb")
+res_biome    <- run_change_bars_simple("WWF_biome",   "biome")
+res_cont     <- run_change_bars_simple("continent",  "continent")
+res_regionun <- run_change_bars_simple("region_un",  "regionun")
+res_income   <- run_change_bars_simple("income_grp", "incomegrp")
 
 ```
