@@ -429,11 +429,7 @@ run_hotspot_violins_by("income_grp", "incomegrp", svc_order = svc_order)
 
 ```
 ```{r global run}
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(forcats)
-library(tidytext)  # reorder_within, scale_x_reordered
+
 
 svc_order_default <- c(
   "C_Risk","N_export","Sed_export",
@@ -544,4 +540,35 @@ res_cont     <- run_change_bars_simple("continent",  "continent")
 res_regionun <- run_change_bars_simple("region_un",  "regionun")
 res_income   <- run_change_bars_simple("income_grp", "incomegrp")
 
+```
+
+
+```{r barplots without global}
+# --- keep your aggregate_change_simple(...) as-is ---
+
+# Rerun bars WITHOUT the Global bar
+run_change_bars_simple <- function(group_col, out_stub, out_dir = "outputs/plots", include_global = FALSE) {
+  regs <- aggregate_change_simple(plt_long, group_col, add_global = include_global)
+
+  plot_change_bars(
+    regs, value_col = "abs_mean",
+    title = paste0("Magnitude of change (absolute units) by ", group_col),
+    ylab  = "Mean |absolute change| per cell",
+    out_file = file.path(out_dir, paste0("simple_abs_change_by_", out_stub, ".png"))
+  )
+
+  plot_change_bars(
+    regs, value_col = "pct_mean",
+    title = paste0("Magnitude of change (percent) by ", group_col),
+    ylab  = "Mean |percent change| per cell",
+    out_file = file.path(out_dir, paste0("simple_pct_change_by_", out_stub, ".png"))
+  )
+}
+
+# Run (no Global bar)
+res_regionwb <- run_change_bars_simple("region_wb",  "regionwb")
+res_biome    <- run_change_bars_simple("BIOME",      "biome")
+res_cont     <- run_change_bars_simple("continent",  "continent")
+res_regionun <- run_change_bars_simple("region_un",  "regionun")
+res_income   <- run_change_bars_simple("income_grp", "incomegrp")
 ```
