@@ -433,54 +433,45 @@ run_hotspot_violins_by("income_grp", "incomegrp", svc_order = svc_order)
 
 ```{r run baplots}
 
-
-
-# ---- PRE-FLIGHT ----
-stopifnot(exists("plt_long"),
-          all(c("service","abs_chg","pct_chg") %in% names(plt_long)))
-
-# make sure the two helpers are loaded from R/
-if (!exists("make_change_bars")) {
-  devtools::load_all(quiet = TRUE)
-}
-
-# If you didn’t define this earlier, uncomment and set once:
 svc_order <- c(
   "C_Risk","N_export","Sed_export",
   "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
   "Pollination","Nature_Access"
 )
 
-# ---- RUNNERS ----
 groupings <- c(
   region_wb = "regionwb",
-  WWF_biome = "biome",
+  BIOME     = "biome",
   continent = "continent",
   region_un = "regionun",
   income_grp= "incomegrp"
 )
 
-# 1) Save plots WITHOUT global reference
+# without global
 invisible(lapply(names(groupings), function(gc) {
   make_change_bars(
     group_col = gc,
     stub      = groupings[[gc]],
     svc_order = svc_order,
-    include_global = FALSE,
-    save = TRUE, show = FALSE,
-    out_dir = "outputs/plots"
+    include_global    = FALSE,
+    keep_only_ordered = TRUE,   # <- default
+    sort_bars         = TRUE,
+    out_dir           = "outputs/plots",
+    save = TRUE, show = FALSE
   )
 }))
 
-# 2) Save plots WITH global reference (files won’t overwrite due to suffix)
+# with global (files get a different suffix so no overwrite)
 invisible(lapply(names(groupings), function(gc) {
   make_change_bars(
     group_col = gc,
     stub      = groupings[[gc]],
     svc_order = svc_order,
-    include_global = TRUE,
-    save = TRUE, show = FALSE,
-    out_dir = "outputs/plots"
+    include_global    = TRUE,
+    keep_only_ordered = TRUE,
+    sort_bars         = TRUE,
+    out_dir           = "outputs/plots",
+    save = TRUE, show = FALSE
   )
 }))
 
