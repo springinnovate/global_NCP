@@ -51,7 +51,7 @@ make_change_bars <- function(group_col, stub,
   
   p_abs <- ggplot2::ggplot(regs, ggplot2::aes(x = grp_fac, y = abs_mean)) +
     ggplot2::geom_col() +
-    ggplot2::coord_flip() +
+    #ggplot2::coord_flip() +
     ggplot2::facet_wrap(~ service, ncol = 3, scales = "free_y") +
     ggplot2::labs(
       title = paste0("Total absolute change (trimmed) by ", group_col),
