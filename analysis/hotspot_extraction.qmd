@@ -317,7 +317,7 @@ dplyr::arrange(dplyr::desc(rows)) |>
 print(n = 50)
 ```
 
-```{r run wrapper}
+```{r run wrapper violins}
 # -----------------------------------------------
 # Faceted violins (VERTICAL) with fixed service order (3 cols)
 # - ABS and PCT plotted separately
@@ -428,10 +428,132 @@ run_hotspot_violins_by("income_grp", "incomegrp", svc_order = svc_order)
 
 
 ```
+# Run Baprlots from Stored Fucntions 
+
+
+```{r run baplots}
+
+
+
+# ---- PRE-FLIGHT ----
+stopifnot(exists("plt_long"),
+          all(c("service","abs_chg","pct_chg") %in% names(plt_long)))
+
+# make sure the two helpers are loaded from R/
+if (!exists("make_change_bars")) {
+  devtools::load_all(quiet = TRUE)
+}
+
+# If you didn’t define this earlier, uncomment and set once:
+svc_order <- c(
+  "C_Risk","N_export","Sed_export",
+  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+  "Pollination","Nature_Access"
+)
+
+# ---- RUNNERS ----
+groupings <- c(
+  region_wb = "regionwb",
+  BIOME     = "biome",
+  continent = "continent",
+  region_un = "regionun",
+  income_grp= "incomegrp"
+)
+
+# 1) Save plots WITHOUT global reference
+invisible(lapply(names(groupings), function(gc) {
+  make_change_bars(
+    group_col = gc,
+    stub      = groupings[[gc]],
+    svc_order = svc_order,
+    include_global = FALSE,
+    save = TRUE, show = FALSE,
+    out_dir = "outputs/plots"
+  )
+}))
+
+# 2) Save plots WITH global reference (files won’t overwrite due to suffix)
+invisible(lapply(names(groupings), function(gc) {
+  make_change_bars(
+    group_col = gc,
+    stub      = groupings[[gc]],
+    svc_order = svc_order,
+    include_global = TRUE,
+    save = TRUE, show = FALSE,
+    out_dir = "outputs/plots"
+  )
+}))
+
+
+```
+# Fucntion macke change bars
+
+```{r macke changebars}
+# ---- Bars helper: toggle "global", saving, and display -------------------
+make_change_bars <- function(group_col,
+                             stub,
+                             include_global = FALSE,
+                             save = TRUE,
+                             show = interactive(),
+                             out_dir = "../outputs/plots",
+                             tag = NULL,                 # optional manual suffix
+                             add_timestamp = FALSE,      # set TRUE to avoid any overwrite
+                             width = 12, height = 8, dpi = 300) {
+  # 1) Get aggregates (your function), respecting the Global toggle
+  regs <- aggregate_change_simple(
+    plt_long, group_col,
+    cut_q = 0.999, drop_zeros = TRUE,
+    svc_order = c("C_Risk","N_export","Sed_export",
+                  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+                  "Pollination","Nature_Access","USLE","Rt_nohab","C_Prot_service"),
+    add_global = include_global
+  )
+
+  # 2) Consistent facet order (already handled in aggregate by svc_order)
+  #    Ensure group order is stable (by freq)
+  regs[[group_col]] <- forcats::fct_infreq(regs[[group_col]])
+
+  # 3) Build plots
+  p_abs <- ggplot(regs, aes(x = .data[[group_col]], y = abs_mean)) +
+    geom_col() +
+    coord_flip() +
+    facet_wrap(~ service, ncol = 3, scales = "free_y") +
+    labs(title = paste0("Magnitude of change (absolute units) by ", group_col),
+         x = NULL, y = "Mean |absolute change| per cell") +
+    theme_minimal(base_size = 11)
+
+  p_pct <- ggplot(regs, aes(x = .data[[group_col]], y = pct_mean)) +
+    geom_col() +
+    coord_flip() +
+    facet_wrap(~ service, ncol = 3, scales = "free_y") +
+    labs(title = paste0("Magnitude of change (percent) by ", group_col),
+         x = NULL, y = "Mean |percent change| per cell") +
+    theme_minimal(base_size = 11)
+
+  # 4) Show in R?
+  if (isTRUE(show)) { print(p_abs); print(p_pct) }
+
+  # 5) Save with a suffix that prevents overwrite
+  if (isTRUE(save)) {
+    dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+    suffix <- if (!is.null(tag)) paste0("_", tag) else if (include_global) "_with_global" else "_no_global"
+    if (isTRUE(add_timestamp)) suffix <- paste0(suffix, "_", format(Sys.time(), "%Y%m%d_%H%M%S"))
+
+    ggsave(file.path(out_dir, paste0(stub, suffix, "_abs_bars.png")),
+           p_abs, width = width, height = height, dpi = dpi)
+    ggsave(file.path(out_dir, paste0(stub, suffix, "_pct_bars.png")),
+           p_pct, width = width, height = height, dpi = dpi)
+  }
+
+  invisible(list(p_abs = p_abs, p_pct = p_pct, data = regs))
+}
+```
+
+
 ```{r global run}
 
 
-svc_order_default <- c(
+svc_order <- c(
   "C_Risk","N_export","Sed_export",
   "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
   "Pollination","Nature_Access"
@@ -534,11 +656,15 @@ run_change_bars_simple <- function(group_col, out_stub, out_dir = "outputs/plots
 }
 
 # Run for your groupings (Global bar included in each figure)
-res_regionwb <- run_change_bars_simple("region_wb",  "regionwb")
-res_biome    <- run_change_bars_simple("WWF_biome",   "biome")
-res_cont     <- run_change_bars_simple("continent",  "continent")
-res_regionun <- run_change_bars_simple("region_un",  "regionun")
-res_income   <- run_change_bars_simple("income_grp", "incomegrp")
+make_change_bars("region_wb", "regionwb", svc_order = svc_order,
+                 include_global = FALSE, save = TRUE, show = FALSE)
+
+make_change_bars("region_wb", "regionwb", svc_order = svc_order,
+                 include_global = TRUE,  tag = "with_global")
+
+make_change_bars("income_grp", "incomegrp", svc_order = svc_order,
+                 include_global = FALSE, save = FALSE, show = TRUE)
+
 
 ```
 
