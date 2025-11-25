@@ -164,7 +164,7 @@ sf::st_write(sf_f_joined, out_gpkg, quiet = TRUE)
 
 ## 1.1 Prepare Data for Analysis
 
-The spatial objects with the anecessary  attributes are loaded and reformatted for analysis and chart preparation, that requires to **pivot** the input vector files into the long format, with one row per service/cell combination.
+The spatial objects with the necessary  attributes are loaded and reformatted for analysis and chart preparation, that requires to **pivot** the input vector files into the long format, with one row per service/cell combination.
 
 ```{r pivot}
 #| eval: true
@@ -204,15 +204,15 @@ names_to = c("service", "chg_type"),
 names_pattern = "^(.*)_(abs|pct)_chg$",
 values_to = "chg_value"
 ) |>
-dplyr::mutate(service = stringr::str_remove(service, "_mean$")) |>
+dplyr::mutate(service = stringr::str_remove(service, "_mean$")) |> 
 tidyr::pivot_wider(
 names_from  = chg_type,
 values_from = chg_value,
 names_vary  = "slowest"
-) |>
+) |> # clean column names
 dplyr::rename(abs_chg = abs, pct_chg = pct) |>
 dplyr::select(fid, c_fid, service, abs_chg, pct_chg, dplyr::any_of(socio_vars)) |>
-dplyr::filter(!is.na(c_fid)) |>
+dplyr::filter(!is.na(c_fid)) |> # remove cells outside any country.
 dplyr::filter(!(is.infinite(abs_chg) | is.infinite(pct_chg))) |>
 dplyr::filter(!is.na(abs_chg) | !is.na(pct_chg))
 
@@ -242,8 +242,11 @@ service_levels <- c(
 "Sed_export","USLE","Sed_Ret_Ratio","Rt_nohab",
 "C_Risk","C_Prot_service","C_Risk_Red_Ratio","Pollination"
 )
+
+svc_order <-  c("C_Risk","N_export","Sed_export","C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+                "Pollination","Nature_Access")
 plt_long <- plt_long |>
-dplyr::mutate(service = forcats::fct_relevel(service, !!!service_levels, after = Inf))
+dplyr::mutate(service = forcats::fct_relevel(service, !!!svc_order, after = Inf))
 
 message(glue::glue("plt_long ready: {nrow(plt_long)} rows across {dplyr::n_distinct(plt_long$service)} services"))
 }
@@ -422,17 +425,16 @@ gain <- c("Sed_export","N_export","C_Risk")
 run_hotspot_violins_by("region_wb", "regionwb",  svc_order = svc_order)
 run_hotspot_violins_by("WWF_biome", "biome",     svc_order = svc_order)
 run_hotspot_violins_by("continent", "continent", svc_order = svc_order)
-#run_hotspot_violins_by("region_un",  "regionun",  svc_order = svc_order)
+run_hotspot_violins_by("region_un",  "regionun",  svc_order = svc_order)
 run_hotspot_violins_by("income_grp", "incomegrp", svc_order = svc_order)
 
 
 
 ```
-# Run Baprlots from Stored Fucntions 
+# Run Baprlots from Stored Functions 
 
 
 ```{r run baplots}
-
 svc_order <- c(
   "C_Risk","N_export","Sed_export",
   "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
@@ -441,251 +443,40 @@ svc_order <- c(
 
 groupings <- c(
   region_wb = "regionwb",
-  BIOME     = "biome",
+  WWF_Biome     = "biome",
   continent = "continent",
   region_un = "regionun",
   income_grp= "incomegrp"
 )
 
-# without global
+# Without global
 invisible(lapply(names(groupings), function(gc) {
   make_change_bars(
     group_col = gc,
     stub      = groupings[[gc]],
     svc_order = svc_order,
-    include_global    = FALSE,
-    keep_only_ordered = TRUE,   # <- default
-    sort_bars         = TRUE,
-    out_dir           = "outputs/plots",
+    svc_order_only = TRUE,   # default; keeps only your listed facets
+    include_global = FALSE,
+    sort_bars = TRUE,
+    out_dir = "outputs/plots",
     save = TRUE, show = FALSE
   )
 }))
 
-# with global (files get a different suffix so no overwrite)
+# With global (now no “NA” facet; Global appears at far right)
 invisible(lapply(names(groupings), function(gc) {
   make_change_bars(
     group_col = gc,
     stub      = groupings[[gc]],
     svc_order = svc_order,
-    include_global    = TRUE,
-    keep_only_ordered = TRUE,
-    sort_bars         = TRUE,
-    out_dir           = "outputs/plots",
+    svc_order_only = TRUE,   # default; keeps only your listed facets
+    include_global = FALSE,
+    sort_bars = TRUE,
+    out_dir = "outputs/plots",
     save = TRUE, show = FALSE
   )
 }))
 
 
-```
-# Fucntion macke change bars
 
-```{r macke changebars}
-# ---- Bars helper: toggle "global", saving, and display -------------------
-make_change_bars <- function(group_col,
-                             stub,
-                             include_global = FALSE,
-                             save = TRUE,
-                             show = interactive(),
-                             out_dir = "../outputs/plots",
-                             tag = NULL,                 # optional manual suffix
-                             add_timestamp = FALSE,      # set TRUE to avoid any overwrite
-                             width = 12, height = 8, dpi = 300) {
-  # 1) Get aggregates (your function), respecting the Global toggle
-  regs <- aggregate_change_simple(
-    plt_long, group_col,
-    cut_q = 0.999, drop_zeros = TRUE,
-    svc_order = c("C_Risk","N_export","Sed_export",
-                  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-                  "Pollination","Nature_Access","USLE","Rt_nohab","C_Prot_service"),
-    add_global = include_global
-  )
-
-  # 2) Consistent facet order (already handled in aggregate by svc_order)
-  #    Ensure group order is stable (by freq)
-  regs[[group_col]] <- forcats::fct_infreq(regs[[group_col]])
-
-  # 3) Build plots
-  p_abs <- ggplot(regs, aes(x = .data[[group_col]], y = abs_mean)) +
-    geom_col() +
-    coord_flip() +
-    facet_wrap(~ service, ncol = 3, scales = "free_y") +
-    labs(title = paste0("Magnitude of change (absolute units) by ", group_col),
-         x = NULL, y = "Mean |absolute change| per cell") +
-    theme_minimal(base_size = 11)
-
-  p_pct <- ggplot(regs, aes(x = .data[[group_col]], y = pct_mean)) +
-    geom_col() +
-    coord_flip() +
-    facet_wrap(~ service, ncol = 3, scales = "free_y") +
-    labs(title = paste0("Magnitude of change (percent) by ", group_col),
-         x = NULL, y = "Mean |percent change| per cell") +
-    theme_minimal(base_size = 11)
-
-  # 4) Show in R?
-  if (isTRUE(show)) { print(p_abs); print(p_pct) }
-
-  # 5) Save with a suffix that prevents overwrite
-  if (isTRUE(save)) {
-    dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-    suffix <- if (!is.null(tag)) paste0("_", tag) else if (include_global) "_with_global" else "_no_global"
-    if (isTRUE(add_timestamp)) suffix <- paste0(suffix, "_", format(Sys.time(), "%Y%m%d_%H%M%S"))
-
-    ggsave(file.path(out_dir, paste0(stub, suffix, "_abs_bars.png")),
-           p_abs, width = width, height = height, dpi = dpi)
-    ggsave(file.path(out_dir, paste0(stub, suffix, "_pct_bars.png")),
-           p_pct, width = width, height = height, dpi = dpi)
-  }
-
-  invisible(list(p_abs = p_abs, p_pct = p_pct, data = regs))
-}
-```
-
-
-```{r global run}
-
-
-svc_order <- c(
-  "C_Risk","N_export","Sed_export",
-  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-  "Pollination","Nature_Access"
-)
-
-aggregate_change_simple <- function(plt_long, group_col,
-                                    cut_q = 0.999,
-                                    drop_zeros = TRUE,
-                                    svc_order = NULL,
-                                    add_global = TRUE) {
-  if (is.null(svc_order)) svc_order <- svc_order_default
-  stopifnot(group_col %in% names(plt_long))
-
-  df <- plt_long %>%
-    filter(!is.na(.data[[group_col]]),
-           service %in% svc_order) %>%
-    mutate(service = factor(service, levels = svc_order))
-
-  # winsorize on |value| per service, then use mean(|value|)
-  dfw <- df %>%
-    group_by(service) %>%
-    mutate(
-      abs_cap = quantile(abs(abs_chg), cut_q, na.rm = TRUE),
-      pct_cap = quantile(abs(pct_chg), cut_q, na.rm = TRUE),
-      abs_m   = pmin(abs(abs_chg), abs_cap),
-      pct_m   = pmin(abs(pct_chg),  pct_cap)
-    ) %>%
-    ungroup()
-
-  if (drop_zeros) {
-    dfw <- dfw %>% filter((!is.na(abs_m) & abs_m > 0) | (!is.na(pct_m) & pct_m > 0))
-  }
-
-  regs <- dfw %>%
-    group_by(.data[[group_col]], service) %>%
-    summarise(
-      n_cells = n(),
-      abs_mean = mean(abs_m, na.rm = TRUE),
-      pct_mean = mean(pct_m, na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    rename(group = {{ group_col }})
-
-  if (add_global) {
-    globals <- dfw %>%
-      group_by(service) %>%
-      summarise(
-        n_cells = n(),
-        abs_mean = mean(abs_m, na.rm = TRUE),
-        pct_mean = mean(pct_m, na.rm = TRUE),
-        .groups = "drop"
-      ) %>%
-      mutate(group = "Global")
-    regs <- bind_rows(globals, regs)
-  }
-
-  regs
-}
-
-plot_change_bars <- function(regs, value_col, title, ylab, out_file) {
-  # reorder regions within each facet by the chosen value
-  pdat <- regs %>%
-    filter(!is.na(.data[[value_col]]), is.finite(.data[[value_col]])) %>%
-    mutate(group = as.character(group),
-           x_lab = reorder_within(group, .data[[value_col]], service))
-
-  p <- ggplot(pdat, aes(x = x_lab, y = .data[[value_col]])) +
-    geom_col() +
-    scale_x_reordered() +
-    facet_wrap(~ service, ncol = 3, scales = "free_y") +
-    labs(title = title,
-         subtitle = "Mean |change| per 10×10 km cell; per-service 99.9% winsorization; 0/NA dropped",
-         x = NULL, y = ylab) +
-    theme_minimal(base_size = 11) +
-    theme(axis.text.x = element_text(size = 8, angle = 45, hjust = 1))
-
-  dir.create(dirname(out_file), recursive = TRUE, showWarnings = FALSE)
-  ggsave(out_file, p, width = 12, height = 8, dpi = 300)
-  p
-}
-
-run_change_bars_simple <- function(group_col, out_stub, out_dir = "outputs/plots") {
-  regs <- aggregate_change_simple(plt_long, group_col, add_global = TRUE)
-
-  p_abs <- plot_change_bars(
-    regs, value_col = "abs_mean",
-    title = paste0("Magnitude of change (absolute units) by ", group_col, " (incl. Global)"),
-    ylab  = "Mean |absolute change| per cell",
-    out_file = file.path(out_dir, paste0("simple_abs_change_by_", out_stub, "_with_global.png"))
-  )
-
-  p_pct <- plot_change_bars(
-    regs, value_col = "pct_mean",
-    title = paste0("Magnitude of change (percent) by ", group_col, " (incl. Global)"),
-    ylab  = "Mean |percent change| per cell",
-    out_file = file.path(out_dir, paste0("simple_pct_change_by_", out_stub, "_with_global.png"))
-  )
-
-  invisible(list(abs_plot = p_abs, pct_plot = p_pct, table = regs))
-}
-
-# Run for your groupings (Global bar included in each figure)
-make_change_bars("region_wb", "regionwb", svc_order = svc_order,
-                 include_global = FALSE, save = TRUE, show = FALSE)
-
-make_change_bars("region_wb", "regionwb", svc_order = svc_order,
-                 include_global = TRUE,  tag = "with_global")
-
-make_change_bars("income_grp", "incomegrp", svc_order = svc_order,
-                 include_global = FALSE, save = FALSE, show = TRUE)
-
-
-```
-
-
-```{r barplots without global}
-# --- keep your aggregate_change_simple(...) as-is ---
-
-# Rerun bars WITHOUT the Global bar
-run_change_bars_simple <- function(group_col, out_stub, out_dir = "outputs/plots", include_global = FALSE) {
-  regs <- aggregate_change_simple(plt_long, group_col, add_global = include_global)
-
-  plot_change_bars(
-    regs, value_col = "abs_mean",
-    title = paste0("Magnitude of change (absolute units) by ", group_col),
-    ylab  = "Mean |absolute change| per cell",
-    out_file = file.path(out_dir, paste0("simple_abs_change_by_", out_stub, ".png"))
-  )
-
-  plot_change_bars(
-    regs, value_col = "pct_mean",
-    title = paste0("Magnitude of change (percent) by ", group_col),
-    ylab  = "Mean |percent change| per cell",
-    out_file = file.path(out_dir, paste0("simple_pct_change_by_", out_stub, ".png"))
-  )
-}
-
-# Run (no Global bar)
-res_regionwb <- run_change_bars_simple("region_wb",  "regionwb")
-res_biome    <- run_change_bars_simple("BIOME",      "biome")
-res_cont     <- run_change_bars_simple("continent",  "continent")
-res_regionun <- run_change_bars_simple("region_un",  "regionun")
-res_income   <- run_change_bars_simple("income_grp", "incomegrp")
 ```

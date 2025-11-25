@@ -12,11 +12,15 @@
 #'
 #' @return Tibble with columns: service, {group_col}, abs_mean, pct_mean.
 #' @export
+#' Aggregate trimmed change by group (simple, fast)
+# ---- aggregate_change_simple ----
+# Aggregate trimmed change by group
 aggregate_change_simple <- function(plt_long, group_col,
                                     cut_q = 0.999,
                                     drop_zeros = TRUE,
                                     svc_order = NULL,
-                                    add_global = FALSE) {
+                                    svc_order_only = TRUE,  # default: only keep services you list
+                                    add_global = FALSE) {   # default: no global reference
   stopifnot(is.character(group_col), length(group_col) == 1L)
   stopifnot(group_col %in% names(plt_long))
   
@@ -46,14 +50,11 @@ aggregate_change_simple <- function(plt_long, group_col,
     )
   
   if (isTRUE(drop_zeros)) {
-    regs <- regs |> dplyr::filter(.data$abs_mean > 0 | .data$pct_mean > 0)
+    regs <- regs |>
+      dplyr::filter(.data$abs_mean > 0 | .data$pct_mean > 0)
   }
   
-  if (!is.null(svc_order)) {
-    extras <- setdiff(unique(regs$service), svc_order)
-    regs$service <- factor(regs$service, levels = c(svc_order, extras))
-  }
-  
+  # Add Global AFTER group summaries (prevents NA facet issues)
   if (isTRUE(add_global)) {
     glob <- cells_trim |>
       dplyr::group_by(.data$service) |>
@@ -66,5 +67,21 @@ aggregate_change_simple <- function(plt_long, group_col,
     regs <- dplyr::bind_rows(regs, glob)
   }
   
+  # Apply service ordering (and optionally drop extras)
+  regs <- regs |>
+    dplyr::mutate(service = as.character(.data$service))
+  
+  if (!is.null(svc_order)) {
+    if (isTRUE(svc_order_only)) {
+      regs <- regs |>
+        dplyr::filter(.data$service %in% svc_order)
+    }
+    regs$service <- factor(regs$service, levels = unique(svc_order))
+  }
+  
+  regs <- regs |>
+    tidyr::drop_na(.data$service)  # nuke any stray NA facet
+  
   regs
 }
+

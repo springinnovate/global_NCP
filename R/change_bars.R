@@ -15,78 +15,85 @@
 #' @param width,height,dpi PNG settings
 #' @param pin_global if TRUE, place "Global" first on x axis (when present)
 #' @export
-make_change_bars <- function(group_col, stub,
+#' Build & (optionally) save faceted bars of mean change by group
+# ---- make_change_bars ----
+# Build faceted bars of mean change by group; optional global ref; optional sorting
+make_change_bars <- function(group_col,
+                             stub,
                              svc_order,
-                             include_global = FALSE,
-                             keep_only_ordered = TRUE,
-                             sort_bars = TRUE,
-                             sort_stat = c("abs_mean","pct_mean"),
-                             sort_desc = TRUE,
-                             save = TRUE, show = FALSE,
-                             out_dir = "outputs/plots",
-                             file_tag = NULL,
-                             width = 12, height = 8, dpi = 300,
-                             pin_global = TRUE) {
-  sort_stat <- match.arg(sort_stat)
+                             include_global    = FALSE,  # <- pkg arg name
+                             svc_order_only    = TRUE,   # <- your preferred default
+                             sort_bars         = TRUE,
+                             out_dir           = "outputs/plots",
+                             save              = TRUE,
+                             show              = FALSE) {
+  stopifnot(is.character(group_col), length(group_col) == 1L)
+  stopifnot(group_col %in% names(plt_long))
   
+  # 1) Aggregate (uses pkg arg names!)
   regs <- aggregate_change_simple(
-    plt_long,
-    group_col         = group_col,
-    cut_q             = 0.999,
-    drop_zeros        = TRUE,
-    svc_order         = svc_order,
-    include_global    = include_global,
-    keep_only_ordered = keep_only_ordered
+    plt_long        = plt_long,
+    group_col       = group_col,
+    cut_q           = 0.999,
+    drop_zeros      = TRUE,
+    svc_order       = svc_order,
+    keep_only_ordered = svc_order_only,   # <- map your flag
+    include_global    = include_global    # <- map your flag
   )
   
-  # Force grouping labels to character for safe reordering (handles numeric BIOME ids)
+  # 2) Keep only the services we asked for (defensive)
+  regs <- dplyr::filter(regs, .data$service %in% svc_order)
+  
+  # 3) Service facet order
+  regs$service <- factor(regs$service, levels = svc_order)
+  
+  # 4) Make x labels stable and (optionally) sort within each facet
+  grp_sym <- rlang::sym(group_col)
   regs <- regs |>
-    dplyr::mutate(.grp_chr = as.character(.data[[group_col]])) |>
-    dplyr::group_by(.data$service) |>
-    dplyr::mutate(
-      grp_fac = if (sort_bars) {
-        forcats::fct_reorder(.grp_chr, .data[[sort_stat]], .desc = sort_desc)
-      } else {
-        forcats::as_factor(.grp_chr)
-      }
-    ) |>
-    dplyr::ungroup()
+    dplyr::mutate(!!grp_sym := as.character(.data[[group_col]]))
   
-  if (include_global && pin_global && any(regs$grp_fac == "Global", na.rm = TRUE)) {
-    regs$grp_fac <- forcats::fct_relevel(regs$grp_fac, "Global", after = 0L)
+  if (isTRUE(include_global)) {
+    regs <- regs |>
+      dplyr::mutate(!!grp_sym := forcats::fct_relevel(.data[[group_col]], "Global", after = Inf))
+  } else {
+    regs <- regs |>
+      dplyr::mutate(!!grp_sym := factor(.data[[group_col]]))
   }
   
-  # Vertical bars, facet order from factor levels, free y so scales differ by service
-  p_abs <- ggplot2::ggplot(regs, ggplot2::aes(x = grp_fac, y = abs_mean)) +
-    ggplot2::geom_col() +
-    ggplot2::facet_wrap(~ service, ncol = 3, scales = "free_y", drop = TRUE) +
+  if (isTRUE(sort_bars)) {
+    regs <- regs |>
+      dplyr::group_by(.data$service) |>
+      dplyr::mutate(!!grp_sym := forcats::fct_reorder(.data[[group_col]], .data$pct_mean, .fun = mean, .desc = TRUE)) |>
+      dplyr::ungroup()
+    if (isTRUE(include_global)) {
+      regs <- regs |>
+        dplyr::mutate(!!grp_sym := forcats::fct_relevel(.data[[group_col]], "Global", after = Inf))
+    }
+  }
+  
+  # 5) Plot (percent by default here; switch to abs_mean if you prefer)
+  p <- ggplot2::ggplot(regs, ggplot2::aes(x = .data[[group_col]], y = .data$pct_mean)) +
+    ggplot2::geom_col(width = 0.8) +
+    ggplot2::facet_wrap(~ service, ncol = 3, scales = "free_y") +
     ggplot2::labs(
-      title = paste0("Total absolute change (trimmed) by ", group_col),
-      x = NULL, y = "Mean |absolute change|"
+      title = paste0("Average trimmed percent change by ", group_col),
+      x     = NULL,
+      y     = "Mean |percent change| (trimmed)"
     ) +
     ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1))
+    ggplot2::theme(
+      axis.text.x  = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
+      strip.text   = ggplot2::element_text(face = "bold")
+    )
   
-  p_pct <- ggplot2::ggplot(regs, ggplot2::aes(x = grp_fac, y = pct_mean)) +
-    ggplot2::geom_col() +
-    ggplot2::facet_wrap(~ service, ncol = 3, scales = "free_y", drop = TRUE) +
-    ggplot2::labs(
-      title = paste0("Mean |percent change| (trimmed) by ", group_col),
-      x = NULL, y = "Mean |percent change|"
-    ) +
-    ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1))
-  
-  if (save) {
+  # 6) Save / show
+  if (isTRUE(save)) {
     dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-    tag <- if (!is.null(file_tag)) paste0("_", file_tag)
-    else if (include_global) "_with-global" else "_no-global"
-    ggplot2::ggsave(file.path(out_dir, paste0(stub, "_abs_bars", tag, ".png")),
-                    p_abs, width = width, height = height, dpi = dpi)
-    ggplot2::ggsave(file.path(out_dir, paste0(stub, "_pct_bars", tag, ".png")),
-                    p_pct, width = width, height = height, dpi = dpi)
+    suffix <- if (include_global) "_with_global" else ""
+    out <- file.path(out_dir, paste0(stub, "_pct_mean_bars", suffix, ".png"))
+    ggplot2::ggsave(out, p, width = 12, height = 8, dpi = 300)
   }
-  if (show) { print(p_abs); print(p_pct) }
+  if (isTRUE(show)) print(p)
   
-  invisible(list(abs_plot = p_abs, pct_plot = p_pct, data = regs))
+  invisible(p)
 }
