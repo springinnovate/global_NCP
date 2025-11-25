@@ -1,24 +1,28 @@
-#' Make vertical bar charts of trimmed change by group
+#' Bar charts of trimmed change by group
 #'
-#' @param group_col grouping column name (string)
-#' @param stub filename stub
-#' @param svc_order character vector for facet order (only these are shown by default)
-#' @param include_global add a Global bar per facet
-#' @param keep_only_ordered default TRUE (hide services not in svc_order)
-#' @param sort_bars order x bars within each facet by magnitude
-#' @param sort_stat "abs_mean" or "pct_mean"
-#' @param sort_desc descending order if TRUE
-#' @param save write PNGs
-#' @param show print ggplots
-#' @param out_dir output directory
-#' @param file_tag optional extra suffix for filenames
-#' @param width,height,dpi PNG settings
-#' @param pin_global if TRUE, place "Global" first on x axis (when present)
-#' @export
-#' Build & (optionally) save faceted bars of mean change by group
-# ---- make_change_bars ----
-# Build faceted bars of mean change by group; optional global ref; optional sorting
-# ---- BAR PLOTS (abs or pct) ----------------------------------------------
+#' Creates vertical bar plots of trimmed mean |absolute change| and |percent change|
+#' for each service, faceted in the order you supply via `svc_order`. X-axis bars can
+#' be sorted by magnitude within each facet. Optionally includes a “Global” bar.
+#'
+#' @param group_col Character scalar naming the grouping column (e.g., "region_wb").
+#' @param stub File name stub for PNGs.
+#' @param svc_order Character vector giving the facet order (only these are shown
+#'   by default; set `keep_only_ordered = FALSE` inside your function if you want extras).
+#' @param include_global Logical; include a “Global” bar in each facet.
+#' @param keep_only_ordered Logical; if TRUE (default in your function), hide services
+#'   not in `svc_order`.
+#' @param sort_bars Logical; order x-bars within each facet by `sort_stat`.
+#' @param sort_stat One of `"abs_mean"` or `"pct_mean"`.
+#' @param sort_desc Logical; descending order if TRUE.
+#' @param save Logical; write PNGs.
+#' @param show Logical; print plots to device.
+#' @param out_dir Output directory for PNGs.
+#' @param file_tag Optional suffix for filenames (helps avoid overwrites).
+#' @param width,height,dpi PNG settings.
+#' @param pin_global Logical; if TRUE, place "Global" first on x-axis when present.
+#'
+#' @return (invisibly) a list with `abs_plot`, `pct_plot`, and the `data` used.
+#' @export---------------------------------------------
 make_change_bars <- function(group_col,
                              stub,
                              svc_order,
