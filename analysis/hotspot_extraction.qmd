@@ -435,6 +435,7 @@ run_hotspot_violins_by("income_grp", "incomegrp", svc_order = svc_order)
 
 
 ```{r run baplots}
+# Desired service order (facets)
 svc_order <- c(
   "C_Risk","N_export","Sed_export",
   "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
@@ -443,40 +444,24 @@ svc_order <- c(
 
 groupings <- c(
   region_wb = "regionwb",
-  WWF_Biome     = "biome",
+  WWF_biome = "biome",      # <- use the label column
   continent = "continent",
   region_un = "regionun",
   income_grp= "incomegrp"
 )
 
-# Without global
+# Generate 20 files: 5 groupings × 2 metrics × 2 (with/without Global)
 invisible(lapply(names(groupings), function(gc) {
-  make_change_bars(
-    group_col = gc,
-    stub      = groupings[[gc]],
-    svc_order = svc_order,
-    svc_order_only = TRUE,   # default; keeps only your listed facets
-    include_global = FALSE,
-    sort_bars = TRUE,
-    out_dir = "outputs/plots",
-    save = TRUE, show = FALSE
-  )
+  stub <- groupings[[gc]]
+  # pct, no global
+  make_change_bars(gc, stub, svc_order, metric = "pct", include_global = FALSE, out_dir = "outputs/plots")
+  # pct, with global
+  make_change_bars(gc, stub, svc_order, metric = "pct", include_global = TRUE,  out_dir = "outputs/plots")
+  # abs, no global
+  make_change_bars(gc, stub, svc_order, metric = "abs", include_global = FALSE, out_dir = "outputs/plots")
+  # abs, with global
+  make_change_bars(gc, stub, svc_order, metric = "abs", include_global = TRUE,  out_dir = "outputs/plots")
 }))
-
-# With global (now no “NA” facet; Global appears at far right)
-invisible(lapply(names(groupings), function(gc) {
-  make_change_bars(
-    group_col = gc,
-    stub      = groupings[[gc]],
-    svc_order = svc_order,
-    svc_order_only = TRUE,   # default; keeps only your listed facets
-    include_global = FALSE,
-    sort_bars = TRUE,
-    out_dir = "outputs/plots",
-    save = TRUE, show = FALSE
-  )
-}))
-
 
 
 ```
