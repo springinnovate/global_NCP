@@ -623,93 +623,287 @@ Why this structure?
 Heavy work (ranking/thresholding/joining) is done once. The manifest gives us traceability and fast loading for downstream steps (bar plots, violins, KS tests) without re-computation.
 
 
-# Call The runner 
-```{r}
-# ---- 1) GLOBAL hotspots (no grouping) -----------------------------------
-idx_global_abs <- run_one_hotset(plt_long, value_col = "abs_chg", scope = "global", cfg = HOTS_CFG)
-idx_global_pct <- run_one_hotset(plt_long, value_col = "pct_chg", scope = "global", cfg = HOTS_CFG)
 
-groupings <- c("income_grp","region_wb","continent","region_un","BIOME")
-index_rows <- list(idx_global_abs, idx_global_pct)
+# Run Baprlots from Stored Functions 
 
-for (gc in groupings) {
-  vals <- sort(unique(plt_long[[gc]])); vals <- vals[!is.na(vals)]
-  if (length(vals) == 0L) next
+::: callout-note
+**How to read these bars**
 
-  idx_abs <- purrr::map_dfr(vals, ~ run_one_hotset(
-    df        = plt_long,
-    value_col = "abs_chg",
-    scope     = "by_group",
-    group_col = gc,
-    group_val = .x,
-    cfg       = HOTS_CFG
-  ))
-  idx_pct <- purrr::map_dfr(vals, ~ run_one_hotset(
-    df        = plt_long,
-    value_col = "pct_chg",
-    scope     = "by_group",
-    group_col = gc,
-    group_val = .x,
-    cfg       = HOTS_CFG
-  ))
+- Each bar shows the **trimmed mean absolute change** (|Δ|) per service within each group; facet axes are free.
+- Bars are **always positive** by design: height = **magnitude of change**, not direction.
+- Direction-of-concern used elsewhere in the analysis:
+  - Worse when **up** ➜ `Sed_export`, `N_export`, `C_Risk`.
+  - Worse when **down** ➜ `Nature_Access`, `Pollination`, `N_Ret_Ratio`, `Sed_Ret_Ratio`, `C_Risk_Red_Ratio`.
+- These bars answer **“where is change largest?”**. See hotspot maps/violins for **up vs. down** patterns.
+:::
 
-  index_rows <- append(index_rows, list(idx_abs, idx_pct))
-}
-hot_index <- dplyr::bind_rows(index_rows)
-readr::write_csv(hot_index, file.path(data_dir(), "processed", "hotspots", "_hotspots_index.csv"))
+```{r run baplots}
+#| label: bars_by_region
+#| message: false
+#| warning: false
+#| echo: false
+#| eval: false
 
-# Small console summary
+# --- knobs you can tweak quickly -----------------------------------------
+group_col         <- "region_wb"   # e.g. "income_grp","continent","region_un","WWF_biome"
+metric            <- "pct"         # "pct" or "abs"
+cut_q             <- 0.999         # trim extreme 0.1% so bars aren't dominated by outliers
+include_global    <- FALSE         # TRUE to add a "Global" bar into each facet
+keep_only_ordered <- TRUE          # show only the 8 services in your svc_order
+save_plot         <- TRUE
+out_dir           <- file.path("outputs","plots")
+out_stub          <- paste0("bars_", tolower(group_col), "_", metric)
 
-dplyr::glimpse(hot_index, width = 100)
-```
+# --- facet order (your canonical 8 first) ---------------------------------
+svc_order <- c(
+  "C_Risk","N_export","Sed_export",
+  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+  "Pollination","Nature_Access"
+)
 
+# --- compute trimmed mean magnitude by region -----------------------------
+stopifnot(group_col %in% names(plt_long))
+gc <- group_col
 
+df_trim <- plt_long |>
+  dplyr::filter(!is.na(.data[[gc]])) |>
+  dplyr::mutate(
+    abs_cell = abs(.data$abs_chg),
+    pct_cell = abs(.data$pct_chg)
+  ) |>
+  dplyr::group_by(.data$service) |>
+  dplyr::mutate(
+    abs_cap = stats::quantile(.data$abs_cell, cut_q, na.rm = TRUE),
+    pct_cap = stats::quantile(.data$pct_cell, cut_q, na.rm = TRUE)
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    abs_trim = pmin(.data$abs_cell, .data$abs_cap),
+    pct_trim = pmin(.data$pct_cell, .data$pct_cap)
+  ) |>
+  dplyr::group_by(.data$service, .data[[gc]]) |>
+  dplyr::summarise(
+    abs_mean = mean(.data$abs_trim, na.rm = TRUE),
+    pct_mean = mean(.data$pct_trim, na.rm = TRUE),
+    .groups = "drop"
+  )
 
-
-Wrapper: extract hotpots per group 
-
-```{r extract hotposts_group}
-
-# group_cols is a character vector like c("income_grp") or c("region_wb")
-extract_hotspots_by <- function(df_long, group_cols,
-                                loss, gain,
-                                value_col = "abs_chg",
-                                pct_cutoff = 0.05,
-                                threshold_mode = "percent") {
-
-  stopifnot(all(group_cols %in% names(df_long)))
-
-  df_long %>%
-    select(fid, service, all_of(group_cols), all_of(value_col), c_fid) %>%
-    rename(.value = {{ value_col }}) %>%  # standardize name for mapping
-    nest(data = -all_of(group_cols)) %>%
-    mutate(
-      res = map(
-        data,
-        ~ extract_hotspots(
-            df            = rename(.x, !!value_col := .value),
-            value_col     = value_col,
-            pct_cutoff    = pct_cutoff,
-            threshold_mode= threshold_mode,
-            rule_mode     = "vectors",
-            loss_services = loss,
-            gain_services = gain,
-            id_cols       = c("c_fid")      # carry c_fid to summaries
-          )
-      )
-    ) %>%
-    transmute(
-      !!!syms(group_cols),
-      hotspots_df     = map(res, "hotspots_df"),
-      non_hotspots_df = map(res, "non_hotspots_df"),
-      summary_df      = map(res, "summary_df"),
-      binary_matrix   = map(res, "binary_matrix")
+# optional: add a "Global" reference row per service
+if (isTRUE(include_global)) {
+  glob <- plt_long |>
+    dplyr::mutate(
+      abs_cell = abs(.data$abs_chg),
+      pct_cell = abs(.data$pct_chg)
+    ) |>
+    dplyr::group_by(.data$service) |>
+    dplyr::mutate(
+      abs_cap = stats::quantile(.data$abs_cell, cut_q, na.rm = TRUE),
+      pct_cap = stats::quantile(.data$pct_cell, cut_q, na.rm = TRUE)
+    ) |>
+    dplyr::ungroup() |>
+    dplyr::mutate(
+      abs_trim = pmin(.data$abs_cell, .data$abs_cap),
+      pct_trim = pmin(.data$pct_cell, .data$pct_cap)
+    ) |>
+    dplyr::group_by(.data$service) |>
+    dplyr::summarise(
+      abs_mean = mean(.data$abs_trim, na.rm = TRUE),
+      pct_mean = mean(.data$pct_trim, na.rm = TRUE),
+      .groups = "drop"
     )
+  glob[[gc]] <- factor("Global")
+  df_trim <- dplyr::bind_rows(df_trim, glob)
 }
+
+# order facets and, by default, drop services not in svc_order
+if (keep_only_ordered) df_trim <- dplyr::filter(df_trim, .data$service %in% svc_order)
+extras <- setdiff(unique(df_trim$service), svc_order)
+df_trim <- dplyr::mutate(df_trim,
+  service = factor(.data$service, levels = c(svc_order, sort(extras)))
+)
+
+# x order: put "Global" first if present, else alphabetical by group
+if (isTRUE(include_global)) {
+  df_trim[[gc]] <- forcats::fct_relevel(as.factor(df_trim[[gc]]), "Global", after = 0)
+} else {
+  df_trim[[gc]] <- as.factor(df_trim[[gc]])
+}
+
+yvar <- if (identical(metric, "abs")) "abs_mean" else "pct_mean"
+
+p_bars <- ggplot2::ggplot(df_trim, ggplot2::aes(x = .data[[gc]], y = .data[[yvar]])) +
+  ggplot2::geom_col() +
+  ggplot2::facet_wrap(~ service, ncol = 3, scales = "free_y", drop = FALSE) +
+  ggplot2::labs(
+    title = paste0("Magnitude of change by ", gc, " (", metric, ")"),
+    x = NULL,
+    y = if (identical(metric, "abs")) "Mean |Δ| (service units)" else "Mean |Δ| (%)"
+  ) +
+  ggplot2::theme_minimal(base_size = 11) +
+  ggplot2::theme(
+    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+    panel.grid.major.x = ggplot2::element_blank()
+  )
+
+if (isTRUE(save_plot)) {
+  # put plots in outputs/plots/<metric>/<group_col>/
+  out_dir <- file.path("outputs", "plots", metric, tolower(group_col))
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  # encode key params in the base name
+  file_base <- paste(
+    "bars",
+    tolower(group_col),
+    metric,
+    paste0("cut", gsub("\\.", "", as.character(cut_q))),
+    if (include_global) "with-global" else "no-global",
+    sep = "_"
+  )
+
+  # avoid overwrite by adding _v02, _v03, …
+  final_path <- file.path(out_dir, paste0(file_base, ".png"))
+  i <- 2
+  while (file.exists(final_path)) {
+    final_path <- file.path(out_dir, sprintf("%s_v%02d.png", file_base, i))
+    i <- i + 1
+  }
+
+  ggplot2::ggsave(
+    filename = final_path,
+    plot = p_bars,
+    width = 12, height = 8, dpi = 300,
+    device = ragg::agg_png,  # crisp text
+    bg = "white"             # <- NO transparency
+  )
+  message("Saved plot to: ", normalizePath(final_path))
+}
+
+p_bars
 
 ```
 
+```{r}
+#| label: make-all-barplots
+#| message: false
+#| warning: false
 
+# ---- inputs ---------------------------------------------------------------
+svc_order <- c(
+  "C_Risk","N_export","Sed_export",
+  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+  "Pollination","Nature_Access"
+)
+groupings <- if (!is.null(HOTS_CFG$groupings)) HOTS_CFG$groupings else
+  c("income_grp","region_wb","continent","region_un","WWF_biome")
+metrics <- c("pct","abs")                # will map to pct_mean / abs_mean below
+cut_q   <- 0.999
+keep_only_ordered <- TRUE
+
+# ---- helper: compute + plot one panel set --------------------------------
+plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
+                             include_global = FALSE,
+                             out_dir = "outputs/plots", out_stub = NULL,
+                             global_outline = "black",   # <-- outline color for Global
+                             global_fill    = NULL) {    # <-- set e.g. "#444444" if you also want a different fill
+
+  metric <- match.arg(metric)
+  ycol   <- rlang::sym(if (metric == "pct") "pct_mean" else "abs_mean")
+
+  regs <- agg_change(
+    plt_long        = df,
+    group_col       = group_col,
+    cut_q           = 0.999,
+    drop_zeros      = TRUE,
+    svc_order       = svc_order,
+    svc_order_only  = keep_only_ordered,
+    include_global  = include_global
+  )
+
+  # Clean + facet order
+  regs <- regs |>
+    dplyr::filter(!is.na(service)) |>
+    dplyr::mutate(service = forcats::fct_relevel(as.character(service), !!!svc_order, after = Inf))
+
+  # Make grouping factor & push "Global" to the rightmost position
+  gsym <- rlang::sym(group_col)
+  regs <- regs |>
+    dplyr::mutate(
+      grp_chr   = as.character(!!gsym),
+      is_global = grp_chr == "Global"
+    )
+
+  lvl <- sort(unique(regs$grp_chr))
+  if ("Global" %in% lvl) lvl <- c(setdiff(lvl, "Global"), "Global")  # shove to end
+  regs <- regs |> dplyr::mutate(.grp = factor(grp_chr, levels = lvl))
+
+  p <- ggplot2::ggplot(regs, ggplot2::aes(x = .grp, y = !!ycol)) +
+    ggplot2::geom_col() +
+    # Overlay the Global bar so it has a subtle outline (and optional fill)
+    {
+      gdat <- dplyr::filter(regs, is_global)
+      if (nrow(gdat)) {
+        if (is.null(global_fill)) {
+          ggplot2::geom_col(
+            data = gdat, fill = NA, color = global_outline, linewidth = 0.8
+          )
+        } else {
+          ggplot2::geom_col(
+            data = gdat, fill = global_fill, color = global_outline, linewidth = 0.8
+          )
+        }
+      } else NULL
+    } +
+    ggplot2::facet_wrap(
+      ~ service, ncol = 3, nrow = 3, scales = "free_y", drop = TRUE
+    ) +
+    ggplot2::labs(
+      x = group_col,
+      y = if (metric == "pct") "Mean |Δ| (%), trimmed" else "Mean |Δ| (units), trimmed",
+      title = paste0("Aggregate change by ", group_col,
+                     if (include_global) " (with Global reference)" else "")
+    ) +
+    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme(
+      plot.background   = ggplot2::element_rect(fill = "white", color = NA),
+      panel.background  = ggplot2::element_rect(fill = "white", color = NA),
+      strip.background  = ggplot2::element_rect(fill = "#f3f4f6", color = NA),
+      strip.text        = ggplot2::element_text(face = "bold"),
+      axis.text.x       = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
+      panel.grid.minor  = ggplot2::element_blank()
+    )
+
+  # Save
+  dir.create(file.path(out_dir, metric, group_col), recursive = TRUE, showWarnings = FALSE)
+  if (is.null(out_stub)) {
+    out_stub <- paste0("bars_", tolower(group_col), "_", metric,
+                       if (include_global) "_wglobal" else "")
+  }
+  final_path <- file.path(out_dir, metric, group_col, paste0(out_stub, ".png"))
+  ragg::agg_png(final_path, width = 12, height = 8, units = "in", res = 300, background = "white")
+  print(p); grDevices::dev.off()
+  message("Saved: ", normalizePath(final_path))
+}
+
+# ---- run: ALL groupings, both metrics, w/ and w/o Global ------------------
+for (gc in groupings) {
+  for (m in metrics) {
+    plot_change_bars(plt_long, group_col = gc, metric = m,
+                     include_global = FALSE, out_dir = "outputs/plots")
+    plot_change_bars(plt_long, group_col = gc, metric = m,
+                     include_global = TRUE,  out_dir = "outputs/plots")
+  }
+}
+
+# ---- run: standalone GLOBAL charts (one bar per service) ------------------
+# (We fake a single grouping column called "global" with a single level.)
+plt_global <- plt_long |>
+  dplyr::mutate(global = "Global")
+
+for (m in metrics) {
+  plot_change_bars(plt_global, group_col = "global", metric = m,
+                   include_global = FALSE, out_dir = "outputs/plots")
+}
+```
 
 
 ```{r run wrapper violins}
@@ -824,55 +1018,4 @@ run_hotspot_violins_by("income_grp", "incomegrp", svc_order = svc_order)
 
 ```
 
-```{r}
-chk <- extract_hotspots( # or pick one group’s df to keep it small
-  df = plt_long,
-  value_col = "pct_chg",  # or "abs_chg"—direction logic is the same
-  pct_cutoff = 0.05,
-  threshold_mode = "percent",
-  rule_mode = "vectors",
-  loss_services = loss,
-  gain_services = gain
-)$hotspots_df
 
-chk |>
-  dplyr::filter(service %in% c("Nature_Access","Pollination")) |>
-  dplyr::count(service, hotspot_flag)
-# Expect hotspot_flag == "low" for these two
-```
-
-
-# Run Baprlots from Stored Functions 
-
-
-```{r run baplots}
-# Desired service order (facets)
-svc_order <- c(
-  "C_Risk","N_export","Sed_export",
-  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-  "Pollination","Nature_Access"
-)
-
-groupings <- c(
-  region_wb = "regionwb",
-  WWF_biome = "biome",      # <- use the label column
-  continent = "continent",
-  region_un = "regionun",
-  income_grp= "incomegrp"
-)
-
-# Generate 20 files: 5 groupings × 2 metrics × 2 (with/without Global)
-invisible(lapply(names(groupings), function(gc) {
-  stub <- groupings[[gc]]
-  # pct, no global
-  make_change_bars(gc, stub, svc_order, metric = "pct", include_global = FALSE, out_dir = "outputs/plots")
-  # pct, with global
-  make_change_bars(gc, stub, svc_order, metric = "pct", include_global = TRUE,  out_dir = "outputs/plots")
-  # abs, no global
-  make_change_bars(gc, stub, svc_order, metric = "abs", include_global = FALSE, out_dir = "outputs/plots")
-  # abs, with global
-  make_change_bars(gc, stub, svc_order, metric = "abs", include_global = TRUE,  out_dir = "outputs/plots")
-}))
-
-
-```
