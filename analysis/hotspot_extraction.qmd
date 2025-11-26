@@ -315,6 +315,9 @@ extras <- setdiff(unique(plt_long$service), svc_order)
 plt_long <- plt_long |>
   mutate(service = factor(service, levels = c(svc_order, sort(extras))))
 
+# after creating plt_long from sf_f ...
+grid_sf <- sf_f %>% dplyr::select(fid, c_fid)  # geometry is "sticky" and kept
+rm(plt, sf_f); gc()                             # free the big attribute table + full sf
 
 ```
 
@@ -465,40 +468,45 @@ if (length(miss_loss) > 0 || length(miss_gain) > 0) {
 # -------------------------------------------------------------------
 
 stopifnot(exists("plt_long"))
-gpkg_grid <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
-stopifnot(file.exists(gpkg_grid))
 
-# Geometry source: prefer the in-memory grid used to build plt_long
-sf_base <- if (exists("sf_f") && inherits(sf_f, "sf")) sf_f else sf::st_read(gpkg_grid, quiet = TRUE)
-
-# Stable fid for joining back to geometry
-if (!"fid" %in% names(sf_base)) sf_base$fid <- seq_len(nrow(sf_base))
-stopifnot(!any(duplicated(sf_base$fid)))
+# ---- Geometry: prefer an in-memory slim grid, else build it --------------
+if (exists("grid_sf") && inherits(grid_sf, "sf")) {
+  geom_sf <- dplyr::select(grid_sf, fid, c_fid)
+} else {
+  gpkg_grid <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+  stopifnot(file.exists(gpkg_grid))
+  geom_sf <- sf::st_read(gpkg_grid, quiet = TRUE) |>
+    dplyr::select(dplyr::any_of(c("fid","c_fid")), dplyr::everything())
+  if (!"fid" %in% names(geom_sf)) {
+    geom_sf$fid <- seq_len(nrow(geom_sf))
+  }
+  geom_sf <- dplyr::select(geom_sf, fid, c_fid)  # keep it slim
+}
+stopifnot("fid" %in% names(geom_sf), !any(duplicated(geom_sf$fid)))
 
 # ---- Helper: safe slug for filenames -------------------------------------
 slug <- function(x) {
   x <- gsub("[^A-Za-z0-9]+", "_", x)
   x <- gsub("_+", "_", x)
-  x <- gsub("^_|_$", "", x)
-  x
+  sub("^_|_$", "", x)
 }
 
 # ---- Core runner (uses central HOTS_CFG) ----------------------------------
 run_one_hotset <- function(df, value_col, scope,
                            group_col = NA_character_, group_val = NA_character_,
-                           sf_obj = sf_base,
+                           sf_obj = geom_sf,
                            cfg = HOTS_CFG) {
-  # Optional: restrict to a specific group value
+  # Optional subsetting by a specific group value
   if (!is.na(group_col) && !is.na(group_val)) {
     df <- df[df[[group_col]] %in% group_val, , drop = FALSE]
   }
   if (nrow(df) == 0L) {
-    return(tibble::tibble(scope, group_col, group_val,
+    return(tibble::tibble(scope, group_col, group_val = as.character(group_val),
                           metric = if (identical(value_col, "abs_chg")) "abs" else "pct",
                           n_hot = 0L, gpkg = NA_character_))
   }
 
-  # Safety: the geometry must have all fids present in df
+  # Safety: geometry must have all fids present in df
   stopifnot("fid" %in% names(df), "fid" %in% names(sf_obj))
   if (!all(df$fid %in% sf_obj$fid)) {
     missing <- setdiff(unique(df$fid), sf_obj$fid)
@@ -513,7 +521,6 @@ run_one_hotset <- function(df, value_col, scope,
     pct_cutoff     = cfg$pct_cutoff,
     threshold_mode = cfg$threshold_mode,
     rule_mode      = cfg$rule_mode,
-    
     loss_services  = cfg$loss,
     gain_services  = cfg$gain,
     combos         = cfg$combos,
@@ -548,7 +555,7 @@ run_one_hotset <- function(df, value_col, scope,
   tibble::tibble(
     scope      = scope,
     group_col  = ifelse(is.na(group_col), NA_character_, group_col),
-    group_val  = ifelse(is.na(group_val), NA_character_, group_val),
+    group_val  = ifelse(is.na(group_val), NA_character_, as.character(group_val)),
     metric     = metric_stub,
     n_hot      = n_hot,
     gpkg       = out_gpkg
@@ -556,24 +563,43 @@ run_one_hotset <- function(df, value_col, scope,
 }
 
 # ---- Execute: global + subregional runs -----------------------------------
-idx_global_abs <- run_one_hotset(plt_long, value_col = "abs_chg", scope = "global")
-idx_global_pct <- run_one_hotset(plt_long, value_col = "pct_chg", scope = "global")
 
-groupings  <- c("income_grp","region_wb","continent","region_un","WWF_biome")
-index_rows <- list(idx_global_abs, idx_global_pct)
+# Pull groupings from config, with a safe fallback
+groupings <- if (!is.null(HOTS_CFG$groupings)) {
+  HOTS_CFG$groupings
+} else {
+  c("income_grp","region_wb","continent","region_un","WWF_biome")
+}
 
+# Run both metrics
+metrics <- c("abs_chg","pct_chg")
+index_rows <- lapply(metrics, function(m) run_one_hotset(plt_long, value_col = m, scope = "global"))
+
+# Subregional runs
 for (gc in groupings) {
-  vals <- sort(unique(plt_long[[gc]])); vals <- vals[!is.na(vals)]
-  if (length(vals) == 0L) next
+  if (!gc %in% names(plt_long)) next
+  vals_chr <- as.character(stats::na.omit(unique(plt_long[[gc]])))
+  if (!length(vals_chr)) next
 
-  index_rows <- append(index_rows, list(
-    purrr::map_dfr(vals, \(v) run_one_hotset(plt_long, "abs_chg", "by_group", gc, v)),
-    purrr::map_dfr(vals, \(v) run_one_hotset(plt_long, "pct_chg", "by_group", gc, v))
-  ))
+  for (m in metrics) {
+    index_rows <- append(index_rows, list(
+      purrr::map_dfr(vals_chr, \(v) run_one_hotset(
+        df        = plt_long,
+        value_col = m,
+        scope     = "by_group",
+        group_col = gc,
+        group_val = v
+      ))
+    ))
+  }
 }
 
 hot_index <- dplyr::bind_rows(index_rows)
-readr::write_csv(hot_index, file.path(data_dir(), "processed", "hotspots", "_hotspots_index.csv"))
+
+# Ensure the output dir exists before writing the CSV index
+csv_dir <- file.path(data_dir(), "processed", "hotspots")
+dir.create(csv_dir, recursive = TRUE, showWarnings = FALSE)
+readr::write_csv(hot_index, file.path(csv_dir, "_hotspots_index.csv"))
 
 # Small console summary
 dplyr::glimpse(hot_index, width = 120)
