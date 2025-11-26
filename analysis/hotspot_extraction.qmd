@@ -329,9 +329,9 @@ Before ranking/thresholding, a lightweight QA helps catch silent problems (e.g.,
 - Confirm `plt_long` exists and peek the structure.
 - Count rows per `service` to spot outliers in coverage (e.g., a service that only exists in a few countries).
 
+#### Pivot Data
 
-
-```{r sanity-chek}
+```{r sanity-check pivot}
 # ---- Quick sanity --------------------------------------------------------
 
 stopifnot(exists("plt_long"))
@@ -605,6 +605,23 @@ readr::write_csv(hot_index, file.path(csv_dir, "_hotspots_index.csv"))
 dplyr::glimpse(hot_index, width = 120)
 
 ```
+
+## What we’ve done (checkpoint)
+
+Wired the project with a metadata banner (version, git, data root) for reproducibility.
+
+Enriched the 10 km grid with country/biome tags (documented chunk, eval: false) and standardized the working input at processed/10k_change_calc.gpkg.
+
+Reshaped to analysis-ready long format (plt_long), cleaned basic issues, harmonized service labels, and set a canonical facet order.
+
+Centralized hotspot rules in HOTS_CFG (loss/gain, combos, cutoff, groupings, IO).
+
+Exported hotspots once (global + by subregion, for abs/pct change) to compact GPKGs under processed/hotspots/, and wrote a manifest:
+processed/hotspots/_hotspots_index.csv.
+
+Why this structure?
+Heavy work (ranking/thresholding/joining) is done once. The manifest gives us traceability and fast loading for downstream steps (bar plots, violins, KS tests) without re-computation.
+
 
 # Call The runner 
 ```{r}
