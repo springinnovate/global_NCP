@@ -6,3 +6,5 @@ grid_sf  <- qs::qread(file.path(data_dir(), "processed", "intermediate", "grid_s
 # quick sanity
 stopifnot(nrow(plt_long) > 0, inherits(grid_sf, "sf"))
 dplyr::glimpse(plt_long, width = 80)
+
+

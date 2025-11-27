@@ -637,6 +637,7 @@ Heavy work (ranking/thresholding/joining) is done once. The manifest gives us tr
 - These bars answer **“where is change largest?”**. See hotspot maps/violins for **up vs. down** patterns.
 :::
 
+Short answer: your current barplots use all grid cells (the full 10-km population), not just hotspots. They summarize trimmed means per subregion/global from plt_long via aggregate_change_simple(), with cut_q=0.999 to cap outliers and (optionally) drop_zeros=TRUE. That’s why every bar is positive—those bars are the magnitude of change, not the direction.
 ```{r run baplots}
 #| label: bars_by_region
 #| message: false
@@ -905,114 +906,134 @@ for (m in metrics) {
 }
 ```
 
-
+## Run Violins new 
 ```{r run wrapper violins}
 # -----------------------------------------------
-# Faceted violins (VERTICAL) with fixed service order (3 cols)
+# Faceted violins (VERTICAL) for hotspots by group
+# - Uses central HOTS_CFG (loss/gain, cutoff mode)
 # - ABS and PCT plotted separately
-# - Free y scales per facet
-# - Removes NA/0 and trims 0.1%–99.9% per service
+# - Free y scales per facet; 3 columns; fixed facet order
+# - Removes NA/0 and trims 0.1%–99.9% per service for plotting
+# - Saves to outputs/plots/<metric>/<group_col>/violins_<group_col>_<metric>.png
 # -----------------------------------------------
-run_hotspot_violins_by <- function(group_col, out_stub,
-                                   svc_order = c("C_Risk","N_export","Sed_export",
-                                                 "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-                                                 "Pollination","Nature_Access"),
-                                   cut_q = 0.999,
-                                   plot_n = 300000L,
-                                   out_dir = "outputs/plots") {
-
+run_hotspot_violins_by <- function(
+  group_col,
+  svc_order = c(
+    "C_Risk","N_export","Sed_export",
+    "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+    "Pollination","Nature_Access"
+  ),
+  cut_q = 0.999,
+  plot_n = 300000L,
+  keep_only_ordered = TRUE,
+  out_root = file.path("outputs","plots")
+) {
+  stopifnot(exists("plt_long"), group_col %in% names(plt_long))
   message("==> Violins by: ", group_col)
-  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-  # Run hotspot wrapper once for ABS and once for PCT
-  by_abs <- extract_hotspots_by(plt_long, group_col, loss, gain, value_col = "abs_chg")
-  by_pct <- extract_hotspots_by(plt_long, group_col, loss, gain, value_col = "pct_chg")
+  # 1) Extract hotspots once for ABS and once for PCT using central config
+  by_abs <- extract_hotspots_by(
+    df_long        = plt_long,
+    group_cols     = group_col,
+    loss           = HOTS_CFG$loss,
+    gain           = HOTS_CFG$gain,
+    value_col      = "abs_chg",
+    pct_cutoff     = HOTS_CFG$pct_cutoff,
+    threshold_mode = HOTS_CFG$threshold_mode
+  )
 
-  # Long value tables (fid × service × group)
+  by_pct <- extract_hotspots_by(
+    df_long        = plt_long,
+    group_cols     = group_col,
+    loss           = HOTS_CFG$loss,
+    gain           = HOTS_CFG$gain,
+    value_col      = "pct_chg",
+    pct_cutoff     = HOTS_CFG$pct_cutoff,
+    threshold_mode = HOTS_CFG$threshold_mode
+  )
+
+  # 2) Long value tables (fid × service × group) and align
   abs_vals <- by_abs %>%
-    dplyr::transmute(!!group_col := .data[[group_col]],
-                     vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, abs_chg))) %>%
-    tidyr::unnest(vals)
+    dplyr::transmute(
+      !!group_col := .data[[group_col]],
+      vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, abs_chg))
+    ) %>% tidyr::unnest(vals)
 
   pct_vals <- by_pct %>%
-    dplyr::transmute(!!group_col := .data[[group_col]],
-                     vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, pct_chg))) %>%
-    tidyr::unnest(vals)
+    dplyr::transmute(
+      !!group_col := .data[[group_col]],
+      vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, pct_chg))
+    ) %>% tidyr::unnest(vals)
 
-  # Join for alignment; keep only desired services and sample for plotting speed
   vals <- dplyr::full_join(abs_vals, pct_vals, by = c(group_col, "fid", "service")) %>%
-    dplyr::filter(service %in% svc_order) %>%
-    dplyr::mutate(service = factor(service, levels = svc_order)) %>%
+    { if (isTRUE(keep_only_ordered)) dplyr::filter(., service %in% svc_order) else . } %>%
+    dplyr::mutate(
+      service = {
+        extras <- setdiff(unique(service), svc_order)
+        factor(service, levels = c(svc_order, sort(extras)))
+      }
+    ) %>%
     dplyr::filter(!is.na(.data[[group_col]])) %>%
     { if (nrow(.) > plot_n) dplyr::slice_sample(., n = plot_n) else . } %>%
     dplyr::mutate(!!group_col := as.factor(.data[[group_col]]))
 
-  # ---- ABS (vertical violins) ----
-  abs_trim <- vals %>%
-    dplyr::filter(!is.na(abs_chg), abs_chg != 0) %>%
-    dplyr::group_by(service) %>%
-    dplyr::mutate(
-      lo = stats::quantile(abs_chg, 1 - cut_q, na.rm = TRUE),
-      hi = stats::quantile(abs_chg, cut_q,     na.rm = TRUE)
-    ) %>%
-    dplyr::ungroup() %>%
-    dplyr::filter(abs_chg >= lo, abs_chg <= hi)
+  # Helper to trim to central [0.1%, 99.9%] range per service
+  trim_df <- function(df, var) {
+    df %>%
+      dplyr::filter(!is.na(.data[[var]]), .data[[var]] != 0) %>%
+      dplyr::group_by(service) %>%
+      dplyr::mutate(
+        lo = stats::quantile(.data[[var]], 1 - cut_q, na.rm = TRUE),
+        hi = stats::quantile(.data[[var]], cut_q,     na.rm = TRUE)
+      ) %>%
+      dplyr::ungroup() %>%
+      dplyr::filter(.data[[var]] >= lo, .data[[var]] <= hi)
+  }
 
+  # 3) ABS violins (vertical, free y)
+  abs_trim <- trim_df(vals, "abs_chg")
   p_abs <- ggplot2::ggplot(abs_trim, ggplot2::aes(x = .data[[group_col]], y = abs_chg)) +
     ggplot2::geom_violin(trim = TRUE, scale = "width") +
     ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
-    ggplot2::labs(title = paste0("Absolute change in hotspots by ", group_col),
-                  subtitle = "Violins only; NA/0 removed; per-service 99.9% trim",
-                  x = NULL, y = "Absolute change (service units)") +
+    ggplot2::labs(
+      title    = paste0("Absolute change in hotspots by ", group_col),
+      subtitle = "Violins only · NA/0 removed · per-service 99.9% trim",
+      x = NULL, y = "Absolute change (service units)"
+    ) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
 
-  ggplot2::ggsave(file.path(out_dir, paste0(out_stub, "_abs_change_violins.png")),
-                  p_abs, width = 12, height = 8, dpi = 300)
-
-  # ---- PCT (vertical violins) ----
-  pct_trim <- vals %>%
-    tidyr::drop_na(pct_chg) %>%
-    dplyr::filter(pct_chg != 0) %>%
-    dplyr::group_by(service) %>%
-    dplyr::mutate(
-      lo = stats::quantile(pct_chg, 1 - cut_q, na.rm = TRUE),
-      hi = stats::quantile(pct_chg, cut_q,     na.rm = TRUE)
-    ) %>%
-    dplyr::ungroup() %>%
-    dplyr::filter(pct_chg >= lo, pct_chg <= hi)
-
+  # 4) PCT violins (vertical, free y)
+  pct_trim <- trim_df(vals, "pct_chg")
   p_pct <- ggplot2::ggplot(pct_trim, ggplot2::aes(x = .data[[group_col]], y = pct_chg)) +
     ggplot2::geom_violin(trim = TRUE, scale = "width") +
     ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
-    ggplot2::labs(title = paste0("Percent change in hotspots by ", group_col),
-                  subtitle = "Violins only; NA/0 removed; per-service 99.9% trim",
-                  x = NULL, y = "Percent change (%)") +
+    ggplot2::labs(
+      title    = paste0("Percent change in hotspots by ", group_col),
+      subtitle = "Violins only · NA/0 removed · per-service 99.9% trim",
+      x = NULL, y = "Percent change (%)"
+    ) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
 
-  ggplot2::ggsave(file.path(out_dir, paste0(out_stub, "_pct_change_violins.png")),
-                  p_pct, width = 12, height = 8, dpi = 300)
+  # 5) Save in the same directory scheme used for bars
+  # NOTE: force white background so VS Code’s dark preview is readable
+  dir_abs <- file.path(out_root, "abs", tolower(group_col))
+  dir_pct <- file.path(out_root, "pct", tolower(group_col))
+  dir.create(dir_abs, recursive = TRUE, showWarnings = FALSE)
+  dir.create(dir_pct, recursive = TRUE, showWarnings = FALSE)
+
+  ggplot2::ggsave(
+    filename = file.path(dir_abs, paste0("violins_", tolower(group_col), "_abs.png")),
+    plot = p_abs, width = 12, height = 8, dpi = 300, bg = "white"
+  )
+  ggplot2::ggsave(
+    filename = file.path(dir_pct, paste0("violins_", tolower(group_col), "_pct.png")),
+    plot = p_pct, width = 12, height = 8, dpi = 300, bg = "white"
+  )
 
   invisible(list(abs_plot = p_abs, pct_plot = p_pct))
 }
-
-# Facet order (row-wise fill with ncol = 3)
-svc_order <- c(
-  "C_Risk","N_export","Sed_export",
-  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-  "Pollination","Nature_Access"
-)
-
-# Run
-loss <- c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
-gain <- c("Sed_export","N_export","C_Risk")
-
-run_hotspot_violins_by("region_wb", "regionwb",  svc_order = svc_order)
-run_hotspot_violins_by("WWF_biome", "biome",     svc_order = svc_order)
-run_hotspot_violins_by("continent", "continent", svc_order = svc_order)
-run_hotspot_violins_by("region_un",  "regionun",  svc_order = svc_order)
-run_hotspot_violins_by("income_grp", "incomegrp", svc_order = svc_order)
 
 
 
