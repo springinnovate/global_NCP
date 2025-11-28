@@ -1,28 +1,33 @@
 ---
 title: "Hotspot Extraction"
 subtitle: "v{{< meta analysis_version >}}"
-author: "Jeronimo Rodríguez"
+author: "Jerónimo Rodríguez Escobar"
+email: "jeronimo.rodriguez@wwfus.org"
 date: today
 date-format: iso
-analysis_version: "v0.4.1"  
+analysis_version: "v0.4.1"
 format:
   html:
     toc: true
     number-sections: true
-    code-fold: show
-editor: visual
+    code-fold: false
+    toc-title: "Contents"
+    theme: cosmo
+editor: source
 
 params:
   analysis_version: "v0.4.1"
-
 ---
 
 ## Setup and Libraries
+
+Load all core packages (tidyverse, spatial, plotting helpers) and initialize reproducibility settings. This chunk also sources `R/paths.R` and runs `devtools::load_all()` so downstream chunks can reuse helper functions.
 
 ```{r}
 #| label: setup
 #| message: false
 #| warning: false
+#| echo: false
 
 # Core tidy + spatial
 library(dplyr)
@@ -35,6 +40,7 @@ library(scales)
 library(sf)
 library(terra)
 library(exactextractr)
+library(here)
 
 # Plot helpers
 library(viridisLite)
@@ -43,7 +49,9 @@ library(ragg)
 
 # Dev/project helpers
 library(devtools)   # for load_all()
-
+# Paths helper (set GLOBAL_NCP_DATA in ~/.Renviron first)
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R","paths.R"))
 # Optional viewers (enable only if you use them)
 # library(httpgd)
 # library(leaflet)
@@ -61,8 +69,7 @@ set.seed(1)
 # Load package-style functions from R/ (if this is a package-ish repo)
 devtools::load_all(quiet = TRUE)
 
-# Paths helper (set GLOBAL_NCP_DATA in ~/.Renviron first)
-source("../R/paths.R")
+
 
 # ---- Python (enable when needed) ----------------------------------------
 # library(reticulate)
@@ -70,16 +77,20 @@ source("../R/paths.R")
 
 ```
 
-
 ## Run Metadata Banner
 
-```{r}
-# Prints version/time/git/data-root info so renders are traceable (no heavy compute).
+Print run metadata (analysis version, timestamp, git commit, data root) so exported reports remain traceable.
 
+Published: `r format(Sys.time(), "%Y-%m-%d %H:%M %Z")`
+
+```{r}
 #| label: run-metadata
 #| echo: false
 #| message: false
 #| warning: false
+#| results: 'asis'
+
+# Prints version/time/git/data-root info so renders are traceable (no heavy compute).
 
 analysis_version <- tryCatch(params$analysis_version, error = function(e) NULL)
 if (is.null(analysis_version) || is.na(analysis_version)) {
@@ -101,7 +112,8 @@ data_root <- tryCatch(data_dir(), error = function(e) NULL)
 if (is.null(data_root)) {
   data_root <- Sys.getenv("GLOBAL_NCP_DATA", unset = "")
 }
-
+message("data_dir(): ", data_dir())
+message("Outputs root: ", out_plots())
 cat(paste0(
   "::: callout-note\n",
   "**Run metadata**\n\n",
@@ -114,29 +126,29 @@ cat(paste0(
 ))
 ```
 
-## Enrich grid with regional attributes (countries & biomes)
+## Add regional attributes to Grid (countries & biomes)
+
+Attach country and biome IDs to the 10 km grid (`sf_f`) so downstream aggregation/hotspot steps can group by region. This chunk only runs if the processed GPKG is missing.
 
 We enrich the 10 km grid (`sf_f`) with country and WWF biome IDs so we can aggregate and compare change by subregions (World Bank region, income group, continent, UN region, and biome). We use a point-on-surface join to avoid sliver/overlap issues, keep only the needed fields, and write a single enriched GPKG for downstream grouping, hotspot extraction, and plotting.
 
 ::: callout-tip
 **What this step does**
 
-- Reads country and biome layers from `vectors/`.
-- Joins them to the 10 km grid via point-on-surface.
-- Writes `processed/10k_change_calc.gpkg` for downstream analysis (pivoting, hotspots, plots).
-**Inputs:** `sf_f` grid; `vectors/cartographic_ee_ee_r264_correspondence.gpkg`; `vectors/Biome.gpkg`  
-**Output:** `processed/10k_change_calc.gpkg` (grid + regional attributes)
+-   Reads country and biome layers from `vectors/`.
+-   Joins them to the 10 km grid via point-on-surface.
+-   Writes `processed/10k_change_calc.gpkg` for downstream analysis (pivoting, hotspots, plots). **Inputs:** `sf_f` grid; `vectors/cartographic_ee_ee_r264_correspondence.gpkg`; `vectors/Biome.gpkg`\
+    **Output:** `processed/10k_change_calc.gpkg` (grid + regional attributes)
 
 **Why point-on-surface?** It’s robust for odd cell shapes and avoids polygon–polygon sliver issues.
 
 **When to bump the version?** If the joined attributes change schema/meaning (e.g., new grouping columns), bump **MINOR**; if file name/structure changes in a breaking way, bump **MAJOR**.
 :::
 
-
 ```{r}
 #| label: attach-region-attrs
 #| eval: false
-#| echo: true
+#| echo: false
 # Purpose:
 # Attach country & biome attributes to the 10 km grid (sf_f) so we can group by
 # income_grp, region_wb, BIOME, etc. This writes a processed GPKG for downstream use.
@@ -145,61 +157,63 @@ We enrich the 10 km grid (`sf_f`) with country and WWF biome IDs so we can aggre
 # - sf_f (grid polygons) in memory with at least: fid, c_fid, geometry
 # - paths.R available and data_dir() points to your data root (GLOBAL_NCP_DATA)
 
-stopifnot(inherits(sf_f, "sf"))
-stopifnot(all(c("fid","c_fid") %in% names(sf_f)))
-
-# Inputs
-ct_path  <- file.path(data_dir(), "vectors", "cartographic_ee_ee_r264_correspondence.gpkg")
-bio_path <- file.path(data_dir(), "vectors", "Biome.gpkg")
-stopifnot(file.exists(ct_path), file.exists(bio_path))
-
-ct <- sf::st_read(ct_path, quiet = TRUE) |>
-  dplyr::select(id, ee_r264_name, iso3, continent, income_grp, region_un, region_wb, subregion)
-
-biomes <- sf::st_read(bio_path, quiet = TRUE) |>
-  dplyr::select(BIOME, WWF_biome)
-
-# CRS harmonization (note the != instead of ! ==)
-crs_grid <- sf::st_crs(sf_f)
-if (sf::st_crs(ct)     != crs_grid) ct     <- sf::st_transform(ct, crs_grid)
-if (sf::st_crs(biomes) != crs_grid) biomes <- sf::st_transform(biomes, crs_grid)
-
-# Lightweight template (keeps geometry)
-sf_template <- sf_f |>
-  dplyr::select(fid, c_fid)
-
-# Representative point per cell; more robust than centroids
-pts <- sf::st_point_on_surface(sf_template)
-
-# Spatial joins
-pts_ct    <- sf::st_join(pts, ct,     left = TRUE)
-pts_biome <- sf::st_join(pts, biomes, left = TRUE)
-
-# Drop geometry and merge attrs by fid
-pts_ctdf <- sf::st_drop_geometry(pts_ct)
-pts_bmdf <- sf::st_drop_geometry(pts_biome)
-
-out_attrs <- pts_ctdf |>
-  dplyr::left_join(pts_bmdf, by = "fid", suffix = c("", "_biome"))
-
-# Enforce uniqueness by fid (defensive)
-if (anyDuplicated(out_attrs$fid)) {
-  out_attrs <- out_attrs |>
-    dplyr::arrange(fid) |>
-    dplyr::distinct(fid, .keep_all = TRUE)
-}
-
-# Bring attributes back to the grid
-sf_f_joined <- sf_f |>
-  dplyr::left_join(out_attrs, by = "fid")
-
-stopifnot(nrow(sf_f_joined) == nrow(sf_f), inherits(sf_f_joined, "sf"))
-
-# Output (idempotent write)
 out_gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
-dir.create(dirname(out_gpkg), recursive = TRUE, showWarnings = FALSE)
-if (file.exists(out_gpkg)) file.remove(out_gpkg)
-sf::st_write(sf_f_joined, out_gpkg, quiet = TRUE)
+if (!file.exists(out_gpkg)) {
+  stopifnot(inherits(sf_f, "sf"))
+  stopifnot(all(c("fid","c_fid") %in% names(sf_f)))
+
+  # Inputs
+  ct_path  <- file.path(data_dir(), "vectors", "cartographic_ee_ee_r264_correspondence.gpkg")
+  bio_path <- file.path(data_dir(), "vectors", "Biome.gpkg")
+  stopifnot(file.exists(ct_path), file.exists(bio_path))
+
+  ct <- sf::st_read(ct_path, quiet = TRUE) |>
+    dplyr::select(id, ee_r264_name, iso3, continent, income_grp, region_un, region_wb, subregion)
+
+  biomes <- sf::st_read(bio_path, quiet = TRUE) |>
+    dplyr::select(BIOME, WWF_biome)
+
+  # CRS harmonization (note the != instead of ! ==)
+  crs_grid <- sf::st_crs(sf_f)
+  if (sf::st_crs(ct)     != crs_grid) ct     <- sf::st_transform(ct, crs_grid)
+  if (sf::st_crs(biomes) != crs_grid) biomes <- sf::st_transform(biomes, crs_grid)
+
+  # Lightweight template (keeps geometry)
+  sf_template <- sf_f |>
+    dplyr::select(fid, c_fid)
+
+  # Representative point per cell; more robust than centroids
+  pts <- sf::st_point_on_surface(sf_template)
+
+  # Spatial joins
+  pts_ct    <- sf::st_join(pts, ct,     left = TRUE)
+  pts_biome <- sf::st_join(pts, biomes, left = TRUE)
+
+  # Drop geometry and merge attrs by fid
+  pts_ctdf <- sf::st_drop_geometry(pts_ct)
+  pts_bmdf <- sf::st_drop_geometry(pts_biome)
+
+  out_attrs <- pts_ctdf |>
+    dplyr::left_join(pts_bmdf, by = "fid", suffix = c("", "_biome"))
+
+  # Enforce uniqueness by fid (defensive)
+  if (anyDuplicated(out_attrs$fid)) {
+    out_attrs <- out_attrs |>
+      dplyr::arrange(fid) |>
+      dplyr::distinct(fid, .keep_all = TRUE)
+  }
+
+  # Bring attributes back to the grid
+  sf_f_joined <- sf_f |>
+    dplyr::left_join(out_attrs, by = "fid")
+
+  stopifnot(nrow(sf_f_joined) == nrow(sf_f), inherits(sf_f_joined, "sf"))
+
+  dir.create(dirname(out_gpkg), recursive = TRUE, showWarnings = FALSE)
+  sf::st_write(sf_f_joined, out_gpkg, quiet = TRUE)
+} else {
+  message("Skipping join: ", out_gpkg, " already exists.")
+}
 
 # TODO (run later): quick QA tables
 # dplyr::count(sf_f_joined, is.na(iso3))
@@ -208,34 +222,35 @@ sf::st_write(sf_f_joined, out_gpkg, quiet = TRUE)
 
 ```
 
-
 ## Reshape grid data to a service-long table
 
-Start by turning the wide grid table (one row per 10 km cell with many *_abs_chg / *_pct_chg columns) into an **analysis-ready long format**: one row per **cell × service** with two value columns: `abs_chg` and `pct_chg`. This makes it easy to rank, filter, and facet by service in later hotspot steps.
+Pivot the processed grid into a tidy `plt_long` table (one row per cell × service) and standardize service labels/factor order. Cached so we only rebuild when inputs change.
 
-**What this chunk does**
-1) Reads the processed grid from `processed/10k_change_calc.gpkg` and ensures a unique `fid`.  
-2) Splits “ID/grouping” columns from change columns.  
-3) Pivots *_abs_chg / *_pct_chg to long, then back to wide as `abs_chg` / `pct_chg` per service.  
-4) Cleans obvious issues (drops `Inf`/`NA` where appropriate) so plots and tests won’t choke.  
-5) Applies a human-readable service label mapping (e.g., `n_export → N_export`).  
+Start by turning the wide grid table (one row per 10 km cell with many \*\_abs_chg / \*\_pct_chg columns) into an **analysis-ready long format**: one row per **cell × service** with two value columns: `abs_chg` and `pct_chg`. This makes it easy to rank, filter, and facet by service in later hotspot steps.
+
+**What this chunk does** 1) Reads the processed grid from `processed/10k_change_calc.gpkg` and ensures a unique `fid`.\
+2) Splits “ID/grouping” columns from change columns.\
+3) Pivots \*\_abs_chg / \*\_pct_chg to long, then back to wide as `abs_chg` / `pct_chg` per service.\
+4) Cleans obvious issues (drops `Inf`/`NA` where appropriate) so plots and tests won’t choke.\
+5) Applies a human-readable service label mapping (e.g., `n_export → N_export`).\
 6) Sets a canonical facet order (`svc_order`) so plots are consistent across the report.
 
-**Inputs:** `processed/10k_change_calc.gpkg` (contains `fid`, `c_fid`, service change fields, and sub-regional tags like `region_wb`, `income_grp`, `BIOME`, etc.).  
-**Output:** `plt_long` (tidy tibble) with columns  
+**Inputs:** `processed/10k_change_calc.gpkg` (contains `fid`, `c_fid`, service change fields, and sub-regional tags like `region_wb`, `income_grp`, `BIOME`, etc.).\
+**Output:** `plt_long` (tidy tibble) with columns\
 `fid, c_fid, service, abs_chg, pct_chg, <grouping/socio vars>`.
 
 ::: callout-tip
-**Why long format?**  
+**Why long format?**\
 Ranking, percentile cuts, ECDFs, and faceted plots are all simpler and faster when each **service** is a row attribute rather than a separate column.
 :::
-
-
 
 ```{r}
 #| label: pivot
 #| eval: true
-#| include: true
+#| include: false
+#| echo: false
+#| results: hide
+#| cache: true
 # ---- Produce plt_long once (skip if already present) ---------------- ----
 
 if (!exists("plt_long", inherits = TRUE)) {
@@ -271,7 +286,7 @@ names_to = c("service", "chg_type"),
 names_pattern = "^(.*)_(abs|pct)_chg$",
 values_to = "chg_value"
 ) |>
-dplyr::mutate(service = stringr::str_remove(service, "_mean$")) |> 
+dplyr::mutate(service = stringr::str_remove(service, "_mean$")) |>
 tidyr::pivot_wider(
 names_from  = chg_type,
 values_from = chg_value,
@@ -325,13 +340,12 @@ rm(plt, sf_f); gc()                             # free the big attribute table +
 
 ```
 
-
 ### QA: sanity checks on `plt_long`
 
 Before ranking/thresholding, a lightweight QA helps catch silent problems (e.g., an empty service, unexpected sparsity, or leftover `Inf`s):
 
-- Confirm `plt_long` exists and peek the structure.
-- Count rows per `service` to spot outliers in coverage (e.g., a service that only exists in a few countries).
+-   Confirm `plt_long` exists and peek the structure.
+-   Count rows per `service` to spot outliers in coverage (e.g., a service that only exists in a few countries).
 
 #### Inspect pivot output
 
@@ -352,20 +366,19 @@ dplyr::count(service, name = "rows") |>
 dplyr::arrange(dplyr::desc(rows)) |>
 print(n = 50)
 ```
+
 ## Hotspot extraction workflow (global + subregional)
 
-We identify per-service hotspots using a 5% percentile rule and **direction vectors**:
-- `loss_services` (e.g., Nature_Access, Pollination, N/Sed_Ret_Ratio, C_Risk_Red_Ratio) → we flag the **lowest** values;
-- `gain_services` (Sed_export, N_export, C_Risk) → we flag the **highest** values.
+We identify per-service hotspots using a 5% percentile rule and **direction vectors**: - `loss_services` (e.g., Nature_Access, Pollination, N/Sed_Ret_Ratio, C_Risk_Red_Ratio) → we flag the **lowest** values; - `gain_services` (Sed_export, N_export, C_Risk) → we flag the **highest** values.
 
 We run this **once globally** and then **once per subregion** (World Bank region, income group, continent, UN region, WWF biome). For each run and for each metric (absolute and percent change) we write a compact **GPKG** containing only the hotspot cells, plus a CSV index:
 
-- Output root: `processed/hotspots/`
-  - `abs/global/hotspots_global_abs.gpkg`
-  - `pct/global/hotspots_global_pct.gpkg`
-  - `abs/<group_col>/hotspots_<group_col>_<group_val>_abs.gpkg`
-  - `pct/<group_col>/hotspots_<group_col>_<group_val>_pct.gpkg`
-- Index: `processed/hotspots/_hotspots_index.csv` (columns: scope, group_col, group_val, metric, n_hot, gpkg).
+-   Output root: `processed/hotspots/`
+    -   `abs/global/hotspots_global_abs.gpkg`
+    -   `pct/global/hotspots_global_pct.gpkg`
+    -   `abs/<group_col>/hotspots_<group_col>_<group_val>_abs.gpkg`
+    -   `pct/<group_col>/hotspots_<group_col>_<group_val>_pct.gpkg`
+-   Index: `processed/hotspots/_hotspots_index.csv` (columns: scope, group_col, group_val, metric, n_hot, gpkg).
 
 These files are meant for QGIS/QA and downstream stats (e.g., KS) without recomputing hotspots.
 
@@ -380,7 +393,6 @@ Direction of concern: services in loss are “worse when they go down” (we kee
 Combos (optional): grouped service sets that we count per cell for quick composite summaries.
 
 Export switches: choose whether to write GPKGs and/or the CSV index.
-
 
 ```{r}
 #| label: hotspots_config
@@ -458,18 +470,20 @@ if (length(miss_loss) > 0 || length(miss_gain) > 0) {
 
 ### Export hotspot layers
 
+::: callout-note
+**Hotspot export module**\
+- Computes hotspot cells once (global + by subregion) for ABS and PCT change.\
+- Writes compact GPKGs for mapping/QA and maintains `_hotspots_index.csv`.\
+- Prereqs: `plt_long` in memory, `HOTS_CFG` defined (loss/gain/combos/etc.).
+:::
+
 ```{r}
 #| label: hotspots_export
 #| message: false
 #| warning: false
-
-# -------------------------------------------------------------------
-# Purpose
-# - Compute hotspot cells once (global + by subregion) for abs/pct change
-# - Write labeled hotspot layers to GPKG for mapping/QA
-# - Keep a compact CSV index of everything written
-# Preconditions: plt_long exists; HOTS_CFG is defined (loss/gain/combos/etc.)
-# -------------------------------------------------------------------
+#| echo: false
+#| include: false
+#| cache: true
 
 stopifnot(exists("plt_long"))
 
@@ -620,28 +634,25 @@ Reshaped to analysis-ready long format (plt_long), cleaned basic issues, harmoni
 
 Centralized hotspot rules in HOTS_CFG (loss/gain, combos, cutoff, groupings, IO).
 
-Exported hotspots once (global + by subregion, for abs/pct change) to compact GPKGs under processed/hotspots/, and wrote a manifest:
-processed/hotspots/_hotspots_index.csv.
+Exported hotspots once (global + by subregion, for abs/pct change) to compact GPKGs under processed/hotspots/, and wrote a manifest: processed/hotspots/\_hotspots_index.csv.
 
-Why this structure?
-Heavy work (ranking/thresholding/joining) is done once. The manifest gives us traceability and fast loading for downstream steps (bar plots, violins, KS tests) without re-computation.
-
-
+Why this structure? Heavy work (ranking/thresholding/joining) is done once. The manifest gives us traceability and fast loading for downstream steps (bar plots, violins, KS tests) without re-computation.
 
 ## Trimmed change bar plots
 
 ::: callout-note
 **How to read these bars**
 
-- Each bar shows the **trimmed mean absolute change** (|Δ|) per service within each group; facet axes are free.
-- Bars are **always positive** by design: height = **magnitude of change**, not direction.
-- Direction-of-concern used elsewhere in the analysis:
-  - Worse when **up** ➜ `Sed_export`, `N_export`, `C_Risk`.
-  - Worse when **down** ➜ `Nature_Access`, `Pollination`, `N_Ret_Ratio`, `Sed_Ret_Ratio`, `C_Risk_Red_Ratio`.
-- These bars answer **“where is change largest?”**. See hotspot maps/violins for **up vs. down** patterns.
+-   Each bar shows the **trimmed mean absolute change** (\|Δ\|) per service within each group; facet axes are free.
+-   Bars are **always positive** by design: height = **magnitude of change**, not direction.
+-   Direction-of-concern used elsewhere in the analysis:
+    -   Worse when **up** ➜ `Sed_export`, `N_export`, `C_Risk`.
+    -   Worse when **down** ➜ `Nature_Access`, `Pollination`, `N_Ret_Ratio`, `Sed_Ret_Ratio`, `C_Risk_Red_Ratio`.
+-   These bars answer **“where is change largest?”**. See hotspot maps/violins for **up vs. down** patterns.
 :::
 
 Short answer: your current barplots use all grid cells (the full 10-km population), not just hotspots. They summarize trimmed means per subregion/global from plt_long via aggregate_change_simple(), with cut_q=0.999 to cap outliers and (optionally) drop_zeros=TRUE. That’s why every bar is positive—those bars are the magnitude of change, not the direction.
+
 ```{r}
 #| label: bars_by_region
 #| message: false
@@ -788,10 +799,14 @@ p_bars
 
 ```
 
+Generate trimmed-mean bar plots (abs & pct) for each grouping. Plots save to `outputs/plots/...` and are embedded below.
+
 ```{r}
 #| label: make-all-barplots
 #| message: false
 #| warning: false
+#| echo: false
+#| cache: false
 
 # ---- inputs ---------------------------------------------------------------
 svc_order <- c(
@@ -801,6 +816,13 @@ svc_order <- c(
 )
 groupings <- if (!is.null(HOTS_CFG$groupings)) HOTS_CFG$groupings else
   c("income_grp","region_wb","continent","region_un","WWF_biome")
+missing_groupings <- setdiff(groupings, names(plt_long))
+if (length(missing_groupings)) {
+  warning("Grouping column(s) not found in plt_long and will be skipped: ",
+          paste(missing_groupings, collapse = ", "))
+}
+groupings <- intersect(groupings, names(plt_long))
+message("make-all-barplots groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
 metrics <- c("pct","abs")                # will map to pct_mean / abs_mean below
 cut_q   <- 0.999
 keep_only_ordered <- TRUE
@@ -892,33 +914,64 @@ plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
 }
 
 # ---- run: ALL groupings, both metrics, w/ and w/o Global ------------------
-for (gc in groupings) {
+if (length(groupings) == 0) {
+  warning("No grouping columns found in plt_long; skipping bar plots.")
+} else {
+  for (gc in groupings) {
+    for (m in metrics) {
+      plot_change_bars(plt_long, group_col = gc, metric = m,
+                       include_global = FALSE)
+      plot_change_bars(plt_long, group_col = gc, metric = m,
+                       include_global = TRUE)
+    }
+  }
+
+  # ---- run: standalone GLOBAL charts (one bar per service) ------------------
+  # (We fake a single grouping column called "global" with a single level.)
+  plt_global <- plt_long |>
+    dplyr::mutate(global = "Global")
+
   for (m in metrics) {
-    plot_change_bars(plt_long, group_col = gc, metric = m,
+    plot_change_bars(plt_global, group_col = "global", metric = m,
                      include_global = FALSE)
-    plot_change_bars(plt_long, group_col = gc, metric = m,
-                     include_global = TRUE)
   }
 }
 
-# ---- run: standalone GLOBAL charts (one bar per service) ------------------
-# (We fake a single grouping column called "global" with a single level.)
-plt_global <- plt_long |>
-  dplyr::mutate(global = "Global")
+latest_dir_bars <- file.path("outputs","plots","latest","bars")
+dir.create(latest_dir_bars, recursive = TRUE, showWarnings = FALSE)
+all_new_bars <- list.files(out_plots(), pattern = "bars_.*\\.png$",
+                           recursive = TRUE, full.names = TRUE)
+if (length(all_new_bars)) {
+  file.copy(all_new_bars, latest_dir_bars, overwrite = TRUE)
+}
 
-for (m in metrics) {
-  plot_change_bars(plt_global, group_col = "global", metric = m,
-                   include_global = FALSE)
+```
+
+```{r}
+#| label: display-barplots
+#| echo: false
+#| results: 'asis'
+#| cache: false
+bar_pngs <- list.files(file.path("outputs","plots","latest","bars"),
+                       pattern = "bars_.*\\.png$",
+                       full.names = TRUE)
+if (length(bar_pngs)) {
+  knitr::include_graphics(sort(bar_pngs))
+} else {
+  knitr::asis_output("> No bar plots were generated; check upstream chunks.")
 }
 ```
 
 ## Hotspot violin plots
-Helper `run_hotspot_violins_by()` now lives in `R/hotspot_violins.R`, so we just call it from this report.
+
+Summarize hotspot distributions by group using saved PNGs; skip computation if group columns are absent. Helper `run_hotspot_violins_by()` now lives in `R/hotspot_violins.R`, so we just call it from this report.
 
 ```{r}
 #| label: make-hotspot-violins
 #| message: false
 #| warning: false
+#| echo: false
+#| cache: false
 
 stopifnot(exists("plt_long"))
 
@@ -927,24 +980,59 @@ groupings <- if (!is.null(HOTS_CFG$groupings) && length(HOTS_CFG$groupings) > 0)
 } else {
   c("income_grp","region_wb","continent","region_un","WWF_biome")
 }
+missing_groupings <- setdiff(groupings, names(plt_long))
+if (length(missing_groupings)) {
+  warning("Grouping column(s) not found in plt_long and will be skipped: ",
+          paste(missing_groupings, collapse = ", "))
+}
+groupings <- intersect(groupings, names(plt_long))
+message("make-hotspot-violins groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
 violin_order <- levels(plt_long$service)
 if (is.null(violin_order)) {
   violin_order <- unique(plt_long$service)
 }
 violin_order <- as.character(violin_order)
 
-for (gc in groupings) {
-  message("Rendering hotspot violins for: ", gc)
-  run_hotspot_violins_by(
-    df_long          = plt_long,
-    group_col         = gc,
-    loss              = HOTS_CFG$loss,
-    gain              = HOTS_CFG$gain,
-    pct_cutoff        = HOTS_CFG$pct_cutoff,
-    threshold_mode    = HOTS_CFG$threshold_mode,
-    svc_order         = violin_order,
-    cut_q             = 0.999,
-    keep_only_ordered = TRUE
-  )
+if (length(groupings) == 0) {
+  warning("No grouping columns found in plt_long; skipping hotspot violins.")
+} else {
+  for (gc in groupings) {
+    message("Rendering hotspot violins for: ", gc)
+    run_hotspot_violins_by(
+      df_long          = plt_long,
+      group_col         = gc,
+      loss              = HOTS_CFG$loss,
+      gain              = HOTS_CFG$gain,
+      pct_cutoff        = HOTS_CFG$pct_cutoff,
+      threshold_mode    = HOTS_CFG$threshold_mode,
+      svc_order         = violin_order,
+      cut_q             = 0.999,
+      keep_only_ordered = TRUE
+    )
+  }
+}
+
+latest_dir_violins <- file.path("outputs","plots","latest","violins")
+dir.create(latest_dir_violins, recursive = TRUE, showWarnings = FALSE)
+all_new_violins <- list.files(out_plots(), pattern = "violins_.*\\.png$",
+                              recursive = TRUE, full.names = TRUE)
+if (length(all_new_violins)) {
+  file.copy(all_new_violins, latest_dir_violins, overwrite = TRUE)
+}
+
+```
+
+```{r}
+#| label: display-violins
+#| echo: false
+#| results: 'asis'
+#| cache: false
+violin_pngs <- list.files(file.path("outputs","plots","latest","violins"),
+                          pattern = "violins_.*\\.png$",
+                          full.names = TRUE)
+if (length(violin_pngs)) {
+  knitr::include_graphics(sort(violin_pngs))
+} else {
+  knitr::asis_output("> No violin plots were generated; check upstream chunks.")
 }
 ```
