@@ -1,3 +1,4 @@
+
 #' Extract hotspots from long-format service-change data
 #'
 #' Identifies hotspots per service using percentile or fixed-count thresholds.

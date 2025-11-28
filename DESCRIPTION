@@ -1,35 +1,38 @@
 Package: EcoZonal
-Title: A package for zonal ecosystem service assessment
+Title: Hotspot Detection and Distributional Comparisons for Ecosystem Service Change
 Version: 0.0.1
 Authors@R: 
     person("Jeronimo", "Rodriguez-Escobar", , "jeronimo.rescobar@gmail.com", role = c("aut", "cre"))
-Description: 
-    ESZonalR is an R package designed to systematically extract, analyze, and visualize 
-    zonal statistics from global ecosystem service raster datasets. It provides tools for 
-    computing summary statistics for various spatial units (e.g., countries, watersheds, 
-    biomes), integrating extracted values into polygon datasets, and generating meaningful 
-    bar plots and maps. The package supports multi-year comparisons, facilitating the 
-    detection of spatial and temporal changes in ecosystem service provision.
-    It also provides tools to extract chnage metrics for categorical land cover maps over multiple spatial units, 
+Description: ESZonalR provides downstream analytics for ecosystem service change: it ingests zonal statistics computed upstream (e.g., via a Python pipeline), computes land-cover change metrics for polygons (R/exactextractr), identifies per-service hotspots under flexible threshold rules, produces mapping-ready outputs, and generates effect-size–centered comparisons of hotspot vs non-hotspot distributions (KS D, AUC, Cliff’s δ with BH adjustment), alongside density overlays, ECDF grids, and heatmaps. 
 License: Apache License (== 2.0)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Imports:
-    terra,
-    sf,
+    diffeR,
     dplyr,
+    ggnewscale,
     ggplot2,
-    yaml,
-    tidyr,
     purrr,
-    diffeR
+    readr,
+    scales,
+    sf,
+    stats,
+    stringr,
+    terra,
+    tibble,
+    tidyr,
+    utils,
+    yaml
 Suggests:
+    testthat (>= 3.0.0),
     knitr,
     rmarkdown,
-    parallel,
-    patchwork
+    arrow,
+    fst,
+    ragg
 VignetteBuilder: knitr
+Config/testthat/edition: 3
 BugReports: https://github.com/springinnovate/global_NCP.git/issues
 URL: https://github.com/springinnovate/global_NCP.git
 Depends:
