@@ -13,7 +13,7 @@ make_change_bars(
   svc_order_only = TRUE,
   sort_bars = TRUE,
   cut_q = 0.999,
-  out_dir = "outputs/plots",
+  out_dir = NULL,
   save = TRUE,
   show = FALSE,
   title_prefix = NULL
