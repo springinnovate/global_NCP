@@ -17,7 +17,9 @@ params:
 
 ---
 
-```{r setup, message=FALSE, warning=FALSE}
+## Setup and Libraries
+
+```{r}
 #| label: setup
 #| message: false
 #| warning: false
@@ -69,6 +71,7 @@ source("../R/paths.R")
 ```
 
 
+## Run Metadata Banner
 
 ```{r}
 # Prints version/time/git/data-root info so renders are traceable (no heavy compute).
@@ -111,7 +114,7 @@ cat(paste0(
 ))
 ```
 
-## Regional attributes for sub-regional analysis (countries & biomes)
+## Enrich grid with regional attributes (countries & biomes)
 
 We enrich the 10 km grid (`sf_f`) with country and WWF biome IDs so we can aggregate and compare change by subregions (World Bank region, income group, continent, UN region, and biome). We use a point-on-surface join to avoid sliver/overlap issues, keep only the needed fields, and write a single enriched GPKG for downstream grouping, hotspot extraction, and plotting.
 
@@ -206,7 +209,7 @@ sf::st_write(sf_f_joined, out_gpkg, quiet = TRUE)
 ```
 
 
-## Prepare data for analysis: reshape to “long” service × cell
+## Reshape grid data to a service-long table
 
 Start by turning the wide grid table (one row per 10 km cell with many *_abs_chg / *_pct_chg columns) into an **analysis-ready long format**: one row per **cell × service** with two value columns: `abs_chg` and `pct_chg`. This makes it easy to rank, filter, and facet by service in later hotspot steps.
 
@@ -229,7 +232,8 @@ Ranking, percentile cuts, ECDFs, and faceted plots are all simpler and faster wh
 
 
 
-```{r pivot}
+```{r}
+#| label: pivot
 #| eval: true
 #| include: true
 # ---- Produce plt_long once (skip if already present) ---------------- ----
@@ -322,16 +326,17 @@ rm(plt, sf_f); gc()                             # free the big attribute table +
 ```
 
 
-### Sanity checks on `plt_long`
+### QA: sanity checks on `plt_long`
 
 Before ranking/thresholding, a lightweight QA helps catch silent problems (e.g., an empty service, unexpected sparsity, or leftover `Inf`s):
 
 - Confirm `plt_long` exists and peek the structure.
 - Count rows per `service` to spot outliers in coverage (e.g., a service that only exists in a few countries).
 
-#### Pivot Data
+#### Inspect pivot output
 
-```{r sanity-check pivot}
+```{r}
+#| label: sanity-check-pivot
 # ---- Quick sanity --------------------------------------------------------
 
 stopifnot(exists("plt_long"))
@@ -347,7 +352,7 @@ dplyr::count(service, name = "rows") |>
 dplyr::arrange(dplyr::desc(rows)) |>
 print(n = 50)
 ```
-## Hotspot extraction and exports (global + subregional)
+## Hotspot extraction workflow (global + subregional)
 
 We identify per-service hotspots using a 5% percentile rule and **direction vectors**:
 - `loss_services` (e.g., Nature_Access, Pollination, N/Sed_Ret_Ratio, C_Risk_Red_Ratio) → we flag the **lowest** values;
@@ -364,7 +369,7 @@ We run this **once globally** and then **once per subregion** (World Bank region
 
 These files are meant for QGIS/QA and downstream stats (e.g., KS) without recomputing hotspots.
 
-## Hotspot rules & export configuration
+### Hotspot rules & export configuration
 
 The analysis uses a single, central configuration so the hotspot rules are consistent everywhere:
 
@@ -381,8 +386,6 @@ Export switches: choose whether to write GPKGs and/or the CSV index.
 #| label: hotspots_config
 #| include: true
 #| eval: true
-
-#| label: hotspots_config
 HOTS_CFG <- list(
   analysis_name   = "global_NCP_hotspots",
   pct_cutoff      = 0.05,
@@ -429,7 +432,7 @@ cat(paste0(
 ))
 ```
 
-#  Validate Config Hotspot 
+### Validate hotspot configuration
 
 ```{r}
 #| label: validate_hotspots_config
@@ -453,6 +456,7 @@ if (length(miss_loss) > 0 || length(miss_gain) > 0) {
 }
 ```
 
+### Export hotspot layers
 
 ```{r}
 #| label: hotspots_export
@@ -606,7 +610,7 @@ dplyr::glimpse(hot_index, width = 120)
 
 ```
 
-## What we’ve done (checkpoint)
+## Checkpoint recap
 
 Wired the project with a metadata banner (version, git, data root) for reproducibility.
 
@@ -624,7 +628,7 @@ Heavy work (ranking/thresholding/joining) is done once. The manifest gives us tr
 
 
 
-# Run Baprlots from Stored Functions 
+## Trimmed change bar plots
 
 ::: callout-note
 **How to read these bars**
@@ -638,7 +642,7 @@ Heavy work (ranking/thresholding/joining) is done once. The manifest gives us tr
 :::
 
 Short answer: your current barplots use all grid cells (the full 10-km population), not just hotspots. They summarize trimmed means per subregion/global from plt_long via aggregate_change_simple(), with cut_q=0.999 to cap outliers and (optionally) drop_zeros=TRUE. That’s why every bar is positive—those bars are the magnitude of change, not the direction.
-```{r run baplots}
+```{r}
 #| label: bars_by_region
 #| message: false
 #| warning: false
@@ -748,7 +752,8 @@ p_bars <- ggplot2::ggplot(df_trim, ggplot2::aes(x = .data[[gc]], y = .data[[yvar
 
 if (isTRUE(save_plot)) {
   # put plots in outputs/plots/<metric>/<group_col>/
-  out_dir <- file.path("outputs", "plots", metric, tolower(group_col))
+  out_root <- out_plots()
+  out_dir <- file.path(out_root, metric, tolower(group_col))
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
   # encode key params in the base name
@@ -803,7 +808,7 @@ keep_only_ordered <- TRUE
 # ---- helper: compute + plot one panel set --------------------------------
 plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
                              include_global = FALSE,
-                             out_dir = "outputs/plots", out_stub = NULL,
+                             out_dir = NULL, out_stub = NULL,
                              global_outline = "black",   # <-- outline color for Global
                              global_fill    = NULL) {    # <-- set e.g. "#444444" if you also want a different fill
 
@@ -874,6 +879,7 @@ plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
     )
 
   # Save
+  if (is.null(out_dir)) out_dir <- out_plots()
   dir.create(file.path(out_dir, metric, group_col), recursive = TRUE, showWarnings = FALSE)
   if (is.null(out_stub)) {
     out_stub <- paste0("bars_", tolower(group_col), "_", metric,
@@ -889,9 +895,9 @@ plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
 for (gc in groupings) {
   for (m in metrics) {
     plot_change_bars(plt_long, group_col = gc, metric = m,
-                     include_global = FALSE, out_dir = "outputs/plots")
+                     include_global = FALSE)
     plot_change_bars(plt_long, group_col = gc, metric = m,
-                     include_global = TRUE,  out_dir = "outputs/plots")
+                     include_global = TRUE)
   }
 }
 
@@ -902,141 +908,43 @@ plt_global <- plt_long |>
 
 for (m in metrics) {
   plot_change_bars(plt_global, group_col = "global", metric = m,
-                   include_global = FALSE, out_dir = "outputs/plots")
+                   include_global = FALSE)
 }
 ```
 
-## Run Violins new 
-```{r run wrapper violins}
-# -----------------------------------------------
-# Faceted violins (VERTICAL) for hotspots by group
-# - Uses central HOTS_CFG (loss/gain, cutoff mode)
-# - ABS and PCT plotted separately
-# - Free y scales per facet; 3 columns; fixed facet order
-# - Removes NA/0 and trims 0.1%–99.9% per service for plotting
-# - Saves to outputs/plots/<metric>/<group_col>/violins_<group_col>_<metric>.png
-# -----------------------------------------------
-run_hotspot_violins_by <- function(
-  group_col,
-  svc_order = c(
-    "C_Risk","N_export","Sed_export",
-    "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-    "Pollination","Nature_Access"
-  ),
-  cut_q = 0.999,
-  plot_n = 300000L,
-  keep_only_ordered = TRUE,
-  out_root = file.path("outputs","plots")
-) {
-  stopifnot(exists("plt_long"), group_col %in% names(plt_long))
-  message("==> Violins by: ", group_col)
+## Hotspot violin plots
+Helper `run_hotspot_violins_by()` now lives in `R/hotspot_violins.R`, so we just call it from this report.
 
-  # 1) Extract hotspots once for ABS and once for PCT using central config
-  by_abs <- extract_hotspots_by(
-    df_long        = plt_long,
-    group_cols     = group_col,
-    loss           = HOTS_CFG$loss,
-    gain           = HOTS_CFG$gain,
-    value_col      = "abs_chg",
-    pct_cutoff     = HOTS_CFG$pct_cutoff,
-    threshold_mode = HOTS_CFG$threshold_mode
-  )
+```{r}
+#| label: make-hotspot-violins
+#| message: false
+#| warning: false
 
-  by_pct <- extract_hotspots_by(
-    df_long        = plt_long,
-    group_cols     = group_col,
-    loss           = HOTS_CFG$loss,
-    gain           = HOTS_CFG$gain,
-    value_col      = "pct_chg",
-    pct_cutoff     = HOTS_CFG$pct_cutoff,
-    threshold_mode = HOTS_CFG$threshold_mode
-  )
+stopifnot(exists("plt_long"))
 
-  # 2) Long value tables (fid × service × group) and align
-  abs_vals <- by_abs %>%
-    dplyr::transmute(
-      !!group_col := .data[[group_col]],
-      vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, abs_chg))
-    ) %>% tidyr::unnest(vals)
-
-  pct_vals <- by_pct %>%
-    dplyr::transmute(
-      !!group_col := .data[[group_col]],
-      vals = purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, pct_chg))
-    ) %>% tidyr::unnest(vals)
-
-  vals <- dplyr::full_join(abs_vals, pct_vals, by = c(group_col, "fid", "service")) %>%
-    { if (isTRUE(keep_only_ordered)) dplyr::filter(., service %in% svc_order) else . } %>%
-    dplyr::mutate(
-      service = {
-        extras <- setdiff(unique(service), svc_order)
-        factor(service, levels = c(svc_order, sort(extras)))
-      }
-    ) %>%
-    dplyr::filter(!is.na(.data[[group_col]])) %>%
-    { if (nrow(.) > plot_n) dplyr::slice_sample(., n = plot_n) else . } %>%
-    dplyr::mutate(!!group_col := as.factor(.data[[group_col]]))
-
-  # Helper to trim to central [0.1%, 99.9%] range per service
-  trim_df <- function(df, var) {
-    df %>%
-      dplyr::filter(!is.na(.data[[var]]), .data[[var]] != 0) %>%
-      dplyr::group_by(service) %>%
-      dplyr::mutate(
-        lo = stats::quantile(.data[[var]], 1 - cut_q, na.rm = TRUE),
-        hi = stats::quantile(.data[[var]], cut_q,     na.rm = TRUE)
-      ) %>%
-      dplyr::ungroup() %>%
-      dplyr::filter(.data[[var]] >= lo, .data[[var]] <= hi)
-  }
-
-  # 3) ABS violins (vertical, free y)
-  abs_trim <- trim_df(vals, "abs_chg")
-  p_abs <- ggplot2::ggplot(abs_trim, ggplot2::aes(x = .data[[group_col]], y = abs_chg)) +
-    ggplot2::geom_violin(trim = TRUE, scale = "width") +
-    ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
-    ggplot2::labs(
-      title    = paste0("Absolute change in hotspots by ", group_col),
-      subtitle = "Violins only · NA/0 removed · per-service 99.9% trim",
-      x = NULL, y = "Absolute change (service units)"
-    ) +
-    ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
-
-  # 4) PCT violins (vertical, free y)
-  pct_trim <- trim_df(vals, "pct_chg")
-  p_pct <- ggplot2::ggplot(pct_trim, ggplot2::aes(x = .data[[group_col]], y = pct_chg)) +
-    ggplot2::geom_violin(trim = TRUE, scale = "width") +
-    ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
-    ggplot2::labs(
-      title    = paste0("Percent change in hotspots by ", group_col),
-      subtitle = "Violins only · NA/0 removed · per-service 99.9% trim",
-      x = NULL, y = "Percent change (%)"
-    ) +
-    ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
-
-  # 5) Save in the same directory scheme used for bars
-  # NOTE: force white background so VS Code’s dark preview is readable
-  dir_abs <- file.path(out_root, "abs", tolower(group_col))
-  dir_pct <- file.path(out_root, "pct", tolower(group_col))
-  dir.create(dir_abs, recursive = TRUE, showWarnings = FALSE)
-  dir.create(dir_pct, recursive = TRUE, showWarnings = FALSE)
-
-  ggplot2::ggsave(
-    filename = file.path(dir_abs, paste0("violins_", tolower(group_col), "_abs.png")),
-    plot = p_abs, width = 12, height = 8, dpi = 300, bg = "white"
-  )
-  ggplot2::ggsave(
-    filename = file.path(dir_pct, paste0("violins_", tolower(group_col), "_pct.png")),
-    plot = p_pct, width = 12, height = 8, dpi = 300, bg = "white"
-  )
-
-  invisible(list(abs_plot = p_abs, pct_plot = p_pct))
+groupings <- if (!is.null(HOTS_CFG$groupings) && length(HOTS_CFG$groupings) > 0) {
+  HOTS_CFG$groupings
+} else {
+  c("income_grp","region_wb","continent","region_un","WWF_biome")
 }
+violin_order <- levels(plt_long$service)
+if (is.null(violin_order)) {
+  violin_order <- unique(plt_long$service)
+}
+violin_order <- as.character(violin_order)
 
-
-
+for (gc in groupings) {
+  message("Rendering hotspot violins for: ", gc)
+  run_hotspot_violins_by(
+    df_long          = plt_long,
+    group_col         = gc,
+    loss              = HOTS_CFG$loss,
+    gain              = HOTS_CFG$gain,
+    pct_cutoff        = HOTS_CFG$pct_cutoff,
+    threshold_mode    = HOTS_CFG$threshold_mode,
+    svc_order         = violin_order,
+    cut_q             = 0.999,
+    keep_only_ordered = TRUE
+  )
+}
 ```
-
-

@@ -31,7 +31,7 @@ make_change_bars <- function(group_col,
                              svc_order_only    = TRUE,
                              sort_bars         = TRUE,
                              cut_q             = 0.999,
-                             out_dir           = "outputs/plots",
+                             out_dir           = NULL,
                              save              = TRUE,
                              show              = FALSE,
                              title_prefix      = NULL) {
@@ -95,6 +95,7 @@ make_change_bars <- function(group_col,
     )
   
   # 6) Save / show
+  if (is.null(out_dir)) out_dir <- out_plots()
   if (isTRUE(save)) {
     dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
     suffix <- paste0("_", metric, if (include_global) "_with_global" else "")

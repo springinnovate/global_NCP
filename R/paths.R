@@ -2,6 +2,30 @@
 
 # read once at load time
 .GLOBAL_NCP_DATA <- Sys.getenv("GLOBAL_NCP_DATA", unset = "")
+.path_state <- new.env(parent = emptyenv())
+.path_state$project_root <- NULL
+
+.find_project_root <- function() {
+  root <- .path_state$project_root
+  if (!is.null(root) && dir.exists(root)) {
+    return(root)
+  }
+  cur <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+  markers <- c("global_NCP.Rproj", ".git")
+  while (nzchar(cur)) {
+    marker_hit <- any(file.exists(file.path(cur, markers)))
+    if (isTRUE(marker_hit)) {
+      .path_state$project_root <- cur
+      return(cur)
+    }
+    parent <- dirname(cur)
+    if (identical(parent, cur)) break
+    cur <- parent
+  }
+  root <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+  .path_state$project_root <- root
+  root
+}
 
 # sanity check helper (optional)
 .assert_data_root <- function() {
@@ -16,9 +40,7 @@
 
 # project-relative path (inside the repo)
 project_dir <- function(...) {
-  # assumes you run from the project root or an Rproj
-  # if you like, swap to `here::here(...)`
-  file.path(getwd(), ...)
+  file.path(.find_project_root(), ...)
 }
 
 # data root path (outside the repo)
