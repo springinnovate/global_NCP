@@ -957,24 +957,25 @@ if (length(groupings) == 0) {
                        include_global = TRUE)
     }
   }
-
-  # ---- run: standalone GLOBAL charts (one bar per service) ------------------
-  # (We fake a single grouping column called "global" with a single level.)
-  plt_global <- plt_long |>
-    dplyr::mutate(global = "Global")
-
-  for (m in metrics) {
-    plot_change_bars(plt_global, group_col = "global", metric = m,
-                     include_global = FALSE)
-  }
 }
 
 latest_dir_bars <- file.path("outputs","plots","latest","bars")
 dir.create(latest_dir_bars, recursive = TRUE, showWarnings = FALSE)
+old_latest_bars <- list.files(latest_dir_bars, full.names = TRUE, all.files = FALSE)
+if (length(old_latest_bars)) invisible(file.remove(old_latest_bars))
+# Clean up legacy global-only bar charts so they don't get recopied
+stale_global_bars <- list.files(out_plots(), pattern = "bars_global_.*\\.png$",
+                                recursive = TRUE, full.names = TRUE)
+if (length(stale_global_bars)) file.remove(stale_global_bars)
+
 all_new_bars <- list.files(out_plots(), pattern = "bars_.*\\.png$",
                            recursive = TRUE, full.names = TRUE)
-if (length(all_new_bars)) {
-  invisible(file.copy(all_new_bars, latest_dir_bars, overwrite = TRUE))
+all_new_bars <- all_new_bars[!grepl("/latest/", all_new_bars)]
+all_new_bars <- all_new_bars[!grepl("/global/", all_new_bars)]
+all_new_bars <- all_new_bars[!grepl("bars_global_", basename(all_new_bars))]
+good_bars <- all_new_bars[file.info(all_new_bars)$size > 0]
+if (length(good_bars)) {
+  invisible(file.copy(good_bars, latest_dir_bars, overwrite = TRUE))
 }
 ```
 
@@ -983,11 +984,13 @@ if (length(all_new_bars)) {
 #| echo: false
 #| results: 'asis'
 #| cache: false
-bar_pngs <- list.files(file.path("outputs","plots","latest","bars"),
-                       pattern = "bars_.*\\.png$",
-                       full.names = TRUE)
+bar_dir  <- file.path("outputs","plots","latest","bars")
+bar_pngs <- list.files(bar_dir, pattern = "bars_.*\\.png$", full.names = FALSE)
 if (length(bar_pngs)) {
-  knitr::include_graphics(sort(bar_pngs))
+  # Render with paths relative to the HTML output (which lives in analysis/)
+  rel_paths <- file.path("..", bar_dir, sort(bar_pngs))
+  md <- paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
+  knitr::asis_output(md)
 } else {
   knitr::asis_output("> No bar plots were generated; check upstream chunks.")
 }
@@ -1046,10 +1049,14 @@ if (length(groupings) == 0) {
 
 latest_dir_violins <- file.path("outputs","plots","latest","violins")
 dir.create(latest_dir_violins, recursive = TRUE, showWarnings = FALSE)
+old_latest_violins <- list.files(latest_dir_violins, full.names = TRUE, all.files = FALSE)
+if (length(old_latest_violins)) invisible(file.remove(old_latest_violins))
 all_new_violins <- list.files(out_plots(), pattern = "violins_.*\\.png$",
                               recursive = TRUE, full.names = TRUE)
-if (length(all_new_violins)) {
-  invisible(file.copy(all_new_violins, latest_dir_violins, overwrite = TRUE))
+all_new_violins <- all_new_violins[!grepl("/latest/", all_new_violins)]
+good_violins <- all_new_violins[file.info(all_new_violins)$size > 0]
+if (length(good_violins)) {
+  invisible(file.copy(good_violins, latest_dir_violins, overwrite = TRUE))
 }
 
 ```
@@ -1059,11 +1066,12 @@ if (length(all_new_violins)) {
 #| echo: false
 #| results: 'asis'
 #| cache: false
-violin_pngs <- list.files(file.path("outputs","plots","latest","violins"),
-                          pattern = "violins_.*\\.png$",
-                          full.names = TRUE)
-if (length(violin_pngs)) {
-  knitr::include_graphics(sort(violin_pngs))
+vio_dir   <- file.path("outputs","plots","latest","violins")
+vio_files <- list.files(vio_dir, pattern = "violins_.*\\.png$", full.names = FALSE)
+if (length(vio_files)) {
+  rel_paths <- file.path("..", vio_dir, sort(vio_files))
+  md <- paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
+  knitr::asis_output(md)
 } else {
   knitr::asis_output("> No violin plots were generated; check upstream chunks.")
 }
