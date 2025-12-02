@@ -802,13 +802,13 @@ p_bars
 Generate trimmed-mean bar plots (abs & pct) for each grouping. Plots save to `outputs/plots/...` and are embedded below.
 
 ```{r}
-#| label: make-all-barplots
+#| label: make-all-barplots-inputs
 #| message: false
 #| warning: false
 #| echo: false
 #| cache: false
+#| results: "hold"
 
-# ---- inputs ---------------------------------------------------------------
 svc_order <- c(
   "C_Risk","N_export","Sed_export",
   "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
@@ -826,8 +826,16 @@ message("make-all-barplots groupings: ", if (length(groupings)) paste(groupings,
 metrics <- c("pct","abs")                # will map to pct_mean / abs_mean below
 cut_q   <- 0.999
 keep_only_ordered <- TRUE
+```
 
-# ---- helper: compute + plot one panel set --------------------------------
+```{r}
+#| label: make-all-barplots-helper
+#| message: false
+#| warning: false
+#| echo: false
+#| cache: false
+#| results: "hold"
+
 plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
                              include_global = FALSE,
                              out_dir = NULL, out_stub = NULL,
@@ -846,6 +854,16 @@ plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
     svc_order_only  = keep_only_ordered,
     include_global  = include_global
   )
+
+  # sanity guards: need data and the target column
+  if (!nrow(regs)) {
+    message("No data returned for ", group_col, " (", metric, "); skipping.")
+    return(invisible(NULL))
+  }
+  if (!rlang::as_string(ycol) %in% names(regs)) {
+    message("Missing column ", rlang::as_string(ycol), " in agg_change output for ", group_col, "; skipping.")
+    return(invisible(NULL))
+  }
 
   # Clean + facet order
   regs <- regs |>
@@ -908,12 +926,26 @@ plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
                        if (include_global) "_wglobal" else "")
   }
   final_path <- file.path(out_dir, metric, group_col, paste0(out_stub, ".png"))
-  ragg::agg_png(final_path, width = 12, height = 8, units = "in", res = 300, background = "white")
-  print(p); grDevices::dev.off()
-  message("Saved: ", normalizePath(final_path))
+  tryCatch({
+    ragg::agg_png(final_path, width = 12, height = 8, units = "in", res = 300, background = "white")
+    print(p)
+    grDevices::dev.off()
+    message("Saved: ", normalizePath(final_path))
+  }, error = function(e) {
+    message("ERROR while saving ", final_path, ": ", e$message)
+    if (grDevices::dev.cur() > 1) grDevices::dev.off()
+  })
 }
+```
 
-# ---- run: ALL groupings, both metrics, w/ and w/o Global ------------------
+```{r}
+#| label: make-all-barplots-run
+#| message: false
+#| warning: false
+#| echo: false
+#| cache: false
+#| results: "hold"
+
 if (length(groupings) == 0) {
   warning("No grouping columns found in plt_long; skipping bar plots.")
 } else {
@@ -942,9 +974,8 @@ dir.create(latest_dir_bars, recursive = TRUE, showWarnings = FALSE)
 all_new_bars <- list.files(out_plots(), pattern = "bars_.*\\.png$",
                            recursive = TRUE, full.names = TRUE)
 if (length(all_new_bars)) {
-  file.copy(all_new_bars, latest_dir_bars, overwrite = TRUE)
+  invisible(file.copy(all_new_bars, latest_dir_bars, overwrite = TRUE))
 }
-
 ```
 
 ```{r}
@@ -972,6 +1003,7 @@ Summarize hotspot distributions by group using saved PNGs; skip computation if g
 #| warning: false
 #| echo: false
 #| cache: false
+#| results: "hold"
 
 stopifnot(exists("plt_long"))
 
@@ -1017,7 +1049,7 @@ dir.create(latest_dir_violins, recursive = TRUE, showWarnings = FALSE)
 all_new_violins <- list.files(out_plots(), pattern = "violins_.*\\.png$",
                               recursive = TRUE, full.names = TRUE)
 if (length(all_new_violins)) {
-  file.copy(all_new_violins, latest_dir_violins, overwrite = TRUE)
+  invisible(file.copy(all_new_violins, latest_dir_violins, overwrite = TRUE))
 }
 
 ```
