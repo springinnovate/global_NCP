@@ -13,6 +13,11 @@ format:
     code-fold: false
     toc-title: "Contents"
     theme: cosmo
+  pdf:
+    toc: true
+    number-sections: true
+    geometry: margin=1in
+    df-print: kable
 editor: source
 
 params:
@@ -653,6 +658,8 @@ Why this structure? Heavy work (ranking/thresholding/joining) is done once. The 
 
 Short answer: your current barplots use all grid cells (the full 10-km population), not just hotspots. They summarize trimmed means per subregion/global from plt_long via aggregate_change_simple(), with cut_q=0.999 to cap outliers and (optionally) drop_zeros=TRUE. That’s why every bar is positive—those bars are the magnitude of change, not the direction.
 
+Outputs: PNGs land in `outputs/plots/{abs|pct}/<group_col>/bars_*.png` plus a flat copy in `outputs/plots/latest/bars/` for embedding here. The legacy global-only single-bar chart was removed to keep the gallery focused on grouped views.
+
 ```{r}
 #| label: bars_by_region
 #| message: false
@@ -999,6 +1006,8 @@ if (length(bar_pngs)) {
 ## Hotspot violin plots
 
 Summarize hotspot distributions by group using saved PNGs; skip computation if group columns are absent. Helper `run_hotspot_violins_by()` now lives in `R/hotspot_violins.R`, so we just call it from this report.
+
+Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/violins_*.png` and mirrored into `outputs/plots/latest/violins/` for embedding.
 
 ```{r}
 #| label: make-hotspot-violins
