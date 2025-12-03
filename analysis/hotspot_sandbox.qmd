@@ -1,11 +1,18 @@
 ---
-title: "Hotspot Extraction (legacy sandbox)"
-format: html
+title: "Hotspot Sandbox (experiments)"
+subtitle: "Lightweight playground; mirror main configs, keep chunks off by default"
+author: "Jerónimo Rodríguez Escobar"
+format:
+  html:
+    toc: true
+    number-sections: true
+    code-fold: true
+    theme: cosmo
 editor: source
 ---
 
 ::: callout-warning
-This notebook is a **legacy scratchpad**. Use `analysis/hotspot_extraction.qmd` for the canonical pipeline. Kept here for quick experiments (e.g., hotspot vs non-hotspot scatterplots) while reusing the same inputs and configs.
+Use `analysis/hotspot_extraction.qmd` for the **canonical** run. This sandbox is for quick experiments (tweaking cutoffs, trying a different input, prototyping plots) without touching the main report. Heavy chunks are `eval: false` by default—flip them on when you actually need them.
 :::
 
 ## Setup
@@ -37,6 +44,8 @@ set.seed(1)
 #| label: config
 #| echo: true
 
+`%||%` <- function(x, y) if (is.null(x)) y else x
+
 HOTS_CFG <- list(
   pct_cutoff      = 0.05,
   threshold_mode  = "percent",
@@ -56,9 +65,9 @@ HOTS_CFG <- list(
 )
 ```
 
-## Pivot to long (optional; heavy)
+## Pivot to long (heavy; off by default)
 
-Rebuild `plt_long` from the processed grid. Set `eval: true` when you need a fresh pivot; otherwise, source it from the main analysis or cache.
+Rebuild `plt_long` from `processed/10k_change_calc.gpkg`. Turn `eval: true` only if you need a fresh pivot here; otherwise, rely on the main report cache.
 
 ```{r}
 #| label: pivot
@@ -120,9 +129,9 @@ plt_long <- plt_long |>
   dplyr::mutate(service = factor(service, levels = c(HOTS_CFG$svc_order, sort(extras))))
 ```
 
-## Hotspot extraction (optional)
+## Hotspot extraction (off by default)
 
-Run only when you need fresh hotspot tables for experiments; otherwise, reuse outputs from `analysis/hotspot_extraction.qmd`.
+Compute hotspots/non-hotspots using the same rules as the main analysis. Turn on when testing different cutoffs or data sources.
 
 ```{r}
 #| label: extract-hotspots
@@ -147,36 +156,54 @@ hotspots_df <- hs$hotspots_df
 inverse_df  <- hs$non_hotspots_df
 ```
 
-## Sandbox: hotspot vs non-hotspot scatter/ECDF
+## Optional: hotspot vs non-hotspot scatters
 
-Use the precomputed `hotspots_df` / `inverse_df` to prototype visualizations (e.g., scatter by socioeconomic variables, ECDF overlays, KS tests). Turn `eval` on per chunk when ready to run.
-
-```{r}
-#| label: scatter-prototype
-#| eval: false
-
-vars_to_plot <- c("GHS_POP_E2020_GLOBE_sum","rast_gdpTot_1990_2020_30arcsec_2020_sum")
-
-plot_ecdf_grid(
-  hotspots_df, inverse_df,
-  var_id = vars_to_plot[1],
-  top_k = 6, transform = "log1p"
-)
-```
+Quick scatter/ECDF prototypes without touching the main report. Pick one variable, cap points for speed, and facet by top services.
 
 ```{r}
-#| label: ks-prototype
+#| label: scatter-hot-vs-non
 #| eval: false
+#| message: false
+#| warning: false
 
-ks_res <- run_ks_hot_vs_non(
-  hotspots_df = hotspots_df,
-  inverse_df  = inverse_df,
-  vars        = vars_to_plot,
-  sampling    = "match_hot",
-  permute_n   = 0,
-  compute_one_sided = TRUE
-)
-plot_ks_heatmap(ks_res)
+stopifnot(exists("hotspots_df"), exists("inverse_df"))
+
+var_id <- "GHS_POP_E2020_GLOBE_sum"
+top_k  <- 6
+max_n  <- 20000  # cap rows per group for plotting speed
+
+base <- dplyr::bind_rows(
+  dplyr::mutate(hotspots_df, group = "hotspot"),
+  dplyr::mutate(inverse_df,  group = "nonhotspot")
+) |>
+  dplyr::select(service, group, val = .data[[var_id]]) |>
+  dplyr::filter(is.finite(val))
+
+# pick top-K services by KS D for this var
+find_D <- function(d) {
+  x <- d$val[d$group=="hotspot"]; y <- d$val[d$group=="nonhotspot"]
+  if (length(x) < 2 || length(y) < 2) return(NA_real_)
+  suppressWarnings(as.numeric(stats::ks.test(x, y, exact = FALSE)$statistic))
+}
+top_services <- base |>
+  dplyr::group_by(service) |>
+  dplyr::summarise(D = find_D(dplyr::cur_data_all()), .groups = "drop") |>
+  dplyr::arrange(dplyr::desc(D)) |>
+  dplyr::slice_head(n = top_k) |>
+  dplyr::pull(service)
+
+dd <- dplyr::filter(base, service %in% top_services)
+if (nrow(dd) > max_n) dd <- dd[sample.int(nrow(dd), max_n), , drop = FALSE]
+
+ggplot(dd, aes(x = val, y = group, color = group)) +
+  ggrepel::geom_jitter(height = 0.1, alpha = 0.2, size = 0.6, show.legend = FALSE) +
+  facet_wrap(~ service, scales = "free_x") +
+  scale_color_manual(values = c(nonhotspot = "#2D708E", hotspot = "#D43D51")) +
+  labs(
+    title = paste("Hotspot vs non-hotspot:", var_id),
+    x = var_id, y = NULL
+  ) +
+  theme_minimal(base_size = 11)
 ```
 
-Add more scratch chunks below as needed; keep paths and configs aligned with the main analysis to avoid divergence.
+Add any other experimental chunks below; keep paths/configs aligned with the main analysis.

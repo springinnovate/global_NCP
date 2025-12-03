@@ -12,6 +12,18 @@ The core of the workflow leverages the R package [`exactextractr`](https://githu
 
 These tools support reproducible extraction and visualization of ES trends and change detection across modeled periods. They enable exploratory and comparative analyses of spatial transformations, ES provision, and relationships to beneficiary groups.
 
+## Current analyses (reports)
+
+- `analysis/hotspot_extraction.qmd`: canonical run; builds `plt_long` from `processed/10k_change_calc.gpkg`, extracts hotspots (loss/gain vectors), and exports bar/violin plots under `outputs/plots/latest/{bars|violins}` plus hotspot GPKGs/CSV index.
+- `analysis/KS_tests_hotspots.qmd`: KS tests comparing hotspot vs non-hotspot distributions for socioeconomic vars; writes `outputs/tables/ks_results_hot_vs_non.csv` and plots to `outputs/plots/latest/ks`.
+- `analysis/hotspot_sandbox.qmd`: lightweight playground mirroring configs; heavy chunks off by default; use for ad-hoc experiments (e.g., scatters/ECDFs) without touching the main report.
+
+## Rendering reports
+
+- HTML: `quarto render analysis/hotspot_extraction.qmd` (same for KS/sandbox).
+- PDF (TinyTeX installed): `quarto render analysis/hotspot_extraction.qmd --to pdf`. If missing TinyTeX, install once via `quarto install tool tinytex` or print the HTML to PDF in a browser.
+- Chunk caches speed reruns; keep `_cache/` intact unless you need a clean recompute.
+
 # Objectives
 
 - Extract and standardize zonal summary statistics for ES rasters.
@@ -158,4 +170,3 @@ This project is licensed under the Apache License 2.0. See the `LICENSE` file fo
 - Richard P. Sharp
 
 For contributions or issues, [open a GitHub issue](https://github.com/springinnovate/global_NCP/issues) or submit a pull request.
-
