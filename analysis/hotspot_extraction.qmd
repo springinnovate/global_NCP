@@ -992,14 +992,18 @@ if (length(good_bars)) {
 #| results: 'asis'
 #| cache: false
 bar_dir  <- file.path("outputs","plots","latest","bars")
-bar_pngs <- list.files(bar_dir, pattern = "bars_.*\\.png$", full.names = FALSE)
-if (length(bar_pngs)) {
+signed_pngs <- list.files(bar_dir, pattern = "^bars_signed_.*\\.png$", full.names = FALSE)
+
+if (length(signed_pngs)) {
   # Render with paths relative to the HTML output (which lives in analysis/)
-  rel_paths <- file.path("..", bar_dir, sort(bar_pngs))
-  md <- paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
-  knitr::asis_output(md)
+  rel_paths <- file.path("..", bar_dir, sort(signed_pngs))
+  md <- c(
+    "### Signed means (zeros included, trimmed caps)",
+    paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
+  )
+  knitr::asis_output(paste(md, collapse = "\n\n"))
 } else {
-  knitr::asis_output("> No bar plots were generated; check upstream chunks.")
+  knitr::asis_output("> No signed bar plots were generated; check upstream chunks.")
 }
 ```
 
