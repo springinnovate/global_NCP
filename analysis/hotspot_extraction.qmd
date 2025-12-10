@@ -251,11 +251,11 @@ Ranking, percentile cuts, ECDFs, and faceted plots are all simpler and faster wh
 
 ```{r}
 #| label: pivot
-#| eval: true
+#| eval: false
 #| include: false
 #| echo: false
 #| results: hide
-#| cache: true
+#| cache: false
 # ---- Produce plt_long once (skip if already present) ---------------- ----
 
 if (!exists("plt_long", inherits = TRUE)) {
@@ -263,13 +263,20 @@ if (!exists("plt_long", inherits = TRUE)) {
 gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
 stopifnot(file.exists(gpkg))
 
-sf_f <- sf::st_read(gpkg, quiet = TRUE)
+# Read the calc layer explicitly; normalize id columns
+sf_f <- sf::st_read(gpkg, layer = "10k_change_calc", quiet = TRUE)
+if (!"fid" %in% names(sf_f)) {
+  sf_f$fid <- seq_len(nrow(sf_f))
+}
+if (!"c_fid" %in% names(sf_f)) {
+  if ("c_fid.x" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.x)
+  else if ("c_fid.y" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.y)
+  else if ("id" %in% names(sf_f))       sf_f <- dplyr::rename(sf_f, c_fid = id)
+}
+if ("c_fid.x" %in% names(sf_f)) sf_f <- dplyr::select(sf_f, -c_fid.x)
+if ("c_fid.y" %in% names(sf_f)) sf_f <- dplyr::select(sf_f, -c_fid.y)
 
 # Ensure fid exists (idempotent)
-
-if (!"fid" %in% names(sf_f)) {
-sf_f$fid <- seq_len(nrow(sf_f))
-}
 
 plt <- sf::st_drop_geometry(sf_f)
 
@@ -303,6 +310,8 @@ dplyr::filter(!is.na(c_fid)) |> # remove cells outside any country.
 dplyr::filter(!(is.infinite(abs_chg) | is.infinite(pct_chg))) |>
 dplyr::filter(!is.na(abs_chg) | !is.na(pct_chg))
 
+# TODO: replace long pivot with per-service aggregation to avoid huge intermediates
+# (loop over services, trim, summarise by group; see scratch/make_signed_bars.R)
 
 # TODO: externalize label mapping (and loss/gain tags) to a config:
 # analysis_configs/service_meta.csv with columns:
@@ -356,20 +365,15 @@ Before ranking/thresholding, a lightweight QA helps catch silent problems (e.g.,
 
 ```{r}
 #| label: sanity-check-pivot
+#| eval: false
 # ---- Quick sanity --------------------------------------------------------
 
-stopifnot(exists("plt_long"))
-
-# Peek a few rows & structure
-
-dplyr::glimpse(head(plt_long, 5), width = 80)
-
-# Counts per service (helps spot weird sparsity)
-
-plt_long |>
-dplyr::count(service, name = "rows") |>
-dplyr::arrange(dplyr::desc(rows)) |>
-print(n = 50)
+# stopifnot(exists("plt_long"))
+# dplyr::glimpse(head(plt_long, 5), width = 80)
+# plt_long |>
+#   dplyr::count(service, name = "rows") |>
+#   dplyr::arrange(dplyr::desc(rows)) |>
+#   print(n = 50)
 ```
 
 ## Hotspot extraction workflow (global + subregional)
@@ -455,22 +459,19 @@ cat(paste0(
 #| label: validate_hotspots_config
 #| message: false
 #| warning: false
-
-stopifnot(exists("plt_long"))
-svc_all <- unique(plt_long$service)
-
-# No service should be in both loss and gain
-if (length(intersect(HOTS_CFG$loss, HOTS_CFG$gain)) > 0) {
-  stop("A service appears in BOTH `loss` and `gain`. Fix HOTS_CFG.")
-}
-
-miss_loss <- setdiff(HOTS_CFG$loss, svc_all)
-miss_gain <- setdiff(HOTS_CFG$gain, svc_all)
-if (length(miss_loss) > 0 || length(miss_gain) > 0) {
-  warning("Services in HOTS_CFG not found in `plt_long$service`:\n",
-          if (length(miss_loss)) paste0("  - missing loss: ", paste(miss_loss, collapse=", "), "\n"),
-          if (length(miss_gain)) paste0("  - missing gain: ", paste(miss_gain, collapse=", "), "\n"))
-}
+#| eval: false
+# stopifnot(exists("plt_long"))
+# svc_all <- unique(plt_long$service)
+# if (length(intersect(HOTS_CFG$loss, HOTS_CFG$gain)) > 0) {
+#   stop("A service appears in BOTH `loss` and `gain`. Fix HOTS_CFG.")
+# }
+# miss_loss <- setdiff(HOTS_CFG$loss, svc_all)
+# miss_gain <- setdiff(HOTS_CFG$gain, svc_all)
+# if (length(miss_loss) > 0 || length(miss_gain) > 0) {
+#   warning("Services in HOTS_CFG not found in `plt_long$service`:\n",
+#           if (length(miss_loss)) paste0("  - missing loss: ", paste(miss_loss, collapse=", "), "\n"),
+#           if (length(miss_gain)) paste0("  - missing gain: ", paste(miss_gain, collapse=", "), "\n"))
+# }
 ```
 
 ### Export hotspot layers
@@ -488,7 +489,8 @@ if (length(miss_loss) > 0 || length(miss_gain) > 0) {
 #| warning: false
 #| echo: false
 #| include: false
-#| cache: true
+#| cache: false
+#| eval: false
 
 stopifnot(exists("plt_long"))
 
@@ -666,6 +668,7 @@ Outputs: PNGs land in `outputs/plots/{abs|pct}/<group_col>/bars_*.png` plus a fl
 #| warning: false
 #| echo: false
 #| eval: false
+#| cache: false
 
 # --- knobs you can tweak quickly -----------------------------------------
 group_col         <- "region_wb"   # e.g. "income_grp","continent","region_un","WWF_biome"
@@ -815,24 +818,25 @@ Generate trimmed-mean bar plots (abs & pct) for each grouping. Plots save to `ou
 #| echo: false
 #| cache: false
 #| results: "hold"
+#| eval: false
 
-svc_order <- c(
-  "C_Risk","N_export","Sed_export",
-  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-  "Pollination","Nature_Access"
-)
-groupings <- if (!is.null(HOTS_CFG$groupings)) HOTS_CFG$groupings else
-  c("income_grp","region_wb","continent","region_un","WWF_biome")
-missing_groupings <- setdiff(groupings, names(plt_long))
-if (length(missing_groupings)) {
-  warning("Grouping column(s) not found in plt_long and will be skipped: ",
-          paste(missing_groupings, collapse = ", "))
-}
-groupings <- intersect(groupings, names(plt_long))
-message("make-all-barplots groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
-metrics <- c("pct","abs")                # will map to pct_mean / abs_mean below
-cut_q   <- 0.999
-keep_only_ordered <- TRUE
+# svc_order <- c(
+#   "C_Risk","N_export","Sed_export",
+#   "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+#   "Pollination","Nature_Access"
+# )
+# groupings <- if (!is.null(HOTS_CFG$groupings)) HOTS_CFG$groupings else
+#   c("income_grp","region_wb","continent","region_un","WWF_biome")
+# missing_groupings <- setdiff(groupings, names(plt_long))
+# if (length(missing_groupings)) {
+#   warning("Grouping column(s) not found in plt_long and will be skipped: ",
+#           paste(missing_groupings, collapse = ", "))
+# }
+# groupings <- intersect(groupings, names(plt_long))
+# message("make-all-barplots groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
+# metrics <- c("pct","abs")                # will map to pct_mean / abs_mean below
+# cut_q   <- 0.999
+# keep_only_ordered <- TRUE
 ```
 
 ```{r}
@@ -943,6 +947,101 @@ plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
     if (grDevices::dev.cur() > 1) grDevices::dev.off()
   })
 }
+
+# Signed bar view with global reference as dotted line (no Global bar)
+plot_signed_bars <- function(df, group_col, metric = c("pct","abs"),
+                             include_global = TRUE,
+                             cut_q = 0.999,
+                             svc_order = NULL,
+                             out_dir = NULL,
+                             out_stub = NULL) {
+  metric <- match.arg(metric)
+  ycol <- if (metric == "pct") "pct_signed" else "abs_signed"
+  vcol <- if (metric == "pct") "pct_chg" else "abs_chg"
+
+  stopifnot(group_col %in% names(df))
+  gsym <- rlang::sym(group_col)
+
+  df_trim <- df |>
+    dplyr::filter(!is.na(.data[[group_col]])) |>
+    dplyr::group_by(.data$service) |>
+    dplyr::mutate(
+      cap      = stats::quantile(abs(.data[[vcol]]), cut_q, na.rm = TRUE),
+      val_trim = pmax(pmin(.data[[vcol]], cap), -cap)
+    ) |>
+    dplyr::ungroup() |>
+    dplyr::group_by(.data$service, .data[[group_col]]) |>
+    dplyr::summarise(
+      !!ycol := mean(.data$val_trim, na.rm = TRUE),
+      .groups = "drop"
+    )
+  # Drop any pre-existing "Global" rows; we show it via line only
+  df_trim <- df_trim |> dplyr::filter(.data[[group_col]] != "Global")
+
+  glob_ref <- NULL
+  if (isTRUE(include_global)) {
+    glob_ref <- df |>
+      dplyr::group_by(.data$service) |>
+      dplyr::mutate(
+        cap      = stats::quantile(abs(.data[[vcol]]), cut_q, na.rm = TRUE),
+        val_trim = pmax(pmin(.data[[vcol]], cap), -cap)
+      ) |>
+      dplyr::ungroup() |>
+      dplyr::group_by(.data$service) |>
+      dplyr::summarise(ref = mean(.data$val_trim, na.rm = TRUE), .groups = "drop")
+  }
+
+  if (!is.null(svc_order)) {
+    df_trim <- df_trim |>
+      dplyr::filter(.data$service %in% svc_order) |>
+      dplyr::mutate(service = factor(.data$service, levels = svc_order))
+    if (!is.null(glob_ref)) {
+      glob_ref <- glob_ref |>
+        dplyr::filter(.data$service %in% svc_order) |>
+        dplyr::mutate(service = factor(.data$service, levels = svc_order))
+    }
+  }
+
+  lvl <- sort(unique(df_trim[[group_col]]))
+  df_trim[[group_col]] <- factor(df_trim[[group_col]], levels = lvl)
+
+  p <- ggplot2::ggplot(df_trim, ggplot2::aes(x = !!gsym, y = !!rlang::sym(ycol), fill = !!gsym)) +
+    ggplot2::geom_col(show.legend = FALSE) +
+    ggplot2::geom_hline(yintercept = 0, color = "#d9d9d9") +
+    {
+      if (!is.null(glob_ref) && nrow(glob_ref)) {
+        ggplot2::geom_hline(data = glob_ref, ggplot2::aes(yintercept = ref),
+                            linetype = "dashed", color = "black", linewidth = 0.8)
+      } else NULL
+    } +
+    ggplot2::facet_wrap(~ service, ncol = 3, scales = "free_y", drop = TRUE) +
+    ggplot2::labs(
+      x = group_col,
+      y = if (metric == "pct") "Mean % change (trimmed, signed)" else "Mean absolute change (trimmed, signed)",
+      title = paste0("Signed mean change by ", group_col,
+                     if (include_global) " (global dotted reference)" else "")
+    ) +
+    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme(
+      strip.background = ggplot2::element_rect(fill = "#f3f4f6", color = NA),
+      strip.text = ggplot2::element_text(face = "bold"),
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1)
+    )
+
+  if (is.null(out_dir)) out_dir <- out_plots()
+  grp_dir <- tolower(group_col)
+  dir.create(file.path(out_dir, paste0("signed_", metric), grp_dir), recursive = TRUE, showWarnings = FALSE)
+  if (is.null(out_stub)) {
+    out_stub <- paste0("bars_signedline_", tolower(group_col), "_", metric)
+  }
+  final_path <- file.path(out_dir, paste0("signed_", metric), grp_dir, paste0(out_stub, ".png"))
+  tryCatch({
+    ggplot2::ggsave(final_path, p, width = 12, height = 8, dpi = 300, bg = "white")
+    message("Saved signed bars: ", normalizePath(final_path))
+  }, error = function(e) {
+    message("ERROR while saving signed bars ", final_path, ": ", e$message)
+  })
+}
 ```
 
 ```{r}
@@ -951,6 +1050,7 @@ plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
 #| warning: false
 #| echo: false
 #| cache: false
+#| eval: false
 #| results: "hold"
 
 if (length(groupings) == 0) {
@@ -962,6 +1062,9 @@ if (length(groupings) == 0) {
                        include_global = FALSE)
       plot_change_bars(plt_long, group_col = gc, metric = m,
                        include_global = TRUE)
+      plot_signed_bars(plt_long, group_col = gc, metric = m,
+                       include_global = TRUE, cut_q = cut_q,
+                       svc_order = svc_order)
     }
   }
 }
@@ -992,7 +1095,7 @@ if (length(good_bars)) {
 #| results: 'asis'
 #| cache: false
 bar_dir  <- file.path("outputs","plots","latest","bars")
-signed_pngs <- list.files(bar_dir, pattern = "^bars_signed_.*\\.png$", full.names = FALSE)
+signed_pngs <- list.files(bar_dir, pattern = "^bars_signedline_.*\\.png$", full.names = FALSE)
 
 if (length(signed_pngs)) {
   # Render with paths relative to the HTML output (which lives in analysis/)
@@ -1020,57 +1123,55 @@ Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/violins_*.png`
 #| echo: false
 #| cache: false
 #| results: "hold"
+#| eval: false
 
-stopifnot(exists("plt_long"))
-
-groupings <- if (!is.null(HOTS_CFG$groupings) && length(HOTS_CFG$groupings) > 0) {
-  HOTS_CFG$groupings
-} else {
-  c("income_grp","region_wb","continent","region_un","WWF_biome")
-}
-missing_groupings <- setdiff(groupings, names(plt_long))
-if (length(missing_groupings)) {
-  warning("Grouping column(s) not found in plt_long and will be skipped: ",
-          paste(missing_groupings, collapse = ", "))
-}
-groupings <- intersect(groupings, names(plt_long))
-message("make-hotspot-violins groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
-violin_order <- levels(plt_long$service)
-if (is.null(violin_order)) {
-  violin_order <- unique(plt_long$service)
-}
-violin_order <- as.character(violin_order)
-
-if (length(groupings) == 0) {
-  warning("No grouping columns found in plt_long; skipping hotspot violins.")
-} else {
-  for (gc in groupings) {
-    message("Rendering hotspot violins for: ", gc)
-    run_hotspot_violins_by(
-      df_long          = plt_long,
-      group_col         = gc,
-      loss              = HOTS_CFG$loss,
-      gain              = HOTS_CFG$gain,
-      pct_cutoff        = HOTS_CFG$pct_cutoff,
-      threshold_mode    = HOTS_CFG$threshold_mode,
-      svc_order         = violin_order,
-      cut_q             = 0.999,
-      keep_only_ordered = TRUE
-    )
-  }
-}
-
-latest_dir_violins <- file.path("outputs","plots","latest","violins")
-dir.create(latest_dir_violins, recursive = TRUE, showWarnings = FALSE)
-old_latest_violins <- list.files(latest_dir_violins, full.names = TRUE, all.files = FALSE)
-if (length(old_latest_violins)) invisible(file.remove(old_latest_violins))
-all_new_violins <- list.files(out_plots(), pattern = "violins_.*\\.png$",
-                              recursive = TRUE, full.names = TRUE)
-all_new_violins <- all_new_violins[!grepl("/latest/", all_new_violins)]
-good_violins <- all_new_violins[file.info(all_new_violins)$size > 0]
-if (length(good_violins)) {
-  invisible(file.copy(good_violins, latest_dir_violins, overwrite = TRUE))
-}
+# stopifnot(exists("plt_long"))
+# groupings <- if (!is.null(HOTS_CFG$groupings) && length(HOTS_CFG$groupings) > 0) {
+#   HOTS_CFG$groupings
+# } else {
+#   c("income_grp","region_wb","continent","region_un","WWF_biome")
+# }
+# missing_groupings <- setdiff(groupings, names(plt_long))
+# if (length(missing_groupings)) {
+#   warning("Grouping column(s) not found in plt_long and will be skipped: ",
+#           paste(missing_groupings, collapse = ", "))
+# }
+# groupings <- intersect(groupings, names(plt_long))
+# message("make-hotspot-violins groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
+# violin_order <- levels(plt_long$service)
+# if (is.null(violin_order)) {
+#   violin_order <- unique(plt_long$service)
+# }
+# violin_order <- as.character(violin_order)
+# if (length(groupings) == 0) {
+#   warning("No grouping columns found in plt_long; skipping hotspot violins.")
+# } else {
+#   for (gc in groupings) {
+#     message("Rendering hotspot violins for: ", gc)
+#     run_hotspot_violins_by(
+#       df_long          = plt_long,
+#       group_col         = gc,
+#       loss              = HOTS_CFG$loss,
+#       gain              = HOTS_CFG$gain,
+#       pct_cutoff        = HOTS_CFG$pct_cutoff,
+#       threshold_mode    = HOTS_CFG$threshold_mode,
+#       svc_order         = violin_order,
+#       cut_q             = 0.999,
+#       keep_only_ordered = TRUE
+#     )
+#   }
+# }
+# latest_dir_violins <- file.path("outputs","plots","latest","violins")
+# dir.create(latest_dir_violins, recursive = TRUE, showWarnings = FALSE)
+# old_latest_violins <- list.files(latest_dir_violins, full.names = TRUE, all.files = FALSE)
+# if (length(old_latest_violins)) invisible(file.remove(old_latest_violins))
+# all_new_violins <- list.files(out_plots(), pattern = "violins_.*\\.png$",
+#                               recursive = TRUE, full.names = TRUE)
+# all_new_violins <- all_new_violins[!grepl("/latest/", all_new_violins)]
+# good_violins <- all_new_violins[file.info(all_new_violins)$size > 0]
+# if (length(good_violins)) {
+#   invisible(file.copy(good_violins, latest_dir_violins, overwrite = TRUE))
+# }
 
 ```
 
