@@ -1,10 +1,10 @@
 ---
-title: "Hotspot Extraction"
+title: "Ecosystem Service Change & Hotspot Extraction"
 subtitle: "v{{< meta analysis_version >}}"
 author: "Jerónimo Rodríguez Escobar"
 email: "jeronimo.rodriguez@wwfus.org"
-date: today
-date-format: iso
+date: last-modified
+date-format: "YYYY-MM-DD HH:mm zzz"
 analysis_version: "v0.4.1"
 format:
   html:
@@ -23,6 +23,10 @@ editor: source
 params:
   analysis_version: "v0.4.1"
 ---
+
+## Overview
+
+Prepares the processed 10 km grid, derives hotspot flags, and produces the bar/violin plots that summarize signed and absolute change by group (region, income, biome). Key steps: load helpers and paths, attach grouping attributes, pivot change fields to long form, define hotspots using the configured thresholds, export hotspot layers, and write the latest plots to `outputs/plots/latest/`.
 
 ## Setup and Libraries
 
@@ -82,9 +86,7 @@ devtools::load_all(quiet = TRUE)
 
 ```
 
-## Run Metadata Banner
-
-Print run metadata (analysis version, timestamp, git commit, data root) so exported reports remain traceable.
+## Metadata Banner
 
 Published: `r format(Sys.time(), "%Y-%m-%d %H:%M %Z")`
 
@@ -135,7 +137,7 @@ cat(paste0(
 
 Attach country and biome IDs to the 10 km grid (`sf_f`) so downstream aggregation/hotspot steps can group by region. This chunk only runs if the processed GPKG is missing.
 
-We enrich the 10 km grid (`sf_f`) with country and WWF biome IDs so we can aggregate and compare change by subregions (World Bank region, income group, continent, UN region, and biome). We use a point-on-surface join to avoid sliver/overlap issues, keep only the needed fields, and write a single enriched GPKG for downstream grouping, hotspot extraction, and plotting.
+The input 10 km grid (`sf_f`) is enriched with country and WWF biome IDs to allow aggregation and comparisons of change by subregions (World Bank region, income group, continent, UN region, and biome). We use a point-on-surface join to avoid sliver/overlap issues, keep only the needed fields, and write a single enriched GPKG for downstream grouping, hotspot extraction, and plotting.
 
 ::: callout-tip
 **What this step does**
@@ -147,7 +149,7 @@ We enrich the 10 km grid (`sf_f`) with country and WWF biome IDs so we can aggre
 
 **Why point-on-surface?** It’s robust for odd cell shapes and avoids polygon–polygon sliver issues.
 
-**When to bump the version?** If the joined attributes change schema/meaning (e.g., new grouping columns), bump **MINOR**; if file name/structure changes in a breaking way, bump **MAJOR**.
+<!-- NOTE (keep in source only): When to bump the version? If the joined attributes change schema/meaning (e.g., new grouping columns), bump MINOR; if file name/structure changes in a breaking way, bump MAJOR. -->
 :::
 
 ```{r}

@@ -5,6 +5,7 @@
 library(sf)
 library(dplyr)
 library(ggplot2)
+library(stringr)
 
 message("Starting signed bar generation (no long pivot)...")
 
@@ -17,19 +18,21 @@ cut_q     <- 0.999
 svc_order <- c("C_Risk","N_export","Sed_export",
                "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
                "Pollination","Nature_Access")
-service_lookup <- c(
-  sed_export    = "Sed_export",
-  n_export      = "N_export",
-  n_retention   = "N_retention",
-  nature_access = "Nature_Access",
-  pollination   = "Pollination",
-  usle          = "USLE",
-  n_ret_ratio   = "N_Ret_Ratio",
-  sed_ret_ratio = "Sed_Ret_Ratio",
-  Rt_ratio      = "C_Risk_Red_Ratio",
-  Rt            = "C_Risk",
-  Rt_service    = "C_Prot_service",
-  Rt_nohab      = "Rt_nohab"
+canonical_lookup <- c(
+  sed_export       = "Sed_export",
+  n_export         = "N_export",
+  n_retention      = "N_retention",
+  nature_access    = "Nature_Access",
+  pollination      = "Pollination",
+  usle             = "USLE",
+  n_ret_ratio      = "N_Ret_Ratio",
+  sed_ret_ratio    = "Sed_Ret_Ratio",
+  rt_ratio         = "C_Risk_Red_Ratio",
+  rt               = "C_Risk",
+  c_risk           = "C_Risk",
+  c_risk_red_ratio = "C_Risk_Red_Ratio",
+  rt_service       = "C_Prot_service",
+  rt_nohab         = "Rt_nohab"
 )
 
 sf_f <- st_read(gpkg, layer = "10k_change_calc", quiet = TRUE)
@@ -43,15 +46,22 @@ sf_f <- select(sf_f, -any_of(c("c_fid.x","c_fid.y")))
 
 # service names inferred from *_chg columns
 chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
-services_raw <- unique(sub("_(abs|pct)_chg$", "", chg_cols))
-services_clean <- stringr::str_remove(services_raw, "_mean$")
-svc_map <- tibble(raw = services_clean,
-                  canonical = dplyr::recode(services_clean, !!!service_lookup, .default = services_clean))
-# keep only canonical services in the specified order
-canonical_services <- svc_order[svc_order %in% svc_map$canonical]
-svc_map <- dplyr::filter(svc_map, canonical %in% canonical_services)
-if (!length(canonical_services)) {
-  stop("No services from svc_order found in change columns; cannot plot signed bars.")
+services_raw   <- unique(sub("_(abs|pct)_chg$", "", chg_cols))     # as in file (may include _mean)
+services_clean <- stringr::str_remove(services_raw, "_mean$")       # remove trailing _mean for canonical
+services_lower <- tolower(services_clean)
+# build mapping; include both raw base and no-_mean base, with ready-to-use columns
+svc_map <- tibble(
+  col_base  = c(services_raw, services_clean),
+  canonical = dplyr::recode(c(services_lower, services_lower),
+                            !!!canonical_lookup, .default = c(services_clean, services_clean))
+) |>
+  dplyr::distinct() |>
+  dplyr::mutate(col_pct = paste0(col_base, "_pct_chg"),
+                col_abs = paste0(col_base, "_abs_chg"))
+canonical_services <- svc_order
+missing_services <- setdiff(canonical_services, unique(svc_map$canonical))
+if (length(missing_services)) {
+  message("Warning: missing change columns for services: ", paste(missing_services, collapse = ", "))
 }
 
 # keep only grouping columns that exist
@@ -66,9 +76,20 @@ plot_one_group <- function(df, group_col, metric, svc_map, canonical_services, c
   v_suffix <- if (metric == "pct") "pct_chg" else "abs_chg"
 
   for (svc in canonical_services) {
-    raw <- svc_map$raw[match(svc, svc_map$canonical)]
-    col <- paste0(raw, "_", v_suffix)
-    if (!col %in% names(df)) next
+    map_rows <- dplyr::filter(svc_map, canonical == svc)
+    if (!nrow(map_rows)) {
+      message("Skipping ", svc, " (no mapping to change columns)")
+      next
+    }
+    candidate_cols <- if (metric == "pct") map_rows$col_pct else map_rows$col_abs
+    candidate_cols <- candidate_cols[candidate_cols %in% names(df)]
+    if (!length(candidate_cols)) {
+      all_candidates <- if (metric == "pct") map_rows$col_pct else map_rows$col_abs
+      message("Skipping ", svc, " (no ", v_suffix, " column found among: ",
+              paste(unique(all_candidates), collapse = ", "), ")")
+      next
+    }
+    col <- candidate_cols[1]
     v <- df[[col]]
     # trim per service
     cap <- quantile(abs(v), cut_q, na.rm = TRUE)
@@ -94,9 +115,9 @@ plot_one_group <- function(df, group_col, metric, svc_map, canonical_services, c
 
   p <- ggplot(df_trim, aes(x = .data[[group_col]], y = val, fill = .data[[group_col]])) +
     geom_col(show.legend = FALSE) +
-    geom_hline(yintercept = 0, color = "#d9d9d9") +
+    geom_hline(yintercept = 0, color = "#7f7f7f", linewidth = 0.6) +
     geom_hline(data = glob_ref, aes(yintercept = ref),
-               linetype = "dashed", color = "black", linewidth = 0.8) +
+               linetype = "dashed", color = "#4a4a4a", linewidth = 0.5) +
     facet_wrap(~ service, ncol = 3, scales = "free_y") +
     labs(x = group_col,
          y = if (metric == "pct") "Mean % change (trimmed, signed)" else "Mean absolute change (trimmed, signed)",

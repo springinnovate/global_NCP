@@ -3,6 +3,8 @@ title: "KS tests: hotspots vs non-hotspots"
 subtitle: "v{{< meta analysis_version >}}"
 author: "Jerónimo Rodríguez Escobar"
 analysis_version: "v0.5.0"
+date: last-modified
+date-format: "YYYY-MM-DD HH:mm zzz"
 format:
   html:
     toc: true
@@ -19,6 +21,10 @@ editor: source
 execute:
   freeze: auto
 ---
+
+## Overview
+
+Uses the hotspot definition from the extraction report to compare hotspots vs non-hotspots across socio-environmental covariates. Workflow: load helpers and cached `plt_long`, derive hotspot/complement subsets with the same thresholds, run KS tests per service × variable, and export heatmaps/bars/ECDFs to `outputs/plots/ks/` (mirrored in `outputs/plots/latest/ks/`). The goal is a quick, reproducible readout of which covariates most strongly distinguish hotspot cells.
 
 ## Setup
 
@@ -122,19 +128,27 @@ Build `plt_long` from the processed grid, harmonizing service labels and keeping
 #| include: false
 #| echo: false
 #| results: hide
-#| cache: true
+#| cache: false
 
-if (!exists("plt_long", inherits = TRUE)) {
+rds_path <- here::here("outputs","tables","plt_long.rds")
+if (file.exists(rds_path)) {
+  plt_long <- readRDS(rds_path)
+} else if (!exists("plt_long", inherits = TRUE)) {
   gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
   stopifnot(file.exists(gpkg))
 
-  sf_f <- sf::st_read(gpkg, quiet = TRUE)
+  sf_f <- sf::st_read(gpkg, layer = "10k_change_calc", quiet = TRUE)
   if (!"fid" %in% names(sf_f)) sf_f$fid <- seq_len(nrow(sf_f))
+  if (!"c_fid" %in% names(sf_f)) {
+    if ("c_fid.x" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.x)
+    else if ("c_fid.y" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.y)
+    else if ("id" %in% names(sf_f))      sf_f <- dplyr::rename(sf_f, c_fid = id)
+  }
+  sf_f <- dplyr::select(sf_f, -dplyr::any_of(c("c_fid.x","c_fid.y")))
   plt <- sf::st_drop_geometry(sf_f)
 
-  id_cols  <- c("fid", "c_fid")
   chg_cols <- grep("_(abs|pct)_chg$", names(plt), value = TRUE)
-  socio_vars <- setdiff(names(plt), c(id_cols, chg_cols))
+  socio_vars <- setdiff(names(plt), c("fid","c_fid", chg_cols))
 
   plt_long <- plt |>
     tidyr::pivot_longer(
@@ -171,6 +185,8 @@ if (!exists("plt_long", inherits = TRUE)) {
   )
   plt_long <- plt_long |>
     dplyr::mutate(service = dplyr::recode(service, !!!service_lookup, .default = service))
+
+  saveRDS(plt_long, rds_path)
 }
 
 svc_order <- c(
@@ -252,9 +268,20 @@ dir.create(ks_plot_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Heatmap
 heat_path <- file.path(ks_plot_dir, "ks_heatmap.png")
+svc_order <- c(
+  "C_Risk","N_export","Sed_export",
+  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+  "Pollination","Nature_Access"
+)
+
 ggplot2::ggsave(
   heat_path,
-  plot_ks_heatmap(ks_res, fill_limits = c(0, NA)),
+  plot_ks_heatmap(
+    ks_res,
+    fill_limits = c(0, NA),
+    reorder = FALSE
+  ) +
+    ggplot2::scale_x_discrete(drop = FALSE, limits = svc_order),
   width = 10, height = 6, dpi = 300, bg = "white"
 )
 
@@ -281,7 +308,7 @@ ecdf_files <- save_ecdf_grids(
   transform_by_var    = KS_CFG$transform_by_var,
   out_dir             = ecdf_dir,
   prefix              = "ecdf",
-  width = 10, height = 7, dpi = 300, use_ragg = TRUE,
+  width = 10, height = 7, dpi = 300, use_ragg = FALSE,
   verbose = FALSE
 )
 

@@ -31,8 +31,11 @@ plot_ecdf_grid <- function(hotspots_df, inverse_df, var_id, top_k = 4,
   dd <- dplyr::filter(base, .data$service %in% top_services)
   if (transform == "log1p") dd <- dplyr::mutate(dd, val = log1p(.data$val))
   
-  ggplot2::ggplot(dd, ggplot2::aes(.data$val, color = .data$group)) +
-    ggplot2::stat_ecdf(linewidth = line_size) +
+  ggplot2::ggplot(
+    dd,
+    ggplot2::aes(x = .data$val, color = .data$group, group = .data$group)
+  ) +
+    ggplot2::stat_ecdf(linewidth = line_size, na.rm = TRUE) +
     ggplot2::facet_wrap(~ service, scales = "free_x") +
     ggplot2::scale_color_manual(values = c(nonhotspot = "#2D708E", hotspot = "#D43D51"),
                                 guide = ggplot2::guide_legend(title = NULL)) +

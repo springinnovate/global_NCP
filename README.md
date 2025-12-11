@@ -4,7 +4,7 @@ Jeronimo Rodriguez Escobar
 
 # Overview
 
-Working version of a structured workflow for extracting, analyzing, and visualizing **zonal summary statistics** from global raster datasets including **ecosystem service (ES)**, **land cover (LC)**, and socioeconomic (beneficiary) layers. The analysis synthesizes outputs across multiple spatial aggregation levels (e.g., basins, countries, regions).
+Working version of a structured workflow for extracting, analyzing, and visualizing **zonal summary statistics** from global raster datasets including **ecosystem service (ES)**, **land cover (LC)**, and socioeconomic (beneficiary) layers. The analysis is built around a synthesized **10 km grid** (`processed/10k_change_calc.gpkg`, external data dir) enriched with country/region/biome attributes, with outputs aggregated to countries, regions, income groups, and biomes.
 
 The core of the workflow leverages the R package [`exactextractr`](https://github.com/isciences/exactextractr), which enables efficient zonal operations between raster and vector data. Python workflows use `taskgraph` for parallel execution.
 
@@ -20,16 +20,11 @@ These tools support reproducible extraction and visualization of ES trends and c
 
 # Input Data
 
-## Polygon Layers
+## Polygon Layers / Grid
 
-Stored in the `vector/` folder and include:
-
--   HydroBASINS (Levels 6 and 7)
--   Country boundaries
--   Income groups, World Bank regions, continents
--   WWF Biomes and Ecoregions
-
-Each basin is assigned to the country where the largest area is contained, facilitating non-spatial joins with country-level attributes. (This logic may be revised for long, transboundary basins.)
+-   **10 km grid with change + attributes**: `processed/10k_change_calc.gpkg` (external data dir), enriched with country, income group, WB/UN regions, continent, WWF biome.
+-   Country boundaries and regional lookups (income, WB/UN regions, continent) under `vector_basedata/`.
+-   WWF Biomes and Ecoregions.
 
 ## Raster Layers
 
@@ -131,12 +126,10 @@ Socioeconomic variables are added from gridded layers using `exact_extract()`:
 
 ## 5. Visualization
 
--   Scatterplots: % change in ES vs.beneficiary variables
--   Maps: faceted binary hotspot maps per service (`tmap::tm_facets()`)
-
-::: {.cell layout-align="center"}
-<img src="outputs/es_change_barplot.png" width="70%"/>
-:::
+-   Barplots (magnitude + signed) by region/income/biome: `outputs/plots/latest/bars/`
+-   Hotspot violins by grouping: `outputs/plots/latest/violins/`
+-   KS ECDFs/plots: `outputs/plots/latest/ks/`; results table at `outputs/tables/ks_results_hot_vs_non.csv`
+-   Existing maps/figures from the reports as needed
 
 # Future Directions
 
