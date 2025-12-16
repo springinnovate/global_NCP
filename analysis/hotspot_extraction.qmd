@@ -70,7 +70,10 @@ source(here::here("R","paths.R"))
 options(dplyr.summarise.inform = FALSE)
 sf::sf_use_s2(TRUE)
 Sys.setenv(GDAL_NUM_THREADS = "ALL_CPUS", PROJ_NETWORK = "ON")
-terraOptions(tempdir = file.path(tempdir(), "terra_tmp"))
+# terraOptions(tempdir = file.path(tempdir(), "terra_tmp"))  # comment out, or:
+dir.create(file.path(tempdir(), "terra_tmp"), recursive = TRUE, showWarnings = FALSE)
+
+
 
 set.seed(1)
 
@@ -144,12 +147,6 @@ if (!exists("svc_order", inherits = TRUE)) {
     "Pollination","Nature_Access"
   )
 }
-```
-
-```{r}
-#| label: svc-canonical-global
-#| include: false
-#| echo: false
 if (!exists("canonical_lookup", inherits = TRUE)) {
   canonical_lookup <- c(
     sed_export       = "Sed_export",
@@ -267,20 +264,15 @@ if (!file.exists(out_gpkg)) {
 ```
 
 
-## Produce signed bars (direct; no pivot)
+## Produce signed change bars
 
-Bars are computed directly from `processed/10k_change_calc.gpkg`; no pivot needed. We output two variants—zeros kept vs zeros dropped—both with trimmed tails and a dashed global mean. `plt_long` is only loaded later for hotspots/KS.
+Bars are computed directly from `processed/10k_change_calc.gpkg`. We output two variants—zeros kept vs zeros dropped—both with trimmed tails and a dashed global mean. Pivioted `plt_long` is only necessary for hotspots/KS.
 
 ```{r}
-#| label: make-signed-bars-direct
+#| label: make-signed-bars-data
 #| eval: true
 #| message: false
 #| warning: false
-
-library(sf)
-library(dplyr)
-library(ggplot2)
-library(stringr)
 
 services <- svc_order
 groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome")
@@ -372,10 +364,19 @@ signed_drop0 <- agg_by_group(sf_f, services, groupings, cut_q = cut_q,
                              handle_inf = handle_inf, drop_zero = TRUE)
 print(dplyr::count(signed_keep0, grouping, metric, service))
 print(dplyr::count(signed_drop0, grouping, metric, service))
+```
+
+```{r}
+#| label: compute-global-refs
+#| eval: true
+#| message: false
+#| warning: false
+#| echo: false
 
 compute_global_refs <- function(df, services, cut_q = 0.999,
                                 handle_inf = c("na","cap"), drop_zero = FALSE) {
   handle_inf <- match.arg(handle_inf)
+  vmsg("Computing global refs: drop_zero = ", drop_zero)
   out <- list()
   for (svc in services) {
     map_rows <- dplyr::filter(svc_map, canonical == svc)
@@ -405,6 +406,14 @@ glob_keep0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
                                   handle_inf = handle_inf, drop_zero = FALSE)
 glob_drop0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
                                   handle_inf = handle_inf, drop_zero = TRUE)
+```
+
+```{r}
+#| label: make-signed-bars-plot
+#| eval: false
+#| message: false
+#| warning: false
+#| echo: false
 
 plot_signed_alt <- function(df, grouping, metric,
                             refs,
@@ -455,78 +464,28 @@ for (g in unique(signed_keep0$grouping)) {
   }
 }
 ```
+### Diagnose sign flips (keep0 vs drop0)
 
-## Reshape grid data to a service-long table
-
-Pivot the processed grid into a tidy `plt_long` table (one row per cell × service) and standardize service labels/factor order. Cached so we only rebuild when inputs change.
-
-Start by turning the wide grid table (one row per 10 km cell with many \*\_abs_chg / \*\_pct_chg columns) into an **analysis-ready long format**: one row per **cell × service** with two value columns: `abs_chg` and `pct_chg`. This makes it easy to rank, filter, and facet by service in later hotspot steps.
-
-**What this chunk does** 1) Reads the processed grid from `processed/10k_change_calc.gpkg` and ensures a unique `fid`.\
-2) Splits “ID/grouping” columns from change columns.\
-3) Pivots \*\_abs_chg / \*\_pct_chg to long, then back to wide as `abs_chg` / `pct_chg` per service.\
-4) Cleans obvious issues (drops `Inf`/`NA` where appropriate) so plots and tests won’t choke.\
-5) Applies a human-readable service label mapping (e.g., `n_export → N_export`).\
-6) Sets a canonical facet order (`svc_order`) so plots are consistent across the report.
-
-**Inputs:** `processed/10k_change_calc.gpkg` (contains `fid`, `c_fid`, service change fields, and sub-regional tags like `region_wb`, `income_grp`, `BIOME`, etc.).\
-**Output:** `plt_long` (tidy tibble) with columns\
-`fid, c_fid, service, abs_chg, pct_chg, <grouping/socio vars>`.
-
-::: callout-tip
-**Why long format?**\
-Ranking, percentile cuts, ECDFs, and faceted plots are all simpler and faster when each **service** is a row attribute rather than a separate column.
-:::
+Use this helper to see where dropping zeros changes the sign of the mean. Run interactively (set `eval: true`) after the direct bars chunk so `signed_keep0`/`signed_drop0` exist.
 
 ```{r}
-#| label: pivot
+#| label: inspect-sign-flips
 #| eval: false
-#| include: false
-#| echo: false
-#| results: hide
-#| cache: false
-# ---- Produce plt_long once (skip if already present) ---------------- ----
 
-if (!exists("plt_long", inherits = TRUE)) {
+cmp <- dplyr::full_join(
+  signed_keep0 |> dplyr::select(grouping, metric, service, group, mean_keep = mean_chg),
+  signed_drop0 |> dplyr::select(grouping, metric, service, group, mean_drop = mean_chg),
+  by = c("grouping","metric","service","group")
+) |>
+  dplyr::mutate(
+    sign_keep = sign(mean_keep),
+    sign_drop = sign(mean_drop),
+    flipped   = sign_keep != sign_drop & !is.na(sign_keep) & !is.na(sign_drop)
+  )
 
-gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
-stopifnot(file.exists(gpkg))
-
-# Read the calc layer explicitly; normalize id columns
-sf_f <- sf::st_read(gpkg, layer = "10k_change_calc", quiet = TRUE)
-if (!"fid" %in% names(sf_f)) {
-  sf_f$fid <- seq_len(nrow(sf_f))
-}
-if (!"c_fid" %in% names(sf_f)) {
-  if ("c_fid.x" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.x)
-  else if ("c_fid.y" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.y)
-  else if ("id" %in% names(sf_f))       sf_f <- dplyr::rename(sf_f, c_fid = id)
-}
-if ("c_fid.x" %in% names(sf_f)) sf_f <- dplyr::select(sf_f, -c_fid.x)
-if ("c_fid.y" %in% names(sf_f)) sf_f <- dplyr::select(sf_f, -c_fid.y)
-
-# Ensure fid exists (idempotent)
-
-## Load cached long table (plt_long)
-
-Hotspot export still expects `plt_long`. To avoid the heavy pivot here, we load the cached table from `outputs/tables/plt_long.rds`. If it’s missing, run `scratch/pivot_long.qmd` (or `scratch/pivot_long.R`) to regenerate it.
-
-```{r}
-#| label: pivot
-#| echo: false
-#| message: false
-#| warning: false
-#| cache: false
-
-if (!exists("plt_long", inherits = TRUE)) {
-  rds_path <- here::here("outputs","tables","plt_long.rds")
-  if (file.exists(rds_path)) {
-    plt_long <- readRDS(rds_path)
-    message("Loaded cached plt_long from ", rds_path)
-  } else {
-    stop("plt_long not found. Run scratch/pivot_long.qmd (or scratch/pivot_long.R) to build outputs/tables/plt_long.rds")
-  }
-}
+# Examples:
+# cmp |> dplyr::filter(flipped, grouping == "continent", metric == "pct")
+# cmp |> dplyr::filter(service %in% c("C_Risk","C_Risk_Red_Ratio"))
 ```
 
 ## Load cached long table (plt_long) for hotspots/KS
@@ -1013,6 +972,10 @@ Generate trimmed-mean bar plots (abs & pct) for each grouping. Plots save to `ou
 # cut_q   <- 0.999
 # keep_only_ordered <- TRUE
 ```
+
+### TODO: Hotspot vs non-hotspot contribution bars
+
+Future idea: stack bars to show how much of each group’s total signed change comes from hotspot cells vs the complement. Steps: compute group means separately for hotspot and non-hotspot subsets (using the same 5% rules), then plot stacked bars (hotspot share + non-hotspot share) per service/group. Keep both absolute and percent-change variants; avoid overwriting existing plots (write to `outputs/plots/signed_hotshare/`).
 
 ```{r}
 #| label: make-all-barplots-helper
