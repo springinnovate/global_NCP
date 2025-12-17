@@ -266,7 +266,14 @@ if (!file.exists(out_gpkg)) {
 
 ## Produce signed change bars
 
-Bars are computed directly from `processed/10k_change_calc.gpkg`. We output two variants—zeros kept vs zeros dropped—both with trimmed tails and a dashed global mean. Pivioted `plt_long` is only necessary for hotspots/KS.
+Bars are computed directly from `processed/10k_change_calc.gpkg`. We output two variants—zeros kept vs zeros dropped—both with trimmed tails and a dashed global mean. Pivoted `plt_long` is only necessary for hotspots/KS.
+
+What this chunk does:
+- Read the processed GPKG and normalize IDs (`fid`, `c_fid`), dropping any `c_fid.x/y` artifacts.
+- Build a service mapping (`svc_map`) so raw column bases (with/without `_mean`) map to the canonical services; construct `col_pct`/`col_abs` names.
+- `agg_by_group()`: intersect requested `groupings` with available columns; for each grouping × service, pick the pct/abs change column, handle `Inf` pct values (`handle_inf`), optionally drop zeros (`drop_zero`), trim extremes at `cut_q`, then compute mean change by group. Returns tidy rows with `grouping, group, service, metric, mean_chg`.
+- Run `agg_by_group()` four ways: trimmed keep0/drop0 and no-trim keep0/drop0 → `signed_keep0`, `signed_drop0`, `signed_keep0_no_trim`, `signed_drop0_no_trim`.
+- A later chunk computes global reference means; plotting is in its own chunk so you can skip it when debugging.
 
 ```{r}
 #| label: make-signed-bars-data
@@ -279,6 +286,7 @@ groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome")
 cut_q <- 0.999
 handle_inf <- "na"  # options: "na", "cap"
 verbose <- TRUE
+# helper for lightweight progress messages
 
 vmsg <- function(...) if (isTRUE(verbose)) message(...)
 
@@ -358,10 +366,16 @@ agg_by_group <- function(df, services, groupings, cut_q = 0.999,
   dplyr::bind_rows(out)
 }
 
+# trimmed means, zeros kept/dropped
 signed_keep0 <- agg_by_group(sf_f, services, groupings, cut_q = cut_q,
                              handle_inf = handle_inf, drop_zero = FALSE)
 signed_drop0 <- agg_by_group(sf_f, services, groupings, cut_q = cut_q,
                              handle_inf = handle_inf, drop_zero = TRUE)
+# untrimmed (cut_q = 1) means, zeros kept/dropped
+signed_keep0_no_trim <- agg_by_group(sf_f, services, groupings, cut_q = 1,
+                                     handle_inf = handle_inf, drop_zero = FALSE)
+signed_drop0_no_trim <- agg_by_group(sf_f, services, groupings, cut_q = 1,
+                                     handle_inf = handle_inf, drop_zero = TRUE)
 print(dplyr::count(signed_keep0, grouping, metric, service))
 print(dplyr::count(signed_drop0, grouping, metric, service))
 ```
@@ -472,20 +486,117 @@ Use this helper to see where dropping zeros changes the sign of the mean. Run in
 #| label: inspect-sign-flips
 #| eval: false
 
-cmp <- dplyr::full_join(
-  signed_keep0 |> dplyr::select(grouping, metric, service, group, mean_keep = mean_chg),
-  signed_drop0 |> dplyr::select(grouping, metric, service, group, mean_drop = mean_chg),
-  by = c("grouping","metric","service","group")
-) |>
+# Join trimmed keep/drop and untrimmed keep/drop, with clear column names
+cmp <- signed_keep0 |>
+  dplyr::rename(mean_keep_trim = mean_chg) |>
+  dplyr::full_join(
+    signed_drop0 |> dplyr::rename(mean_drop_trim = mean_chg),
+    by = c("grouping","metric","service","group")
+  ) |>
+  dplyr::full_join(
+    signed_keep0_no_trim |> dplyr::rename(mean_keep_notrim = mean_chg),
+    by = c("grouping","metric","service","group")
+  ) |>
+  dplyr::full_join(
+    signed_drop0_no_trim |> dplyr::rename(mean_drop_notrim = mean_chg),
+    by = c("grouping","metric","service","group")
+  ) |>
   dplyr::mutate(
-    sign_keep = sign(mean_keep),
-    sign_drop = sign(mean_drop),
-    flipped   = sign_keep != sign_drop & !is.na(sign_keep) & !is.na(sign_drop)
+    sign_keep_trim   = sign(mean_keep_trim),
+    sign_drop_trim   = sign(mean_drop_trim),
+    sign_keep_notrim = sign(mean_keep_notrim),
+    sign_drop_notrim = sign(mean_drop_notrim),
+    flipped_trim     = sign_keep_trim != sign_drop_trim &
+                       !is.na(sign_keep_trim) & !is.na(sign_drop_trim),
+    flipped_notrim   = sign_keep_notrim != sign_drop_notrim &
+                       !is.na(sign_keep_notrim) & !is.na(sign_drop_notrim)
   )
 
-# Examples:
-# cmp |> dplyr::filter(flipped, grouping == "continent", metric == "pct")
-# cmp |> dplyr::filter(service %in% c("C_Risk","C_Risk_Red_Ratio"))
+flips_trim_only <- cmp |> dplyr::filter(flipped_trim == TRUE)
+flips_no_trim_only <- cmp |> dplyr::filter(flipped_notrim==TRUE)
+```
+
+```{r}
+#| label: inspect-sign-flips-examples trim
+#| eval: false
+# Trimmed, zeros kept: compare pct vs abs signs
+flips_pct_abs_keep_trim <- signed_keep0 |>
+  tidyr::pivot_wider(names_from = metric, values_from = mean_chg) |>
+  dplyr::mutate(
+    sign_pct = sign(pct),
+    sign_abs = sign(abs),
+    flipped_pct_abs = sign_pct != sign_abs &
+                      !is.na(sign_pct) & !is.na(sign_abs)
+  ) |>
+  dplyr::filter(flipped_pct_abs)
+
+# Same for zeros dropped
+flips_pct_abs_drop_trim <- signed_drop0 |>
+  tidyr::pivot_wider(names_from = metric, values_from = mean_chg) |>
+  dplyr::mutate(
+    sign_pct = sign(pct),
+    sign_abs = sign(abs),
+    flipped_pct_abs = sign_pct != sign_abs &
+                      !is.na(sign_pct) & !is.na(sign_abs)
+  ) |>
+  dplyr::filter(flipped_pct_abs)
+
+```
+
+
+```{r}
+#| label: inspect-sign-flips-examples no trim
+#| eval: false
+# Trimmed, zeros kept: compare pct vs abs signs
+flips_pct_abs_keep_no_trim <- signed_keep0_no_trim |>
+  tidyr::pivot_wider(names_from = metric, values_from = mean_chg) |>
+  dplyr::mutate(
+    sign_pct = sign(pct),
+    sign_abs = sign(abs),
+    flipped_pct_abs = sign_pct != sign_abs &
+                      !is.na(sign_pct) & !is.na(sign_abs)
+  ) |>
+  dplyr::filter(flipped_pct_abs)
+
+# Same for zeros dropped
+flips_pct_abs_drop_no_trim <- signed_drop0_no_trim |>
+  tidyr::pivot_wider(names_from = metric, values_from = mean_chg) |>
+  dplyr::mutate(
+    sign_pct = sign(pct),
+    sign_abs = sign(abs),
+    flipped_pct_abs = sign_pct != sign_abs &
+                      !is.na(sign_pct) & !is.na(sign_abs)
+  ) |>
+  dplyr::filter(flipped_pct_abs)
+
+```
+
+```{r}
+
+# after make-signed-bars-data, set eval: true on this once
+#| label: export-flip-tables
+#| eval: false
+out_tbl <- file.path("outputs","tables"); dir.create(out_tbl, recursive = TRUE, showWarnings = FALSE)
+
+mk_pct_abs <- function(df, suffix) {
+  df |> tidyr::pivot_wider(names_from = metric, values_from = mean_chg) |>
+    dplyr::mutate(flipped_pct_abs = sign(pct) != sign(abs) & !is.na(pct) & !is.na(abs)) |>
+    dplyr::filter(flipped_pct_abs) |>
+    dplyr::rename(mean_abs = abs, mean_pct = pct) |>
+    dplyr::mutate(source = suffix)
+}
+
+flips_keep_trim    <- mk_pct_abs(signed_keep0,           "keep_trim")
+flips_drop_trim    <- mk_pct_abs(signed_drop0,           "drop_trim")
+flips_keep_notrim  <- mk_pct_abs(signed_keep0_no_trim,   "keep_notrim")
+flips_drop_notrim  <- mk_pct_abs(signed_drop0_no_trim,   "drop_notrim")
+
+# save
+saveRDS(list(flips_keep_trim, flips_drop_trim, flips_keep_notrim, flips_drop_notrim),
+        file.path(out_tbl, "flips_pct_abs_all.rds"))
+readr::write_csv(dplyr::bind_rows(flips_keep_trim, flips_drop_trim,
+                                  flips_keep_notrim, flips_drop_notrim),
+                 file.path(out_tbl, "flips_pct_abs_all.csv"))
 ```
 
 ## Load cached long table (plt_long) for hotspots/KS
@@ -765,19 +876,6 @@ dplyr::glimpse(hot_index, width = 120)
 
 ```
 
-## Checkpoint recap
-
-Wired the project with a metadata banner (version, git, data root) for reproducibility.
-
-Enriched the 10 km grid with country/biome tags (documented chunk, eval: false) and standardized the working input at processed/10k_change_calc.gpkg.
-
-Reshaped to analysis-ready long format (plt_long), cleaned basic issues, harmonized service labels, and set a canonical facet order.
-
-Centralized hotspot rules in HOTS_CFG (loss/gain, combos, cutoff, groupings, IO).
-
-Exported hotspots once (global + by subregion, for abs/pct change) to compact GPKGs under processed/hotspots/, and wrote a manifest: processed/hotspots/\_hotspots_index.csv.
-
-Why this structure? Heavy work (ranking/thresholding/joining) is done once. The manifest gives us traceability and fast loading for downstream steps (bar plots, violins, KS tests) without re-computation.
 
 ## Trimmed change bar plots
 
