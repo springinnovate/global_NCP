@@ -81,8 +81,6 @@ set.seed(1)
 # Load package-style functions from R/ (if this is a package-ish repo)
 devtools::load_all(quiet = TRUE)
 
-
-
 # ---- Python (enable when needed) ----------------------------------------
 # library(reticulate)
 # use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
@@ -198,7 +196,7 @@ The input 10 km grid (`sf_f`) is enriched with country and WWF biome IDs to allo
 # - sf_f (grid polygons) in memory with at least: fid, c_fid, geometry
 # - paths.R available and data_dir() points to your data root (GLOBAL_NCP_DATA)
 
-out_gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+out_gpkg <-
 if (!file.exists(out_gpkg)) {
   stopifnot(inherits(sf_f, "sf"))
   stopifnot(all(c("fid","c_fid") %in% names(sf_f)))
