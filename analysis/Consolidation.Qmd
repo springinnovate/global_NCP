@@ -87,21 +87,45 @@ inpath <- processed_dir
 Global 10 km grid covering terrestrial areas worldwide (polygon-based template).
 
 ### Create 10 km grid
-```{r create grid}
-# Approximate 10km in degrees
-cell_size_deg <- 10 / 111.32  # ≈ 0.08983
 
-# Define extent: full global bounds
+Equal-area grid is required for consistent cell area. A grid made in degrees
+is ~10 km only at the equator and shrinks with latitude.
+
+```{r create-grid-equal-area}
+# Equal-area grid in meters (EPSG:6933)
+library(sf)
+
+world_ll <- st_as_sfc(st_bbox(c(xmin=-180, ymin=-90, xmax=180, ymax=90), crs = 4326))
+world_ea <- st_transform(world_ll, 6933)
+
+st_crs(world_ea)        # must say EPSG:6933
+st_is_longlat(world_ea) # must be FALSE
+st_bbox(world_ea)       # should be in meters (tens of millions)
+
+stopifnot(!st_is_longlat(world_ea))
+
+grid_sfc <- st_make_grid(world_ea, cellsize = 10000, what = "polygons", square = TRUE)
+length(grid_sfc)        # should be millions
+
+grid_ea <- st_sf(grid_id = seq_along(grid_sfc), geometry = grid_sfc)
+
+st_write(grid_ea, data_vectors("grid_10km_equal_area.gpkg"),
+         delete_layer = TRUE)
+
+
+
+# Optional: store a WGS84 version for mapping only (not for area calcs)
+# grid_ll <- st_transform(grid_ea, 4326)
+# st_write(grid_ll, data_vectors("grid_10km_equal_area_wgs84.gpkg"))
+```
+
+```{r create-grid-legacy, eval=FALSE}
+# Legacy (not equal-area): ~10 km at equator only
+cell_size_deg <- 10 / 111.32
 world_bounds <- st_as_sfc(st_bbox(c(xmin = -180, ymin = -90, xmax = 180, ymax = 90), crs = 4326))
-
-# Create the grid
 global_grid <- st_make_grid(world_bounds, cellsize = cell_size_deg, square = TRUE) |> st_sf()
-
-# Add unique ID column
 global_grid$grid_id <- seq_len(nrow(global_grid))
-
-# Save to shapefile or GeoPackage
-st_write(global_grid, "data/reference/grid_wgs84_approx10km.shp")
+st_write(global_grid, data_vectors("grid_wgs84_approx10km.shp"))
 ```
 
 Coastal protection model outputs (1992 and 2020) originally as points spaced \~500 m along shorelines.
@@ -114,7 +138,7 @@ Country polygon dataset for spatial aggregation and attribution.
 
 ### Coastal Protection Aggregation
 
-This data set comes originally as a vector included in this analysis three key variables for each year: *convert into math notation*
+This dataset comes originally as a vector included in this analysis three key variables for each year: *convert into math notation*
 
 -   Rt: Actual Risk Level
 -   Rt_nohab: Potential Risk Level if no ecosystem (expected to remain constant over time, but necessary to calculate the next ones)

@@ -28,6 +28,7 @@ library(tidyr)
 library(ggplot2)
 library(sf)
 library(here)
+library(ragg)
 
 library(devtools)
 source(here::here("R","paths.R"))
@@ -63,6 +64,320 @@ HOTS_CFG <- list(
   ),
   include_services = NULL  # NULL = use all in svc_order
 )
+
+# Canonical service mapping (match main report)
+if (!exists("canonical_lookup", inherits = TRUE)) {
+  canonical_lookup <- c(
+    sed_export       = "Sed_export",
+    n_export         = "N_export",
+    n_retention      = "N_retention",
+    nature_access    = "Nature_Access",
+    pollination      = "Pollination",
+    usle             = "USLE",
+    n_ret_ratio      = "N_Ret_Ratio",
+    sed_ret_ratio    = "Sed_Ret_Ratio",
+    rt_ratio         = "C_Risk_Red_Ratio",
+    rt               = "C_Risk",
+    c_risk           = "C_Risk",
+    c_risk_red_ratio = "C_Risk_Red_Ratio",
+    rt_service       = "C_Prot_service",
+    rt_nohab         = "Rt_nohab"
+  )
+}
+
+# Sandbox output roots (keep experiments separate from canonical outputs)
+sandbox_plot_root <- file.path("outputs", "plots", "sandbox_signed")
+sandbox_tbl_root  <- file.path("outputs", "tables", "sandbox_signed")
+```
+
+## Signed bars experiments (trim vs no-trim)
+
+Use this section to test trimming and sign-flip behavior without touching the main report. Outputs go to `outputs/plots/sandbox_signed/` and `outputs/tables/sandbox_signed/`.
+
+```{r}
+#| label: cleanup-sandbox-outputs
+#| eval: false
+#| message: false
+#| warning: false
+
+if (dir.exists(sandbox_plot_root)) {
+  unlink(sandbox_plot_root, recursive = TRUE, force = TRUE)
+}
+if (dir.exists(sandbox_tbl_root)) {
+  unlink(sandbox_tbl_root, recursive = TRUE, force = TRUE)
+}
+dir.create(sandbox_plot_root, recursive = TRUE, showWarnings = FALSE)
+dir.create(sandbox_tbl_root, recursive = TRUE, showWarnings = FALSE)
+```
+
+```{r}
+#| label: signed-bars-data
+#| eval: false
+#| message: false
+#| warning: false
+
+services  <- HOTS_CFG$svc_order
+groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome")
+cut_q <- 0.999
+handle_inf <- "na"  # options: "na", "cap"
+verbose <- TRUE
+
+vmsg <- function(...) if (isTRUE(verbose)) message(...)
+
+gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+stopifnot(file.exists(gpkg))
+
+vmsg("Reading: ", gpkg, " [layer: 10k_change_calc]")
+sf_f <- sf::st_read(gpkg, layer = "10k_change_calc", quiet = TRUE)
+sf_f <- sf::st_drop_geometry(sf_f)
+if (!"fid" %in% names(sf_f)) sf_f$fid <- seq_len(nrow(sf_f))
+if (!"c_fid" %in% names(sf_f)) {
+  if ("c_fid.x" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.x)
+  else if ("c_fid.y" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.y)
+  else if ("id" %in% names(sf_f))      sf_f <- dplyr::rename(sf_f, c_fid = id)
+}
+sf_f <- dplyr::select(sf_f, -dplyr::any_of(c("c_fid.x","c_fid.y")))
+
+chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
+services_raw   <- unique(sub("_(abs|pct)_chg$", "", chg_cols))
+services_clean <- stringr::str_remove(services_raw, "_mean$")
+services_lower <- tolower(services_clean)
+svc_map <- tibble::tibble(
+  col_base  = c(services_raw, services_clean),
+  canonical = dplyr::recode(c(services_lower, services_lower),
+                            !!!canonical_lookup, .default = c(services_clean, services_clean))
+) |>
+  dplyr::distinct() |>
+  dplyr::mutate(col_pct = paste0(col_base, "_pct_chg"),
+                col_abs = paste0(col_base, "_abs_chg"))
+
+agg_by_group <- function(df, services, groupings, cut_q = 0.999,
+                         handle_inf = c("na","cap"), drop_zero = FALSE) {
+  handle_inf <- match.arg(handle_inf)
+  groupings <- intersect(groupings, names(df))
+  vmsg("Groupings available: ", paste(groupings, collapse = ", "))
+  out <- list()
+  for (g in groupings) {
+    vmsg("  Grouping: ", g)
+    for (svc in services) {
+      map_rows <- dplyr::filter(svc_map, canonical == svc)
+      if (!nrow(map_rows)) next
+      cols_pct <- map_rows$col_pct[map_rows$col_pct %in% names(df)]
+      cols_abs <- map_rows$col_abs[map_rows$col_abs %in% names(df)]
+      if (!length(cols_pct) && !length(cols_abs)) next
+
+      add_one <- function(col, metric) {
+        v <- df[[col]]
+        if (metric == "pct" && any(is.infinite(v))) {
+          if (handle_inf == "na") v[is.infinite(v)] <- NA_real_
+        }
+        if (isTRUE(drop_zero)) v[v == 0] <- NA_real_
+        cap <- stats::quantile(abs(v), cut_q, na.rm = TRUE)
+        v_trim <- pmax(pmin(v, cap), -cap)
+        tibble::tibble(
+          service = svc,
+          group   = df[[g]],
+          metric  = metric,
+          val     = v_trim
+        )
+      }
+
+      rows <- list()
+      if (length(cols_pct)) rows[[length(rows)+1]] <- add_one(cols_pct[1], "pct")
+      if (length(cols_abs)) rows[[length(rows)+1]] <- add_one(cols_abs[1], "abs")
+      rows <- dplyr::bind_rows(rows)
+      if (!nrow(rows)) next
+      rows <- rows |>
+        dplyr::filter(!is.na(group)) |>
+        dplyr::group_by(service, metric, group) |>
+        dplyr::summarise(mean_chg = mean(val, na.rm = TRUE), .groups = "drop") |>
+        dplyr::mutate(grouping = g)
+      out[[length(out)+1]] <- rows
+    }
+  }
+  dplyr::bind_rows(out)
+}
+
+signed_keep0 <- agg_by_group(sf_f, services, groupings, cut_q = cut_q,
+                             handle_inf = handle_inf, drop_zero = FALSE)
+signed_drop0 <- agg_by_group(sf_f, services, groupings, cut_q = cut_q,
+                             handle_inf = handle_inf, drop_zero = TRUE)
+signed_keep0_no_trim <- agg_by_group(sf_f, services, groupings, cut_q = 1,
+                                     handle_inf = handle_inf, drop_zero = FALSE)
+signed_drop0_no_trim <- agg_by_group(sf_f, services, groupings, cut_q = 1,
+                                     handle_inf = handle_inf, drop_zero = TRUE)
+```
+
+```{r}
+#| label: signed-bars-global-refs
+#| eval: false
+#| message: false
+#| warning: false
+
+compute_global_refs <- function(df, services, cut_q = 0.999,
+                                handle_inf = c("na","cap"), drop_zero = FALSE) {
+  handle_inf <- match.arg(handle_inf)
+  out <- list()
+  for (svc in services) {
+    map_rows <- dplyr::filter(svc_map, canonical == svc)
+    if (!nrow(map_rows)) next
+    for (metric in c("pct","abs")) {
+      cols <- if (metric == "pct") map_rows$col_pct else map_rows$col_abs
+      cols <- cols[cols %in% names(df)]
+      if (!length(cols)) next
+      v <- df[[cols[1]]]
+      if (metric == "pct" && any(is.infinite(v))) {
+        if (handle_inf == "na") v[is.infinite(v)] <- NA_real_
+      }
+      if (isTRUE(drop_zero)) v[v == 0] <- NA_real_
+      cap <- stats::quantile(abs(v), cut_q, na.rm = TRUE)
+      v_trim <- pmax(pmin(v, cap), -cap)
+      out[[length(out)+1]] <- tibble::tibble(
+        service = svc,
+        metric  = metric,
+        ref     = mean(v_trim, na.rm = TRUE)
+      )
+    }
+  }
+  dplyr::bind_rows(out)
+}
+
+glob_keep0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
+                                  handle_inf = handle_inf, drop_zero = FALSE)
+glob_drop0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
+                                  handle_inf = handle_inf, drop_zero = TRUE)
+glob_keep0_no_trim <- compute_global_refs(sf_f, services, cut_q = 1,
+                                          handle_inf = handle_inf, drop_zero = FALSE)
+glob_drop0_no_trim <- compute_global_refs(sf_f, services, cut_q = 1,
+                                          handle_inf = handle_inf, drop_zero = TRUE)
+```
+
+```{r}
+#| label: signed-bars-plot
+#| eval: false
+#| message: false
+#| warning: false
+
+plot_signed_alt <- function(df, grouping, metric,
+                            refs,
+                            variant_label = "keep0",
+                            variant_desc  = "Zeros kept",
+                            out_dir = "outputs/plots/signed_alt") {
+  d <- dplyr::filter(df, grouping == !!grouping, metric == !!metric)
+  if (!nrow(d)) return(invisible(NULL))
+  d$service <- factor(d$service, levels = services)
+  d$group   <- factor(d$group, levels = sort(unique(d$group)))
+  refs_use <- dplyr::filter(refs, metric == !!metric)
+  refs_use$service <- factor(refs_use$service, levels = services)
+  p <- ggplot(d, aes(group, mean_chg, fill = group)) +
+    geom_col(show.legend = FALSE) +
+    geom_hline(yintercept = 0, color = "#7f7f7f", linewidth = 0.6) +
+    geom_hline(data = refs_use, aes(yintercept = ref),
+               linetype = "dashed", color = "#4a4a4a", linewidth = 0.5) +
+    facet_wrap(~ service, scales = "free_y", ncol = 3) +
+    labs(title = paste0("Signed mean change (alt) — ", grouping, " [", metric, "]"),
+         subtitle = variant_desc,
+         x = grouping,
+         y = if (metric == "pct") "Mean % change (trimmed, signed)" else "Mean absolute change (trimmed, signed)") +
+    theme_minimal(base_size = 12) +
+    theme(strip.background = element_rect(fill = "#f3f4f6", color = NA),
+          strip.text = element_text(face = "bold"),
+          axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+  fp <- file.path(out_dir, paste0("bars_signed_alt_", variant_label, "_", tolower(grouping), "_", metric, ".png"))
+  ggsave(fp, p, width = 12, height = 8, dpi = 300, bg = "white")
+  message("Saved alt bars: ", fp)
+}
+
+for (g in unique(signed_keep0$grouping)) {
+  for (m in unique(signed_keep0$metric)) {
+    plot_signed_alt(signed_keep0, g, m,
+                    refs = glob_keep0,
+                    variant_label = "keep0",
+                    variant_desc  = "Zeros kept; dashed = global mean",
+                    out_dir = file.path(sandbox_plot_root, "signed_alt_keep0"))
+    plot_signed_alt(signed_drop0, g, m,
+                    refs = glob_drop0,
+                    variant_label = "drop0",
+                    variant_desc  = "Zeros dropped; dashed = global mean",
+                    out_dir = file.path(sandbox_plot_root, "signed_alt_drop0"))
+    plot_signed_alt(signed_keep0_no_trim, g, m,
+                    refs = glob_keep0_no_trim,
+                    variant_label = "keep0_notrim",
+                    variant_desc  = "Zeros kept; no trim; dashed = global mean",
+                    out_dir = file.path(sandbox_plot_root, "signed_alt_keep0_notrim"))
+    plot_signed_alt(signed_drop0_no_trim, g, m,
+                    refs = glob_drop0_no_trim,
+                    variant_label = "drop0_notrim",
+                    variant_desc  = "Zeros dropped; no trim; dashed = global mean",
+                    out_dir = file.path(sandbox_plot_root, "signed_alt_drop0_notrim"))
+  }
+}
+```
+
+```{r}
+#| label: inspect-sign-flips
+#| eval: false
+
+cmp <- signed_keep0 |>
+  dplyr::rename(mean_keep_trim = mean_chg) |>
+  dplyr::full_join(
+    signed_drop0 |> dplyr::rename(mean_drop_trim = mean_chg),
+    by = c("grouping","metric","service","group")
+  ) |>
+  dplyr::full_join(
+    signed_keep0_no_trim |> dplyr::rename(mean_keep_notrim = mean_chg),
+    by = c("grouping","metric","service","group")
+  ) |>
+  dplyr::full_join(
+    signed_drop0_no_trim |> dplyr::rename(mean_drop_notrim = mean_chg),
+    by = c("grouping","metric","service","group")
+  ) |>
+  dplyr::mutate(
+    sign_keep_trim   = sign(mean_keep_trim),
+    sign_drop_trim   = sign(mean_drop_trim),
+    sign_keep_notrim = sign(mean_keep_notrim),
+    sign_drop_notrim = sign(mean_drop_notrim),
+    flipped_trim     = sign_keep_trim != sign_drop_trim &
+                       !is.na(sign_keep_trim) & !is.na(sign_drop_trim),
+    flipped_notrim   = sign_keep_notrim != sign_drop_notrim &
+                       !is.na(sign_keep_notrim) & !is.na(sign_drop_notrim)
+  )
+
+flips_trim_only <- cmp |> dplyr::filter(flipped_trim == TRUE)
+flips_no_trim_only <- cmp |> dplyr::filter(flipped_notrim == TRUE)
+```
+
+```{r}
+#| label: inspect-sign-flips-examples
+#| eval: false
+
+mk_pct_abs <- function(df, suffix) {
+  df |> tidyr::pivot_wider(names_from = metric, values_from = mean_chg) |>
+    dplyr::mutate(flipped_pct_abs = sign(pct) != sign(abs) & !is.na(pct) & !is.na(abs)) |>
+    dplyr::filter(flipped_pct_abs) |>
+    dplyr::rename(mean_abs = abs, mean_pct = pct) |>
+    dplyr::mutate(source = suffix)
+}
+
+flips_keep_trim    <- mk_pct_abs(signed_keep0,         "keep_trim")
+flips_drop_trim    <- mk_pct_abs(signed_drop0,         "drop_trim")
+flips_keep_notrim  <- mk_pct_abs(signed_keep0_no_trim, "keep_notrim")
+flips_drop_notrim  <- mk_pct_abs(signed_drop0_no_trim, "drop_notrim")
+```
+
+```{r}
+#| label: export-flip-tables
+#| eval: false
+
+out_tbl <- sandbox_tbl_root
+dir.create(out_tbl, recursive = TRUE, showWarnings = FALSE)
+
+saveRDS(list(flips_keep_trim, flips_drop_trim, flips_keep_notrim, flips_drop_notrim),
+        file.path(out_tbl, "flips_pct_abs_all.rds"))
+readr::write_csv(dplyr::bind_rows(flips_keep_trim, flips_drop_trim,
+                                  flips_keep_notrim, flips_drop_notrim),
+                 file.path(out_tbl, "flips_pct_abs_all.csv"))
 ```
 
 ## Pivot to long (heavy; off by default)

@@ -1,0 +1,63 @@
+# Slim services extraction (1992/2020), all needed rasters in one run.
+# Uses canonical land grid and GLOBAL_NCP_DATA for portability.
+
+workspace_dir:
+  path: "./summary_pipeline_workspace"
+
+vector_zones:
+  grid_10km_land:
+    path: "${GLOBAL_NCP_DATA}/vector_basedata/AOOGrid_10x10km_land.gpkg"
+
+raster_layers:
+  global_usle_marine_mod_ESA_1992:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/global_usle_marine_mod_ESA_1992_compressed_md5_7e68e0.tif"
+    band: 1
+  global_usle_marine_mod_ESA_2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/global_usle_marine_mod_ESA_2020_compressed_md5_99e715.tif"
+    band: 1
+  nature_access_lspop2019_ESA1992:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/nature_access_lspop2019_ESA1992_md5_b32b8b.tif"
+    band: 1
+  nature_access_lspop2019_ESA2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/nature_access_lspop2019_ESA2020_compressed_md5_6727ac.tif"
+    band: 1
+  N_ret_ratio_1992:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/N_ret_ratio_1992.tif"
+    band: 1
+  N_ret_ratio_2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/N_ret_ratio_2020.tif"
+    band: 1
+  Sed_ret_ratio_1992:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/Sed_ret_ratio_1992.tif"
+    band: 1
+  Sed_ret_ratio_2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/Sed_ret_ratio_2020.tif"
+    band: 1
+  global_n_export_tnc_esa1992:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/global_n_export_tnc_esa1992_compressed_md5_728edc.tif"
+    band: 1
+  global_n_export_tnc_esa2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/global_n_export_tnc_esa2020_compressed_md5_1d3c17.tif"
+    band: 1
+  global_n_retention_ESAmar_1992_fertilizer:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/global_n_retention_ESAmar_1992_fertilizer_current_valid_md5_86031b.tif"
+    band: 1
+  global_n_retention_ESAmar_2020_fertilizer:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/global_n_retention_ESAmar_2020_fertilizer_current_valid_md5_82fc1e.tif"
+    band: 1
+  global_sed_export_marine_mod_ESA_1992:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/global_sed_export_marine_mod_ESA_1992_compressed_md5_18eaae.tif"
+    band: 1
+  global_sed_export_marine_mod_ESA_2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/global_sed_export_marine_mod_ESA_2020_compressed_md5_a988c0.tif"
+    band: 1
+  realized_polllination_on_ag_ESA1992:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/realized_polllination_on_ag_ESA1992mar_md5_d3d0d3.tif"
+    band: 1
+  realized_polllination_on_ag_ESA2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Spring/Inspring/realized_polllination_on_ag_ESA2020mar_md5_da610a.tif"
+    band: 1
+
+op_stats:
+  - mean
+  - sum

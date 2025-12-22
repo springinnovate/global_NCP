@@ -1,0 +1,36 @@
+# Slim beneficiaries extraction, minimal rasters used in KS/bars.
+# Uses canonical land grid and GLOBAL_NCP_DATA for portability.
+
+workspace_dir:
+  path: "./summary_pipeline_workspace"
+
+vector_zones:
+  grid_10km_land:
+    path: "${GLOBAL_NCP_DATA}/vector_basedata/AOOGrid_10x10km_land.gpkg"
+
+raster_layers:
+  GHS_BUILT_S_E2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Beneficiaries/GHS_BUILT/GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0.tif"
+    band: 1
+  fields_mehrabi_2017:
+    path: "${GLOBAL_NCP_DATA}/raw/Beneficiaries/Mehrabi/SI_A/Data/Out/farmsize.tif"
+    band: 1
+  hdi_raster_predictions_2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Beneficiaries/Gridded_HDI/hdi_raster_predictions_2020.tif"
+    band: 1
+  rast_adm1_gini_disp_2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Beneficiaries/GINI_Gridded/rast_adm1_gini_disp_1990_2021.tif"
+    band: 1
+  GHS_POP_E2020_GLOBE:
+    path: "${GLOBAL_NCP_DATA}/raw/Beneficiaries/GHS_POP/GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.tif"
+    band: 1
+  rast_gdpTot_1990_2020_30arcsec_2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Beneficiaries/Gridded_GDP/rast_gdpTot_1990_2020_30arcsec.tif"
+    band: 7
+  GlobPOP_Count_30arc_2020:
+    path: "${GLOBAL_NCP_DATA}/raw/Beneficiaries/GlobPOP/GlobPOP_Count_30arc_2020_I32.tif"
+    band: 1
+
+op_stats:
+  - mean
+  - sum
