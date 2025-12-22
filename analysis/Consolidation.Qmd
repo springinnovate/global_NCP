@@ -86,47 +86,115 @@ inpath <- processed_dir
 
 Global 10 km grid covering terrestrial areas worldwide (polygon-based template).
 
-### Create 10 km grid
+### Canonical 10 km grid (IUCN AOO, land-only)
 
-Equal-area grid is required for consistent cell area. A grid made in degrees
-is ~10 km only at the equator and shrinks with latitude.
+We do **not** generate the grid from scratch. We use the published IUCN
+Area of Occupancy (AOO) 10×10 km equal-area grid and subset it to land
+by intersecting with the correspondence polygons. We keep the full grid
+cells that touch land (no clipping) and append attributes used for
+subregional aggregation (country/continent/region/biome).
 
-```{r create-grid-equal-area}
-# Equal-area grid in meters (EPSG:6933)
+```{r prep-grid-aoo-land, eval=FALSE}
 library(sf)
+library(dplyr)
 
-world_ll <- st_as_sfc(st_bbox(c(xmin=-180, ymin=-90, xmax=180, ymax=90), crs = 4326))
-world_ea <- st_transform(world_ll, 6933)
+grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"))
+land_polys <- st_read(
+  data_vectors("cartographic_ee_ee_r264_correspondence.gpkg"),
+  layer = "ee_r264_correspondence"
+)
 
-st_crs(world_ea)        # must say EPSG:6933
-st_is_longlat(world_ea) # must be FALSE
-st_bbox(world_ea)       # should be in meters (tens of millions)
+if (st_crs(grid_raw) != st_crs(land_polys)) {
+  land_polys <- st_transform(land_polys, st_crs(grid_raw))
+}
 
-stopifnot(!st_is_longlat(world_ea))
+# Keep grid cells that intersect any land polygon
+grid_land <- st_filter(grid_raw, land_polys, .predicate = st_intersects)
 
-grid_sfc <- st_make_grid(world_ea, cellsize = 10000, what = "polygons", square = TRUE)
-length(grid_sfc)        # should be millions
+# Attach attributes for aggregation (spatial join or fid-based join)
+land_attrs <- land_polys |>
+  dplyr::select(
+    iso3, nev_name, continent, region_un, region_wb,
+    income_grp, WWF_biome
+  )
+grid_land <- st_join(grid_land, land_attrs, join = st_intersects, left = TRUE)
 
-grid_ea <- st_sf(grid_id = seq_along(grid_sfc), geometry = grid_sfc)
-
-st_write(grid_ea, data_vectors("grid_10km_equal_area.gpkg"),
-         delete_layer = TRUE)
-
-
-
-# Optional: store a WGS84 version for mapping only (not for area calcs)
-# grid_ll <- st_transform(grid_ea, 4326)
-# st_write(grid_ll, data_vectors("grid_10km_equal_area_wgs84.gpkg"))
+st_write(
+  grid_land,
+  data_vectors("AOOGrid_10x10km_land.gpkg"),
+  delete_layer = TRUE
+)
 ```
 
-```{r create-grid-legacy, eval=FALSE}
-# Legacy (not equal-area): ~10 km at equator only
-cell_size_deg <- 10 / 111.32
-world_bounds <- st_as_sfc(st_bbox(c(xmin = -180, ymin = -90, xmax = 180, ymax = 90), crs = 4326))
-global_grid <- st_make_grid(world_bounds, cellsize = cell_size_deg, square = TRUE) |> st_sf()
-global_grid$grid_id <- seq_len(nrow(global_grid))
-st_write(global_grid, data_vectors("grid_wgs84_approx10km.shp"))
+```{python}
+#| label: make-grid-valid-shapely
+#| eval: false
+#| message: false
+#| warning: false
+
+# Optional: create a Shapely-validated grid copy to avoid GEOS errors in Python.
+# Requires geopandas/shapely in the Quarto Python environment.
+import os
+import geopandas as gpd
+
+data_root = os.environ.get("GLOBAL_NCP_DATA", "")
+grid_in = os.path.join(data_root, "vector_basedata", "AOOGrid_10x10km_land.gpkg")
+grid_out = os.path.join(data_root, "vector_basedata", "AOOGrid_10x10km_land_shpvalid.gpkg")
+
+gdf = gpd.read_file(grid_in)
+gdf["geometry"] = gdf.geometry.make_valid()
+gdf = gdf[gdf.geometry.notna() & gdf.is_valid]
+
+gdf.to_file(grid_out, driver="GPKG")
+print(f"wrote {len(gdf):,} features -> {grid_out}")
 ```
+
+```{python}
+#| label: grid-4326-clean
+#| eval: false
+#| message: false
+#| warning: false
+
+# Create a 4326 version for raster extraction (avoids to_crs errors at runtime).
+# This keeps the same cells, only expressed in EPSG:4326.
+import geopandas as gpd
+from shapely.ops import transform
+from pyproj import Transformer
+
+grid_in = os.path.join(data_root, "vector_basedata", "AOOGrid_10x10km_land_shpvalid.gpkg")
+grid_out = os.path.join(data_root, "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
+
+gdf = gpd.read_file(grid_in)
+transformer = Transformer.from_crs(gdf.crs, "EPSG:4326", always_xy=True)
+
+bad = 0
+new_geoms = []
+for geom in gdf.geometry:
+    try:
+        g = transform(transformer.transform, geom)
+        if g.is_empty or not g.is_valid:
+            bad += 1
+            new_geoms.append(None)
+        else:
+            new_geoms.append(g)
+    except Exception:
+        bad += 1
+        new_geoms.append(None)
+
+gdf["geometry"] = new_geoms
+gdf = gdf[gdf.geometry.notna()]
+gdf = gdf.set_crs("EPSG:4326", allow_override=True)
+gdf.to_file(grid_out, driver="GPKG")
+print(f"dropped {bad:,} invalid geometries; wrote -> {grid_out}")
+```
+
+**Canonical grids used downstream**
+
+- **Equal-area canonical grid**: `AOOGrid_10x10km_land.gpkg`
+- **Extraction grid (EPSG:4326)**: `AOOGrid_10x10km_land_4326_clean.gpkg`
+
+The 4326 file is only for raster extraction; the cell geometry is the same
+10×10 km equal-area grid expressed in a different CRS.
 
 Coastal protection model outputs (1992 and 2020) originally as points spaced \~500 m along shorelines.
 
