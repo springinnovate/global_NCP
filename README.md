@@ -1,12 +1,16 @@
 # README
 
 Jeronimo Rodriguez Escobar
+Affiliation: Global Science, WWF
+Supervisor: <add name>
+Version: <add version>
+Last updated: <add date>
 
 # Overview
 
-Working version of a structured workflow for extracting, analyzing, and visualizing **zonal summary statistics** from global raster datasets including **ecosystem service (ES)**, **land cover (LC)**, and socioeconomic (beneficiary) layers. The analysis is built around a synthesized **10 km grid** (`processed/10k_change_calc.gpkg`, external data dir) enriched with country/region/biome attributes, with outputs aggregated to countries, regions, income groups, and biomes.
+Working version of a structured workflow for extracting, analyzing, and visualizing **zonal summary statistics** from global raster datasets including **ecosystem service (ES)**, **land cover (LC)**, and socioeconomic (beneficiary) layers. The analysis is built around the IUCN AOO **10 km equal-area grid** (land-only) enriched with country/region/biome attributes, with outputs aggregated to countries, regions, income groups, and biomes.
 
-The core of the workflow leverages the R package [`exactextractr`](https://github.com/isciences/exactextractr), which enables efficient zonal operations between raster and vector data. Python workflows use `taskgraph` for parallel execution.
+The core extraction workflow uses Python (`taskgraph` + `exactextract`) for zonal summaries; R/Quarto is used for consolidation, change calculations, hotspot extraction, and KS tests.
 
 These tools support reproducible extraction and visualization of ES trends and change detection across modeled periods. They enable exploratory and comparative analyses of spatial transformations, ES provision, and relationships to beneficiary groups.
 
@@ -22,13 +26,13 @@ These tools support reproducible extraction and visualization of ES trends and c
 
 ## Polygon Layers / Grid
 
--   **10 km grid with change + attributes**: `processed/10k_change_calc.gpkg` (external data dir), enriched with country, income group, WB/UN regions, continent, WWF biome.
+-   **IUCN AOO 10 km equal-area grid (land-only)**: stored under `vector_basedata/`, enriched with country, income group, WB/UN regions, continent, WWF biome.
 -   Country boundaries and regional lookups (income, WB/UN regions, continent) under `vector_basedata/`.
 -   WWF Biomes and Ecoregions.
 
 ## Raster Layers
 
-Stored in `input_ES/`, include:
+Stored under the external data root (`raw/`), include:
 
 -   InVEST-modeled ecosystem services for 1992 and 2020
 -   ESA 300m land cover products (reclassified into binary: Transformed/Natural)
@@ -66,49 +70,83 @@ Metrics are computed for each class and overall and then reshaped into wide form
 
 # Pipeline Usage (Python)
 
-The `summary_pipeline.py` script executes batch zonal summaries using `taskgraph`. Inputs and logic are defined through these key data structures:
+The `summary_pipeline_landgrid.py` script executes batch zonal summaries using
+`taskgraph` inside a Docker container. Inputs are defined in YAML files under
+`analysis_configs/` (e.g., `services_slim.yaml`, `beneficiaries_slim.yaml`,
+`c_protection_synth.yaml`) and point to the canonical IUCN AOO 10 km land grid
+(`AOOGrid_10x10km_land_4326_clean.gpkg`) plus the raw raster inputs.
 
--   `ANALYSIS_DATA`
--   `REFERENCE_SUMMARY_VECTOR_PATHS`
--   `ZONAL_OPS`
-
-These define the rasters, vectors, and operations to apply. To execute:
+To execute:
 
 ``` bash
 docker pull therealspring/global_ncp-computational-environment:latest
 
 # Linux/macOS
-docker run -it --rm -v $(pwd):/workspace therealspring/global_ncp-computational-environment:latest /bin/bash
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v /home/jeronimo/data/global_ncp:/data \
+  -w /workspace \
+  therealspring/global_ncp-computational-environment:latest /bin/bash
 
 # Windows
-docker run -it --rm -v %CD%:/workspace therealspring/global_ncp-computational-environment:latest /bin/bash
+docker run -it --rm ^
+  -v %CD%:/workspace ^
+  -v C:\path\to\global_ncp\data:/data ^
+  -w /workspace ^
+  therealspring/global_ncp-computational-environment:latest /bin/bash
 ```
 
 Then, run the workflow:
 
 ``` bash
-python summary_pipeline.py
+python summary_pipeline_landgrid.py --data-root /data analysis_configs/services_slim.yaml
+python summary_pipeline_landgrid.py --data-root /data analysis_configs/beneficiaries_slim.yaml
+python summary_pipeline_landgrid.py --data-root /data analysis_configs/c_protection_synth.yaml
 ```
 
-Each raster-vector combo is processed in parallel, using `exactextract` for zonal summaries. Results are cached and returned quickly on reruns.
+Each raster-vector combo is processed in parallel, using `exactextract` for
+zonal summaries. Results are cached and returned quickly on reruns.
+
+## Coastal Protection Rasterization (points → rasters)
+
+Coastal protection outputs are provided as point features. Rasterize them to the
+ESA 300 m land cover template before running zonal summaries:
+
+``` bash
+# requires GLOBAL_NCP_DATA to be set (e.g., /home/jeronimo/data/global_ncp)
+COASTAL_INCLUDE_CH=1 python Python_scripts/rasterize_coastal.py
+```
+
+This produces rasters in:
+`$GLOBAL_NCP_DATA/interim/coastal_protection_rasters/`
+for `Rt_1992`, `Rt_2020`, and the ratios (plus `Rt_serv_ch` when enabled).
 
 After the run, the pipeline writes timestamped GPKGs to `summary_pipeline_workspace/`.
 Move/rename them into the interim folder and wrap dateline geometries for clean
-mapping (prevents the 180° wraparound polygon artifact):
+mapping (prevents the 180° wraparound polygon artifact). Use a timestamp to
+avoid overwriting prior outputs:
 
 ``` bash
 # identify outputs (services = older, beneficiaries = newer)
 ls -lt summary_pipeline_workspace/*.gpkg
 
 OUT_DIR=/home/jeronimo/data/global_ncp/interim
+TS=$(date +%Y%m%d_%H%M%S)
+
 SERV_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/<services_file>.gpkg
+ogr2ogr -wrapdateline -datelineoffset 180 \
+  "$OUT_DIR/10k_grid_synth_serv_${TS}.gpkg" "$SERV_SRC"
+
 BEN_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/<beneficiaries_file>.gpkg
-
 ogr2ogr -wrapdateline -datelineoffset 180 \
-  "$OUT_DIR/10k_grid_synth_serv.gpkg" "$SERV_SRC"
+  "$OUT_DIR/10k_grid_synth_benef_${TS}.gpkg" "$BEN_SRC"
 
+# coastal protection summary (single output in workspace)
+COAST_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/<coastal_file>.gpkg
 ogr2ogr -wrapdateline -datelineoffset 180 \
-  "$OUT_DIR/10k_grid_synth_benef.gpkg" "$BEN_SRC"
+  "$OUT_DIR/10k_grid_synth_coastal_${TS}.gpkg" "$COAST_SRC"
+
+# Naming convention: synthesis outputs start with "10k_"
 ```
 
 # R Analysis Workflow

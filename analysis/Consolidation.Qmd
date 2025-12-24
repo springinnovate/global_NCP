@@ -49,12 +49,17 @@ data_root <- data_dir()
 interim_dir <- data_interim()
 processed_dir <- data_processed()
 
-# Expected structure (adjust if you keep these elsewhere)
-interim_output_dir <- file.path(interim_dir, "output_data")
-interim_archive_dir <- file.path(interim_output_dir, "archive")
 processed_tables_dir <- file.path(processed_dir, "tables")
 processed_hotspots_dir <- file.path(processed_dir, "hotspots")
 processed_coastal_dir <- file.path(processed_dir, "coastal")
+
+latest_interim <- function(pattern) {
+  files <- list.files(interim_dir, pattern = pattern, full.names = TRUE)
+  if (!length(files)) {
+    stop("No interim files match pattern: ", pattern)
+  }
+  files[which.max(file.mtime(files))]
+}
 
 # Legacy locations (kept for tracking):
 # inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data"
@@ -63,24 +68,23 @@ inpath <- processed_dir
 ```
 
 ::: callout-warning
-**TODO / cleanup (do not run heavy chunks as-is)**
+**TODO / cleanup (run heavy chunks only when inputs are ready)**
 
-- Centralize paths (replace hard-coded OneDrive/home paths with `data_interim()` / `data_processed()`).
-- Keep expensive consolidation chunks `eval: false` until paths are fixed and data are local.
-- Use this file mainly as documentation of the pipeline; move reusable text to README/methods.
-- When baseline (T0/T1) grids are in one place, add a clean, single consolidation step to produce a final GPKG and a tidy table.
+- Paths are centralized via `data_dir()`; keep `GLOBAL_NCP_DATA` set.
+- Keep expensive consolidation chunks `eval: false` until the latest `10k_grid_synth_{serv,benef,coastal}_*.gpkg` files are in `interim/`.
+- Use this file as the living pipeline record; promote stable text to README/methods.
+- Maintain the AOO equal-area grid as canonical; use the 4326 clean copy for raster extraction, then wrap dateline for display/output hygiene.
 :::
 
 # Workflow Synthesis: Global Hotspots of Ecosystem Service Change
 
 ## Notes to lift into README / Methods
 
-- Inputs: 10 km global grid (WGS84), ES rasters (1992/2020), coastal protection vectors, country/regional polygons.
-- Data roots: input syntheses in `/home/jeronimo/data/global_ncp/interim`; consolidated outputs and hotspots in `/home/jeronimo/data/global_ncp/processed`.
-- Steps: build grid → extract zonal stats (mean/sum per service/year) → compute abs/pct change → reshape to long for hotspots → flag hotspots by percentile (loss/gain rules, combos) → join hotspot flags back to grid.
-- Coastal protection: Rt, Rt_nohab, Rt_service, Rt_ratio; compute mean/max per grid cell.
-- Outputs (intended): final GPKGs with per-service stats (T0/T1, abs/pct change), beneficiaries, hotspot flags, combo counts, plus indexes/CSVs of field names.
-- Current gaps: verify interim/processed subfolders match this layout; baseline (T0/T1) services are scattered; consolidation chunks need a final cleanup before running.
+- Inputs: IUCN AOO 10 km equal-area grid (land-only, with admin/biome attributes), ES rasters (1992/2020), coastal protection points (rasterized), and beneficiary rasters.
+- Data roots: raw data in `/home/jeronimo/data/global_ncp/raw`; synth outputs in `/home/jeronimo/data/global_ncp/interim`; consolidated outputs and hotspots in `/home/jeronimo/data/global_ncp/processed`.
+- Steps: rasterize coastal points → extract zonal stats (mean/sum per service/year via `summary_pipeline_landgrid.py` in Docker) → wrap dateline + move `10k_grid_synth_*` to `interim/` → consolidate (services+beneficiaries+coastal) → compute abs/pct change → hotspot extraction → KS analysis.
+- Coastal protection: summarize Rt and Rt_ratio per grid cell (optional Rt_serv_ch for comparison).
+- Outputs: `10k_grid_synth_*` in interim; consolidated `10k_change_calc.gpkg` in processed (intermediate `10k_grid_ES_change_benef.gpkg` is optional); hotspot GPKGs and tables.
 
 ## Data Inputs
 
@@ -215,6 +219,27 @@ This dataset comes originally as a vector included in this analysis three key va
 
 Computed mean and max per grid cell for each coastal protection metric.
 
+```{r}
+#| label: coastal-change-compare
+#| eval: false
+
+# Optional comparison: mean of point-level change vs change of means.
+# Requires c_protection_compare.yaml (Rt_1992, Rt_2020, Rt_serv_ch).
+
+cp_compare_path <- file.path(data_interim(), "10k_grid_synth_coastal_compare.gpkg")
+cp <- st_read(cp_compare_path)
+
+cp_tbl <- cp |>
+  st_drop_geometry() |>
+  dplyr::mutate(
+    diff_means = coastal_protection_Rt_2020_mean - coastal_protection_Rt_1992_mean,
+    delta = coastal_protection_Rt_serv_ch_mean - diff_means
+  )
+
+summary(cp_tbl$delta)
+stats::cor(cp_tbl$diff_means, cp_tbl$coastal_protection_Rt_serv_ch_mean, use = "complete.obs")
+```
+
 ### Zonal Statistics for Gridded ES Services
 
 Geosharding-based pipeline to extract zonal statistics (mean or sum, depending on the service) from modeled global ES raster layers for two years (1992-2020) to the 10 km grid (or any poygon vector file). Values are labeled and appended as new columns in an output vector dataset (gpkg)
@@ -273,41 +298,50 @@ There is an issue with the naming of the variables that has been giving me a lot
 
 Assemble final gridded Change/beneficiary data set
 
-```{r consolidate final outputs}
+```{r}
 #| eval: false
 #| include: false
 # Legacy locations (keep for tracking):
 # inpath <- "/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs"
 # inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data"
+source(here::here("R", "paths.R"))
+interim_dir <- data_interim()
+processed_dir <- data_processed()
+processed_coastal_dir <- file.path(processed_dir, "coastal")
+
+latest_interim <- function(pattern) {
+  files <- list.files(interim_dir, pattern = pattern, full.names = TRUE)
+  if (!length(files)) stop("No interim files match pattern: ", pattern)
+  files[which.max(file.mtime(files))]
+}
+
 inpath <- processed_dir
 # Optional: export name indexes to CSV
 write_index <- FALSE
 
-# Build explicit file lists
-svc_files <- c(
-  file.path(interim_output_dir, "10k_grid_synth_serv_means.gpkg"),
-  file.path(interim_archive_dir, "10k_grid_synth_serv_sums.gpkg")
-)
-ben_files <- c(
-  file.path(interim_archive_dir, "hydrosheds_lv6_synth_benef_sums.gpkg"),
-  file.path(interim_archive_dir, "10k_grid_synth_benef_means.gpkg")
-)
-# Beneficiaries:
+# New workflow: means + sums are in the same synth output.
+serv_path  <- latest_interim("^10k_grid_services(.*)?\\.gpkg$")
+ben_path   <- latest_interim("^10k_grid_benef(.*)?\\.gpkg$")
+coast_path <- latest_interim("^10k_grid_coastal(.*)?\\.gpkg$")
 
-# B_sums <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/archive/10k_grid_synth_benef_sums.gpkg")
-# B_means <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/archive/10k_grid_synth_benef_means.gpkg")
-B_sums <- st_read(file.path(interim_archive_dir, "10k_grid_synth_benef_sums.gpkg"))
-B_means <- st_read(file.path(interim_archive_dir, "10k_grid_synth_benef_means.gpkg"))
 
-B_sums <- B_sums %>% mutate(fid = dplyr::row_number())
-B_means <- B_means %>% mutate(fid = dplyr::row_number())
-B_means <- st_drop_geometry(B_means)
+S <- st_read(serv_path)
+B <- st_read(ben_path)
+CP <- st_read(coast_path)
 
-B_sums <- left_join(B_sums, B_means)
-B_sums["fid"] <- NULL
+if (!"fid" %in% names(S)) S$fid <- seq_len(nrow(S))
+if (!"fid" %in% names(B)) B$fid <- seq_len(nrow(B))
+if (!"fid" %in% names(CP)) CP$fid <- seq_len(nrow(CP))
 
-# st_write(B_sums, "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_benef.gpkg")
-st_write(B_sums, file.path(processed_dir, "10k_grid_benef.gpkg"))
+S_tbl <- st_drop_geometry(S)
+B_tbl <- st_drop_geometry(B)
+CP_tbl <- st_drop_geometry(CP)
+
+sf_f <- S |>
+  left_join(B_tbl, by = "fid") |>
+  left_join(CP_tbl, by = "fid")
+
+st_write(sf_f, file.path(processed_dir, "10k_grid_ES_change_benef.gpkg"), append = FALSE)
 
 if (isTRUE(write_index)) {
   nams <- names(B_sums)
@@ -318,37 +352,21 @@ if (isTRUE(write_index)) {
 
 
 ################################
-# Services (from Rasters):
+# Services (from rasters):
 
-# S_means <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_synth_serv_means.gpkg")
-# S_sums <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/archive/10k_grid_synth_serv_sums.gpkg")
-S_means <- st_read(file.path(interim_output_dir, "10k_grid_synth_serv_means.gpkg"))
-S_sums <- st_read(file.path(interim_archive_dir, "10k_grid_synth_serv_sums.gpkg"))
-
-
-S_sums <- S_sums %>% mutate(fid = dplyr::row_number())
-S_means <- S_means %>% mutate(fid = dplyr::row_number())
-
-S_means <- st_drop_geometry(S_means)
-
-S_sums <- left_join(S_sums, S_means)
-S_sums["fid"] <- NULL
-
-# st_write(S_sums, "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_services.gpkg")
-st_write(S_sums, file.path(processed_dir, "10k_grid_services.gpkg"))
+st_write(S, file.path(processed_dir, "10k_grid_services.gpkg"), append = FALSE)
 
 if (isTRUE(write_index)) {
-  nams <- names(S_sums)
+  nams <- names(S)
   nams <- cbind(nams, nams)
-  # write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/serv.csv")
   write.csv(nams, file= file.path(processed_tables_dir, "serv.csv"))
 }
 
 
 
-# c_prot <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data_NCP/vector/grid_10k_coastal_calc.gpkg")
+# c_prot <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data_NCP/vector/10k_grid_coastal_calc.gpkg")
 # Optional: inventory fields for the coastal protection layer
-c_prot <- st_read(file.path(processed_coastal_dir, "grid_10k_coastal_calc.gpkg"))
+c_prot <- st_read(file.path(processed_coastal_dir, "10k_grid_coastal_calc.gpkg"))
 if (isTRUE(write_index)) {
   nams <- names(c_prot)
   nams <- cbind(nams, nams)
@@ -356,15 +374,7 @@ if (isTRUE(write_index)) {
   write.csv(nams, file= file.path(processed_tables_dir, "cp.csv"))
 }
 
-# Step 1. Load vectors with the summary stats objects
-sf_a <- lapply(svc_files, st_read)
-
-# Step 2: Add fid to each (all have same row count & order)
-sf_a <- lapply(sf_a, function(x) dplyr::mutate(x, fid = dplyr::row_number()))
-
-# Update: include the coastal protection data (reference layer; not yet merged here)
-# sf_cp <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/summary_pipeline_workspace/grid_10k_synth_zonal_2025_07_20_23_45_27.gpkg")
-sf_cp <- st_read(file.path(interim_dir, "summary_pipeline_workspace", "grid_10k_synth_zonal_2025_07_20_23_45_27.gpkg"))
+# `sf_f` already contains services + beneficiaries + coastal summaries.
 # Define name replacements per object. Had to do it manually, there is just too much variability to automatize, did it by hand, but this is the kind of thing an LLM helps to write easily. Still, there must be a smarter, more flexible way to do it (maybe the best approach is to keep a consistent naming convention for the modeled rasters, this has been a PIA since i started this work)
 
 # Update 2. Include corrected Access Data
@@ -390,56 +400,35 @@ rename_list <- list(
     pollination_2020_sum = "realized_polllination_on_ag_ESA2020_sum"
   )
 )
-sf_a <- Map(function(x, renames) {
-  dplyr::rename(x, !!!renames)
-}, sf_a, rename_list)
+rename_map <- c(rename_list[[1]], rename_list[[2]])
+sf_f <- dplyr::rename(sf_f, !!!rename_map)
+
 ```
 
+### next
 ```{r compute-bitemporal-change}
 #| eval: false
 #| include: false
-# Assumes `sf_a` is already loaded and renamed in the previous chunk.
-
-# Calculate bi-temporal change in % and absolute terms. Drop original columns.
+# Assumes `sf_f` is already created in the consolidation chunk above.
+# Calculate bi-temporal change in % and absolute terms.
 # pct_chg uses the earliest year as baseline: ((t1 - t0) / t0) * 100.
 # Division by zero yields Inf/NaN; handle downstream if needed.
-sf_a <- lapply(sf_a, function(x) compute_change(x, suffix = c("_sum", "_mean"), change_type= "both", drop_columns = TRUE))
+sf_f <- compute_change(
+  sf_f,
+  suffix = c("_sum", "_mean"),
+  change_type = "both",
+  drop_columns = FALSE
+)
 
-# Join into a single sf object
-sf_f <- sf_a[[1]]
-
-# Step 2: Loop over the rest and join by 'fid'
-for (i in 2:length(sf_a)) {
-  sf_f <- dplyr::left_join(sf_f, sf_a[[i]] %>% sf::st_drop_geometry(), by = "fid")
-}
-rm(sf_a)
-
- # NaN are divisions by 0, NA is when values are NA
+# NaN are divisions by 0, NA is when values are NA
 
 ```
 
 ```{r attach-beneficiaries}
 #| eval: false
 #| include: false
-# Load beneficiaries data. There is no change going on here right now, but maybe in the future. The workflow can handle this
-sf_ben <- lapply(ben_files, st_read)
-# Add fid (primary key)
-sf_ben <- lapply(sf_ben, function(x) dplyr::mutate(x, fid = dplyr::row_number()))
-
-sf_benf <- sf_ben[[1]]
-
-# Step 2: Loop over the rest and join by 'fid'
-for (i in 2:length(sf_ben)) {
-  sf_benf <- dplyr::left_join(sf_benf, sf_ben[[i]] %>% sf::st_drop_geometry(), by = "fid")
-}
-rm(sf_ben) # remove not needed anymore
-# join beneficiary data to the ES change data
-sf_f <- dplyr::left_join(sf_f, sf_benf %>% sf::st_drop_geometry(), by = "fid")
-rm(sf_benf)
-
-# export output
-
-st_write(sf_f, file.path(inpath, "10k_grid_ES_change_benef.gpkg"), append=FALSE)
+# Beneficiaries are already merged into `sf_f` in the consolidation chunk.
+# Keep this chunk as a placeholder if a separate beneficiary workflow is needed later.
 ```
 
 Note: coastal protection shows up twice in this document. The earlier `c_prot` block is only a field inventory; the actual join and aggregation happen in the sections below.
@@ -459,7 +448,7 @@ inpath <- processed_dir
 cp2 <- st_read(file.path(inpath, "grid_10k_coastal.gpkg"))
 
 # load cleaned coastal protection data:
-cp_points <- st_read(file.path(processed_coastal_dir, "grid_10k_coastal_calc.gpkg"))
+cp_points <- st_read(file.path(processed_coastal_dir, "10k_grid_coastal_calc.gpkg"))
 
 # this is because i created the fid only for the subset and thus it will not match
 cp_points <- cp_points %>% rename(fid=fid_2)
@@ -506,8 +495,8 @@ cp2_joined$fid <- as.integer(cp2_joined$fid)
 sapply(cp2_joined, class)
 #
 # # to separate it from the raw empty template, added this with the calculated data.
-# st_write(cp2_joined,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/grid_10k_coastal_calc.gpkg", append=FALSE)
-st_write(cp2_joined, file.path(processed_coastal_dir, "grid_10k_coastal_calc.gpkg"), append=FALSE)
+# st_write(cp2_joined,"/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/10k_grid_coastal_calc.gpkg", append=FALSE)
+st_write(cp2_joined, file.path(processed_coastal_dir, "10k_grid_coastal_calc.gpkg"), append=FALSE)
 ```
 
 ### Fix Coastal protection
@@ -521,7 +510,7 @@ cp2 <- st_read(data_vectors("grid_10k_coastal.shp"))
 cp2 <- cp2 %>% mutate(fid_2 = row_number())
 
 # Already calculated
-cp_calc <- st_read(file.path(processed_coastal_dir, "grid_10k_coastal_calc.gpkg"))
+cp_calc <- st_read(file.path(processed_coastal_dir, "10k_grid_coastal_calc.gpkg"))
 
 cp_calc <- cp_calc %>% mutate(fid_2 = row_number())
 cp_calc <- st_drop_geometry(cp_calc)
@@ -550,8 +539,8 @@ sf_f <- sf_f %>%
 sf_f <- sf_f %>% mutate(fid = row_number()) # make sure that the fid matches! this is key!
 
 
-ly_c <- st_layers(file.path(processed_coastal_dir, "grid_10k_coastal_calc.gpkg"))
-cp_calc <- st_read(file.path(processed_coastal_dir, "grid_10k_coastal_calc.gpkg"), layer = "Coastal_Protection")
+ly_c <- st_layers(file.path(processed_coastal_dir, "10k_grid_coastal_calc.gpkg"))
+cp_calc <- st_read(file.path(processed_coastal_dir, "10k_grid_coastal_calc.gpkg"), layer = "Coastal_Protection")
 
 # Calculate change
 # pct_chg uses the earliest year as baseline: ((t1 - t0) / t0) * 100.
@@ -597,58 +586,7 @@ No need to run again, already updated the Access Data.
 #| eval: false
 #| include: false
 
-sf_f <- st_read(file.path(inpath, "10k_grid_ES_change_benef.gpkg")) # why am I loading this? What is the purpose. This is always the final (most curtrent version). To this one is that ineed to do the adjustments, add new columns
-
-
-# This is the old output with the calculated means for services (because we want to add the new columns to this output, even if it was created sli
-# sf_1 <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_synth_serv_means.gpkg")
-sf_1 <- st_read(file.path(interim_output_dir, "10k_grid_synth_serv_means.gpkg"))
-
-sf_1 <- sf_1 %>% mutate(fid = dplyr::row_number())
-
-
-poly1 <- poly1 %>% rename(nature_access_lspop2019_ESA2020_mean = nature_access_lspop2019_ESA2020._mean)
-sf_1 <- sf_1 %>% rename(nature_access_lspop2019_ESA2020_mean = nature_access_lspop2019_ESA2020._mean)
-poly1 <- poly1 %>% mutate(fid = dplyr::row_number())
-
-poly1 <- st_drop_geometry(poly1)
-
-
-sf_1$nature_access_lspop2019_ESA2020_mean <- NULL
-sf_1$nature_access_lspop2019_ESA2020_mean <- poly1$nature_access_lspop2019_ESA2020_mean
-
-sf_1 <- sf_1 %>% select(fid, global_usle_marine_mod_ESA_1992_mean, global_usle_marine_mod_ESA_2020_mean,nature_access_lspop2019_ESA1992_mean,nature_access_lspop2019_ESA2020_mean, N_ret_ratio_1992_mean,N_ret_ratio_2020_mean, Sed_ret_ratio_1992_mean, Sed_ret_ratio_2020_mean)
-
-# st_write(sf_1, "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_synth_serv_means.gpkg", append=FALSE)
-st_write(sf_1, file.path(interim_output_dir, "10k_grid_synth_serv_means.gpkg"), append=FALSE)
-
-
-poly1 <- poly1 %>% rename(nature_access_abs_chg=access_abs_chg)
-poly1 %>% rename(nature_access_pct_chg = access_pct_chg)
-
-sf_f$nature_access_abs_chg=poly1$nature_access_abs_chg
-sf_f$nature_access_pct_chg=poly1$access_pct_chg
-st_write(sf_f, file.path(inpath, "10k_grid_ES_change_benef.gpkg"), append=FALSE)
-# ch <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/10k_grid_ES_change_benef.gpkg")
-ch <- st_read(file.path(inpath, "10k_grid_ES_change_benef.gpkg"))
-
-nams <- names(ch)
-
-nams <- cbind(nams, nams)
-# write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/ch.csv")
-write.csv(nams, file= file.path(processed_tables_dir, "ch.csv"))
-
-
-
-# hp <- st_read("/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/hotspots_5_final-lilling-safeBackup-0001.gpkg")
-hp <- st_read(file.path(processed_hotspots_dir, "hotspots_5_final-lilling-safeBackup-0001.gpkg"))
-
-nams <- names(hp)
-
-
-nams <- cbind(nams, nams)
-
-# write.csv(nams, file= "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data/hp.csv")
-write.csv(nams, file= file.path(processed_tables_dir, "hp.csv"))
+# Deprecated: access corrections are handled in the current services_slim outputs.
+# Keeping this chunk as historical reference only.
 
 ```

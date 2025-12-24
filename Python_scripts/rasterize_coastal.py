@@ -3,20 +3,40 @@ import rasterio
 from rasterio.features import rasterize
 from rasterio.windows import Window
 from rasterio.merge import merge
+import os
 from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-# Paths
-points_fp = "/home/jeronimo/OneDrive/global_NCP/data/Spring/Inspring/coastal_protection_Wchange.shp"
-template_fp = "/home/jeronimo/OneDrive/global_NCP/data/input_rasters/LandCovers/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1_md5_2ed6285e6f8ec1e7e0b75309cc6d6f9f.tif"
-output_dir = Path("/home/jeronimo/OneDrive/global_NCP/data/input_rasters/coastal_protection_rast_tiles")
-final_output_dir = Path("/home/jeronimo/OneDrive/global_NCP/data/input_rasters/coastal_protection_rasters")
+# Paths (set GLOBAL_NCP_DATA in your environment)
+data_root = os.environ.get("GLOBAL_NCP_DATA", "")
+if not data_root:
+    raise RuntimeError("GLOBAL_NCP_DATA is not set; expected /home/jeronimo/data/global_ncp")
+data_root = Path(data_root)
+
+points_fp = data_root / "raw" / "Spring" / "Inspring" / "coastal_risk_tnc_esa1992_2020_ch.gpkg"
+template_fp = (
+    data_root
+    / "raw"
+    / "LandCovers"
+    / "landcover_gl_1992.tif"
+)
+output_dir = data_root / "interim" / "coastal_protection_rast_tiles"
+final_output_dir = data_root / "interim" / "coastal_protection_rasters"
 output_dir.mkdir(parents=True, exist_ok=True)
 final_output_dir.mkdir(parents=True, exist_ok=True)
 
 # Parameters
-columns = ["Rt_1992", "Rt_2020"]  # Removed Rt_serv_ch
+# Optional: include Rt_serv_ch raster for comparison runs
+include_change = os.environ.get("COASTAL_INCLUDE_CH", "0") == "1"
+columns = [
+    "Rt_1992",
+    "Rt_2020",
+    "Rt_ratio_1992",
+    "Rt_ratio_2020",
+]
+if include_change:
+    columns.append("Rt_serv_ch")
 tile_size = 2000  # Adjust based on available memory
 
 # Function to generate tile boundaries
@@ -42,6 +62,12 @@ with rasterio.open(template_fp) as src:
     res = src.res
 
 meta.update(dtype="float32", count=1, nodata=np.nan, compress="deflate")
+
+if gdf.crs != crs:
+    print(f"Reprojecting points to {crs} ...")
+    gdf = gdf.to_crs(crs)
+
+# NOTE: Rt_ratio_1992/2020 are expected to already exist in the input layer.
 
 # Rasterize each variable by tile
 for column in columns:
@@ -113,3 +139,10 @@ for column in columns:
         r.close()
 
     print(f"✓ Final raster saved to: {final_fp}")
+
+# Optional cleanup: remove intermediate tiles to save space
+cleanup_tiles = os.environ.get("COASTAL_CLEAN_TILES", "1") == "1"
+if cleanup_tiles:
+    for fp in output_dir.glob("*.tif"):
+        fp.unlink()
+    print(f"✓ Removed intermediate tiles in {output_dir}")

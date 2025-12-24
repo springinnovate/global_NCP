@@ -1,4 +1,5 @@
-# Example config file for the globalNCP summary pipeline
+# Coastal protection comparison run (Rt_serv_ch vs diff of means).
+# Requires rasterize_coastal.py with COASTAL_INCLUDE_CH=1.
 
 workspace_dir:
   path: "./summary_pipeline_workspace"
@@ -6,6 +7,7 @@ workspace_dir:
 vector_zones:
   grid_10km_land:
     path: "${GLOBAL_NCP_DATA}/vector_basedata/AOOGrid_10x10km_land_4326_clean.gpkg"
+
 raster_layers:
   coastal_protection_Rt_1992:
     path: "${GLOBAL_NCP_DATA}/interim/coastal_protection_rasters/Rt_1992.tif"
@@ -13,16 +15,9 @@ raster_layers:
   coastal_protection_Rt_2020:
     path: "${GLOBAL_NCP_DATA}/interim/coastal_protection_rasters/Rt_2020.tif"
     band: 1
-  coastal_protection_Rt_ratio_1992:
-    path: "${GLOBAL_NCP_DATA}/interim/coastal_protection_rasters/Rt_ratio_1992.tif"
-    band: 1
-  coastal_protection_Rt_ratio_2020:
-    path: "${GLOBAL_NCP_DATA}/interim/coastal_protection_rasters/Rt_ratio_2020.tif"
-    band: 1
   coastal_protection_Rt_serv_ch:
     path: "${GLOBAL_NCP_DATA}/interim/coastal_protection_rasters/Rt_serv_ch.tif"
     band: 1
 
 op_stats:
   - mean
-  
