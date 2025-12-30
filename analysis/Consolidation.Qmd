@@ -482,12 +482,38 @@ canonical_change <- unique(c(
 ))
 chg_cols <- intersect(chg_cols, canonical_change)
 
+benef_keep <- intersect(
+  c(
+    paste0(
+      c(
+        "fields_mehrabi_2017",
+        "GHS_BUILT_S_E2020",
+        "hdi_raster_predictions_2020",
+        "rast_adm1_gini_disp_2020"
+      ),
+      "_mean"
+    ),
+    paste0(
+      c(
+        "GHS_POP_E2020_GLOBE",
+        "GlobPOP_Count_30arc_2020",
+        "rast_gdpTot_1990_2020_30arcsec_2020"
+      ),
+      "_sum"
+    )
+  ),
+  names(sf_f)
+)
+
 keep_cols <- unique(c(
   keep_fixed,
-  grep(benef_pattern, names(sf_f), value = TRUE),
+  benef_keep,
   chg_cols
 ))
 keep_cols <- setdiff(keep_cols, c("RasterVal", "id_2"))
+
+message("Beneficiary columns kept (n = ", length(benef_keep), "):")
+print(benef_keep)
 
 svc_meta <- tibble::tibble(
   col = svc_cols,
@@ -499,9 +525,7 @@ message("Service stats kept (canonical):")
 print(svc_meta)
 message("Change columns kept (n = ", length(chg_cols), "):")
 print(head(chg_cols, 25))
-
 sf_canon <- sf_f |> dplyr::select(any_of(keep_cols))
-
 grid_attrs <- st_read(
   file.path(data_interim(), "..", "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"),
   quiet = TRUE
@@ -521,6 +545,11 @@ if (!all(keep_fixed %in% names(sf_canon))) {
 # Re-apply selection to ensure only intended columns remain after the join
 sf_canon <- sf_canon |> dplyr::select(any_of(keep_cols))
 
+```
+
+```{r write-canonical-change}
+#| eval: false
+#| include: false
 # Clean service change names only (drop _mean/_sum for canonical services).
 rename_change <- function(nm) {
   stringr::str_replace(nm, "_(mean|sum)_(abs|pct)_chg$", "_\\2_chg")
@@ -542,80 +571,10 @@ st_write(
 )
 ```
 
-Note: coastal protection shows up twice in this document. The earlier `c_prot` block is only a field inventory; the actual join and aggregation happen in the sections below.
-
-## Include Coastal Protection (final)
-
-This whole part need to be fixed at some point. The key part is to get the coastal with the right fid so we can join and add this correclty wqhen we have more data. Right now keep this hewre
-
-```{r include coastal points}
-#| eval: false
-#| include: false
-# Add ratios to the joined coastal points (1992/2020) before rasterization.
-
-cp_joined_path <- file.path(data_interim(), "c_protection_1992_2020_joined.gpkg")
-cp_points <- st_read(cp_joined_path, quiet = TRUE)
-
-missing_cols <- setdiff(
-  c("Rt_1992", "Rt_nohab_all_1992", "Rt_2020", "Rt_nohab_all_2020"),
-  names(cp_points)
-)
-if (length(missing_cols)) {
-  stop("Missing coastal columns: ", paste(missing_cols, collapse = ", "))
-}
-
-cp_points <- cp_points |>
-  dplyr::mutate(
-    Rt_service_1992 = .data$Rt_nohab_all_1992 - .data$Rt_1992,
-    Rt_service_2020 = .data$Rt_nohab_all_2020 - .data$Rt_2020,
-    Rt_ratio_1992 = dplyr::if_else(
-      .data$Rt_nohab_all_1992 != 0,
-      .data$Rt_service_1992 / .data$Rt_nohab_all_1992,
-      NA_real_
-    ),
-    Rt_ratio_2020 = dplyr::if_else(
-      .data$Rt_nohab_all_2020 != 0,
-      .data$Rt_service_2020 / .data$Rt_nohab_all_2020,
-      NA_real_
-    )
-  )
-
-st_write(cp_points, cp_joined_path, append = FALSE)
-```
-
-### Coastal protection pipeline (current)
-
-Coastal protection now follows a three-step sequence. Keep this order to avoid
-stale joins and to ensure the ratios are computed before rasterization:
-
-1. Join 1992/2020 points → `interim/c_protection_1992_2020_joined.gpkg`
-   (via `Python_scripts/coastal_protection_join.py`).
-2. Add Rt_service and Rt_ratio columns (see chunk above).
-3. Rasterize the joined points (with ratios) and run the summary pipeline to
-   produce the coastal synthesis GPKG.
-
-```{r coastal-protection-runbook}
-#| eval: false
-#| include: false
-
-# 1) Join points (creates interim/c_protection_1992_2020_joined.gpkg)
-# python Python_scripts/coastal_protection_join.py
-
-# 2) Add ratios (run the chunk above)
-
-# 3) Rasterize the updated points
-# COASTAL_INCLUDE_CH=1 python Python_scripts/rasterize_coastal.py
-
-# 4) Summarize to the 10 km grid (Docker)
-# python summary_pipeline_landgrid.py --data-root /data analysis_configs/c_protection_synth.yaml
-
-# 5) Wrap dateline + move to interim (see README section)
-# OUT_DIR=/home/jeronimo/data/global_ncp/interim
-# TS=$(date +%Y%m%d_%H%M%S)
-# COAST_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/<coastal_file>.gpkg
-# ogr2ogr -wrapdateline -datelineoffset 180 \
-#   "$OUT_DIR/10k_grid_synth_coastal_${TS}.gpkg" "$COAST_SRC"
-```
+Note: coastal protection is prepared upstream (join → ratios → rasterize → summary)
+via `Python_scripts/coastal_protection_join.py`, `Python_scripts/rasterize_coastal.py`,
+and `analysis_configs/c_protection_synth.yaml`. This document consumes the resulting
+coastal synthesis GPKG from `data_interim()`.
 
 ## Add Updated Access Data
 
