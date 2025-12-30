@@ -134,9 +134,12 @@ def zonal_stats(raster_path_band_dict, op_stats, vector_path):
     if gdf.crs != raster_crs:
         gdf = gdf.to_crs(raster_crs)
 
-    # need to get the FID column in there so we can join results
-    gdf = gdf[["geometry"]].copy()
-    gdf["fid"] = gdf.index.astype("int32")
+    # keep/derive FID so joins align with the output vector
+    if "fid" not in gdf.columns:
+        gdf["fid"] = gdf.index.astype("int32")
+    else:
+        gdf["fid"] = gdf["fid"].astype("int32")
+    gdf = gdf[["geometry", "fid"]].copy()
 
     stem = Path(raster_path_band_dict["path"]).stem
     stats_df = exact_extract(
@@ -280,8 +283,10 @@ def main():
 
         # copy original vector and join to zonal stats via 'fid'
         gdf = gpd.read_file(vector_path)
-        gdf = gdf[["geometry"]].copy()
-        gdf["fid"] = gdf.index.astype("int32")
+        if "fid" not in gdf.columns:
+            gdf["fid"] = gdf.index.astype("int32")
+        else:
+            gdf["fid"] = gdf["fid"].astype("int32")
         for raster_id, band_idx, stats_task in zonal_stats_task_list:
             stats_df = stats_task.get()
             # renames the stat to be the raster id provided in the

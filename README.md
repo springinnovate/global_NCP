@@ -107,6 +107,14 @@ python summary_pipeline_landgrid.py --data-root /data analysis_configs/c_protect
 Each raster-vector combo is processed in parallel, using `exactextract` for
 zonal summaries. Results are cached and returned quickly on reruns.
 
+If you change grids or configs, clear the workspace cache (or set a new
+workspace dir) to avoid stale taskgraph outputs:
+
+``` bash
+rm -f summary_pipeline_workspace/*.gpkg
+rm -f summary_pipeline_workspace/taskgraph_data.db
+```
+
 ## Coastal Protection Rasterization (points → rasters)
 
 Coastal protection outputs are provided as point features. Rasterize them to the

@@ -14,7 +14,12 @@ if not data_root:
     raise RuntimeError("GLOBAL_NCP_DATA is not set; expected /home/jeronimo/data/global_ncp")
 data_root = Path(data_root)
 
-points_fp = data_root / "raw" / "Spring" / "Inspring" / "coastal_risk_tnc_esa1992_2020_ch.gpkg"
+points_fp = Path(
+    os.environ.get(
+        "COASTAL_POINTS_GPKG",
+        data_root / "interim" / "c_protection_1992_2020_joined.gpkg",
+    )
+)
 template_fp = (
     data_root
     / "raw"
@@ -29,14 +34,8 @@ final_output_dir.mkdir(parents=True, exist_ok=True)
 # Parameters
 # Optional: include Rt_serv_ch raster for comparison runs
 include_change = os.environ.get("COASTAL_INCLUDE_CH", "0") == "1"
-columns = [
-    "Rt_1992",
-    "Rt_2020",
-    "Rt_ratio_1992",
-    "Rt_ratio_2020",
-]
-if include_change:
-    columns.append("Rt_serv_ch")
+clean_outputs = os.environ.get("COASTAL_CLEAN", "0") == "1"
+columns_env = os.environ.get("COASTAL_COLUMNS")
 tile_size = 2000  # Adjust based on available memory
 
 # Function to generate tile boundaries
@@ -46,6 +45,13 @@ def tile_bounds(width, height, tile_size):
             w = min(tile_size, width - x)
             h = min(tile_size, height - y)
             yield x, y, w, h
+
+# Optional cleanup for re-runs
+if clean_outputs:
+    for fp in output_dir.glob("*.tif"):
+        fp.unlink(missing_ok=True)
+    for fp in final_output_dir.glob("*.tif"):
+        fp.unlink(missing_ok=True)
 
 # Load data
 print("Loading points...")
@@ -68,6 +74,17 @@ if gdf.crs != crs:
     gdf = gdf.to_crs(crs)
 
 # NOTE: Rt_ratio_1992/2020 are expected to already exist in the input layer.
+if columns_env:
+    columns = [c.strip() for c in columns_env.split(",") if c.strip()]
+else:
+    numeric_cols = gdf.select_dtypes(include=["number"]).columns.tolist()
+    exclude = {"fid", "id"}
+    if not include_change:
+        exclude.add("Rt_serv_ch")
+    columns = [c for c in numeric_cols if c not in exclude]
+
+if not columns:
+    raise RuntimeError("No numeric columns found to rasterize.")
 
 # Rasterize each variable by tile
 for column in columns:

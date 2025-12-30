@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import argparse
 
 import geopandas as gpd
 import numpy as np
@@ -10,13 +12,41 @@ def _set_geom(gdf):
     return gdf
 
 
+def _default_interim():
+    root = Path(os.environ.get("GLOBAL_NCP_DATA", "/home/jeronimo/data/global_ncp"))
+    return root / "interim"
+
+
+def parse_args():
+    interim = _default_interim()
+    parser = argparse.ArgumentParser(
+        description="Join coastal protection point layers (1992 vs 2020) and compute deltas."
+    )
+    parser.add_argument(
+        "--cp-1992",
+        type=Path,
+        default=interim / "c_protection_1992.gpkg",
+        help="Input 1992 coastal protection points (GPKG).",
+    )
+    parser.add_argument(
+        "--cp-2020",
+        type=Path,
+        default=interim / "c_protection_2020.gpkg",
+        help="Input 2020 coastal protection points (GPKG).",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=interim / "c_protection_1992_2020_joined.gpkg",
+        help="Output joined GPKG.",
+    )
+    return parser.parse_args()
+
+
 def main():
-    cp_1992_path = Path(
-        r"C:/Users/JerónimoRodríguezEsc/OneDrive - World Wildlife Fund, Inc/PROJECTS/Global_NCP/data/interim/c_protection_1992.gpkg"
-    )
-    cp_2020_path = Path(
-        r"C:/Users/JerónimoRodríguezEsc/OneDrive - World Wildlife Fund, Inc/PROJECTS/Global_NCP/data/interim/c_protection_2020.gpkg"
-    )
+    args = parse_args()
+    cp_1992_path = args.cp_1992
+    cp_2020_path = args.cp_2020
 
     print(f"Reading: {cp_1992_path}")
     cp_1992 = gpd.read_file(cp_1992_path)
@@ -64,7 +94,7 @@ def main():
         np.nan,
     )
 
-    out_path = cp_1992_path.parent / "c_protection_1992_2020_joined.gpkg"
+    out_path = args.out
     joined.to_file(out_path, driver="GPKG")
     print(f"Wrote: {out_path}")
 
