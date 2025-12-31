@@ -1,6 +1,6 @@
 ---
 title: "Hotspot Extraction Pipeline"
-subtitle: "v0.5.0"
+subtitle: "v1.0.0"
 author: "Jerónimo Rodríguez Escobar"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
@@ -415,6 +415,10 @@ if (isTRUE(write_full_change)) {
 #| include: false
 # Create a trimmed, canonical change dataset for downstream use.
 # Keep the full QA dataset in 10k_grid_ES_change_benef.gpkg.
+#
+# Note: the canonical dataset is intentionally a subset (selected services +
+# selected beneficiary summaries + groupings). If you need more variables
+# later, expand the keep lists below or use the full QA dataset as input.
 
 if (!"fid" %in% names(sf_f)) {
   sf_f$fid <- seq_len(nrow(sf_f))

@@ -380,6 +380,84 @@ readr::write_csv(dplyr::bind_rows(flips_keep_trim, flips_drop_trim,
                  file.path(out_tbl, "flips_pct_abs_all.csv"))
 ```
 
+## Flip diagnostics strategies
+
+Use the blocks below to test the three diagnostic strategies for sign flips:
+
+1. **Shared trimming mask:** force pct/abs to use the same subset of cells.
+2. **Baseline inspection:** check whether T0 values are near zero or mixed sign.
+3. **Aggregate‑then‑percent:** compute pct change after aggregating to group level.
+
+```{r}
+#| label: flip-shared-trim-mask
+#| eval: false
+
+# Uses the same mask for abs and pct (per service) so trimming is identical.
+shared_trim_summary <- function(df, service, group_col, cut_q = 0.999) {
+  d <- df |> dplyr::filter(.data$service == !!service, !is.na(.data[[group_col]]))
+  if (!nrow(d)) return(tibble::tibble())
+
+  cap_abs <- stats::quantile(abs(d$abs_chg), cut_q, na.rm = TRUE)
+  cap_pct <- stats::quantile(abs(d$pct_chg), cut_q, na.rm = TRUE)
+  keep <- abs(d$abs_chg) <= cap_abs & abs(d$pct_chg) <= cap_pct
+
+  d |>
+    dplyr::filter(keep) |>
+    dplyr::group_by(.data[[group_col]]) |>
+    dplyr::summarise(
+      mean_abs = mean(abs_chg, na.rm = TRUE),
+      mean_pct = mean(pct_chg, na.rm = TRUE),
+      .groups = "drop"
+    )
+}
+
+# Example:
+# shared_trim_summary(plt_long, service = "Sed_export", group_col = "continent")
+```
+
+```{r}
+#| label: flip-baseline-inspection
+#| eval: false
+
+# Inspect baseline (T0) values for services with flips.
+# Requires the full QA dataset with base-year columns.
+full_path <- file.path(data_dir(), "processed", "10k_grid_ES_change_benef.gpkg")
+if (file.exists(full_path)) {
+  full <- sf::st_read(full_path, quiet = TRUE) |> sf::st_drop_geometry()
+  # Example: check 1992 baseline for a service
+  # base_col <- "global_usle_marine_mod_ESA_1992_mean"
+  # summary(full[[base_col]])
+  # mean(full[[base_col]] == 0, na.rm = TRUE)
+} else {
+  message("Full QA dataset not found: ", full_path)
+}
+```
+
+```{r}
+#| label: flip-aggregate-then-percent
+#| eval: false
+
+# Compute pct change after aggregation (group mean first, then pct).
+agg_then_pct <- function(df, col_1992, col_2020, group_col) {
+  df |>
+    dplyr::filter(!is.na(.data[[group_col]])) |>
+    dplyr::group_by(.data[[group_col]]) |>
+    dplyr::summarise(
+      mean_1992 = mean(.data[[col_1992]], na.rm = TRUE),
+      mean_2020 = mean(.data[[col_2020]], na.rm = TRUE),
+      pct_change = dplyr::if_else(mean_1992 != 0,
+                                  (mean_2020 - mean_1992) / mean_1992,
+                                  NA_real_),
+      .groups = "drop"
+    )
+}
+
+# Example (requires base-year cols in full dataset):
+# agg_then_pct(full, "global_usle_marine_mod_ESA_1992_mean",
+#              "global_usle_marine_mod_ESA_2020_mean",
+#              "continent")
+```
+
 ## Pivot to long (heavy; off by default)
 
 Rebuild `plt_long` from `processed/10k_change_calc.gpkg`. Turn `eval: true` only if you need a fresh pivot here; otherwise, rely on the main report cache.

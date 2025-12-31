@@ -30,6 +30,7 @@ if (!"c_fid" %in% names(sf_f)) {
   else if ("id" %in% names(sf_f))      sf_f <- dplyr::rename(sf_f, c_fid = id)
 }
 sf_f <- dplyr::select(sf_f, -dplyr::any_of(c("c_fid.x","c_fid.y")))
+if (!"c_fid" %in% names(sf_f)) sf_f$c_fid <- sf_f$fid
 
 plt <- sf::st_drop_geometry(sf_f)
 chg_cols <- grep("_(abs|pct)_chg$", names(plt), value = TRUE)

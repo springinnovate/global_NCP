@@ -5,7 +5,7 @@ author: "Jerónimo Rodríguez Escobar"
 email: "jeronimo.rodriguez@wwfus.org"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
-analysis_version: "v0.5.0"
+analysis_version: "v1.0.0"
 format:
   html:
     toc: true
@@ -21,12 +21,12 @@ format:
 editor: source
 
 params:
-  analysis_version: "v0.5.0"
+  analysis_version: "v1.0.0"
 ---
 
 ## Overview
 
-Prepares the processed 10 km grid, derives hotspot flags, and produces the bar/violin plots that summarize signed and absolute change by group (region, income, biome). Key steps: load helpers and paths, attach grouping attributes, pivot change fields to long form, define hotspots using the configured thresholds, export hotspot layers, and write the latest plots to `outputs/plots/latest/`.
+Prepares the processed 10 km grid, derives hotspot flags, and produces the bar/violin plots that summarize signed and absolute change by group (region, income, biome). This version uses the corrected 10 km equal-area (AOO land-only) grid. Key steps: load helpers and paths, attach grouping attributes, pivot change fields to long form, define hotspots using the configured thresholds, export hotspot layers, and write the latest plots to `outputs/plots/latest/`.
 
 ## Setup and Libraries
 
@@ -155,6 +155,9 @@ if (!exists("canonical_lookup", inherits = TRUE)) {
     usle             = "USLE",
     n_ret_ratio      = "N_Ret_Ratio",
     sed_ret_ratio    = "Sed_Ret_Ratio",
+    coastal_protection_rt            = "C_Risk",
+    coastal_protection_rt_nohab_all  = "C_Risk_NoHab",
+    coastal_protection_rt_ratio      = "C_Risk_Red_Ratio",
     rt_ratio         = "C_Risk_Red_Ratio",
     rt               = "C_Risk",
     c_risk           = "C_Risk",
@@ -196,8 +199,26 @@ The input 10 km grid (`sf_f`) is enriched with country and WWF biome IDs to allo
 # - sf_f (grid polygons) in memory with at least: fid, c_fid, geometry
 # - paths.R available and data_dir() points to your data root (GLOBAL_NCP_DATA)
 
-out_gpkg <-
-if (!file.exists(out_gpkg)) {
+out_gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+force_attach <- FALSE  # set TRUE to force re-attach even if file exists
+required_group_cols <- c(
+  "iso3","continent","income_grp","region_un","region_wb","subregion","WWF_biome","BIOME"
+)
+skip_attach <- FALSE
+if (file.exists(out_gpkg) && !force_attach) {
+  existing <- tryCatch(sf::st_read(out_gpkg, quiet = TRUE, n_max = 1), error = function(e) NULL)
+  if (is.null(existing) || !inherits(existing, "sf") || is.null(sf::st_geometry(existing))) {
+    message("attach-region-attrs: existing 10k_change_calc.gpkg is non-spatial; skipping join.")
+    skip_attach <- TRUE
+  } else {
+    missing <- setdiff(required_group_cols, names(existing))
+    if (length(missing) == 0) {
+      message("attach-region-attrs: existing 10k_change_calc.gpkg already has groupings; skipping join.")
+      skip_attach <- TRUE
+    }
+  }
+}
+if (!skip_attach) {
   stopifnot(inherits(sf_f, "sf"))
   stopifnot(all(c("fid","c_fid") %in% names(sf_f)))
 
@@ -476,7 +497,7 @@ Hotspot export and KS still expect `plt_long`. To avoid the heavy pivot here, we
 
 ```{r}
 #| label: pivot
-#| eval: false
+#| eval: true
 #| echo: false
 #| message: false
 #| warning: false
@@ -602,29 +623,31 @@ cat(paste0(
 
 ```{r}
 #| label: hotspots_export
-#| eval: false
+#| eval: true
 #| message: false
 #| warning: false
 #| echo: false
 #| include: false
 #| cache: false
-#| eval: false
 
 stopifnot(exists("plt_long"))
 
 # ---- Geometry: prefer an in-memory slim grid, else build it --------------
 if (exists("grid_sf") && inherits(grid_sf, "sf")) {
-  geom_sf <- dplyr::select(grid_sf, fid, c_fid)
+  geom_sf <- dplyr::select(grid_sf, dplyr::any_of(c("fid", "c_fid")))
 } else {
   gpkg_grid <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
   stopifnot(file.exists(gpkg_grid))
   geom_sf <- sf::st_read(gpkg_grid, quiet = TRUE) |>
-    dplyr::select(dplyr::any_of(c("fid","c_fid")), dplyr::everything())
-  if (!"fid" %in% names(geom_sf)) {
-    geom_sf$fid <- seq_len(nrow(geom_sf))
-  }
-  geom_sf <- dplyr::select(geom_sf, fid, c_fid)  # keep it slim
+    dplyr::select(dplyr::any_of(c("fid", "c_fid")), dplyr::everything())
 }
+if (!"fid" %in% names(geom_sf)) {
+  geom_sf$fid <- seq_len(nrow(geom_sf))
+}
+if (!"c_fid" %in% names(geom_sf)) {
+  geom_sf$c_fid <- geom_sf$fid
+}
+geom_sf <- dplyr::select(geom_sf, fid, c_fid)  # keep it slim
 stopifnot("fid" %in% names(geom_sf), !any(duplicated(geom_sf$fid)))
 
 # ---- Helper: safe slug for filenames -------------------------------------
@@ -714,9 +737,9 @@ groupings <- if (!is.null(HOTS_CFG$groupings)) {
   c("income_grp","region_wb","continent","region_un","WWF_biome")
 }
 
-# Run both metrics
-metrics <- c("abs_chg","pct_chg")
-index_rows <- lapply(metrics, function(m) run_one_hotset(plt_long, value_col = m, scope = "global"))
+# Run both metrics (hotspot export)
+metrics_hs <- c("abs_chg","pct_chg")
+index_rows <- lapply(metrics_hs, function(m) run_one_hotset(plt_long, value_col = m, scope = "global"))
 
 # Subregional runs
 for (gc in groupings) {
@@ -724,7 +747,7 @@ for (gc in groupings) {
   vals_chr <- as.character(stats::na.omit(unique(plt_long[[gc]])))
   if (!length(vals_chr)) next
 
-  for (m in metrics) {
+  for (m in metrics_hs) {
     index_rows <- append(index_rows, list(
       purrr::map_dfr(vals_chr, \(v) run_one_hotset(
         df        = plt_long,
@@ -780,12 +803,12 @@ group_col         <- "region_wb"   # e.g. "income_grp","continent","region_un","
 metric            <- "pct"         # "pct" or "abs"
 cut_q             <- 0.999         # trim extreme 0.1% so bars aren't dominated by outliers
 include_global    <- FALSE         # TRUE to add a "Global" bar into each facet
-keep_only_ordered <- TRUE          # show only the 8 services in your svc_order
+keep_only_ordered <- TRUE          # show only services in your svc_order
 save_plot         <- TRUE
 out_dir           <- file.path("outputs","plots")
 out_stub          <- paste0("bars_", tolower(group_col), "_", metric)
 
-# --- facet order (your canonical 8 first) ---------------------------------
+# --- facet order (your canonical set first) --------------------------------
 svc_order <- c(
   "C_Risk","N_export","Sed_export",
   "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
@@ -1159,12 +1182,14 @@ plot_signed_bars <- function(df, group_col, metric = c("pct","abs"),
 #| warning: false
 #| echo: false
 #| cache: false
-#| eval: false
+#| eval: true
 #| results: "hold"
 
 if (length(groupings) == 0) {
   warning("No grouping columns found in plt_long; skipping bar plots.")
 } else {
+  metrics <- c("pct","abs")
+  keep_only_ordered <- TRUE
   for (gc in groupings) {
     for (m in metrics) {
       plot_change_bars(plt_long, group_col = gc, metric = m,
@@ -1233,55 +1258,55 @@ Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/violins_*.png`
 #| echo: false
 #| cache: false
 #| results: "hold"
-#| eval: false
+#| eval: true
 
-# stopifnot(exists("plt_long"))
-# groupings <- if (!is.null(HOTS_CFG$groupings) && length(HOTS_CFG$groupings) > 0) {
-#   HOTS_CFG$groupings
-# } else {
-#   c("income_grp","region_wb","continent","region_un","WWF_biome")
-# }
-# missing_groupings <- setdiff(groupings, names(plt_long))
-# if (length(missing_groupings)) {
-#   warning("Grouping column(s) not found in plt_long and will be skipped: ",
-#           paste(missing_groupings, collapse = ", "))
-# }
-# groupings <- intersect(groupings, names(plt_long))
-# message("make-hotspot-violins groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
-# violin_order <- levels(plt_long$service)
-# if (is.null(violin_order)) {
-#   violin_order <- unique(plt_long$service)
-# }
-# violin_order <- as.character(violin_order)
-# if (length(groupings) == 0) {
-#   warning("No grouping columns found in plt_long; skipping hotspot violins.")
-# } else {
-#   for (gc in groupings) {
-#     message("Rendering hotspot violins for: ", gc)
-#     run_hotspot_violins_by(
-#       df_long          = plt_long,
-#       group_col         = gc,
-#       loss              = HOTS_CFG$loss,
-#       gain              = HOTS_CFG$gain,
-#       pct_cutoff        = HOTS_CFG$pct_cutoff,
-#       threshold_mode    = HOTS_CFG$threshold_mode,
-#       svc_order         = violin_order,
-#       cut_q             = 0.999,
-#       keep_only_ordered = TRUE
-#     )
-#   }
-# }
-# latest_dir_violins <- file.path("outputs","plots","latest","violins")
-# dir.create(latest_dir_violins, recursive = TRUE, showWarnings = FALSE)
-# old_latest_violins <- list.files(latest_dir_violins, full.names = TRUE, all.files = FALSE)
-# if (length(old_latest_violins)) invisible(file.remove(old_latest_violins))
-# all_new_violins <- list.files(out_plots(), pattern = "violins_.*\\.png$",
-#                               recursive = TRUE, full.names = TRUE)
-# all_new_violins <- all_new_violins[!grepl("/latest/", all_new_violins)]
-# good_violins <- all_new_violins[file.info(all_new_violins)$size > 0]
-# if (length(good_violins)) {
-#   invisible(file.copy(good_violins, latest_dir_violins, overwrite = TRUE))
-# }
+stopifnot(exists("plt_long"))
+groupings <- if (!is.null(HOTS_CFG$groupings) && length(HOTS_CFG$groupings) > 0) {
+  HOTS_CFG$groupings
+} else {
+  c("income_grp","region_wb","continent","region_un","WWF_biome")
+}
+missing_groupings <- setdiff(groupings, names(plt_long))
+if (length(missing_groupings)) {
+  warning("Grouping column(s) not found in plt_long and will be skipped: ",
+          paste(missing_groupings, collapse = ", "))
+}
+groupings <- intersect(groupings, names(plt_long))
+message("make-hotspot-violins groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
+violin_order <- levels(plt_long$service)
+if (is.null(violin_order)) {
+  violin_order <- unique(plt_long$service)
+}
+violin_order <- as.character(violin_order)
+if (length(groupings) == 0) {
+  warning("No grouping columns found in plt_long; skipping hotspot violins.")
+} else {
+  for (gc in groupings) {
+    message("Rendering hotspot violins for: ", gc)
+    run_hotspot_violins_by(
+      df_long          = plt_long,
+      group_col         = gc,
+      loss              = HOTS_CFG$loss,
+      gain              = HOTS_CFG$gain,
+      pct_cutoff        = HOTS_CFG$pct_cutoff,
+      threshold_mode    = HOTS_CFG$threshold_mode,
+      svc_order         = violin_order,
+      cut_q             = 0.999,
+      keep_only_ordered = TRUE
+    )
+  }
+}
+latest_dir_violins <- file.path("outputs","plots","latest","violins")
+dir.create(latest_dir_violins, recursive = TRUE, showWarnings = FALSE)
+old_latest_violins <- list.files(latest_dir_violins, full.names = TRUE, all.files = FALSE)
+if (length(old_latest_violins)) invisible(file.remove(old_latest_violins))
+all_new_violins <- list.files(out_plots(), pattern = "violins_.*\\.png$",
+                              recursive = TRUE, full.names = TRUE)
+all_new_violins <- all_new_violins[!grepl("/latest/", all_new_violins)]
+good_violins <- all_new_violins[file.info(all_new_violins)$size > 0]
+if (length(good_violins)) {
+  invisible(file.copy(good_violins, latest_dir_violins, overwrite = TRUE))
+}
 
 ```
 
