@@ -1,3 +1,285 @@
+
+## Legacy barplot workflow (migrated from hotspot_extraction.qmd)
+
+```{r}
+#| label: make-all-barplots-inputs
+#| message: false
+#| warning: false
+#| echo: false
+#| cache: false
+#| results: "hold"
+#| eval: false
+
+# svc_order <- c(
+#   "C_Risk","N_export","Sed_export",
+#   "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+#   "Pollination","Nature_Access"
+# )
+# groupings <- if (!is.null(HOTS_CFG$groupings)) HOTS_CFG$groupings else
+#   c("income_grp","region_wb","continent","region_un","WWF_biome")
+# missing_groupings <- setdiff(groupings, names(plt_long))
+# if (length(missing_groupings)) {
+#   warning("Grouping column(s) not found in plt_long and will be skipped: ",
+#           paste(missing_groupings, collapse = ", "))
+# }
+# groupings <- intersect(groupings, names(plt_long))
+# message("make-all-barplots groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
+# metrics <- c("pct","abs")                # will map to pct_mean / abs_mean below
+# cut_q   <- 0.999
+# keep_only_ordered <- TRUE
+```
+
+### TODO: Hotspot vs non-hotspot contribution bars
+
+Future idea: stack bars to show how much of each group’s total signed change comes from hotspot cells vs the complement. Steps: compute group means separately for hotspot and non-hotspot subsets (using the same 5% rules), then plot stacked bars (hotspot share + non-hotspot share) per service/group. Keep both absolute and percent-change variants; avoid overwriting existing plots (write to `outputs/plots/signed_hotshare/`).
+
+```{r}
+#| label: make-all-barplots-helper
+#| message: false
+#| warning: false
+#| echo: false
+#| cache: false
+#| results: "hold"
+
+plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
+                             include_global = FALSE,
+                             out_dir = NULL, out_stub = NULL,
+                             global_outline = "black",   # <-- outline color for Global
+                             global_fill    = NULL) {    # <-- set e.g. "#444444" if you also want a different fill
+
+  metric <- match.arg(metric)
+  ycol   <- rlang::sym(if (metric == "pct") "pct_mean" else "abs_mean")
+
+  regs <- agg_change(
+    plt_long        = df,
+    group_col       = group_col,
+    cut_q           = 0.999,
+    drop_zeros      = TRUE,
+    svc_order       = svc_order,
+    svc_order_only  = keep_only_ordered,
+    include_global  = include_global
+  )
+
+  # sanity guards: need data and the target column
+  if (!nrow(regs)) {
+    message("No data returned for ", group_col, " (", metric, "); skipping.")
+    return(invisible(NULL))
+  }
+  if (!rlang::as_string(ycol) %in% names(regs)) {
+    message("Missing column ", rlang::as_string(ycol), " in agg_change output for ", group_col, "; skipping.")
+    return(invisible(NULL))
+  }
+
+  # Clean + facet order
+  regs <- regs |>
+    dplyr::filter(!is.na(service)) |>
+    dplyr::mutate(service = forcats::fct_relevel(as.character(service), !!!svc_order, after = Inf))
+
+  # Make grouping factor & push "Global" to the rightmost position
+  gsym <- rlang::sym(group_col)
+  regs <- regs |>
+    dplyr::mutate(
+      grp_chr   = as.character(!!gsym),
+      is_global = grp_chr == "Global"
+    )
+
+  lvl <- sort(unique(regs$grp_chr))
+  if ("Global" %in% lvl) lvl <- c(setdiff(lvl, "Global"), "Global")  # shove to end
+  regs <- regs |> dplyr::mutate(.grp = factor(grp_chr, levels = lvl))
+
+  p <- ggplot2::ggplot(regs, ggplot2::aes(x = .grp, y = !!ycol)) +
+    ggplot2::geom_col() +
+    # Overlay the Global bar so it has a subtle outline (and optional fill)
+    {
+      gdat <- dplyr::filter(regs, is_global)
+      if (nrow(gdat)) {
+        if (is.null(global_fill)) {
+          ggplot2::geom_col(
+            data = gdat, fill = NA, color = global_outline, linewidth = 0.8
+          )
+        } else {
+          ggplot2::geom_col(
+            data = gdat, fill = global_fill, color = global_outline, linewidth = 0.8
+          )
+        }
+      } else NULL
+    } +
+    ggplot2::facet_wrap(
+      ~ service, ncol = 3, nrow = 3, scales = "free_y", drop = TRUE
+    ) +
+    ggplot2::labs(
+      x = group_col,
+      y = if (metric == "pct") "Mean |Δ| (%), trimmed" else "Mean |Δ| (units), trimmed",
+      title = paste0("Aggregate change by ", group_col,
+                     if (include_global) " (with Global reference)" else "")
+    ) +
+    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme(
+      plot.background   = ggplot2::element_rect(fill = "white", color = NA),
+      panel.background  = ggplot2::element_rect(fill = "white", color = NA),
+      strip.background  = ggplot2::element_rect(fill = "#f3f4f6", color = NA),
+      strip.text        = ggplot2::element_text(face = "bold"),
+      axis.text.x       = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
+      panel.grid.minor  = ggplot2::element_blank()
+    )
+
+  # Save
+  if (is.null(out_dir)) out_dir <- out_plots()
+  dir.create(file.path(out_dir, metric, group_col), recursive = TRUE, showWarnings = FALSE)
+  if (is.null(out_stub)) {
+    out_stub <- paste0("bars_", tolower(group_col), "_", metric,
+                       if (include_global) "_wglobal" else "")
+  }
+  final_path <- file.path(out_dir, metric, group_col, paste0(out_stub, ".png"))
+  tryCatch({
+    ragg::agg_png(final_path, width = 12, height = 8, units = "in", res = 300, background = "white")
+    print(p)
+    grDevices::dev.off()
+    message("Saved: ", normalizePath(final_path))
+  }, error = function(e) {
+    message("ERROR while saving ", final_path, ": ", e$message)
+    if (grDevices::dev.cur() > 1) grDevices::dev.off()
+  })
+}
+
+# Signed bar view with global reference as dotted line (no Global bar)
+plot_signed_bars <- function(df, group_col, metric = c("pct","abs"),
+                             include_global = TRUE,
+                             cut_q = 0.999,
+                             svc_order = NULL,
+                             out_dir = NULL,
+                             out_stub = NULL) {
+  metric <- match.arg(metric)
+  ycol <- if (metric == "pct") "pct_signed" else "abs_signed"
+  vcol <- if (metric == "pct") "pct_chg" else "abs_chg"
+
+  stopifnot(group_col %in% names(df))
+  gsym <- rlang::sym(group_col)
+
+  df_trim <- df |>
+    dplyr::filter(!is.na(.data[[group_col]])) |>
+    dplyr::group_by(.data$service) |>
+    dplyr::mutate(
+      cap      = stats::quantile(abs(.data[[vcol]]), cut_q, na.rm = TRUE),
+      val_trim = pmax(pmin(.data[[vcol]], cap), -cap)
+    ) |>
+    dplyr::ungroup() |>
+    dplyr::group_by(.data$service, .data[[group_col]]) |>
+    dplyr::summarise(
+      !!ycol := mean(.data$val_trim, na.rm = TRUE),
+      .groups = "drop"
+    )
+  # Drop any pre-existing "Global" rows; we show it via line only
+  df_trim <- df_trim |> dplyr::filter(.data[[group_col]] != "Global")
+
+  glob_ref <- NULL
+  if (isTRUE(include_global)) {
+    glob_ref <- df |>
+      dplyr::group_by(.data$service) |>
+      dplyr::mutate(
+        cap      = stats::quantile(abs(.data[[vcol]]), cut_q, na.rm = TRUE),
+        val_trim = pmax(pmin(.data[[vcol]], cap), -cap)
+      ) |>
+      dplyr::ungroup() |>
+      dplyr::group_by(.data$service) |>
+      dplyr::summarise(ref = mean(.data$val_trim, na.rm = TRUE), .groups = "drop")
+  }
+
+  if (!is.null(svc_order)) {
+    df_trim <- df_trim |>
+      dplyr::filter(.data$service %in% svc_order) |>
+      dplyr::mutate(service = factor(.data$service, levels = svc_order))
+    if (!is.null(glob_ref)) {
+      glob_ref <- glob_ref |>
+        dplyr::filter(.data$service %in% svc_order) |>
+        dplyr::mutate(service = factor(.data$service, levels = svc_order))
+    }
+  }
+
+  lvl <- sort(unique(df_trim[[group_col]]))
+  df_trim[[group_col]] <- factor(df_trim[[group_col]], levels = lvl)
+
+  p <- ggplot2::ggplot(df_trim, ggplot2::aes(x = !!gsym, y = !!rlang::sym(ycol), fill = !!gsym)) +
+    ggplot2::geom_col(show.legend = FALSE) +
+    ggplot2::geom_hline(yintercept = 0, color = "#d9d9d9") +
+    {
+      if (!is.null(glob_ref) && nrow(glob_ref)) {
+        ggplot2::geom_hline(data = glob_ref, ggplot2::aes(yintercept = ref),
+                            linetype = "dashed", color = "black", linewidth = 0.8)
+      } else NULL
+    } +
+    ggplot2::facet_wrap(~ service, ncol = 3, scales = "free_y", drop = TRUE) +
+    ggplot2::labs(
+      x = group_col,
+      y = if (metric == "pct") "Mean % change (trimmed, signed)" else "Mean absolute change (trimmed, signed)",
+      title = paste0("Signed mean change by ", group_col,
+                     if (include_global) " (global dotted reference)" else "")
+    ) +
+    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme(
+      strip.background = ggplot2::element_rect(fill = "#f3f4f6", color = NA),
+      strip.text = ggplot2::element_text(face = "bold"),
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1)
+    )
+
+  if (is.null(out_dir)) out_dir <- out_plots()
+  grp_dir <- tolower(group_col)
+  dir.create(file.path(out_dir, paste0("signed_", metric), grp_dir), recursive = TRUE, showWarnings = FALSE)
+  if (is.null(out_stub)) {
+    out_stub <- paste0("bars_signedline_", tolower(group_col), "_", metric)
+  }
+  final_path <- file.path(out_dir, paste0("signed_", metric), grp_dir, paste0(out_stub, ".png"))
+  tryCatch({
+    ggplot2::ggsave(final_path, p, width = 12, height = 8, dpi = 300, bg = "white")
+    message("Saved signed bars: ", normalizePath(final_path))
+  }, error = function(e) {
+    message("ERROR while saving signed bars ", final_path, ": ", e$message)
+  })
+}
+```
+
+```{r}
+#| label: make-all-barplots-run
+#| message: false
+#| warning: false
+#| echo: false
+#| cache: false
+#| eval: true
+#| results: "hold"
+
+if (length(groupings) == 0) {
+  warning("No grouping columns found in plt_long; skipping bar plots.")
+} else {
+  metrics <- c("pct","abs")
+  keep_only_ordered <- TRUE
+  for (gc in groupings) {
+    for (m in metrics) {
+      plot_change_bars(plt_long, group_col = gc, metric = m,
+                       include_global = FALSE)
+      plot_change_bars(plt_long, group_col = gc, metric = m,
+                       include_global = TRUE)
+      plot_signed_bars(plt_long, group_col = gc, metric = m,
+                       include_global = TRUE, cut_q = cut_q,
+                       svc_order = svc_order)
+    }
+  }
+}
+
+latest_dir_bars <- file.path("outputs","plots","latest","bars")
+dir.create(latest_dir_bars, recursive = TRUE, showWarnings = FALSE)
+old_latest_bars <- list.files(latest_dir_bars, full.names = TRUE, all.files = FALSE)
+if (length(old_latest_bars)) invisible(file.remove(old_latest_bars))
+# Clean up legacy global-only bar charts so they don't get recopied
+stale_global_bars <- list.files(out_plots(), pattern = "bars_global_.*\\.png$",
+                                recursive = TRUE, full.names = TRUE)
+if (length(stale_global_bars)) file.remove(stale_global_bars)
+
+all_new_bars <- list.files(out_plots(), pattern = "bars_.*\\.png$",
+                           recursive = TRUE, full.names = TRUE)
+all_new_bars <- all_new_bars[!grepl("/latest/", all_new_bars)]
+all_new_bars <- all_new_bars[!grepl("/global/", all_new_bars)]
+all_new_bars <- all_new_bars[!grepl("bars_global_", basename(all_new_bars))]
+good_bars <- all_new_bars[file.info(all_new_bars)$size > 0]
 ---
 title: "Hotspot Sandbox (experiments)"
 subtitle: "Lightweight playground; mirror main configs, keep chunks off by default"

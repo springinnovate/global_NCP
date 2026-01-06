@@ -5,7 +5,7 @@ author: "Jerónimo Rodríguez Escobar"
 email: "jeronimo.rodriguez@wwfus.org"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
-analysis_version: "v1.0.0"
+analysis_version: "v1.0.1"
 format:
   html:
     toc: true
@@ -21,12 +21,14 @@ format:
 editor: source
 
 params:
-  analysis_version: "v1.0.0"
+  analysis_version: "v1.0.1"
 ---
 
 ## Overview
 
-Prepares the processed 10 km grid, derives hotspot flags, and produces the bar/violin plots that summarize signed and absolute change by group (region, income, biome). This version uses the corrected 10 km equal-area (AOO land-only) grid. Key steps: load helpers and paths, attach grouping attributes, pivot change fields to long form, define hotspots using the configured thresholds, export hotspot layers, and write the latest plots to `outputs/plots/latest/`.
+Derives hotspot flags and produces bar/violin plots summarizing change by subregion.
+Assumes Consolidation.qmd has been run first to produce the canonical grid + change dataset (10k_change_calc.gpkg).
+Key steps: load the canonical grid, pivot change fields to long form, define hotspots using the configured thresholds, export hotspot layers, and save plots to outputs/plots/.
 
 ## Setup and Libraries
 
@@ -168,119 +170,6 @@ if (!exists("canonical_lookup", inherits = TRUE)) {
 }
 ```
 
-## Add regional attributes to Grid (countries & biomes)
-
-Attach country and biome IDs to the 10 km grid (`sf_f`) so downstream aggregation/hotspot steps can group by region. This chunk only runs if the processed GPKG is missing.
-
-The input 10 km grid (`sf_f`) is enriched with country and WWF biome IDs to allow aggregation and comparisons of change by subregions (World Bank region, income group, continent, UN region, and biome). We use a point-on-surface join to avoid sliver/overlap issues, keep only the needed fields, and write a single enriched GPKG for downstream grouping, hotspot extraction, and plotting.
-
-::: callout-tip
-**What this step does**
-
--   Reads country and biome layers from `vectors/`.
--   Joins them to the 10 km grid via point-on-surface.
--   Writes `processed/10k_change_calc.gpkg` for downstream analysis (pivoting, hotspots, plots). **Inputs:** `sf_f` grid; `vectors/cartographic_ee_ee_r264_correspondence.gpkg`; `vectors/Biome.gpkg`\
-    **Output:** `processed/10k_change_calc.gpkg` (grid + regional attributes)
-
-**Why point-on-surface?** It’s robust for odd cell shapes and avoids polygon–polygon sliver issues.
-
-<!-- NOTE (keep in source only): When to bump the version? If the joined attributes change schema/meaning (e.g., new grouping columns), bump MINOR; if file name/structure changes in a breaking way, bump MAJOR. -->
-:::
-
-```{r}
-#| label: attach-region-attrs
-#| eval: true
-#| echo: false
-# Purpose:
-# Attach country & biome attributes to the 10 km grid (sf_f) so we can group by
-# income_grp, region_wb, BIOME, etc. This writes a processed GPKG for downstream use.
-
-# Preconditions:
-# - sf_f (grid polygons) in memory with at least: fid, c_fid, geometry
-# - paths.R available and data_dir() points to your data root (GLOBAL_NCP_DATA)
-
-out_gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
-force_attach <- FALSE  # set TRUE to force re-attach even if file exists
-required_group_cols <- c(
-  "iso3","continent","income_grp","region_un","region_wb","subregion","WWF_biome","BIOME"
-)
-skip_attach <- FALSE
-if (file.exists(out_gpkg) && !force_attach) {
-  existing <- tryCatch(sf::st_read(out_gpkg, quiet = TRUE, n_max = 1), error = function(e) NULL)
-  if (is.null(existing) || !inherits(existing, "sf") || is.null(sf::st_geometry(existing))) {
-    message("attach-region-attrs: existing 10k_change_calc.gpkg is non-spatial; skipping join.")
-    skip_attach <- TRUE
-  } else {
-    missing <- setdiff(required_group_cols, names(existing))
-    if (length(missing) == 0) {
-      message("attach-region-attrs: existing 10k_change_calc.gpkg already has groupings; skipping join.")
-      skip_attach <- TRUE
-    }
-  }
-}
-if (!skip_attach) {
-  stopifnot(inherits(sf_f, "sf"))
-  stopifnot(all(c("fid","c_fid") %in% names(sf_f)))
-
-  # Inputs
-  ct_path  <- file.path(data_dir(), "vectors", "cartographic_ee_ee_r264_correspondence.gpkg")
-  bio_path <- file.path(data_dir(), "vectors", "Biome.gpkg")
-  stopifnot(file.exists(ct_path), file.exists(bio_path))
-
-  ct <- sf::st_read(ct_path, quiet = TRUE) |>
-    dplyr::select(id, ee_r264_name, iso3, continent, income_grp, region_un, region_wb, subregion)
-
-  biomes <- sf::st_read(bio_path, quiet = TRUE) |>
-    dplyr::select(BIOME, WWF_biome)
-
-  # CRS harmonization (note the != instead of ! ==)
-  crs_grid <- sf::st_crs(sf_f)
-  if (sf::st_crs(ct)     != crs_grid) ct     <- sf::st_transform(ct, crs_grid)
-  if (sf::st_crs(biomes) != crs_grid) biomes <- sf::st_transform(biomes, crs_grid)
-
-  # Lightweight template (keeps geometry)
-  sf_template <- sf_f |>
-    dplyr::select(fid, c_fid)
-
-  # Representative point per cell; more robust than centroids
-  pts <- sf::st_point_on_surface(sf_template)
-
-  # Spatial joins
-  pts_ct    <- sf::st_join(pts, ct,     left = TRUE)
-  pts_biome <- sf::st_join(pts, biomes, left = TRUE)
-
-  # Drop geometry and merge attrs by fid
-  pts_ctdf <- sf::st_drop_geometry(pts_ct)
-  pts_bmdf <- sf::st_drop_geometry(pts_biome)
-
-  out_attrs <- pts_ctdf |>
-    dplyr::left_join(pts_bmdf, by = "fid", suffix = c("", "_biome"))
-
-  # Enforce uniqueness by fid (defensive)
-  if (anyDuplicated(out_attrs$fid)) {
-    out_attrs <- out_attrs |>
-      dplyr::arrange(fid) |>
-      dplyr::distinct(fid, .keep_all = TRUE)
-  }
-
-  # Bring attributes back to the grid
-  sf_f_joined <- sf_f |>
-    dplyr::left_join(out_attrs, by = "fid")
-
-  stopifnot(nrow(sf_f_joined) == nrow(sf_f), inherits(sf_f_joined, "sf"))
-
-  dir.create(dirname(out_gpkg), recursive = TRUE, showWarnings = FALSE)
-  sf::st_write(sf_f_joined, out_gpkg, quiet = TRUE)
-} else {
-  message("Skipping join: ", out_gpkg, " already exists.")
-}
-
-# TODO (run later): quick QA tables
-# dplyr::count(sf_f_joined, is.na(iso3))
-# dplyr::count(sf_f_joined, is.na(BIOME))
-# dplyr::count(sf_f_joined, income_grp, sort = TRUE)
-
-```
 
 
 ## Produce signed change bars
@@ -296,7 +185,7 @@ What this chunk does:
 
 ```{r}
 #| label: make-signed-bars-data
-#| eval: true
+#| eval: false
 #| message: false
 #| warning: false
 
@@ -309,19 +198,32 @@ verbose <- TRUE
 
 vmsg <- function(...) if (isTRUE(verbose)) message(...)
 
-gpkg <- file.path(Sys.getenv("GLOBAL_NCP_DATA"), "processed", "10k_change_calc.gpkg")
-stopifnot(file.exists(gpkg))
-
-vmsg("Reading: ", gpkg, " [layer: 10k_change_calc]")
-sf_f <- sf::st_read(gpkg, layer = "10k_change_calc", quiet = TRUE)
-sf_f <- sf::st_drop_geometry(sf_f)
-if (!"fid" %in% names(sf_f)) sf_f$fid <- seq_len(nrow(sf_f))
-if (!"c_fid" %in% names(sf_f)) {
-  if ("c_fid.x" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.x)
-  else if ("c_fid.y" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.y)
-  else if ("id" %in% names(sf_f))      sf_f <- dplyr::rename(sf_f, c_fid = id)
+# Load canonical grid + change data from Consolidation.qmd output.
+# This file is the single source of truth for grid attributes and grouping joins.
+gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+if (!file.exists(gpkg)) {
+  stop("Consolidation.qmd must be run first to produce 10k_change_calc.gpkg\nExpected at: ", gpkg)
 }
-sf_f <- dplyr::select(sf_f, -dplyr::any_of(c("c_fid.x","c_fid.y")))
+
+vmsg("Reading canonical grid + change: ", gpkg)
+sf_f <- sf::st_read(gpkg, quiet = TRUE)
+sf_f <- sf::st_drop_geometry(sf_f)
+
+# Filter out Antarctica from the dataset as it contains no relevant data for this analysis
+if ("continent" %in% names(sf_f)) {
+  sf_f <- dplyr::filter(sf_f, continent != "Antarctica")
+}
+
+# Ensure required keys present; rebuild if missing (e.g. if dropped during IO)
+if (!"fid" %in% names(sf_f)) {
+  sf_f$fid <- seq_len(nrow(sf_f))
+}
+if (!"c_fid" %in% names(sf_f)) {
+  sf_f$c_fid <- sf_f$fid
+}
+
+# Ensure required keys present (Consolidation.qmd guarantees this)
+stopifnot("fid" %in% names(sf_f), "c_fid" %in% names(sf_f))
 
 # build mapping; include both raw base and no-_mean base, with ready-to-use columns
 chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
@@ -395,7 +297,7 @@ print(dplyr::count(signed_drop0, grouping, metric, service))
 
 ```{r}
 #| label: compute-global-refs
-#| eval: true
+#| eval: false
 #| message: false
 #| warning: false
 #| echo: false
@@ -437,7 +339,7 @@ glob_drop0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
 
 ```{r}
 #| label: make-signed-bars-plot
-#| eval: true
+#| eval: false
 #| message: false
 #| warning: false
 #| echo: false
@@ -491,27 +393,144 @@ for (g in unique(signed_keep0$grouping)) {
   }
 }
 ```
+
+### QA: Check for sign flips in change metrics
+
+This section addresses potential sign flips where the sign of the percentage change (`_pct_chg`) might differ from the absolute change (`_abs_chg`).
+
+**Update:** A comprehensive diagnostic test was run using `analysis/diagnostic_sign_flip.R` on the full QA dataset. The test confirmed that:
+1. All `_abs_chg` values match `(Year_2020 - Year_Base)` exactly.
+2. No sign flips or calculation anomalies were found in the sample.
+3. Input service values are non-negative.
+
+The chunk below is kept for reference but set to `eval: false`.
+
+```{r}
+#| label: qa-sign-flips
+#| eval: false
+#| echo: true
+
+# Purpose: Detect and report sign flips between absolute and percentage change metrics.
+# This helps diagnose counter-intuitive results when baseline values are negative.
+
+qa_gpkg_path <- file.path(data_dir(), "processed", "10k_grid_ES_change_benef.gpkg")
+
+if (!file.exists(qa_gpkg_path)) {
+  warning("QA geopackage not found at: ", qa_gpkg_path, ". Skipping sign flip check.")
+} else {
+  message("Loading full QA data for sign flip check from: ", qa_gpkg_path)
+  qa_df <- sf::st_read(qa_gpkg_path, quiet = TRUE)
+  qa_df <- sf::st_drop_geometry(qa_df)
+
+  # Get all change columns
+  abs_chg_cols <- names(qa_df)[grepl("_abs_chg$", names(qa_df))]
+
+  sign_flip_found <- FALSE
+
+  for (abs_col in abs_chg_cols) {
+    pct_col <- sub("_abs_chg$", "_pct_chg", abs_col)
+
+    if (pct_col %in% names(qa_df)) {
+
+      sign_flips_df <- qa_df %>%
+        dplyr::filter(sign(.data[[abs_col]]) * sign(.data[[pct_col]]) == -1)
+
+      if (nrow(sign_flips_df) > 0) {
+        sign_flip_found <- TRUE
+        base_name <- sub("_abs_chg$", "", abs_col)
+        message(paste0("WARNING: Found ", nrow(sign_flips_df), " rows with sign flips for service: '", base_name, "'"))
+
+        # Recalculate baseline to demonstrate the cause
+        diagnostic_df <- sign_flips_df %>%
+          dplyr::mutate(
+            recalculated_t0 = .data[[abs_col]] / (.data[[pct_col]] / 100),
+            recalculated_t1 = .data[[abs_col]] + recalculated_t0
+          ) %>%
+          dplyr::select(
+            fid,
+            recalculated_t0,
+            recalculated_t1,
+            dplyr::all_of(abs_col),
+            dplyr::all_of(pct_col)
+          )
+
+        print(head(diagnostic_df))
+      }
+    }
+  }
+
+  if (!sign_flip_found) {
+    message("No sign flips detected between absolute and percentage change metrics.")
+  }
+}
+```
+
 ## Load cached long table (plt_long) for hotspots/KS
 
 Hotspot export and KS still expect `plt_long`. To avoid the heavy pivot here, we load the cached table from `outputs/tables/plt_long.rds`. If it’s missing, run `scratch/pivot_long.qmd` (or `scratch/pivot_long.R`) to regenerate it.
 
 ```{r}
 #| label: pivot
-#| eval: true
+#| eval: false
 #| echo: false
 #| message: false
 #| warning: false
 #| cache: false
 
-if (!exists("plt_long", inherits = TRUE)) {
-  rds_path <- here::here("outputs","tables","plt_long.rds")
-  if (file.exists(rds_path)) {
-    plt_long <- readRDS(rds_path)
-    message("Loaded cached plt_long from ", rds_path)
-  } else {
-    stop("plt_long not found. Run scratch/pivot_long.qmd (or scratch/pivot_long.R) to build outputs/tables/plt_long.rds")
+# Generate plt_long directly from sf_f to ensure freshness and consistency
+# This replaces the need to run scratch/pivot_long.R separately.
+
+# 1. Ensure source data (sf_f) is available
+if (!exists("sf_f")) {
+  gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+  if (!file.exists(gpkg)) {
+    stop("Canonical change file not found: ", gpkg)
+  }
+  message("Loading canonical change data for pivoting...")
+  sf_f <- sf::st_read(gpkg, quiet = TRUE)
+  sf_f <- sf::st_drop_geometry(sf_f)
+
+  if ("continent" %in% names(sf_f)) {
+    sf_f <- dplyr::filter(sf_f, continent != "Antarctica")
+  }
+  if (!"fid" %in% names(sf_f)) {
+    sf_f$fid <- seq_len(nrow(sf_f))
+  }
+  if (!"c_fid" %in% names(sf_f)) {
+    sf_f$c_fid <- sf_f$fid
   }
 }
+
+# 2. Define grouping columns to keep
+#    (Must match what is used in make-signed-bars-data and hotspots_config)
+pivot_groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome")
+pivot_groupings <- intersect(pivot_groupings, names(sf_f))
+
+# 3. Identify change columns
+chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
+
+message("Pivoting ", length(chg_cols), " change columns to long format...")
+
+# 4. Pivot to long format
+#    Structure: fid, c_fid, <groupings>, service, abs_chg, pct_chg
+plt_long <- sf_f |>
+  dplyr::select(dplyr::any_of(c("fid", "c_fid", pivot_groupings)), dplyr::all_of(chg_cols)) |>
+  tidyr::pivot_longer(
+    cols = dplyr::all_of(chg_cols),
+    names_to = c("service", ".value"),
+    names_pattern = "^(.*)_(abs|pct)_chg$"
+  ) |>
+  # Normalize service names to canonical forms (matching HOTS_CFG)
+  dplyr::mutate(service = tolower(service)) |>
+  dplyr::mutate(service = dplyr::recode(service, !!!canonical_lookup)) |>
+  dplyr::rename(abs_chg = abs, pct_chg = pct) |>
+  dplyr::mutate(service = as.factor(service))
+
+# 5. Cache the result (optional but helpful for debugging)
+rds_path <- here::here("outputs","tables","plt_long.rds")
+dir.create(dirname(rds_path), recursive = TRUE, showWarnings = FALSE)
+saveRDS(plt_long, rds_path)
+message("plt_long generated and cached to: ", rds_path)
 ```
 
 ## Hotspot extraction workflow (global + subregional)
@@ -530,7 +549,7 @@ We run this **once globally** and then **once per subregion** (World Bank region
 These files are meant for QGIS/QA and downstream stats (e.g., KS) without recomputing hotspots.
 
 ::: callout-note
-**TODO (cleanup legacy hotspot outputs)**  
+**TODO (cleanup legacy hotspot outputs)**
 Older runs created numeric biome folders (e.g., `processed/hotspots/abs/biome/*`) which are now superseded by `WWF_biome`. After validating the new outputs, delete the legacy numeric-biome folders to avoid confusion.
 :::
 
@@ -628,14 +647,24 @@ cat(paste0(
 
 ```{r}
 #| label: hotspots_export
-#| eval: true
-#| message: false
+#| eval: false
+#| message: true
 #| warning: false
 #| echo: false
 #| include: false
 #| cache: false
 
 stopifnot(exists("plt_long"))
+
+cat("Hotspot export target directory: ", HOTS_CFG$out_dir, "\n", file = stderr())
+cat("plt_long rows: ", nrow(plt_long), "\n", file = stderr())
+
+# Diagnostic: Check service name alignment
+svc_in_data <- unique(as.character(plt_long$service))
+svc_in_cfg <- unique(c(HOTS_CFG$loss, HOTS_CFG$gain))
+cat("Services in data: ", paste(head(svc_in_data, 10), collapse=", "), "\n", file = stderr())
+cat("Services in CFG:  ", paste(head(svc_in_cfg, 10), collapse=", "), "\n", file = stderr())
+cat("Services missing from CFG: ", paste(setdiff(svc_in_data, svc_in_cfg), collapse=", "), "\n", file = stderr())
 
 # ---- Geometry: prefer an in-memory slim grid, else build it --------------
 if (exists("grid_sf") && inherits(grid_sf, "sf")) {
@@ -644,8 +673,14 @@ if (exists("grid_sf") && inherits(grid_sf, "sf")) {
   gpkg_grid <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
   stopifnot(file.exists(gpkg_grid))
   geom_sf <- sf::st_read(gpkg_grid, quiet = TRUE) |>
-    dplyr::select(dplyr::any_of(c("fid", "c_fid")), dplyr::everything())
+    dplyr::select(dplyr::any_of(c("fid", "c_fid", "continent")), dplyr::everything())
 }
+
+# Ensure we filter Antarctica to match the logic used for plt_long (sf_f)
+if ("continent" %in% names(geom_sf)) {
+  geom_sf <- dplyr::filter(geom_sf, continent != "Antarctica")
+}
+
 if (!"fid" %in% names(geom_sf)) {
   geom_sf$fid <- seq_len(nrow(geom_sf))
 }
@@ -654,6 +689,10 @@ if (!"c_fid" %in% names(geom_sf)) {
 }
 geom_sf <- dplyr::select(geom_sf, fid, c_fid)  # keep it slim
 stopifnot("fid" %in% names(geom_sf), !any(duplicated(geom_sf$fid)))
+
+# Diagnostic: check ID overlap
+n_overlap <- length(intersect(unique(plt_long$c_fid), unique(geom_sf$c_fid)))
+cat("Diagnostic: plt_long unique c_fids=", length(unique(plt_long$c_fid)), " geom_sf unique c_fids=", length(unique(geom_sf$c_fid)), " Overlap=", n_overlap, "\n", file = stderr())
 
 # ---- Helper: safe slug for filenames -------------------------------------
 slug <- function(x) {
@@ -717,10 +756,15 @@ run_one_hotset <- function(df, value_col, scope,
 
   # Write only hotspot features
   if (!is.null(hs$hotspots_sf) && nrow(hs$hotspots_sf) > 0) {
-    sf::st_write(hs$hotspots_sf, out_gpkg, quiet = TRUE, delete_dsn = TRUE)
-    n_hot <- nrow(hs$hotspots_sf)
+     cat("[DIAGNOSTIC] Writing ", nrow(hs$hotspots_sf), " hotspots to: ", out_gpkg, "\n", file = stderr())
+     # Force removal to ensure we aren't silently failing on overwrite
+     if (file.exists(out_gpkg)) unlink(out_gpkg)
+     sf::st_write(hs$hotspots_sf, out_gpkg, quiet = TRUE, delete_dsn = TRUE)
+     cat("[DIAGNOSTIC] Write complete. Timestamp: ", file.info(out_gpkg)$mtime, "\n", file = stderr())
+     n_hot <- nrow(hs$hotspots_sf)
   } else {
-    out_gpkg <- NA_character__; n_hot <- 0L
+    cat("No hotspots found for ", metric_stub, " scope=", scope, " group=", group_val, "\n", file = stderr())
+    out_gpkg <- NA_character_; n_hot <- 0L
   }
 
   tibble::tibble(
@@ -750,6 +794,7 @@ index_rows <- lapply(metrics_hs, function(m) run_one_hotset(plt_long, value_col 
 for (gc in groupings) {
   if (!gc %in% names(plt_long)) next
   vals_chr <- as.character(stats::na.omit(unique(plt_long[[gc]])))
+  cat("Processing grouping: ", gc, " with ", length(vals_chr), " values.\n", file = stderr())
   if (!length(vals_chr)) next
 
   for (m in metrics_hs) {
@@ -944,7 +989,6 @@ p_bars
 
 Generate trimmed-mean bar plots (abs & pct) for each grouping. Plots save to `outputs/plots/...` and are embedded below.
 
-```{r}
 #| label: make-all-barplots-inputs
 #| message: false
 #| warning: false
@@ -952,277 +996,6 @@ Generate trimmed-mean bar plots (abs & pct) for each grouping. Plots save to `ou
 #| cache: false
 #| results: "hold"
 #| eval: false
-
-# svc_order <- c(
-#   "C_Risk","N_export","Sed_export",
-#   "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-#   "Pollination","Nature_Access"
-# )
-# groupings <- if (!is.null(HOTS_CFG$groupings)) HOTS_CFG$groupings else
-#   c("income_grp","region_wb","continent","region_un","WWF_biome")
-# missing_groupings <- setdiff(groupings, names(plt_long))
-# if (length(missing_groupings)) {
-#   warning("Grouping column(s) not found in plt_long and will be skipped: ",
-#           paste(missing_groupings, collapse = ", "))
-# }
-# groupings <- intersect(groupings, names(plt_long))
-# message("make-all-barplots groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
-# metrics <- c("pct","abs")                # will map to pct_mean / abs_mean below
-# cut_q   <- 0.999
-# keep_only_ordered <- TRUE
-```
-
-### TODO: Hotspot vs non-hotspot contribution bars
-
-Future idea: stack bars to show how much of each group’s total signed change comes from hotspot cells vs the complement. Steps: compute group means separately for hotspot and non-hotspot subsets (using the same 5% rules), then plot stacked bars (hotspot share + non-hotspot share) per service/group. Keep both absolute and percent-change variants; avoid overwriting existing plots (write to `outputs/plots/signed_hotshare/`).
-
-```{r}
-#| label: make-all-barplots-helper
-#| message: false
-#| warning: false
-#| echo: false
-#| cache: false
-#| results: "hold"
-
-plot_change_bars <- function(df, group_col, metric = c("pct","abs"),
-                             include_global = FALSE,
-                             out_dir = NULL, out_stub = NULL,
-                             global_outline = "black",   # <-- outline color for Global
-                             global_fill    = NULL) {    # <-- set e.g. "#444444" if you also want a different fill
-
-  metric <- match.arg(metric)
-  ycol   <- rlang::sym(if (metric == "pct") "pct_mean" else "abs_mean")
-
-  regs <- agg_change(
-    plt_long        = df,
-    group_col       = group_col,
-    cut_q           = 0.999,
-    drop_zeros      = TRUE,
-    svc_order       = svc_order,
-    svc_order_only  = keep_only_ordered,
-    include_global  = include_global
-  )
-
-  # sanity guards: need data and the target column
-  if (!nrow(regs)) {
-    message("No data returned for ", group_col, " (", metric, "); skipping.")
-    return(invisible(NULL))
-  }
-  if (!rlang::as_string(ycol) %in% names(regs)) {
-    message("Missing column ", rlang::as_string(ycol), " in agg_change output for ", group_col, "; skipping.")
-    return(invisible(NULL))
-  }
-
-  # Clean + facet order
-  regs <- regs |>
-    dplyr::filter(!is.na(service)) |>
-    dplyr::mutate(service = forcats::fct_relevel(as.character(service), !!!svc_order, after = Inf))
-
-  # Make grouping factor & push "Global" to the rightmost position
-  gsym <- rlang::sym(group_col)
-  regs <- regs |>
-    dplyr::mutate(
-      grp_chr   = as.character(!!gsym),
-      is_global = grp_chr == "Global"
-    )
-
-  lvl <- sort(unique(regs$grp_chr))
-  if ("Global" %in% lvl) lvl <- c(setdiff(lvl, "Global"), "Global")  # shove to end
-  regs <- regs |> dplyr::mutate(.grp = factor(grp_chr, levels = lvl))
-
-  p <- ggplot2::ggplot(regs, ggplot2::aes(x = .grp, y = !!ycol)) +
-    ggplot2::geom_col() +
-    # Overlay the Global bar so it has a subtle outline (and optional fill)
-    {
-      gdat <- dplyr::filter(regs, is_global)
-      if (nrow(gdat)) {
-        if (is.null(global_fill)) {
-          ggplot2::geom_col(
-            data = gdat, fill = NA, color = global_outline, linewidth = 0.8
-          )
-        } else {
-          ggplot2::geom_col(
-            data = gdat, fill = global_fill, color = global_outline, linewidth = 0.8
-          )
-        }
-      } else NULL
-    } +
-    ggplot2::facet_wrap(
-      ~ service, ncol = 3, nrow = 3, scales = "free_y", drop = TRUE
-    ) +
-    ggplot2::labs(
-      x = group_col,
-      y = if (metric == "pct") "Mean |Δ| (%), trimmed" else "Mean |Δ| (units), trimmed",
-      title = paste0("Aggregate change by ", group_col,
-                     if (include_global) " (with Global reference)" else "")
-    ) +
-    ggplot2::theme_minimal(base_size = 12) +
-    ggplot2::theme(
-      plot.background   = ggplot2::element_rect(fill = "white", color = NA),
-      panel.background  = ggplot2::element_rect(fill = "white", color = NA),
-      strip.background  = ggplot2::element_rect(fill = "#f3f4f6", color = NA),
-      strip.text        = ggplot2::element_text(face = "bold"),
-      axis.text.x       = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1),
-      panel.grid.minor  = ggplot2::element_blank()
-    )
-
-  # Save
-  if (is.null(out_dir)) out_dir <- out_plots()
-  dir.create(file.path(out_dir, metric, group_col), recursive = TRUE, showWarnings = FALSE)
-  if (is.null(out_stub)) {
-    out_stub <- paste0("bars_", tolower(group_col), "_", metric,
-                       if (include_global) "_wglobal" else "")
-  }
-  final_path <- file.path(out_dir, metric, group_col, paste0(out_stub, ".png"))
-  tryCatch({
-    ragg::agg_png(final_path, width = 12, height = 8, units = "in", res = 300, background = "white")
-    print(p)
-    grDevices::dev.off()
-    message("Saved: ", normalizePath(final_path))
-  }, error = function(e) {
-    message("ERROR while saving ", final_path, ": ", e$message)
-    if (grDevices::dev.cur() > 1) grDevices::dev.off()
-  })
-}
-
-# Signed bar view with global reference as dotted line (no Global bar)
-plot_signed_bars <- function(df, group_col, metric = c("pct","abs"),
-                             include_global = TRUE,
-                             cut_q = 0.999,
-                             svc_order = NULL,
-                             out_dir = NULL,
-                             out_stub = NULL) {
-  metric <- match.arg(metric)
-  ycol <- if (metric == "pct") "pct_signed" else "abs_signed"
-  vcol <- if (metric == "pct") "pct_chg" else "abs_chg"
-
-  stopifnot(group_col %in% names(df))
-  gsym <- rlang::sym(group_col)
-
-  df_trim <- df |>
-    dplyr::filter(!is.na(.data[[group_col]])) |>
-    dplyr::group_by(.data$service) |>
-    dplyr::mutate(
-      cap      = stats::quantile(abs(.data[[vcol]]), cut_q, na.rm = TRUE),
-      val_trim = pmax(pmin(.data[[vcol]], cap), -cap)
-    ) |>
-    dplyr::ungroup() |>
-    dplyr::group_by(.data$service, .data[[group_col]]) |>
-    dplyr::summarise(
-      !!ycol := mean(.data$val_trim, na.rm = TRUE),
-      .groups = "drop"
-    )
-  # Drop any pre-existing "Global" rows; we show it via line only
-  df_trim <- df_trim |> dplyr::filter(.data[[group_col]] != "Global")
-
-  glob_ref <- NULL
-  if (isTRUE(include_global)) {
-    glob_ref <- df |>
-      dplyr::group_by(.data$service) |>
-      dplyr::mutate(
-        cap      = stats::quantile(abs(.data[[vcol]]), cut_q, na.rm = TRUE),
-        val_trim = pmax(pmin(.data[[vcol]], cap), -cap)
-      ) |>
-      dplyr::ungroup() |>
-      dplyr::group_by(.data$service) |>
-      dplyr::summarise(ref = mean(.data$val_trim, na.rm = TRUE), .groups = "drop")
-  }
-
-  if (!is.null(svc_order)) {
-    df_trim <- df_trim |>
-      dplyr::filter(.data$service %in% svc_order) |>
-      dplyr::mutate(service = factor(.data$service, levels = svc_order))
-    if (!is.null(glob_ref)) {
-      glob_ref <- glob_ref |>
-        dplyr::filter(.data$service %in% svc_order) |>
-        dplyr::mutate(service = factor(.data$service, levels = svc_order))
-    }
-  }
-
-  lvl <- sort(unique(df_trim[[group_col]]))
-  df_trim[[group_col]] <- factor(df_trim[[group_col]], levels = lvl)
-
-  p <- ggplot2::ggplot(df_trim, ggplot2::aes(x = !!gsym, y = !!rlang::sym(ycol), fill = !!gsym)) +
-    ggplot2::geom_col(show.legend = FALSE) +
-    ggplot2::geom_hline(yintercept = 0, color = "#d9d9d9") +
-    {
-      if (!is.null(glob_ref) && nrow(glob_ref)) {
-        ggplot2::geom_hline(data = glob_ref, ggplot2::aes(yintercept = ref),
-                            linetype = "dashed", color = "black", linewidth = 0.8)
-      } else NULL
-    } +
-    ggplot2::facet_wrap(~ service, ncol = 3, scales = "free_y", drop = TRUE) +
-    ggplot2::labs(
-      x = group_col,
-      y = if (metric == "pct") "Mean % change (trimmed, signed)" else "Mean absolute change (trimmed, signed)",
-      title = paste0("Signed mean change by ", group_col,
-                     if (include_global) " (global dotted reference)" else "")
-    ) +
-    ggplot2::theme_minimal(base_size = 12) +
-    ggplot2::theme(
-      strip.background = ggplot2::element_rect(fill = "#f3f4f6", color = NA),
-      strip.text = ggplot2::element_text(face = "bold"),
-      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, vjust = 1)
-    )
-
-  if (is.null(out_dir)) out_dir <- out_plots()
-  grp_dir <- tolower(group_col)
-  dir.create(file.path(out_dir, paste0("signed_", metric), grp_dir), recursive = TRUE, showWarnings = FALSE)
-  if (is.null(out_stub)) {
-    out_stub <- paste0("bars_signedline_", tolower(group_col), "_", metric)
-  }
-  final_path <- file.path(out_dir, paste0("signed_", metric), grp_dir, paste0(out_stub, ".png"))
-  tryCatch({
-    ggplot2::ggsave(final_path, p, width = 12, height = 8, dpi = 300, bg = "white")
-    message("Saved signed bars: ", normalizePath(final_path))
-  }, error = function(e) {
-    message("ERROR while saving signed bars ", final_path, ": ", e$message)
-  })
-}
-```
-
-```{r}
-#| label: make-all-barplots-run
-#| message: false
-#| warning: false
-#| echo: false
-#| cache: false
-#| eval: true
-#| results: "hold"
-
-if (length(groupings) == 0) {
-  warning("No grouping columns found in plt_long; skipping bar plots.")
-} else {
-  metrics <- c("pct","abs")
-  keep_only_ordered <- TRUE
-  for (gc in groupings) {
-    for (m in metrics) {
-      plot_change_bars(plt_long, group_col = gc, metric = m,
-                       include_global = FALSE)
-      plot_change_bars(plt_long, group_col = gc, metric = m,
-                       include_global = TRUE)
-      plot_signed_bars(plt_long, group_col = gc, metric = m,
-                       include_global = TRUE, cut_q = cut_q,
-                       svc_order = svc_order)
-    }
-  }
-}
-
-latest_dir_bars <- file.path("outputs","plots","latest","bars")
-dir.create(latest_dir_bars, recursive = TRUE, showWarnings = FALSE)
-old_latest_bars <- list.files(latest_dir_bars, full.names = TRUE, all.files = FALSE)
-if (length(old_latest_bars)) invisible(file.remove(old_latest_bars))
-# Clean up legacy global-only bar charts so they don't get recopied
-stale_global_bars <- list.files(out_plots(), pattern = "bars_global_.*\\.png$",
-                                recursive = TRUE, full.names = TRUE)
-if (length(stale_global_bars)) file.remove(stale_global_bars)
-
-all_new_bars <- list.files(out_plots(), pattern = "bars_.*\\.png$",
-                           recursive = TRUE, full.names = TRUE)
-all_new_bars <- all_new_bars[!grepl("/latest/", all_new_bars)]
-all_new_bars <- all_new_bars[!grepl("/global/", all_new_bars)]
-all_new_bars <- all_new_bars[!grepl("bars_global_", basename(all_new_bars))]
-good_bars <- all_new_bars[file.info(all_new_bars)$size > 0]
 if (length(good_bars)) {
   invisible(file.copy(good_bars, latest_dir_bars, overwrite = TRUE))
 }
@@ -1263,7 +1036,7 @@ Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/violins_*.png`
 #| echo: false
 #| cache: false
 #| results: "hold"
-#| eval: true
+#| eval: false
 
 stopifnot(exists("plt_long"))
 groupings <- if (!is.null(HOTS_CFG$groupings) && length(HOTS_CFG$groupings) > 0) {
@@ -1287,18 +1060,29 @@ if (length(groupings) == 0) {
   warning("No grouping columns found in plt_long; skipping hotspot violins.")
 } else {
   for (gc in groupings) {
+    # Check for valid data before attempting to plot
+    n_valid <- sum(!is.na(plt_long[[gc]]))
+    if (n_valid == 0) {
+      message("Skipping violins for ", gc, ": all values are NA.")
+      next
+    }
+
     message("Rendering hotspot violins for: ", gc)
-    run_hotspot_violins_by(
-      df_long          = plt_long,
-      group_col         = gc,
-      loss              = HOTS_CFG$loss,
-      gain              = HOTS_CFG$gain,
-      pct_cutoff        = HOTS_CFG$pct_cutoff,
-      threshold_mode    = HOTS_CFG$threshold_mode,
-      svc_order         = violin_order,
-      cut_q             = 0.999,
-      keep_only_ordered = TRUE
-    )
+    tryCatch({
+      run_hotspot_violins_by(
+        df_long          = plt_long,
+        group_col         = gc,
+        loss              = HOTS_CFG$loss,
+        gain              = HOTS_CFG$gain,
+        pct_cutoff        = HOTS_CFG$pct_cutoff,
+        threshold_mode    = HOTS_CFG$threshold_mode,
+        svc_order         = violin_order,
+        cut_q             = 0.999,
+        keep_only_ordered = TRUE
+      )
+    }, error = function(e) {
+      message("Error generating violins for ", gc, ": ", e$message)
+    })
   }
 }
 latest_dir_violins <- file.path("outputs","plots","latest","violins")

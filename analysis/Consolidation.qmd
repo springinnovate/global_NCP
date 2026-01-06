@@ -1,6 +1,6 @@
 ---
 title: "Hotspot Extraction Pipeline"
-subtitle: "v1.0.0"
+subtitle: "v1.0.1"
 author: "Jerónimo Rodríguez Escobar"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
@@ -65,6 +65,36 @@ latest_interim <- function(pattern) {
 # inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data"
 # inpath <- "/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs"
 inpath <- processed_dir
+# This maps raw column names from synth outputs to canonical names.
+rename_list <- list(
+  c(
+    usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean",
+    usle_2020_mean = "global_usle_marine_mod_ESA_2020_mean",
+    nature_access_1992_mean = "nature_access_lspop2019_ESA1992_mean",
+    nature_access_2020_mean = "nature_access_lspop2019_ESA2020_mean",
+    n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean",
+    n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
+    sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean",
+    sed_ret_ratio_2020_mean = "Sed_ret_ratio_2020_mean",
+    coastal_protection_Rt_1992_mean = "coastal_protection_Rt_1992_mean",
+    coastal_protection_Rt_2020_mean = "coastal_protection_Rt_2020_mean",
+    coastal_protection_Rt_nohab_all_1992_mean = "coastal_protection_Rt_nohab_all_1992_mean",
+    coastal_protection_Rt_nohab_all_2020_mean = "coastal_protection_Rt_nohab_all_2020_mean",
+    coastal_protection_Rt_ratio_1992_mean = "coastal_protection_Rt_ratio_1992_mean",
+    coastal_protection_Rt_ratio_2020_mean = "coastal_protection_Rt_ratio_2020_mean"
+  ),
+  c(
+    n_export_1992_sum = "global_n_export_tnc_esa1992_sum",
+    n_export_2020_sum = "global_n_export_tnc_esa2020_sum",
+    n_retention_1992_sum = "global_n_retention_ESAmar_1992_fertilizer_sum",
+    n_retention_2020_sum = "global_n_retention_ESAmar_2020_fertilizer_sum",
+    sed_export_1992_sum = "global_sed_export_marine_mod_ESA_1992_sum",
+    sed_export_2020_sum = "global_sed_export_marine_mod_ESA_2020_sum",
+    pollination_1992_sum = "realized_polllination_on_ag_ESA1992_sum",
+    pollination_2020_sum = "realized_polllination_on_ag_ESA2020_sum"
+  )
+)
+
 ```
 
 ::: callout-warning
@@ -279,7 +309,8 @@ There is an issue with the naming of the variables that has been giving me a lot
 Assemble final gridded Change/beneficiary data set
 
 ```{r}
-#| eval: false
+#| label: assemble-final-grid
+#| eval: true
 #| include: false
 # Legacy locations (keep for tracking):
 # inpath <- "/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs"
@@ -333,6 +364,9 @@ if (isTRUE(write_index)) {
 # Define name replacements per object. Had to do it manually, there is just too much variability to automatize, did it by hand, but this is the kind of thing an LLM helps to write easily. Still, there must be a smarter, more flexible way to do it (maybe the best approach is to keep a consistent naming convention for the modeled rasters, this has been a PIA since i started this work)
 
 # Update 2. Include corrected Access Data
+# TODO: Normalize variable names EARLY in this pipeline.
+# Currently, downstream scripts (hotspot_extraction.qmd) have to apply a second layer of renaming/normalization
+# (e.g. tolower + recode) to match config. Ideally, sf_f should have canonical CamelCase names right here.
 rename_list <- list(
   c(
     usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean",
@@ -364,9 +398,14 @@ rename_list <- list(
 rename_map <- c(rename_list[[1]], rename_list[[2]])
 sf_f <- dplyr::rename(sf_f, !!!rename_map)
 
+# Ensure c_fid is present (critical for downstream hotspot extraction)
+if (!"c_fid" %in% names(sf_f)) {
+  sf_f$c_fid <- sf_f$fid
+}
+
 # Optional: save the base synthesis (raw 1992/2020 + beneficiaries + coastal)
 if (isTRUE(write_base_synth)) {
-  st_write(sf_f, file.path(processed_dir, "10k_grid_synth_all.gpkg"), append = FALSE)
+  st_write(sf_f, file.path(processed_dir, "10k_grid_synth_all.gpkg"), delete_dsn = TRUE)
 }
 
  # Services-only synth lives in interim (10k_grid_services.gpkg) if needed for QA.
@@ -375,11 +414,19 @@ if (isTRUE(write_base_synth)) {
 
 ### next
 ```{r compute-bitemporal-change}
-#| eval: false
+#| eval: true
 #| include: false
 # Assumes `sf_f` is already created in the consolidation chunk above.
 # If not, load the latest base synthesis from processed.
 # This keeps the change calculation resumable without rerunning consolidation.
+if (!exists("processed_dir")) {
+  if (!exists("data_processed")) source(here::here("R", "paths.R"))
+  processed_dir <- data_processed()
+}
+if (!exists("compute_change")) {
+  devtools::load_all(here::here(), quiet = TRUE)
+}
+
 if (!exists("sf_f")) {
   synth_path <- file.path(processed_dir, "10k_grid_synth_all.gpkg")
   sf_f <- st_read(synth_path, quiet = TRUE)
@@ -387,11 +434,16 @@ if (!exists("sf_f")) {
 # Calculate bi-temporal change in % and absolute terms.
 # pct_chg uses the earliest year as baseline: ((t1 - t0) / t0) * 100.
 # Division by zero yields Inf/NaN; handle downstream if needed.
+# Use pct_mode = "symm" to avoid counter-intuitive sign flips in percent change
+# when baseline values are negative. The symmetric formula ensures that the
+# sign of the percentage change is always consistent with the sign of the
+# absolute change.
 sf_f <- compute_change(
   sf_f,
   suffix = c("_sum", "_mean"),
   change_type = "both",
-  drop_columns = FALSE
+  drop_columns = FALSE,
+  pct_mode = "symm"
 )
 
 # NaN are divisions by 0, NA is when values are NA
@@ -409,106 +461,102 @@ if (isTRUE(write_full_change)) {
 
 
 ```
-
-```{r filter-canonical-change}
-#| eval: false
-#| include: false
-# Create a trimmed, canonical change dataset for downstream use.
-# Keep the full QA dataset in 10k_grid_ES_change_benef.gpkg.
+# ============================================================================
+# AUTHORITATIVE GRID + GROUPING + CHANGE DATASET
+# ============================================================================
+# This chunk produces 10k_change_calc.gpkg, the canonical input for:
+#   - analysis/hotspot_extraction.qmd
+#   - analysis/KS_tests_hotspots.qmd
+#   - Any downstream aggregation/plotting
 #
-# Note: the canonical dataset is intentionally a subset (selected services +
-# selected beneficiary summaries + groupings). If you need more variables
-# later, expand the keep lists below or use the full QA dataset as input.
+# Grid attributes (fid, c_fid, iso3, continent, region_wb, income_grp,
+# region_un, subregion, WWF_biome, BIOME) are attached via Consolidation.qmd
+# and NOT re-derived elsewhere.
+#
+# If this file is missing or stale, regenerate by running the full
+# Consolidation.qmd workflow.
+# ============================================================================
+```{r filter-canonical-change-prep}
+#| eval: true
+#| include: false
+# STEP 1: Prepare all column lists and perform an initial slim-down of sf_f.
+# This avoids doing too many complex operations in a single chunk.
 
 if (!"fid" %in% names(sf_f)) {
   sf_f$fid <- seq_len(nrow(sf_f))
 }
 
+# Define service rename mapping (same as in consolidation chunk).
+
 keep_fixed <- c(
-  "fid", "iso3", "continent", "region_un", "region_wb",
+  "fid", "c_fid", "iso3", "continent", "region_un", "region_wb",
   "income_grp", "subregion", "WWF_biome", "BIOME"
 )
 
 benef_pattern <- "^(GHS_|GlobPOP_|hdi_|rast_gdpTot_|rast_adm1_gini_|fields_mehrabi_)"
 
 # Drop raw/base-year service columns; we only keep change metrics here.
+message("Dropping raw year columns to reduce memory footprint...")
 year_cols <- grep("1992|2020", names(sf_f), value = TRUE)
 benef_cols <- grep(benef_pattern, names(sf_f), value = TRUE)
 drop_year_cols <- setdiff(year_cols, benef_cols)
-if (length(drop_year_cols)) {
-  sf_f <- sf_f |> dplyr::select(-any_of(drop_year_cols))
+
+if (length(drop_year_cols) > 0) {
+  sf_f <- sf_f[, !names(sf_f) %in% drop_year_cols]
+  # free memory after the drop
+  rm(year_cols, benef_cols, drop_year_cols)
+  gc()
 }
+message("Initial column drop complete.")
 
-# Canonical services (mean vs sum encoded in rename_list).
-svc_cols <- names(c(rename_list[[1]], rename_list[[2]]))
-svc_raw <- unname(c(rename_list[[1]], rename_list[[2]]))
-svc_base <- unique(stringr::str_replace(svc_cols, "_(1992|2020)_", "_"))
-svc_raw_base <- unique(stringr::str_replace(svc_raw, "_?(1992|2020)_?", "_"))
-svc_raw_base <- stringr::str_replace_all(svc_raw_base, "__+", "_")
-svc_raw_base <- stringr::str_replace(svc_raw_base, "_$", "")
-
-# Normalize raw service prefixes to canonical bases before filtering.
-svc_map <- stats::setNames(svc_base, svc_raw_base)
-for (i in seq_along(svc_map)) {
-  raw_base <- names(svc_map)[i]
-  canon_base <- unname(svc_map[i])
-  sf_f <- dplyr::rename_with(
-    sf_f,
-    ~ sub(paste0("^", raw_base, "_"), paste0(canon_base, "_"), .x)
-  )
-}
-
-# Start with all change columns; we can narrow to canonical services.
+# Now, define the final set of columns to keep.
 chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
 if (!length(chg_cols)) {
-  message("No change columns found in sf_f; reloading full dataset.")
-  sf_f <- st_read(file.path(processed_dir, "10k_grid_ES_change_benef.gpkg"), quiet = TRUE)
+  message("No change columns found in sf_f; probing full dataset file I/O (n_max=1)...")
+  # quick probe to ensure the file is accessible and not stuck on IO
+  try({
+    sf::st_read(file.path(processed_dir, "10k_grid_ES_change_benef.gpkg"), n_max = 1, quiet = TRUE)
+    message('Probe read OK; performing full read...')
+  }, silent = TRUE)
+  sf_f <- st_read(file.path(processed_dir, "10k_grid_ES_change_benef.gpkg"), quiet = FALSE)
   if (!"fid" %in% names(sf_f)) {
     sf_f$fid <- seq_len(nrow(sf_f))
   }
   chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
 }
 
-coastal_keep <- c(
-  "coastal_protection_Rt",
-  "coastal_protection_Rt_nohab_all",
-  "coastal_protection_Rt_ratio"
-)
-coastal_mean_change <- grep(
-  paste0("^(", paste(coastal_keep, collapse = "|"), ")_mean_(abs|pct)_chg$"),
-  names(sf_f),
-  value = TRUE
-)
+# Ensure c_fid is preserved/normalized before final selection
+# TODO: Clarify legacy usage of c_fid. Originally used for non-spatial country joins.
+# Currently serves as a stable unique identifier for grid cells (often == fid).
+# In future refactors, consider unifying strictly on 'fid' if c_fid is redundant.
+if (!"c_fid" %in% names(sf_f)) {
+  if ("c_fid.x" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.x)
+  else if ("c_fid.y" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.y)
+  else if ("id" %in% names(sf_f))      sf_f <- dplyr::rename(sf_f, c_fid = id)
+}
+if (!"c_fid" %in% names(sf_f)) {
+  sf_f$c_fid <- sf_f$fid
+}
+
+# Define canonical services and beneficiaries to keep
+svc_cols <- names(c(rename_list[[1]], rename_list[[2]]))
+svc_base <- unique(stringr::str_replace(svc_cols, "_(1992|2020)_", "_"))
+
 canonical_change <- unique(c(
   paste0(svc_base, "_abs_chg"),
-  paste0(svc_base, "_pct_chg"),
-  coastal_mean_change
+  paste0(svc_base, "_pct_chg")
 ))
 chg_cols <- intersect(chg_cols, canonical_change)
 
 benef_keep <- intersect(
   c(
-    paste0(
-      c(
-        "fields_mehrabi_2017",
-        "GHS_BUILT_S_E2020",
-        "hdi_raster_predictions_2020",
-        "rast_adm1_gini_disp_2020"
-      ),
-      "_mean"
-    ),
-    paste0(
-      c(
-        "GHS_POP_E2020_GLOBE",
-        "GlobPOP_Count_30arc_2020",
-        "rast_gdpTot_1990_2020_30arcsec_2020"
-      ),
-      "_sum"
-    )
+    paste0(c("fields_mehrabi_2017", "GHS_BUILT_S_E2020", "hdi_raster_predictions_2020", "rast_adm1_gini_disp_2020"), "_mean"),
+    paste0(c("GHS_POP_E2020_GLOBE", "GlobPOP_Count_30arc_2020", "rast_gdpTot_1990_2020_30arcsec_2020"), "_sum")
   ),
   names(sf_f)
 )
 
+# This is the final list of columns for our canonical dataset
 keep_cols <- unique(c(
   keep_fixed,
   benef_keep,
@@ -516,20 +564,41 @@ keep_cols <- unique(c(
 ))
 keep_cols <- setdiff(keep_cols, c("RasterVal", "id_2"))
 
-message("Beneficiary columns kept (n = ", length(benef_keep), "):")
+message("Beneficiary columns to keep (n = ", length(benef_keep), "):")
 print(benef_keep)
 
-svc_meta <- tibble::tibble(
-  col = svc_cols,
-  stat = stringr::str_match(svc_cols, "_(mean|sum)$")[, 2],
-  base = stringr::str_replace(svc_cols, "_(1992|2020)_", "_")
-) |>
+svc_meta <- tibble::tibble(col = svc_cols, stat = stringr::str_match(svc_cols, "_(mean|sum)$")[, 2], base = stringr::str_replace(svc_cols, "_(1992|2020)_", "_")) |>
   dplyr::distinct(base, stat)
 message("Service stats kept (canonical):")
 print(svc_meta)
-message("Change columns kept (n = ", length(chg_cols), "):")
+message("Change columns to keep (n = ", length(chg_cols), "):")
 print(head(chg_cols, 25))
-sf_canon <- sf_f |> dplyr::select(any_of(keep_cols))
+message('Freeing temporary objects before heavy selection...')
+rm(svc_meta); gc()
+
+```
+
+```{r filter-canonical-change-select}
+#| eval: true
+#| include: false
+# STEP 2: Perform the main, heavy selection operation.
+# This is isolated to prevent memory hangs.
+message("Creating canonical subset by selecting final columns...")
+# attempt a small test of selection to detect schema issues quickly
+message('Testing select on a small subset (first 10 rows)')
+try({ tmp_test <- sf_f[seq_len(min(10, nrow(sf_f))), ] |> dplyr::select(any_of(keep_cols)); rm(tmp_test) }, silent = TRUE)
+gc()
+t0 <- Sys.time();
+cols_to_keep <- intersect(keep_cols, names(sf_f))
+sf_canon <- sf_f[, cols_to_keep]
+rm(sf_f); gc()
+message('Canonical subset created. Elapsed (mins): ', round(as.numeric(difftime(Sys.time(), t0, units = 'mins')), 2))
+```
+
+```{r filter-canonical-change-join}
+#| eval: true
+#| include: false
+# STEP 3: Join missing grid attributes if necessary and finalize schema.
 grid_attrs <- st_read(
   file.path(data_interim(), "..", "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"),
   quiet = TRUE
@@ -541,18 +610,29 @@ if (!"fid" %in% names(grid_attrs)) {
   grid_attrs$fid <- seq_len(nrow(grid_attrs))
 }
 
+# If fixed grouping columns are missing after the select, join them back.
 if (!all(keep_fixed %in% names(sf_canon))) {
+  message("Fixed grouping columns are missing, joining them back...")
+  gc(); t_join <- Sys.time()
   sf_canon <- sf_canon |>
     left_join(grid_attrs, by = "fid")
+  message('Join complete. Elapsed (secs): ', round(as.numeric(difftime(Sys.time(), t_join, units = 'secs')), 1))
+
+  # Clean up potential join artifacts if c_fid existed in both
+  if ("c_fid.x" %in% names(sf_canon)) {
+    sf_canon$c_fid <- dplyr::coalesce(sf_canon$c_fid.x, sf_canon$c_fid.y)
+    sf_canon$c_fid.x <- NULL
+    sf_canon$c_fid.y <- NULL
+  }
 }
 
 # Re-apply selection to ensure only intended columns remain after the join
 sf_canon <- sf_canon |> dplyr::select(any_of(keep_cols))
-
+message("Final column schema enforced.")
 ```
 
 ```{r write-canonical-change}
-#| eval: false
+#| eval: true
 #| include: false
 # Clean service change names only (drop _mean/_sum for canonical services).
 rename_change <- function(nm) {
@@ -581,14 +661,3 @@ and `analysis_configs/c_protection_synth.yaml`. This document consumes the resul
 coastal synthesis GPKG from `data_interim()`.
 
 ## Add Updated Access Data
-
-No need to run again, already updated the Access Data.
-
-```{r add access}
-#| eval: false
-#| include: false
-
-# Deprecated: access corrections are handled in the current services_slim outputs.
-# Keeping this chunk as historical reference only.
-
-```
