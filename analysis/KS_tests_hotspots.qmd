@@ -1,8 +1,8 @@
 ---
 title: "KS tests: hotspots vs non-hotspots"
-subtitle: "v{{< meta analysis_version >}}"
+subtitle: "v1.0.1"
 author: "Jerónimo Rodríguez Escobar"
-analysis_version: "v1.0.0"
+analysis_version: "v1.0.1"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
 format:
@@ -169,22 +169,29 @@ if (file.exists(rds_path)) {
     dplyr::filter(!(is.infinite(abs_chg) | is.infinite(pct_chg))) |>
     dplyr::filter(!is.na(abs_chg) | !is.na(pct_chg))
 
-  service_lookup <- c(
-    sed_export     = "Sed_export",
-    n_export       = "N_export",
-    n_retention    = "N_retention",
-    nature_access  = "Nature_Access",
-    pollination    = "Pollination",
-    usle           = "USLE",
-    n_ret_ratio    = "N_Ret_Ratio",
-    sed_ret_ratio  = "Sed_Ret_Ratio",
-    Rt_ratio       = "C_Risk_Red_Ratio",
-    Rt             = "C_Risk",
-    Rt_service     = "C_Prot_service",
-    Rt_nohab       = "Rt_nohab"
+  # Canonical lookup matching hotspot_extraction.qmd (v1.0.1)
+  canonical_lookup <- c(
+    sed_export       = "Sed_export",
+    n_export         = "N_export",
+    n_retention      = "N_retention",
+    nature_access    = "Nature_Access",
+    pollination      = "Pollination",
+    usle             = "USLE",
+    n_ret_ratio      = "N_Ret_Ratio",
+    sed_ret_ratio    = "Sed_Ret_Ratio",
+    coastal_protection_rt            = "C_Risk",
+    coastal_protection_rt_nohab_all  = "C_Risk_NoHab",
+    coastal_protection_rt_ratio      = "C_Risk_Red_Ratio",
+    rt_ratio         = "C_Risk_Red_Ratio",
+    rt               = "C_Risk",
+    c_risk           = "C_Risk",
+    c_risk_red_ratio = "C_Risk_Red_Ratio",
+    rt_service       = "C_Prot_service",
+    rt_nohab         = "Rt_nohab"
   )
   plt_long <- plt_long |>
-    dplyr::mutate(service = dplyr::recode(service, !!!service_lookup, .default = service))
+    dplyr::mutate(service = tolower(service)) |>
+    dplyr::mutate(service = dplyr::recode(service, !!!canonical_lookup))
 
   saveRDS(plt_long, rds_path)
 }

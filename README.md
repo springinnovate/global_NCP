@@ -3,14 +3,16 @@
 Jeronimo Rodriguez Escobar
 Affiliation: Global Science, WWF
 Supervisor: <add name>
-Version: v1.0.0
-Last updated: <add date>
+Version: v1.0.1
+Last updated: 2026-01-06
 
 # Overview
 
 Working version of a structured workflow for extracting, analyzing, and visualizing **zonal summary statistics** from global raster datasets including **ecosystem service (ES)**, **land cover (LC)**, and socioeconomic (beneficiary) layers. The analysis is built around the IUCN AOO **10 km equal-area grid** (land-only) enriched with country/region/biome attributes, with outputs aggregated to countries, regions, income groups, and biomes.
 
 The core extraction workflow uses Python (`taskgraph` + `exactextract`) for zonal summaries; R/Quarto is used for consolidation, change calculations, hotspot extraction, and KS tests.
+
+For a detailed technical description of the pipeline steps, see analysis/README_pipeline.md.
 
 These tools support reproducible extraction and visualization of ES trends and change detection across modeled periods. They enable exploratory and comparative analyses of spatial transformations, ES provision, and relationships to beneficiary groups.
 
@@ -179,13 +181,10 @@ The R analysis workflow is conducted through a series of Quarto notebooks locate
 -   **File:** `analysis/KS_tests_hotspots.qmd`
 -   **Purpose:** This final notebook performs a Kolmogorov-Smirnov (KS) statistical analysis. It compares the distributions of the beneficiary variables within the identified hotspots versus non-hotspot areas to identify significant differences.
 
-# Sign-Flip Diagnostics (pct vs abs)
+# Methodology Notes
 
-We are tracking a few cases where the sign of percent change differs from the sign of absolute change for the same service/group. To diagnose this:
-
-1. **Shared sampling for pct/abs:** use the same subset of cells for both metrics (e.g., shared trimming mask) so outlier trimming does not differ by metric.
-2. **Baseline inspection:** recheck the baseline (T0) values for the affected service/group to see if near-zero or mixed-sign baselines are driving pct instability.
-3. **Aggregate-then-percent:** compute percent change *after* aggregating to the group level (mean/sum at group, then percent change), rather than per-cell percent first.
+## Symmetric Percentage Change
+To address mathematical artifacts where the sign of percentage change differs from absolute change (common when baselines are negative or near-zero), this analysis uses a **symmetric percentage change** calculation (`pct_mode="symm"`). This ensures that the direction of the percentage change always aligns with the absolute difference ($t_1 - t_0$).
 
 # Future Directions
 
