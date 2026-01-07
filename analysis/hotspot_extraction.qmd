@@ -30,6 +30,15 @@ Derives hotspot flags and produces bar/violin plots summarizing change by subreg
 Assumes Consolidation.qmd has been run first to produce the canonical grid + change dataset (10k_change_calc.gpkg).
 Key steps: load the canonical grid, pivot change fields to long form, define hotspots using the configured thresholds, export hotspot layers, and save plots to outputs/plots/.
 
+::: {.callout-tip icon="true"}
+## Future Tasks & Ideas
+
+Here are some ideas and future tasks for this analysis:
+
+1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
+2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to quantify and visualize the share of total change (from bar plots) that occurs within hotspots versus outside of them, possibly using stacked bar plots.
+:::
+
 ## Setup and Libraries
 
 Load all core packages (tidyverse, spatial, plotting helpers) and initialize reproducibility settings. This chunk also sources `R/paths.R` and runs `devtools::load_all()` so downstream chunks can reuse helper functions.
@@ -465,9 +474,33 @@ if (!file.exists(qa_gpkg_path)) {
 }
 ```
 
+
 ## Load cached long table (plt_long) for hotspots/KS
 
-Hotspot export and KS still expect `plt_long`. To avoid the heavy pivot here, we load the cached table from `outputs/tables/plt_long.rds`. If it’s missing, run `scratch/pivot_long.qmd` (or `scratch/pivot_long.R`) to regenerate it.
+::: callout-note
+**Data sharing and external validation**
+
+The pivoted long table (`plt_long`) is exported as an RDS file to the processed data directory (e.g., `/home/jeronimo/data/global_ncp/processed/plt_long.rds`). This file contains all per-cell, per-service change metrics and is the canonical input for hotspot and KS analyses.
+
+- **For R users:** Load with:
+  ```r
+  source("R/config.R") # to load cfg object
+  plt_long <- readRDS(file.path(cfg$paths$processed_data_dir, "plt_long.rds"))
+  ```
+- **For Python users:** Use `pyreadr` (`pip install pyreadr`), e.g.:
+  ```python
+  import pyreadr
+  # Note: You may need to define the path manually if not running in an R-integrated environment
+  processed_data_dir = "/home/jeronimo/data/global_ncp/processed"
+  result = pyreadr.read_r(f'{processed_data_dir}/plt_long.rds')
+  df = result[None]
+  ```
+- **For other tools:** RDS is a binary format; consider converting to CSV or Feather for broader compatibility if needed.
+
+This object is suitable for external review, reproducibility checks, and further interpretation in any suitable software.
+:::
+
+Hotspot export and KS still expect `plt_long`. To avoid the heavy pivot here, we load the cached table from the processed data directory. If it’s missing, this script can regenerate it.
 
 ```{r}
 #| label: pivot
@@ -527,7 +560,7 @@ plt_long <- sf_f |>
   dplyr::mutate(service = as.factor(service))
 
 # 5. Cache the result (optional but helpful for debugging)
-rds_path <- here::here("outputs","tables","plt_long.rds")
+rds_path <- file.path(cfg$paths$processed_data_dir, "plt_long.rds")
 dir.create(dirname(rds_path), recursive = TRUE, showWarnings = FALSE)
 saveRDS(plt_long, rds_path)
 message("plt_long generated and cached to: ", rds_path)
@@ -548,10 +581,6 @@ We run this **once globally** and then **once per subregion** (World Bank region
 
 These files are meant for QGIS/QA and downstream stats (e.g., KS) without recomputing hotspots.
 
-::: callout-note
-**TODO (cleanup legacy hotspot outputs)**
-Older runs created numeric biome folders (e.g., `processed/hotspots/abs/biome/*`) which are now superseded by `WWF_biome`. After validating the new outputs, delete the legacy numeric-biome folders to avoid confusion.
-:::
 
 ### Hotspot rules & export configuration
 

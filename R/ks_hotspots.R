@@ -53,7 +53,7 @@
 #'   sampling = "match_hot",   # helpful when nonhot >> hot
 #'   permute_n = 0,            # set to e.g. 500 for perm p
 #'   compute_one_sided = TRUE,
-#'   out_csv = "output_charts/ks_results_hot_vs_non.csv"
+#'   out_csv = file.path(cfg$paths$processed_data_dir, "ks_results_hot_vs_non.csv")
 #' )
 #' }
 #'
@@ -74,7 +74,7 @@ run_ks_hot_vs_non <- function(
     min_n = 2L,
     compute_one_sided = TRUE,
     add_summaries = TRUE,
-    out_csv = "output_charts/ks_results_hot_vs_non.csv"
+    out_csv = NULL
 ) {
   sampling <- match.arg(sampling)
   set.seed(seed)

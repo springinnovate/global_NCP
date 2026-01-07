@@ -194,6 +194,15 @@ To address mathematical artifacts where the sign of percentage change differs fr
 -   Add transitions and swap metrics to land cover summaries
 -   Build R + Python dashboards or plug-ins for visualization
 
+::: {.callout-tip icon="true"}
+## Future Tasks & Ideas
+
+Here are some ideas and future tasks for this analysis:
+
+1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
+2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to quantify and visualize the share of total change (from bar plots) that occurs within hotspots versus outside of them, possibly using stacked bar plots.
+:::
+
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE).

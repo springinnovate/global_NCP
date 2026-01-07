@@ -1,4 +1,5 @@
 # One-time: rebuild plt_long and save to disk for reuse (avoids heavy pivot in QMDs).
+library(here)
 library(sf)
 library(dplyr)
 library(tidyr)
@@ -47,9 +48,18 @@ plt_long <- plt |>
   dplyr::filter(!is.na(abs_chg) | !is.na(pct_chg)) |>
   dplyr::mutate(service = dplyr::recode(service, !!!service_lookup, .default = service))
 
-saveRDS(plt_long, "outputs/tables/plt_long.rds")
+library(here)
+source(here::here("R","config.R"))
+
+plt_long_rds_path <- file.path(cfg$paths$processed_data_dir, "plt_long.rds")
+dir.create(dirname(plt_long_rds_path), recursive = TRUE, showWarnings = FALSE)
+message("Saving plt_long.rds to: ", normalizePath(plt_long_rds_path))
+saveRDS(plt_long, plt_long_rds_path)
+
 # Optional: feather/parquet for Python
 if (requireNamespace("arrow", quietly = TRUE)) {
-  arrow::write_feather(plt_long, "outputs/tables/plt_long.feather")
+  plt_long_feather_path <- file.path(cfg$paths$processed_data_dir, "plt_long.feather")
+  arrow::write_feather(plt_long, plt_long_feather_path)
 }
-message("Finished writing outputs/tables/plt_long.rds", if (requireNamespace("arrow", quietly = TRUE)) " and plt_long.feather" else "")
+message("Finished writing plt_long to ", normalizePath(cfg$paths$processed_data_dir),
+        if (requireNamespace("arrow", quietly = TRUE)) " (RDS and feather)" else " (RDS only)")
