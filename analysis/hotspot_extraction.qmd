@@ -185,7 +185,7 @@ What this chunk does:
 
 ```{r}
 #| label: make-signed-bars-data
-#| eval: false
+#| eval: true
 #| message: false
 #| warning: false
 
@@ -297,7 +297,7 @@ print(dplyr::count(signed_drop0, grouping, metric, service))
 
 ```{r}
 #| label: compute-global-refs
-#| eval: false
+#| eval: true
 #| message: false
 #| warning: false
 #| echo: false
@@ -1006,13 +1006,17 @@ if (length(good_bars)) {
 #| echo: false
 #| results: 'asis'
 #| cache: false
-bar_dir  <- file.path("outputs","plots","latest","bars")
-pngs <- list.files(bar_dir, pattern = "^bars_signed_alt_.*\\.png$", full.names = FALSE)
+# Show barplots directly from signed_alt_keep0 and signed_alt_drop0
+bar_dirs <- c(
+  file.path("outputs","plots","signed_alt_keep0"),
+  file.path("outputs","plots","signed_alt_drop0")
+)
+pngs <- unlist(lapply(bar_dirs, function(d) list.files(d, pattern = "^bars_signed_alt_.*\\.png$", full.names = TRUE)))
 
 if (length(pngs)) {
   # Show keep0 first, then drop0
   pngs <- pngs[order(grepl("drop0", pngs))]
-  rel_paths <- file.path("..", bar_dir, pngs)
+  rel_paths <- file.path("..", pngs)
   md <- c(
     "### Signed means (alt variants: keep0 vs drop0; dashed = global mean)",
     paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
