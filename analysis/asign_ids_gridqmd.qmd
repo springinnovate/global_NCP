@@ -248,7 +248,7 @@ sf_cp <- compute_variable_change(sf_cp, suffix = c("_mean"), change_type= "both"
 sf_cp <- st_drop_geometry(sf_cp)
 # load previous version
 sf_f <- st_read(paste0(inpath, '/', '10k_grid_ES_change_benef.gpkg'))
-sf_f <-  sf_f %>% mutate(fid = dplyr::row_number()) # not sure why fid is missing. Nevermind, added here 
+sf_f <-  sf_f %>% mutate(fid = dplyr::row_number()) # not sure why fid is missing. Nevermind, added here
 sf_f <- left_join(sf_f, sf_cp)
 # reorganize columns:
 
@@ -268,7 +268,7 @@ Option 2: QGIS (no coding)
 
 Use the “Join attributes by location (summary)” tool:
 
-```         
+```
 Input layer: your cp2
 
 Join layer: your points

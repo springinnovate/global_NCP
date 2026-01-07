@@ -15,6 +15,10 @@
 #' @param round_digits Integer. If specified, will round the computed values to this number of digits. Default is `NULL` (no rounding).
 #' @param drop_columns Logical. If `TRUE`, drops all original columns except for `"fid"`, computed change columns, and geometry. Default is `FALSE`.
 #' @param change_type Type of change to compute. One of `"pct"` (percentage), `"abs"` (absolute), or `"both"` (default).
+#' @param pct_mode How to compute percent change. `"baseline"` uses `t1 - t0` divided by `t0`
+#'        (default). `"symm"` uses a symmetric percent change: `200 * (t1 - t0) / (|t1| + |t0|)`.
+#' @param pct_eps Optional numeric threshold. When `abs(denominator) < pct_eps`, percent change is set
+#'        to `NA` to avoid unstable values.
 #'
 #' @return A `data.frame` or `sf` object with added change columns. If `drop_columns = TRUE`, only `"fid"`, the computed columns, and geometry are kept.
 #'
@@ -37,9 +41,12 @@ compute_change <- function(df,
                            suffix = c("_sum", "_mean"), 
                            round_digits = NULL, 
                            drop_columns = FALSE,
-                           change_type = c("both", "pct", "abs")) {
+                           change_type = c("both", "pct", "abs"),
+                           pct_mode = c("baseline", "symm"),
+                           pct_eps = 0) {
   
   change_type <- match.arg(change_type)
+  pct_mode <- match.arg(pct_mode)
   
   suffix_pattern <- paste0("(", paste(suffix, collapse = "|"), ")")
   pattern <- paste0("^(.*)_([0-9]{4})", suffix_pattern, "$")
@@ -86,7 +93,17 @@ compute_change <- function(df,
     # Percentage change
     if (change_type %in% c("pct", "both")) {
       new_col_pct <- paste0(var_base, "_pct_chg")
-      df[[new_col_pct]] <- ((df[[col2]] - df[[col1]]) / df[[col1]]) * 100
+      if (pct_mode == "baseline") {
+        denom <- df[[col1]]
+        pct <- ((df[[col2]] - df[[col1]]) / denom) * 100
+      } else {
+        denom <- abs(df[[col2]]) + abs(df[[col1]])
+        pct <- 200 * (df[[col2]] - df[[col1]]) / denom
+      }
+      if (pct_eps > 0) {
+        pct[abs(denom) < pct_eps] <- NA_real_
+      }
+      df[[new_col_pct]] <- pct
       if (!is.null(round_digits)) {
         df[[new_col_pct]] <- round(df[[new_col_pct]], round_digits)
       }

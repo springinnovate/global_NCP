@@ -81,12 +81,20 @@ plot_ecdf_grid <- function(hotspots_df, inverse_df, var_id, top_k = 4,
   dd <- dplyr::filter(base, .data$service %in% top_services)
   if (transform == "log1p") dd <- dplyr::mutate(dd, val = log1p(.data$val))
   
-  ggplot2::ggplot(dd, ggplot2::aes(.data$val, color = .data$group)) +
-    ggplot2::stat_ecdf(linewidth = line_size) +
+  ggplot2::ggplot(
+    dd,
+    ggplot2::aes(x = .data$val, color = .data$group, group = .data$group)
+  ) +
+    ggplot2::stat_ecdf(linewidth = line_size, linetype = "solid", na.rm = TRUE) +
     ggplot2::facet_wrap(~ service, scales = "free_x") +
-    ggplot2::scale_color_manual(values = c(nonhotspot = "#2D708E", hotspot = "#D43D51"), guide = ggplot2::guide_legend(title = NULL)) +
-    ggplot2::labs(title = paste("ECDF overlays —", var_id, if (transform=="log1p") "(log1p)" else ""),
-                  x = var_id, y = "F(value)") +
+    ggplot2::scale_color_manual(
+      values = c(nonhotspot = "#2D708E", hotspot = "#D43D51"),
+      guide = ggplot2::guide_legend(title = NULL)
+    ) +
+    ggplot2::labs(
+      title = paste("ECDF overlays —", var_id, if (transform=="log1p") "(log1p)" else ""),
+      x = var_id, y = "F(value)"
+    ) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(legend.position = "top")
 }
@@ -124,4 +132,3 @@ plot_ks_mountain <- function(hotspots_df, inverse_df, service_id, var_id,
     ) +
     ggplot2::theme_minimal(base_size = 11)
 }
-
