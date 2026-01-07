@@ -1,7 +1,8 @@
 # AI Context (Minimal, Invariants)
 
+## Pipeline Version: v1.0.1 (Stable)
 ## Project Goal
-Global NCP time-series analysis (~1995–2020): quantify ecosystem-service change at ~10 km resolution, extract **hotspots** of concerning change, and summarize patterns globally and by subregions (WB region, income group, continent, UN region, WWF biome).
+Global NCP time-series analysis (~1992–2020): quantify ecosystem-service change at ~10 km resolution, extract **hotspots** of concerning change, and summarize patterns globally and by subregions (WB region, income group, continent, UN region, WWF biome).
 
 ## Primary Entry Points (do not duplicate logic)
 - `analysis/Consolidation.qmd`
@@ -12,12 +13,15 @@ All major logic should be **called from these QMDs**, not redefined inline.
 
 ## Data & Geometry Invariants
 - Unique grid key: `fid`
-- Country key: `c_fid`
+- Canonical grid ID: `c_fid` (Legacy artifact. Used as primary key for hotspots. Often == `fid`. **NOT** a country code).
+- **Change Calculation**: Must use `pct_mode="symm"` (symmetric percentage change) to prevent sign flips when baseline is negative.
+- **ID Preservation**: `c_fid` must be preserved through consolidation to ensure correct joining of subregional attributes.
 - Long table schema (required):
   `fid, c_fid, service, abs_chg, pct_chg, <grouping vars>`
 - Slim geometry object: `grid_sf <- sf[, c("fid","c_fid")]`
 
 ## Canonical Services (order matters)
+- **Normalization**: Inputs may be lowercase/inconsistent. Must map to canonical CamelCase via lookup before hotspot logic.
 - C_Risk, N_export, Sed_export,
 - C_Risk_Red_Ratio, N_Ret_Ratio, Sed_Ret_Ratio,
 - Pollination, Nature_Access

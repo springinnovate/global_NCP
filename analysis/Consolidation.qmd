@@ -53,13 +53,8 @@ processed_tables_dir <- file.path(processed_dir, "tables")
 processed_hotspots_dir <- file.path(processed_dir, "hotspots")
 processed_coastal_dir <- file.path(processed_dir, "coastal")
 
-latest_interim <- function(pattern) {
-  files <- list.files(interim_dir, pattern = pattern, full.names = TRUE)
-  if (!length(files)) {
-    stop("No interim files match pattern: ", pattern)
-  }
-  files[which.max(file.mtime(files))]
-}
+# Source unified hotspot/change helpers
+source(here::here("R", "utils_hotspot.R"))
 
 # Legacy locations (kept for tracking):
 # inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data"
@@ -106,16 +101,11 @@ rename_list <- list(
 - Maintain the AOO equal-area grid as canonical; use the 4326 clean copy for raster extraction, then wrap dateline for display/output hygiene.
 :::
 
-# Workflow Synthesis: Global Hotspots of Ecosystem Service Change
+# Pipeline Overview
 
-## Notes to lift into README / Methods
+For a detailed description of the full pipeline methodology, see README_pipeline.md.
 
-- Inputs: IUCN AOO 10 km equal-area grid (land-only, with admin/biome attributes), ES rasters (1992/2020), coastal protection points (rasterized), and beneficiary rasters.
-- Data roots: raw data in `/home/jeronimo/data/global_ncp/raw`; synth outputs in `/home/jeronimo/data/global_ncp/interim`; consolidated outputs and hotspots in `/home/jeronimo/data/global_ncp/processed`.
-- Steps: rasterize coastal points → extract zonal stats (mean/sum per service/year via `summary_pipeline_landgrid.py` in Docker) → wrap dateline + move `10k_grid_synth_*` to `interim/` → consolidate (services+beneficiaries+coastal) → compute abs/pct change → hotspot extraction → KS analysis.
-- Coastal protection: summarize Rt and Rt_ratio per grid cell (optional Rt_serv_ch for comparison).
-- Outputs: `10k_grid_synth_*` in interim; consolidated `10k_change_calc.gpkg` in processed (intermediate `10k_grid_ES_change_benef.gpkg` is optional); hotspot GPKGs and tables.
-- TODO: add a `keep_fields` option to the summary pipeline YAMLs so we can preserve only needed grid attributes (instead of all).
+This notebook focuses on the **consolidation** step: synthesizing zonal stats, calculating change, and preparing the canonical dataset.
 
 ## Data Inputs
 
@@ -237,84 +227,17 @@ Global raster datasets for nitrogen retention/export/ratio, sediment retention/e
 
 Country polygon dataset for spatial aggregation and attribution.
 
-## Data Processing Pipeline
-
-### Zonal Statistics for Gridded ES Services
-
-Geosharding-based pipeline to extract zonal statistics (mean or sum, depending on the service) from modeled global ES raster layers for two years (1992-2020) to the 10 km grid (or any poygon vector file). Values are labeled and appended as new columns in an output vector dataset (gpkg)
-
-### Coastal Protection Aggregation
-
-This dataset comes originally as a vector included in this analysis three key variables for each year: *convert into math notation*
-
--   Rt: Actual Risk Level
--   Rt_nohab: Potential Risk Level if no ecosystem (expected to remain constant over time, but necessary to calculate the next ones)
--   Rt_nohab - Rt = Rt_service: This difference is the actual value of the service provided (the potential-the observed Risk) = Provided service
--   (Rt_nohab-Rt)/Rt: Coastal risk reduction ratio
-
-Computed mean and max per grid cell for each coastal protection metric.
-
-### Bi-temporal Change Calculation
-
-Applied compute_change() function to derive absolute and percentage changes for all variables, using consistent naming conventions (\_abs_chg, \_pct_chg). Percentage change uses the earliest year as the baseline, so zero baselines yield Inf/NaN and should be handled downstream.
-
-### Reshaping Data for Hotspot Detection
-
-Converted the dataset to long format (plt_long) with columns: fid, c_fid, service, and pct_chg.
-
-### Hotspot Identification
-
-Defined loss/damage services and gain services.
-
-Identified hotspots as grid cells in the bottom 5% (losses) or top 5% (gains) per service. The developed function can extract any threshold, and the inverses. It is also posssible to set the variables for which an increase is an improvement (goods) to which an increase is a deterioration (damage), and set groups of variables, aka *combos* to count the number of variables for which a cell is a hotspot. ( Binary columns explicitly indicating whether a cell is a hotpot for each variable analized is included, as well as columns indicating the type of hotpot (damage/service loss).
-
-### Hotspot Grouping into Service Combos
-
-Created combos for aggregated hotspot counts:
-
-combo_1 = c("Nature_Access","Pollination","N_export", "Sed_export", "C_Risk"), combo_2 = c("Nature_Access","Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio", "C_Risk_Red_Ratio")
-
-Calculated counts per combo and total hotspot count.
-
-### Final Integration and Output
-
-Generated binary columns (0/1) per service for hotspot presence.
-
-Joined hotspot attributes back to the 10 km grid sf object.
-
-Produced final geopackage file with:
-
-Per-service hotspot flags.
-
-Total hotspot count.
-
-Counts for each combo
-
-A column listing all hotspot services per grid cell.
-
-### Outputs
-
-Final gpkg with the summary stats for each year for all variables plus socio economic data. Final gpkg object containing all hotspot-related attributes for each 10 km grid cell.
-
-Map outputs prepared in Qis (one for the hotspots for each variable) and for the *combos*
-
-Flexible structure allows filtering for losses only, per-service mapping, or aggregated combo-based analyses.
 
 # Data processing
 
 ## Consolidate Synthesis Data
 
-There is an issue with the naming of the variables that has been giving me a lot of trouble. I will need to clean and review this, remove remaining unnecesary data. Doing this based on the index is definitively not a good think, each change/new dataset shifts the whole thing and it is hard to follow effectively.
-
-Assemble final gridded Change/beneficiary data set
+Assemble the final gridded Change/Beneficiary dataset by joining the interim synthesis files (Services, Beneficiaries, Coastal).
 
 ```{r}
 #| label: assemble-final-grid
 #| eval: true
 #| include: false
-# Legacy locations (keep for tracking):
-# inpath <- "/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs"
-# inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data"
 source(here::here("R", "paths.R"))
 interim_dir <- data_interim()
 processed_dir <- data_processed()
@@ -345,6 +268,9 @@ if (!"fid" %in% names(S)) S$fid <- seq_len(nrow(S))
 if (!"fid" %in% names(B)) B$fid <- seq_len(nrow(B))
 if (!"fid" %in% names(CP)) CP$fid <- seq_len(nrow(CP))
 
+sf_f <- S |>
+
+# Immediately normalize variable names after joining
 S_tbl <- st_drop_geometry(S)
 B_tbl <- st_drop_geometry(B)
 CP_tbl <- st_drop_geometry(CP)
@@ -353,50 +279,10 @@ sf_f <- S |>
   left_join(B_tbl, by = "fid") |>
   left_join(CP_tbl, by = "fid")
 
-# Optional: index fields for audit/debugging
-if (isTRUE(write_index)) {
-  write.csv(cbind(names(B_tbl), names(B_tbl)), file = file.path(processed_tables_dir, "benef.csv"))
-  write.csv(cbind(names(S), names(S)), file = file.path(processed_tables_dir, "serv.csv"))
-  write.csv(cbind(names(CP_tbl), names(CP_tbl)), file = file.path(processed_tables_dir, "cp.csv"))
-}
-
-# `sf_f` already contains services + beneficiaries + coastal summaries.
-# Define name replacements per object. Had to do it manually, there is just too much variability to automatize, did it by hand, but this is the kind of thing an LLM helps to write easily. Still, there must be a smarter, more flexible way to do it (maybe the best approach is to keep a consistent naming convention for the modeled rasters, this has been a PIA since i started this work)
-
-# Update 2. Include corrected Access Data
-# TODO: Normalize variable names EARLY in this pipeline.
-# Currently, downstream scripts (hotspot_extraction.qmd) have to apply a second layer of renaming/normalization
-# (e.g. tolower + recode) to match config. Ideally, sf_f should have canonical CamelCase names right here.
-rename_list <- list(
-  c(
-    usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean",
-    usle_2020_mean = "global_usle_marine_mod_ESA_2020_mean",
-    nature_access_1992_mean = "nature_access_lspop2019_ESA1992_mean",
-    nature_access_2020_mean = "nature_access_lspop2019_ESA2020_mean",
-    n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean",
-    n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
-    sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean",
-    sed_ret_ratio_2020_mean = "Sed_ret_ratio_2020_mean",
-    coastal_protection_Rt_1992_mean = "coastal_protection_Rt_1992_mean",
-    coastal_protection_Rt_2020_mean = "coastal_protection_Rt_2020_mean",
-    coastal_protection_Rt_nohab_all_1992_mean = "coastal_protection_Rt_nohab_all_1992_mean",
-    coastal_protection_Rt_nohab_all_2020_mean = "coastal_protection_Rt_nohab_all_2020_mean",
-    coastal_protection_Rt_ratio_1992_mean = "coastal_protection_Rt_ratio_1992_mean",
-    coastal_protection_Rt_ratio_2020_mean = "coastal_protection_Rt_ratio_2020_mean"
-  ),
-  c(
-    n_export_1992_sum = "global_n_export_tnc_esa1992_sum",
-    n_export_2020_sum = "global_n_export_tnc_esa2020_sum",
-    n_retention_1992_sum = "global_n_retention_ESAmar_1992_fertilizer_sum",
-    n_retention_2020_sum = "global_n_retention_ESAmar_2020_fertilizer_sum",
-    sed_export_1992_sum = "global_sed_export_marine_mod_ESA_1992_sum",
-    sed_export_2020_sum = "global_sed_export_marine_mod_ESA_2020_sum",
-    pollination_1992_sum = "realized_polllination_on_ag_ESA1992_sum",
-    pollination_2020_sum = "realized_polllination_on_ag_ESA2020_sum"
-  )
-)
+# Canonical renaming: apply once, early, and only here
 rename_map <- c(rename_list[[1]], rename_list[[2]])
 sf_f <- dplyr::rename(sf_f, !!!rename_map)
+
 
 # Ensure c_fid is present (critical for downstream hotspot extraction)
 if (!"c_fid" %in% names(sf_f)) {
