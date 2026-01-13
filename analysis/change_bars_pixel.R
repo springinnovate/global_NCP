@@ -25,7 +25,7 @@ clean_service_names <- function(column_names) {
 
 # --- 1. DATA INGESTION & STACKING ---
 file_list <- list.files(pattern = "\\.csv$") %>% 
-  .[!str_detect(., "data[._](combined|filtered|final|change)")]
+  .[!str_detect(., "data[._](combined|filtered|final|change|ES)")]
 
 tt_combined <- map_df(file_list, ~{
   df <- read_csv(.x, show_col_types = FALSE)
@@ -40,7 +40,7 @@ tt_combined <- map_df(file_list, ~{
     select(grouping, unit, everything())
 })
 
-write_csv(tt_combined, "data.combined.csv")
+# write_csv(tt_combined, "data.combined.csv")
 
 # --- 2. FILTERING & CLEANING ---
 # Keep only relevant summary stats and change variables

@@ -50,3 +50,7 @@
 - 2026-01-06 (cont): Extracted pipeline overview and methods text from `Consolidation.qmd` to a new `README_pipeline.md` to serve as a central methods draft.
 - 2026-01-06 (cont): Manually added Executive Summary to `analysis/README_pipeline.md`.
 - 2026-01-07: Resolved the sign flip issue in change metrics (absolute vs percent) by normalizing service names and centralizing logic. All downstream analyses (hotspot extraction, KS tests) now use consistent, canonical service definitions. Successfully re-ran the KS analysis with updated data and code; outputs are reproducible and ready for interpretation. Added explicit documentation and export of the pivoted long table (plt_long) and KS results for external review and reproducibility. Project is now in a stable, review-ready state.
+- 2026-01-13: Addressed performance issues with raster masking.
+    - Created `R/mask_zeros_and_diff.R` to specifically mask pixels that are 0 in both time steps (1992/2020) and calculate differences.
+    - Optimized `R/nochh_mskR.R` (`no_chmsk`) to use `terra` min/max algebra, significantly improving speed over the previous `lapply` approach.
+    - Developed `Python_scripts/msk_zeros_diff.py` as a robust alternative for large files, implementing chunked reading and parallel processing (`concurrent.futures`) to prevent memory overflows and speed up execution.
