@@ -54,3 +54,4 @@
     - Created `R/mask_zeros_and_diff.R` to specifically mask pixels that are 0 in both time steps (1992/2020) and calculate differences.
     - Optimized `R/nochh_mskR.R` (`no_chmsk`) to use `terra` min/max algebra, significantly improving speed over the previous `lapply` approach.
     - Developed `Python_scripts/msk_zeros_diff.py` as a robust alternative for large files, implementing chunked reading and parallel processing (`concurrent.futures`) to prevent memory overflows and speed up execution.
+    - Implemented QAQC in `analysis/change_bars_pixel.R` to flag units where valid pixel counts differ significantly (>5%) between 1992 and 2020, which may indicate land use change or mask inconsistencies.
