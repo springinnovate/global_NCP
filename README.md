@@ -181,6 +181,11 @@ The R analysis workflow is conducted through a series of Quarto notebooks locate
 -   **File:** `analysis/KS_tests_hotspots.qmd`
 -   **Purpose:** This final notebook performs a Kolmogorov-Smirnov (KS) statistical analysis. It compares the distributions of the beneficiary variables within the identified hotspots versus non-hotspot areas to identify significant differences.
 
+## 4. Visualization and QAQC
+
+-   **Script:** `analysis/change_bars_pixel.R`
+-   **Purpose:** Generates bar plots of ecosystem service changes. Includes a QAQC step to flag units where the valid pixel count differs significantly (>5%) between years, ensuring that reported changes are not artifacts of mask inconsistencies.
+
 # Methodology Notes
 
 ## Symmetric Percentage Change
@@ -193,6 +198,15 @@ To address mathematical artifacts where the sign of percentage change differs fr
 -   Extend temporal coverage (e.g., 1990–2020 at 5-year intervals)
 -   Add transitions and swap metrics to land cover summaries
 -   Build R + Python dashboards or plug-ins for visualization
+
+::: {.callout-tip icon="true"}
+## Future Tasks & Ideas
+
+Here are some ideas and future tasks for this analysis:
+
+1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
+2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to quantify and visualize the share of total change (from bar plots) that occurs within hotspots versus outside of them, possibly using stacked bar plots.
+:::
 
 ## License
 

@@ -1,3 +1,15 @@
+#' Canonical service order for all plots and analyses
+#'
+#' This vector defines the canonical order of ecosystem services for all plots and analyses.
+#' Adjust this order as needed for your project. All scripts should source this variable.
+#'
+#' Example usage:
+#'   source("R/utils_hotspot.R"); svc_order
+svc_order <- c(
+  "C_Risk", "N_export", "Sed_export",
+  "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
+  "Pollination", "Nature_Access"
+)
 #' Hotspot and Change Analysis Utilities
 #'
 #' Helper functions for the global NCP pipeline, consolidated from QMD notebooks.

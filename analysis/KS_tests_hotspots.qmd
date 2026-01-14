@@ -26,6 +26,51 @@ execute:
 
 Uses the hotspot definition from the extraction report to compare hotspots vs non-hotspots across socio-environmental covariates. Workflow: load helpers and cached `plt_long`, derive hotspot/complement subsets with the same thresholds, run KS tests per service × variable, and export heatmaps/bars/ECDFs to `outputs/plots/ks/` (mirrored in `outputs/plots/latest/ks/`). The goal is a quick, reproducible readout of which covariates most strongly distinguish hotspot cells.
 
+## Interpreting the KS Results
+
+::: callout-note
+**How to read the KS analysis outputs**
+
+- The Kolmogorov-Smirnov (KS) test compares the distribution of each covariate (e.g., population, built area, GDP, HDI) between hotspot and non-hotspot grid cells, for each ecosystem service.
+- The KS statistic ($D$) measures the maximum difference between the two distributions. Higher $D$ means a stronger distinction.
+- The p-value indicates whether the difference is statistically significant (after adjustment for multiple testing).
+- The heatmap and barplots show which variables and services most strongly distinguish hotspots.
+:::
+
+### Key Findings
+
+- **Strongest discriminators:** Variables like built area (GHS_BUILT_S_E2020_mean), population (GHS_POP_E2020_GLOBE_sum, GlobPOP_Count_30arc_2020_sum), and GDP (rast_gdpTot_1990_2020_30arcsec_2020_sum) consistently show high KS statistics across several services, indicating that hotspots are associated with distinct socio-environmental profiles.
+- **Service patterns:** Services such as C_Risk, C_Risk_Red_Ratio, and Nature_Access tend to have higher $D$ values for built area and population, suggesting these hotspots are more urbanized or densely populated.
+- **Significance:** Most top results have extremely low p-values, confirming that the observed differences are robust and unlikely due to chance.
+- **Directionality:** The mean and median values for hotspots vs non-hotspots (see CSV) help interpret whether hotspots are higher or lower in each covariate. For example, if mean_hot > mean_non for population, hotspots are more populated.
+
+### How to use these results
+
+- **Targeting interventions:** Focus on covariates and services with the highest $D$ and lowest p-values—these are the most distinctive and may guide prioritization.
+- **External validation:** The full KS results table (CSV) and plots can be shared for review, and the underlying data (plt_long) is available for reproducibility and further analysis in R, Python, or other tools.
+- **Limitations:** KS tests are sensitive to distribution shape, not just mean differences. Always consider the context and possible confounders.
+
+::: callout-note
+**Exporting KS results for peer review and further interpretation**
+
+The full KS results are saved as a CSV in the processed data directory (typically `/home/jeronimo/data/global_ncp/processed/ks_results_hot_vs_non.csv`). You can share this file for external review, meta-analysis, or further interpretation in any statistical software.
+
+- **For R users:**
+  ```r
+  source("R/config.R") # to load cfg object
+  ks_res <- read.csv(file.path(cfg$paths$processed_data_dir, "ks_results_hot_vs_non.csv"))
+  ```
+- **For Python users:**
+  ```python
+  import pandas as pd
+  # Note: You may need to define the path manually if not running in an R-integrated environment
+  processed_data_dir = "/home/jeronimo/data/global_ncp/processed"
+  ks_res = pd.read_csv(f'{processed_data_dir}/ks_results_hot_vs_non.csv')
+  ```
+- **For other tools:** CSV is a universal format and can be imported into Excel, Stata, etc.
+
+If you need a different format (e.g., Feather, Parquet), you can easily convert it in R or Python.
+:::
 ## Setup
 
 Uses the same wiring as the hotspot extraction report: load project helpers, set a stable root, and keep output paths under `outputs/`.
@@ -112,7 +157,7 @@ KS_CFG <- list(
   mountain_var            = "rast_gdpTot_1990_2020_30arcsec_2020_sum",
   mountain_transform      = "log1p",
   # outputs
-  out_table  = out_tables("ks_results_hot_vs_non.csv"),
+  out_table  = file.path(cfg$paths$processed_data_dir, "ks_results_hot_vs_non.csv"),
   out_dir    = out_plots("ks"),
   latest_dir = out_plots("latest","ks")
 )
@@ -130,7 +175,7 @@ Build `plt_long` from the processed grid, harmonizing service labels and keeping
 #| results: hide
 #| cache: false
 
-rds_path <- here::here("outputs","tables","plt_long.rds")
+rds_path <- file.path(cfg$paths$processed_data_dir, "plt_long.rds")
 if (file.exists(rds_path)) {
   plt_long <- readRDS(rds_path)
 } else if (!exists("plt_long", inherits = TRUE)) {

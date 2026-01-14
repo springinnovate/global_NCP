@@ -1,0 +1,310 @@
+---
+title: "Zonal Reanalysis of Ecosystem Service Change"
+subtitle: "v1.0.2"
+author: "Jerónimo Rodríguez Escobar & Gemini"
+date: last-modified
+date-format: "YYYY-MM-DD HH:mm zzz"
+format:
+  html:
+    toc: true
+    number-sections: true
+    code-fold: false
+    toc-title: "Contents"
+    theme: cosmo
+  pdf:
+    toc: true
+    number-sections: true
+    geometry: margin=1in
+    df-print: kable
+editor: source
+---
+
+## Overview
+
+This document loads the new zonal statistics data, which aggregates ecosystem service raster values at different administrative and geographical levels (e.g., country, biome). It then calculates the mean change and standard deviation for each service and grouping. Finally, it visualizes these changes using bar plots with error bars to represent the uncertainty, as requested.
+
+This analysis is based on the new data provided in `/analysis_data`, which uses direct zonal statistics from the original rasters, avoiding the averaging of averages from the previous 10km grid approach.
+
+## Setup and Libraries
+
+Load core packages and initialize reproducibility settings. This chunk also sources `R/paths.R` and runs `devtools::load_all()` to make helper functions available.
+
+````{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+# Core packages
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(stringr)
+library(ggplot2)
+library(here)
+library(readr)
+
+# Dev/project helpers
+library(devtools)
+# Paths helper
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R","paths.R"))
+
+# Global options
+options(dplyr.summarise.inform = FALSE)
+set.seed(123)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+# Load package-style functions from R/
+devtools::load_all(quiet = TRUE)
+````
+
+## Metadata Banner
+
+````{r}
+#| label: run-metadata
+#| results: 'asis'
+
+# Prints version/time/git info
+analysis_version <- "1.0.2"
+git_branch <- tryCatch(
+  system2("git", c("rev-parse", "--abbrev-ref", "HEAD"), stdout = TRUE, stderr = FALSE),
+  error = function(e) NA_character_
+)
+git_commit <- tryCatch(
+  system2("git", c("rev-parse", "--short", "HEAD"), stdout = TRUE, stderr = FALSE),
+  error = function(e) NA_character_
+)
+
+cat(paste0(
+  "::: callout-note\n",
+  "**Run metadata**\n\n",
+  "- Analysis version: ", analysis_version, "\n",
+  "- Rendered: ", format(Sys.time(), "%Y-%m-%d %H:%M %Z"), "\n",
+  "- Git: ", if (!is.na(git_branch)) git_branch else "NA", " @ ",
+                 if (!is.na(git_commit)) git_commit else "NA", "\n",
+  ":::"
+))
+````
+
+## Load and Process Zonal Statistics Data
+
+This chunk performs the following steps:
+1.  Identifies all CSV files in the `analysis_data/` directory.
+2.  Reads each CSV file. For each file, it determines the `grouping_variable` from the filename (e.g., 'biome', 'country').
+3.  Reshapes the data from its wide format into a long format. It parses the complex column names to extract the `metric` (mean, stdev), the `service_year`, and the `service_name`.
+4.  It separates the `service_year` into `service` and `year` (or 'change').
+5.  All individual data frames are combined into a single, tidy data frame.
+6.  The processed data is then pivoted to a wider format suitable for plotting, with separate columns for `mean` and `stdev`.
+
+````{r}
+#| label: load-and-process-data
+
+data_path <- here("analysis_data")
+csv_files <- list.files(data_path, pattern = "\\.csv$", full.names = TRUE)
+
+# Function to read and process a single csv file
+process_file <- function(file_path) {
+  grouping_name <- str_extract(basename(file_path), "^[^_]+")
+
+  df <- read_csv(file_path, show_col_types = FALSE)
+
+  # A few files have a completely empty first column name. Let's fix it.
+  if (names(df)[1] == "...1") {
+      names(df)[1] <- grouping_name
+  }
+
+  # Rename first column to a generic "group" to make merging easier
+  df <- df %>%
+    rename(group = 1) %>%
+    mutate(grouping_variable = grouping_name)
+
+  df_long <- df %>%
+    pivot_longer(
+      cols = -c(group, grouping_variable),
+      names_to = c("metric", "service_full"),
+      names_pattern = "(mean|stdev)_(.*)",
+      values_to = "value",
+      values_drop_na = TRUE
+    ) %>%
+    # Further parse the service name and year/change
+    mutate(
+      year = case_when(
+        str_detect(service_full, "_1992") ~ "1992",
+        str_detect(service_full, "_2020") ~ "2020",
+        str_detect(service_full, "_change") ~ "change",
+        TRUE ~ "unknown"
+      ),
+      service = str_remove(service_full, "_1992|_2020|_change_.*|_.*$")
+    ) %>%
+    select(grouping_variable, group, service, year, metric, value)
+
+  return(df_long)
+}
+
+# Process all files and combine
+all_data_long <- map_dfr(csv_files, process_file)
+
+# Pivot to have mean and stdev in separate columns for plotting
+plot_data <- all_data_long %>%
+  filter(year == "change") %>%
+  pivot_wider(
+    names_from = metric,
+    values_from = value
+  ) %>%
+  filter(!is.na(mean) & !is.na(stdev))
+
+glimpse(plot_data)
+````
+
+## Export Processed Data
+
+This chunk saves the final, tidy data frame (`plot_data`) to the `outputs/tables/` directory for use in other analyses or for external review.
+
+````{r}
+#| label: export-data
+
+output_table_dir <- here("outputs", "tables")
+dir.create(output_table_dir, recursive = TRUE, showWarnings = FALSE)
+
+output_table_path <- file.path(output_table_dir, "zonal_reanalysis_tidy_change_data.csv")
+write_csv(plot_data, output_table_path)
+
+message("Tidy data exported to: ", output_table_path)
+````
+
+
+## Generate and Save Bar Plots
+
+This chunk creates two versions of the bar plots visualizing the mean change for each service, faceted by the grouping variable.
+
+1.  **Horizontal Bars with Error Bars**: The first plot shows horizontal bars (`coord_flip()`) with error bars representing the standard deviation.
+2.  **Vertical Bars without Error Bars**: The second plot shows standard vertical bars, omitting the error bars to focus on the mean change itself.
+
+- Each plot represents a different grouping variable (e.g., biomes, countries).
+- Facets within each plot separate the different ecosystem services.
+- For clarity, the country plot is filtered to show the top 15 countries with the largest absolute change.
+- All plots are printed to the document and saved to the `outputs/plots/zonal_reanalysis/` directory.
+
+````{r}
+#| label: generate-plots
+#| fig.width: 12
+#| fig.height: 8
+
+output_dir <- here("outputs", "plots", "zonal_reanalysis")
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Get the unique grouping variables to create a plot for each
+grouping_vars <- unique(plot_data$grouping_variable)
+
+for (group_var in grouping_vars) {
+
+  is_country <- group_var == "country"
+  
+  # For readability, filter to top 15 largest changes for groupings with many levels
+  # like 'country'. For others like 'biome', show all.
+  if (is_country) {
+      plot_subset <- plot_data %>%
+        filter(grouping_variable == group_var) %>%
+        group_by(service) %>%
+        slice_max(abs(mean), n = 15) %>%
+        ungroup()
+      
+      subtitle_text_with_error <- "Showing top 15 countries by absolute mean change. Error bars are stdev."
+      subtitle_text_without_error <- "Showing top 15 countries by absolute mean change."
+
+  } else {
+      plot_subset <- plot_data %>%
+        filter(grouping_variable == group_var)
+      
+      subtitle_text_with_error <- "Showing mean change with standard deviation as error bars."
+      subtitle_text_without_error <- "Showing mean change."
+  }
+
+  # --- Plot 1: With error bars and flipped coordinates ---
+  cat(paste0("\n### ", group_var, " (with error bars)\n"))
+  p1 <- ggplot(plot_subset, aes(x = reorder(group, mean), y = mean, fill = group)) +
+    geom_bar(stat = "identity") +
+    geom_errorbar(aes(ymin = mean - stdev, ymax = mean + stdev), width = 0.2) +
+    coord_flip() +
+    facet_wrap(~ service, scales = "free") +
+    labs(
+      title = paste("Mean Change in Ecosystem Services by", group_var),
+      subtitle = subtitle_text_with_error,
+      x = group_var,
+      y = "Mean Change"
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "none",
+      strip.text = element_text(face = "bold"),
+      axis.text.y = element_text(size = 7)
+    )
+
+  # Save the plot
+  plot_path1 <- file.path(output_dir, paste0("signed_barplot_errorbars_", group_var, ".png"))
+  ggsave(
+    filename = plot_path1,
+    plot = p1,
+    width = 14,
+    height = 10,
+    dpi = 300,
+    bg = "white"
+  )
+  
+  print(p1)
+  message("Saved plot: ", plot_path1)
+
+  # --- Plot 2: Without error bars and vertical bars ---
+  cat(paste0("\n### ", group_var, " (vertical, no error bars)\n"))
+  p2 <- ggplot(plot_subset, aes(x = reorder(group, mean), y = mean, fill = group)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~ service, scales = "free_x") +
+    labs(
+      title = paste("Mean Change in Ecosystem Services by", group_var, "(Vertical)"),
+      subtitle = subtitle_text_without_error,
+      x = group_var,
+      y = "Mean Change"
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "none",
+      strip.text = element_text(face = "bold"),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 7)
+    )
+    
+  # Save the plot
+  plot_path2 <- file.path(output_dir, paste0("signed_barplot_vertical_", group_var, ".png"))
+  ggsave(
+    filename = plot_path2,
+    plot = p2,
+    width = 14,
+    height = 10,
+    dpi = 300,
+    bg = "white"
+  )
+  
+  print(p2)
+  message("Saved plot: ", plot_path2)
+}
+````
+
+## Discussion on Visualization
+
+The bar plots above show the mean change and standard deviation. However, in cases where the standard deviation is very large compared to the mean, a bar plot might not be the most informative visualization. The large error bars can obscure the central tendency and make comparisons difficult.
+
+### Proposal: Violin Plots
+
+A potential alternative is to use **violin plots**. A violin plot is a hybrid of a box plot and a kernel density plot, which shows the distribution of the data.
+
+**Advantages of Violin Plots:**
+
+*   **Shows the full distribution:** Instead of just a summary statistic (mean) and error (stdev), a violin plot shows the probability density of the data at different values. We could see if the distribution of change is bimodal (e.g., strong positive and strong negative changes being common), or skewed.
+*   **Better for complex distributions:** If the underlying data of change for a service within a region is not normally distributed, a violin plot will reveal this, whereas a mean and standard deviation assume a more symmetric distribution.
+
+**What would be needed:**
+
+To create violin plots, we would need access to a more granular dataset than the summarized data we are currently using. We would need the pixel-level change values for each service within each geographical unit (e.g., country, biome). If this data is available, we could sample from it to create informative violin plots that would give a much richer view of the changes occurring.
+
+**Example explanation for your boss:**
+
+> "The current bar charts with error bars are a good first step, but the large standard deviations suggest there's a wide variety of changes happening within each region. To better understand this, I propose we create violin plots. These would show us the full distribution of change for each service, revealing if changes are, for example, consistently moderate, or if we are seeing both extreme positive and negative changes that average out. This would give us a more nuanced understanding of the hotspots of change. To do this, we would need access to the per-pixel change data before it is aggregated into a single mean and standard deviation."
