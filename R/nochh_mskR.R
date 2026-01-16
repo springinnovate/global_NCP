@@ -1,54 +1,45 @@
-#' Create a Mask for No-Change or Change Across Multiple spatRaster Layers or Objects
+#' Create a Mask for No-Change or Change Across Multiple SpatRaster Layers
 #'
-#' This function takes a multiband spatRaster or multiple spatRaster objects 
-#' and produces a mask indicating pixels that remained the same or changed 
-#' across all layers/objects.
+#' This function identifies pixels that remain the same (or change) across all 
+#' provided SpatRaster layers. It is optimized to use terra's internal algebra 
+#' (min/max) for speed.
 #'
-#' @param ... Multiple spatRaster objects or a single multiband spatRaster.
-#' @param type A character string, either "nochange" to create a no-change mask
-#'             or "change" to create a change mask. Default is "nochange".
-#' @return A spatRaster object with 1 indicating no-change or change pixels
-#'         and NA for the rest.
+#' @param ... SpatRaster objects. Can be provided as individual arguments 
+#'            (e.g., `r1, r2`), as a list of SpatRasters, or as a single 
+#'            multiband SpatRaster.
+#' @param type Character. "nochange" (default) to mask pixels that have the 
+#'             same value across all layers. "change" to mask pixels that 
+#'             have at least one different value across layers.
+#' @return A SpatRaster with value 1 for matching pixels and NA otherwise.
 #' @export
 #' @examples
-#' # Given r1, r2, and r3 are spatRaster objects
-#' # Create a no-change mask:
-#' mask <- no_chmsk(r1, r2, r3, type = "nochange")
-#' # Create a change mask:
-#' mask <- no_chmsk(r1, r2, r3, type = "change")
-#'
-#' # Given multi_band_raster is a multiband spatRaster
-#' # Create a no-change mask:
-#' mask <- no_chmsk(multi_band_raster, type = "nochange")
+#' # mask <- no_chmsk(r1, r2, type = "nochange")
 no_chmsk <- function(..., type = "nochange") {
   inputs <- list(...)
   
-  # If a single multiband spatRaster is provided
-  if (length(inputs) == 1 && terra::nlyr(inputs[[1]]) > 1) {
-    rasters <- lapply(1:terra::nlyr(inputs[[1]]), function(i) terra::subset(inputs[[1]], i))
-  } else {
-    rasters <- inputs
-  }
+  # Combine inputs into a single SpatRaster stack
+  # terra::rast handles lists of rasters or single multiband rasters efficiently
+  r_stack <- tryCatch(terra::rast(inputs), error = function(e) {
+    stop("Could not create a raster stack from inputs. Ensure all inputs are SpatRaster objects.")
+  })
   
-  # Check if all objects are of type spatRaster
-  # if(!all(sapply(rasters, function(x) class(x)[1] == "spatRaster"))) {
-  #   stop("All input objects must be of type spatRaster")
-  # }
+  # Optimization: Use range (min/max) to detect change across layers
+  # If min == max, values are identical across all layers.
+  r_min <- terra::min(r_stack)
+  r_max <- terra::max(r_stack)
   
-  # Calculate mask
   if (type == "nochange") {
-    mask <- Reduce(`==`, rasters)
+    mask_logic <- (r_min == r_max)
   } else if (type == "change") {
-    mask <- !Reduce(`==`, rasters)
+    mask_logic <- (r_min != r_max)
   } else {
     stop('Invalid type. Choose either "nochange" or "change".')
   }
   
-  # Convert logical mask to spatRaster with values 1 and NA
-  result_rast <- rasters[[1]] * 0
-  result_rast[mask] <- 1
-  result_rast[!mask] <- NA
+  # Convert logical (TRUE/FALSE) to 1/NA
+  # We multiply by 1 to get 0/1, then set 0 to NA
+  result_rast <- mask_logic * 1
+  result_rast[result_rast == 0] <- NA
   
   return(result_rast)
 }
-
