@@ -6,6 +6,10 @@ Supervisor: <add name>
 Version: v1.0.1
 Last updated: 2026-01-06
 
+# Project Status: Reference / Legacy
+
+> **Note:** This repository implements a zonal statistics workflow based on the **IUCN AOO 10 km equal-area grid**. While this pipeline is fully functional for grid-based analysis (including hotspot extraction, KS tests, and visualization), the project strategy is shifting towards summarizing directly from input rasters to avoid grid-based artifacts. Future development is expected to move to the `zonal_stats_toolkit` repository. This codebase remains the definitive reference for the 10km grid approach.
+
 # Overview
 
 Working version of a structured workflow for extracting, analyzing, and visualizing **zonal summary statistics** from global raster datasets including **ecosystem service (ES)**, **land cover (LC)**, and socioeconomic (beneficiary) layers. The analysis is built around the IUCN AOO **10 km equal-area grid** (land-only) enriched with country/region/biome attributes, with outputs aggregated to countries, regions, income groups, and biomes.

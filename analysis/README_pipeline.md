@@ -1,5 +1,7 @@
 # Executive Summary
 
+> **Status Note:** This pipeline is designed for the **10 km grid** approach. Future analyses may pivot to direct raster summarization (see `zonal_stats_toolkit`).
+
 ::: note
 **What is this pipeline?**
 
