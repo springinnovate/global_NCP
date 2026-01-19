@@ -4,7 +4,7 @@
 - Migrated AI workflow from ChatGPT Codex Connector to GitHub Copilot due to unrecoverable authentication issues on Remote SSH (lilling).
 - Re-establishing continuity using explicit context and worklog files.
 - Generating difference rasters (2020-1992) for all services to support updated zonal statistics.
-- Integrating `zonal_stats_toolkit` for synthesis instead of legacy pipelines.
+- **Completed** integration of `zonal_stats_toolkit` for synthesis (replacing legacy pipelines).
 - Next analysis focus: Running zonal synthesis with the new toolkit.
 
 ## Environment notes
@@ -51,3 +51,8 @@
 - 2026-01-06 (cont): Manually added Executive Summary to `analysis/README_pipeline.md`.
 - 2026-01-07: Resolved the sign flip issue in change metrics (absolute vs percent) by normalizing service names and centralizing logic. All downstream analyses (hotspot extraction, KS tests) now use consistent, canonical service definitions. Successfully re-ran the KS analysis with updated data and code; outputs are reproducible and ready for interpretation. Added explicit documentation and export of the pivoted long table (plt_long) and KS results for external review and reproducibility. Project is now in a stable, review-ready state.
 - 2026-01-09: Implemented `Python_scripts/batch_raster_diff.py` to recursively calculate difference rasters (2020 - 1992) for all services. This supports the transition to using the `zonal_stats_toolkit` (located at `/home/jeronimo/projects/zonal_stats_toolkit`) for zonal synthesis. Updated `analysis/zonal_reanalysis.qmd` to initialize the Python environment (`coastal_snap_env`) and prepare for the new analysis workflow.
+- 2026-01-16: **Repository Cleanup & Archival**:
+    - Archived `analysis/zonal_stats.Rmd` to `analysis/legacy_zonal_stats.qmd` (deprecated R `exactextractr` workflow).
+    - Archived `analysis/asign_ids_grid.qmd` to `analysis/legacy_asign_ids_grid.qmd` (deprecated rasterization workflow).
+    - Updated `README.md` to document helper scripts (`restore_checkpoint.R`, `save_checkpoint.R`) and the deprecated legacy scripts.
+    - **Checkpoint**: Committing current state (v1.0.1 cleanup) to prepare for merge to `main`.
