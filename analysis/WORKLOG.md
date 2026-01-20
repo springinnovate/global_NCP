@@ -1,7 +1,7 @@
 # Worklog — Global NCP Hotspots
 
 ## Current focus
-- Migrated AI workflow from ChatGPT Codex Connector to GitHub Copilot due to unrecoverable authentication issues on Remote SSH (lilling).
+- Re-calculating and verifying core ecosystem service ratios (sediment, nitrogen) for the 1992-2020 period.
 - Re-establishing continuity using explicit context and worklog files.
 - Generating difference rasters (2020-1992) for all services to support updated zonal statistics.
 - **Completed** integration of `zonal_stats_toolkit` for synthesis (replacing legacy pipelines).
@@ -11,7 +11,6 @@
 - Local machine: Lenovo (Windows 11)
 - Remote: lilling (VS Code Remote SSH)
 - AI assistant: GitHub Copilot + Copilot Chat
-- ChatGPT Codex Connector: broken on remote; reported to publisher.
 - Personal MacBook may still retain Codex history and could be used later to recover past context.
 
 ## Active entry points
@@ -25,9 +24,9 @@
 - Do not use ChatGPT Codex Connector on lilling (auth persists after uninstall).
 
 ## Next steps (short horizon)
-1. Verify difference rasters in `data/global_ncp/2020_1992_chg`.
-2. Configure `zonal_stats_toolkit` to process these difference rasters against the 10km grid.
-3. Update analysis configs to point to new difference rasters.
+1. Finalize and verify the newly calculated ratio rasters (Sediment and Nitrogen Retention) and their corresponding difference rasters. This is the current task.
+2. Configure `zonal_stats_toolkit` to process all difference rasters against the 10km grid.
+3. Update the analysis configuration YAML files (in `analysis_configs/`) to use the new difference rasters as inputs for the zonal statistics pipeline.
 
 ## Future Tasks (Long-term)
 1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
@@ -56,3 +55,19 @@
     - Archived `analysis/asign_ids_grid.qmd` to `analysis/legacy_asign_ids_grid.qmd` (deprecated rasterization workflow).
     - Updated `README.md` to document helper scripts (`restore_checkpoint.R`, `save_checkpoint.R`) and the deprecated legacy scripts.
     - **Checkpoint**: Committing current state (v1.0.1 cleanup) to prepare for merge to `main`.
+- 2026-01-19: **Created a new script for robust ratio calculations.**
+    - Investigated the codebase to find existing raster ratio calculations.
+    - Created `Python_scripts/calculate_ratios.py` to generate reliable sediment and nitrogen retention ratios for 1992 and 2020, as well as their bi-temporal differences.
+    - Corrected the nitrogen retention formula to the more standard `retention / (retention + export)` to avoid artifacts present in previous calculations.
+    - Engineered the script to be highly performant and robust by:
+        1.  Adding `BIGTIFF=YES` support to handle large output files.
+        2.  Implementing a parallelized, tiled processing approach for speed and memory efficiency.
+        3.  Debugging and resolving thread-safety issues in the parallel implementation related to reading compressed TIFFs.
+    - Updated `environment.yml` to include `tqdm` as a dependency and advised on building a custom Docker image for a reproducible environment.
+    - **Fixes during execution**:
+        - Encountered `ValueError: operands could not be broadcast together` when processing edge tiles (e.g., 3x256 vs 256x256).
+        - **Fix**: Added `boundless=True` to `rasterio.read` calls in `calculate_ratios.py` to ensure consistent tile shapes at image boundaries.
+        - Clarified that `tqdm` was already present in `environment.yml`, removing the need to edit the Dockerfile directly.
+    - **Status**: Ratio calculations (Sediment/Nitrogen 1992 & 2020) and difference rasters completed successfully.
+    - **Next**: Added automated statistical checks to `calculate_ratios.py` to scan difference rasters for atypical values (outliers outside [-1, 1] range).
+    - **Action**: User is downloading data for GIS inspection; script now includes self-check for outliers.
