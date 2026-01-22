@@ -46,18 +46,18 @@ plot_hotspot_boxviolin <- function(
   if (hide_inline && isTRUE(getOption("knitr.in.progress"))) {
     knitr::opts_chunk$set(fig.show = "hide")
   }
-  
+
   socio_vars <- names(socio_labels)
   if (!is.null(drop_services) && length(drop_services)) {
     inverse_df <- dplyr::filter(inverse_df, !.data$service %in% drop_services)
   }
-  
+
   # tag and combine
   hot_df  <- dplyr::mutate(plt_long,   hotspot_flag = "Hotspot")
   non_df  <- dplyr::mutate(inverse_df, hotspot_flag = "Non-hotspot")
   both_df <- dplyr::bind_rows(hot_df, non_df)
-  
-  # long, numeric coercion, common pct_chg trim per service
+
+  # long, numeric coercion. No data trimming here.
   df_long <- both_df %>%
     tidyr::pivot_longer(
       cols = tidyselect::all_of(socio_vars),
@@ -68,38 +68,53 @@ plot_hotspot_boxviolin <- function(
       socio_val = as.numeric(.data$socio_val)
     ) %>%
     dplyr::filter(is.finite(.data$pct_chg), is.finite(.data$socio_val)) %>%
-    dplyr::group_by(.data$service) %>%
-    dplyr::mutate(
-      pct_low  = stats::quantile(.data$pct_chg, trim_p[1], na.rm = TRUE),
-      pct_high = stats::quantile(.data$pct_chg, trim_p[2], na.rm = TRUE)
-    ) %>% dplyr::ungroup() %>%
-    dplyr::filter(.data$pct_chg >= .data$pct_low, .data$pct_chg <= .data$pct_high) %>%
     dplyr::mutate(socio_label = socio_labels[as.character(.data$socio_var)])
-  
+
+  # Calculate y-limits per facet (service and socio_label)
+  # These will be used later with coord_cartesian
+  ylim_df <- df_long %>%
+    dplyr::group_by(.data$service, .data$socio_label) %>%
+    dplyr::summarise(
+      min_y = stats::quantile(.data$socio_val, trim_p[1], na.rm = TRUE),
+      max_y = stats::quantile(.data$socio_val, trim_p[2], na.rm = TRUE),
+      .groups = "drop"
+    )
+
   # drop panels with no variance to avoid violin warnings
   drop_flat_facets <- function(d) {
     d %>% dplyr::group_by(.data$socio_label, .data$hotspot_flag) %>%
       dplyr::filter(dplyr::n_distinct(.data$socio_val) > 1) %>%
       dplyr::ungroup()
   }
-  
+
   safe_name <- function(x) {
     x <- gsub("[^A-Za-z0-9_\\-]+", "_", x)
     gsub("_+", "_", x)
   }
-  
+
   if (is.null(run_id)) run_id <- paste0("run", format(Sys.time(), "%Y%m%d_%H%M%S"))
   if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-  
+
   services <- unique(df_long$service)
   out_files <- character(0)
-  
+
   for (svc in services) {
     d <- df_long %>% dplyr::filter(.data$service == svc)
     if (nrow(d) == 0) next
-    
+
+    # Get the y-limits for this service's facets
+    current_ylims <- ylim_df %>% dplyr::filter(.data$service == svc)
+
+    # Create a dummy dataframe for geom_blank to enforce y-limits per facet
+    # This is a robust way to set per-facet limits without complex plot manipulation
+    blank_data <- tidyr::pivot_longer(current_ylims, 
+                                      cols = c("min_y", "max_y"), 
+                                      names_to = "limit_type",
+                                      values_to = "socio_val") %>%
+                  dplyr::mutate(hotspot_flag = NA) # needs x-aesthetic
+
     d_violin <- drop_flat_facets(d)
-    
+
     # jitter samples (optional)
     jitter_d <- NULL
     if (show_jitter) {
@@ -115,8 +130,10 @@ plot_hotspot_boxviolin <- function(
       }
       jitter_d <- dplyr::bind_rows(nh, hs)
     }
-    
+
     p <- ggplot2::ggplot(d, ggplot2::aes(x = .data$hotspot_flag, y = .data$socio_val)) +
+      # Use the blank data to set the y-range for each facet, without clipping data for stats
+      ggplot2::geom_blank(data = blank_data) +
       { if (show_violin) ggplot2::geom_violin(
         data = d_violin,
         ggplot2::aes(fill = .data$hotspot_flag),
@@ -154,7 +171,7 @@ plot_hotspot_boxviolin <- function(
         legend.position = "right",
         plot.caption = ggplot2::element_text(size = 7, color = "grey30")
       )
-    
+
     # y transform if requested
     if (!is.null(y_trans) && y_trans != "identity") {
       if (y_trans == "log1p") {
@@ -163,7 +180,7 @@ plot_hotspot_boxviolin <- function(
         p <- p + ggplot2::scale_y_continuous(trans = y_trans)
       }
     }
-    
+
     png_file <- file.path(out_dir, paste0(safe_name(svc), "_", run_id, filename_suffix))
     if (use_ragg) {
       ggplot2::ggsave(png_file, p, width = width, height = height, dpi = dpi, bg = "white",
@@ -171,11 +188,11 @@ plot_hotspot_boxviolin <- function(
     } else {
       ggplot2::ggsave(png_file, p, width = width, height = height, dpi = dpi, bg = "white")
     }
-    
+
     if (print_interactive && interactive() && !isTRUE(getOption("knitr.in.progress"))) print(p)
     out_files <- c(out_files, png_file)
     rm(p); gc()
   }
-  
+
   invisible(out_files)
 }

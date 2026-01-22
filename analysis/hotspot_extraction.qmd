@@ -5,7 +5,7 @@ author: "Jerónimo Rodríguez Escobar"
 email: "jeronimo.rodriguez@wwfus.org"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
-analysis_version: "v1.0.1"
+analysis_version: "v1.0.2"
 format:
   html:
     toc: true
@@ -21,7 +21,7 @@ format:
 editor: source
 
 params:
-  analysis_version: "v1.0.1"
+  analysis_version: "v1.0.2"
 ---
 
 ## Overview
@@ -93,8 +93,8 @@ set.seed(1)
 devtools::load_all(quiet = TRUE)
 
 # ---- Python (enable when needed) ----------------------------------------
-# library(reticulate)
-# use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
+library(reticulate)
+use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 
 ```
 
@@ -218,9 +218,9 @@ vmsg("Reading canonical grid + change: ", gpkg)
 sf_f <- sf::st_read(gpkg, quiet = TRUE)
 sf_f <- sf::st_drop_geometry(sf_f)
 
-# Filter out Antarctica from the dataset as it contains no relevant data for this analysis
+# Filter out Antarctica and Seven Seas from the dataset as they contain no relevant data for this analysis
 if ("continent" %in% names(sf_f)) {
-  sf_f <- dplyr::filter(sf_f, continent != "Antarctica")
+  sf_f <- dplyr::filter(sf_f, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
 }
 
 # Ensure required keys present; rebuild if missing (e.g. if dropped during IO)
@@ -348,7 +348,7 @@ glob_drop0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
 
 ```{r}
 #| label: make-signed-bars-plot
-#| eval: false
+#| eval: true
 #| message: false
 #| warning: false
 #| echo: false
@@ -361,23 +361,22 @@ plot_signed_alt <- function(df, grouping, metric,
   d <- dplyr::filter(df, grouping == !!grouping, metric == !!metric)
   if (!nrow(d)) return(invisible(NULL))
   d$service <- factor(d$service, levels = services)
-  d$group   <- factor(d$group, levels = sort(unique(d$group)))
+  d$group   <- factor(d$group, levels = rev(sort(unique(d$group))))
   refs_use <- dplyr::filter(refs, metric == !!metric)
   refs_use$service <- factor(refs_use$service, levels = services)
-  p <- ggplot(d, aes(group, mean_chg, fill = group)) +
+  p <- ggplot(d, aes(x = mean_chg, y = group, fill = group)) +
     geom_col(show.legend = FALSE) +
-    geom_hline(yintercept = 0, color = "#7f7f7f", linewidth = 0.6) +
-    geom_hline(data = refs_use, aes(yintercept = ref),
+    geom_vline(xintercept = 0, color = "#7f7f7f", linewidth = 0.6) +
+    geom_vline(data = refs_use, aes(xintercept = ref),
                linetype = "dashed", color = "#4a4a4a", linewidth = 0.5) +
-    facet_wrap(~ service, scales = "free_y", ncol = 3) +
+    facet_wrap(~ service, scales = "free_x", ncol = 3) +
     labs(title = paste0("Signed mean change (alt) — ", grouping, " [", metric, "]"),
          subtitle = variant_desc,
-         x = grouping,
-         y = if (metric == "pct") "Mean % change (trimmed, signed)" else "Mean absolute change (trimmed, signed)") +
+         y = NULL,
+         x = if (metric == "pct") "Mean % change (trimmed, signed)" else "Mean absolute change (trimmed, signed)") +
     theme_minimal(base_size = 12) +
     theme(strip.background = element_rect(fill = "#f3f4f6", color = NA),
-          strip.text = element_text(face = "bold"),
-          axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+          strip.text = element_text(face = "bold"))
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
   fp <- file.path(out_dir, paste0("bars_signed_alt_", variant_label, "_", tolower(grouping), "_", metric, ".png"))
   ggsave(fp, p, width = 12, height = 8, dpi = 300, bg = "white")
@@ -504,7 +503,7 @@ Hotspot export and KS still expect `plt_long`. To avoid the heavy pivot here, we
 
 ```{r}
 #| label: pivot
-#| eval: false
+#| eval: true
 #| echo: false
 #| message: false
 #| warning: false
@@ -524,7 +523,7 @@ if (!exists("sf_f")) {
   sf_f <- sf::st_drop_geometry(sf_f)
 
   if ("continent" %in% names(sf_f)) {
-    sf_f <- dplyr::filter(sf_f, continent != "Antarctica")
+    sf_f <- dplyr::filter(sf_f, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
   }
   if (!"fid" %in% names(sf_f)) {
     sf_f$fid <- seq_len(nrow(sf_f))
@@ -536,7 +535,7 @@ if (!exists("sf_f")) {
 
 # 2. Define grouping columns to keep
 #    (Must match what is used in make-signed-bars-data and hotspots_config)
-pivot_groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome")
+pivot_groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome","country_name")
 pivot_groupings <- intersect(pivot_groupings, names(sf_f))
 
 # 3. Identify change columns
@@ -610,7 +609,7 @@ HOTS_CFG <- list(
     rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
   ),
 # centralize the grouping columns here
-  groupings = c("income_grp","region_wb","continent","region_un","WWF_biome"),
+  groupings = c("income_grp","region_wb","continent","region_un","WWF_biome","country_name"),
   # IO
   write_layers = TRUE,
   write_index  = TRUE,
@@ -739,10 +738,11 @@ run_one_hotset <- function(df, value_col, scope,
   if (!is.na(group_col) && !is.na(group_val)) {
     df <- df[df[[group_col]] %in% group_val, , drop = FALSE]
   }
+  n_total <- nrow(df)
   if (nrow(df) == 0L) {
     return(tibble::tibble(scope, group_col, group_val = as.character(group_val),
                           metric = if (identical(value_col, "abs_chg")) "abs" else "pct",
-                          n_hot = 0L, gpkg = NA_character_))
+                          n_hot = 0L, n_total = 0L, pct_hot = 0, gpkg = NA_character_))
   }
 
   # Safety: geometry must have all fids present in df
@@ -802,6 +802,8 @@ run_one_hotset <- function(df, value_col, scope,
     group_val  = ifelse(is.na(group_val), NA_character_, as.character(group_val)),
     metric     = metric_stub,
     n_hot      = n_hot,
+    n_total    = n_total,
+    pct_hot    = if (n_total > 0) (n_hot / n_total) * 100 else 0,
     gpkg       = out_gpkg
   )
 }
@@ -812,7 +814,7 @@ run_one_hotset <- function(df, value_col, scope,
 groupings <- if (!is.null(HOTS_CFG$groupings)) {
   HOTS_CFG$groupings
 } else {
-  c("income_grp","region_wb","continent","region_un","WWF_biome")
+  c("income_grp","region_wb","continent","region_un","WWF_biome","country_name")
 }
 
 # Run both metrics (hotspot export)
@@ -1058,7 +1060,8 @@ if (length(pngs)) {
 
 ## Hotspot violin plots
 
-Summarize hotspot distributions by group using saved PNGs; skip computation if group columns are absent. Helper `run_hotspot_violins_by()` now lives in `R/hotspot_violins.R`, so we just call it from this report.
+Summarize hotspot distributions by group using saved PNGs; skip computation if group columns are absent. Helper `run_
+violins_by()` now lives in `R/hotspot_violins.R`, so we just call it from this report.
 
 Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/violins_*.png` and mirrored into `outputs/plots/latest/violins/` for embedding.
 
@@ -1069,13 +1072,13 @@ Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/violins_*.png`
 #| echo: false
 #| cache: false
 #| results: "hold"
-#| eval: false
+#| eval: true
 
 stopifnot(exists("plt_long"))
 groupings <- if (!is.null(HOTS_CFG$groupings) && length(HOTS_CFG$groupings) > 0) {
   HOTS_CFG$groupings
 } else {
-  c("income_grp","region_wb","continent","region_un","WWF_biome")
+  c("income_grp","region_wb","continent","region_un","WWF_biome","country_name")
 }
 missing_groupings <- setdiff(groupings, names(plt_long))
 if (length(missing_groupings)) {
@@ -1110,7 +1113,6 @@ if (length(groupings) == 0) {
         pct_cutoff        = HOTS_CFG$pct_cutoff,
         threshold_mode    = HOTS_CFG$threshold_mode,
         svc_order         = violin_order,
-        cut_q             = 0.999,
         keep_only_ordered = TRUE
       )
     }, error = function(e) {

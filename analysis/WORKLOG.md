@@ -3,10 +3,10 @@
 ## Current focus
 - Re-calculating and verifying core ecosystem service ratios (sediment, nitrogen) for the 1992-2020 period.
 - Re-establishing continuity using explicit context and worklog files.
-- Generating difference rasters (2020-1992) for all services to support updated zonal statistics.
+- **Completed** Generating difference rasters (2020-1992) for all services to support updated zonal statistics.
 - **Completed** integration of `zonal_stats_toolkit` for synthesis (replacing legacy pipelines).
-- Next analysis focus: Running zonal synthesis with the new toolkit.
-
+- Current/complementary analysis: Running zonal synthesis with the new toolkit.
+- Revisiting Hotspots Analysis and KS tests: fixing violin limits,, adjusting sample sizes, calcualte percentages of areas and statistical analysis
 ## Environment notes
 - Local machine: Lenovo (Windows 11)
 - Remote: lilling (VS Code Remote SSH)
@@ -67,7 +67,13 @@
     - **Fixes during execution**:
         - Encountered `ValueError: operands could not be broadcast together` when processing edge tiles (e.g., 3x256 vs 256x256).
         - **Fix**: Added `boundless=True` to `rasterio.read` calls in `calculate_ratios.py` to ensure consistent tile shapes at image boundaries.
-        - Clarified that `tqdm` was already present in `environment.yml`, removing the need to edit the Dockerfile directly.
     - **Status**: Ratio calculations (Sediment/Nitrogen 1992 & 2020) and difference rasters completed successfully.
     - **Next**: Added automated statistical checks to `calculate_ratios.py` to scan difference rasters for atypical values (outliers outside [-1, 1] range).
-    - **Action**: User is downloading data for GIS inspection; script now includes self-check for outliers.
+- 2026-01-21: **Technical Issue Resolution & Next Steps**:
+    - **Percentage Change Artifacts**: [RESOLVED / DOCUMENTED]. Confirmed that the "fat tail" at ±200% and bi-modal distributions are inherent properties of the Symmetric Percentage Change (SPC) metric (bounded [-200%, +200%]). Documented in README.
+    - **Sign Flip / Polarity Issues**: [INVESTIGATING]. Persistent "sign flips" remain in specific grid cells. Hypothesis: Inherent noise in original models (InVEST/Spring) or edge-effects during 10km aggregation.
+    - **Action Items**:
+        1. Locate "Flip Identification Report" (CSV).
+        2. Conduct Data Quality Audit on raw source rasters.
+    - **Plan**: Postpone flip investigation. Prioritize "enhanced violins" on a new feature branch.
+    - **New Feature**: Added "Hotspot Area Analysis" to `hotspot_extraction.qmd`. Implemented modular blocks for calculating and visualizing the percentage of land area classified as a hotspot per grouping variable.

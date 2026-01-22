@@ -6,7 +6,6 @@
 #' @param pct_cutoff Numeric cutoff (e.g., 0.05) passed to `extract_hotspots_by()`.
 #' @param threshold_mode Threshold interpretation (passed through).
 #' @param svc_order Optional service ordering; defaults to factor levels in `df_long`.
-#' @param cut_q Trim quantile for violin plotting.
 #' @param plot_n Max rows sampled for plotting (to keep files manageable).
 #' @param keep_only_ordered Keep only services in `svc_order`.
 #' @param out_root Directory root for plots (defaults to `out_plots()`).
@@ -21,7 +20,6 @@ run_hotspot_violins_by <- function(
     pct_cutoff,
     threshold_mode,
     svc_order = NULL,
-    cut_q = 0.999,
     plot_n = 300000L,
     keep_only_ordered = TRUE,
     out_root = out_plots()) {
@@ -81,37 +79,53 @@ run_hotspot_violins_by <- function(
     { if (nrow(.) > plot_n) dplyr::slice_sample(., n = plot_n) else . } %>%
     dplyr::mutate(!!group_col := as.factor(.data[[group_col]]))
 
-  trim_df <- function(df, var) {
+  if (nrow(vals) == 0) {
+    message("No hotspot data found for grouping: ", group_col)
+    return(invisible(NULL))
+  }
+
+  # Calculate limits without filtering the data.
+  get_limits <- function(df, var) {
     df %>%
       dplyr::filter(!is.na(.data[[var]]), .data[[var]] != 0) %>%
       dplyr::group_by(service) %>%
-      dplyr::mutate(
-        lo = stats::quantile(.data[[var]], 1 - cut_q, na.rm = TRUE),
-        hi = stats::quantile(.data[[var]], cut_q,     na.rm = TRUE)
-      ) %>%
-      dplyr::ungroup() %>%
-      dplyr::filter(.data[[var]] >= lo, .data[[var]] <= hi)
+      dplyr::summarise(
+        lo = stats::quantile(.data[[var]], 0.01, na.rm = TRUE),
+        hi = stats::quantile(.data[[var]], 0.99, na.rm = TRUE),
+        .groups = "drop"
+      )
   }
 
-  abs_trim <- trim_df(vals, "abs_chg")
-  p_abs <- ggplot2::ggplot(abs_trim, ggplot2::aes(x = .data[[group_col]], y = abs_chg)) +
+  abs_limits <- get_limits(vals, "abs_chg")
+  pct_limits <- get_limits(vals, "pct_chg")
+
+  # Filter data to limits to avoid extreme outliers flattening the violin
+  # This effectively implements the "Y-axis limited to 1st and 99th percentiles"
+  vals_abs <- vals %>%
+    dplyr::inner_join(abs_limits, by = "service") %>%
+    dplyr::filter(abs_chg >= lo & abs_chg <= hi)
+
+  vals_pct <- vals %>%
+    dplyr::inner_join(pct_limits, by = "service") %>%
+    dplyr::filter(pct_chg >= lo & pct_chg <= hi)
+
+  p_abs <- ggplot2::ggplot(vals_abs, ggplot2::aes(x = .data[[group_col]], y = abs_chg)) +
     ggplot2::geom_violin(trim = TRUE, scale = "width") +
     ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
     ggplot2::labs(
       title    = paste0("Absolute change in hotspots by ", group_col),
-      subtitle = "Violins only · NA/0 removed · per-service 99.9% trim",
+      subtitle = "Y-axis limited to 1st and 99th percentiles.",
       x = NULL, y = "Absolute change (service units)"
     ) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
 
-  pct_trim <- trim_df(vals, "pct_chg")
-  p_pct <- ggplot2::ggplot(pct_trim, ggplot2::aes(x = .data[[group_col]], y = pct_chg)) +
+  p_pct <- ggplot2::ggplot(vals_pct, ggplot2::aes(x = .data[[group_col]], y = pct_chg)) +
     ggplot2::geom_violin(trim = TRUE, scale = "width") +
     ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
     ggplot2::labs(
       title    = paste0("Percent change in hotspots by ", group_col),
-      subtitle = "Violins only · NA/0 removed · per-service 99.9% trim",
+      subtitle = "Y-axis limited to 1st and 99th percentiles.",
       x = NULL, y = "Percent change (%)"
     ) +
     ggplot2::theme_minimal(base_size = 11) +
