@@ -107,6 +107,7 @@ global_totals <- hs_flags %>%
 # Ensure we only select groupings present in the data
 valid_groupings <- intersect(HOTS_CFG$groupings, names(plt_long))
 df_area_calc <- plt_long %>%
+  dplyr::filter(!is.na(pct_chg)) %>%
   dplyr::select(c_fid, service, dplyr::all_of(valid_groupings)) %>%
   dplyr::left_join(hs_flags, by = c("c_fid", "service")) %>%
   dplyr::mutate(is_hotspot = tidyr::replace_na(is_hotspot, 0))

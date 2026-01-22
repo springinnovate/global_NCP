@@ -675,7 +675,7 @@ cat(paste0(
 
 ```{r}
 #| label: hotspots_export
-#| eval: false
+#| eval: true
 #| message: true
 #| warning: false
 #| echo: false
@@ -734,6 +734,9 @@ run_one_hotset <- function(df, value_col, scope,
                            group_col = NA_character_, group_val = NA_character_,
                            sf_obj = geom_sf,
                            cfg = HOTS_CFG) {
+  # Filter to valid values (domain) so n_total reflects the service area, not global land
+  df <- df[!is.na(df[[value_col]]), , drop = FALSE]
+
   # Optional subsetting by a specific group value
   if (!is.na(group_col) && !is.na(group_val)) {
     df <- df[df[[group_col]] %in% group_val, , drop = FALSE]
