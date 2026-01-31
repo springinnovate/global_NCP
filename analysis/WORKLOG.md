@@ -35,7 +35,7 @@
 ## Session notes
 - 2026-01-05: Created `doc/ai_context.md` and `doc/ai_context.min.md`. Migrated AI workflow to Copilot after Codex auth failure. Sign flip issue remains unresolved and explicitly tracked here.
 - 2026-01-06: Fixed critical bug in `Consolidation.qmd` where `c_fid` was dropped, causing "No hotspots found" errors downstream. Resolved file casing conflict (`Consolidation.Qmd` vs `.qmd`). Regenerated `10k_change_calc.gpkg` and verified ID consistency.
-- 2026-01-06 (cont): Resolved "No hotspots found" by normalizing service names in `hotspot_extraction.qmd` (lowercase -> canonical lookup) to match `HOTS_CFG`. Confirmed successful export with diagnostic logs.
+- 2026-01-06 (cont): Resolved "No hotspots found" by normalizing service names in `hotspot_extraction.qmd` (lowercase -&gt; canonical lookup) to match `HOTS_CFG`. Confirmed successful export with diagnostic logs.
 - 2026-01-06 (cont): Configured `hotspot_extraction.qmd` for PDF generation by disabling heavy computation chunks (`hotspots_export`, `pivot`, plot generation) to rely on cached outputs from the HTML run.
 - 2026-01-06 (cont): Bumped analysis version to v1.0.1 in `Consolidation.qmd` and `hotspot_extraction.qmd` to mark the stable hotspot release.
 - 2026-01-06 (cont): **Hand-off to Agent**:
@@ -76,4 +76,10 @@
         1. Locate "Flip Identification Report" (CSV).
         2. Conduct Data Quality Audit on raw source rasters.
     - **Plan**: Postpone flip investigation. Prioritize "enhanced violins" on a new feature branch.
-    - **New Feature**: Added "Hotspot Area Analysis" to `hotspot_extraction.qmd`. Implemented modular blocks for calculating and visualizing the percentage of land area classified as a hotspot per grouping variable.
+    - **New Feature**: Added "Hotspot Area Analysis" to `hotspot_extraction.qmd`. Implemented modular blocks for calculating and visualizing the percentage of land area classified as a hotspot per grouping variable..
+- 2026-01-31: **Refactoring and Scope Refinement**:
+    - **Goal**: Simplify the analysis pipeline for better clarity and maintenance.
+    - **Action**: Initiated the refactoring of `analysis/Consolidation.qmd` by splitting it into `analysis/prepare_data.qmd` (preprocessing) and `analysis/process_data.qmd` (data processing).
+    - **Discussion**: Explored merging `analysis/process_data.qmd` with `analysis/hotspot_extraction.qmd` to create a single, streamlined hotspot generation script.
+    - **Scope Refinement**: Reviewed grouping variables in `hotspot_extraction.qmd`, deciding to focus on `income_grp`, `region_wb`, and `WWF_biome`, deferring country-level analysis (`nev_name`).
+    - **Status**: Paused refactoring to consolidate the work plan. The immediate next step is to re-verify data structures, starting with the main processed file (`10k_change_calc.gpkg`), to ensure a stable base before proceeding with code changes.

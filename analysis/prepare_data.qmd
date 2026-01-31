@@ -1,0 +1,237 @@
+---
+title: "Data Preparation"
+subtitle: "v1.0.1"
+author: "Jerónimo Rodríguez Escobar"
+date: last-modified
+date-format: "YYYY-MM-DD HH:mm zzz"
+format:
+  html:
+    toc: true
+    number-sections: true
+    theme: cosmo
+  pdf:
+    toc: true
+    number-sections: true
+    geometry: margin=1in
+editor: source
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(tidytext)
+library(rlang)
+library(tidyr)
+library(forcats)
+library(scales)
+library(RColorBrewer)
+library(htmltools)
+library(leaflet)
+library(devtools)
+library(reticulate)
+library(exactextractr)
+library(httpgd)
+load_all()
+
+# set venv for Python
+use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
+
+# Centralize data roots (set GLOBAL_NCP_DATA in ~/.Renviron)
+data_root <- data_dir()
+interim_dir <- data_interim()
+processed_dir <- data_processed()
+
+processed_tables_dir <- file.path(processed_dir, "tables")
+processed_hotspots_dir <- file.path(processed_dir, "hotspots")
+processed_coastal_dir <- file.path(processed_dir, "coastal")
+
+# Source unified hotspot/change helpers
+source(here::here("R", "utils_hotspot.R"))
+
+# Legacy locations (kept for tracking):
+# inpath <- "/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/output_data"
+# inpath <- "/home/jeronimo/OneDrive/PROJECTS/Global_NCP/Final_outputs"
+inpath <- processed_dir
+# This maps raw column names from synth outputs to canonical names.
+rename_list <- list(
+  c(
+    usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean",
+    usle_2020_mean = "global_usle_marine_mod_ESA_2020_mean",
+    nature_access_1992_mean = "nature_access_lspop2019_ESA1992_mean",
+    nature_access_2020_mean = "nature_access_lspop2019_ESA2020_mean",
+    n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean",
+    n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
+    sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean",
+    sed_ret_ratio_2020_mean = "Sed_ret_ratio_2020_mean",
+    coastal_protection_Rt_1992_mean = "coastal_protection_Rt_1992_mean",
+    coastal_protection_Rt_2020_mean = "coastal_protection_Rt_2020_mean",
+    coastal_protection_Rt_nohab_all_1992_mean = "coastal_protection_Rt_nohab_all_1992_mean",
+    coastal_protection_Rt_nohab_all_2020_mean = "coastal_protection_Rt_nohab_all_2020_mean",
+    coastal_protection_Rt_ratio_1992_mean = "coastal_protection_Rt_ratio_1992_mean",
+    coastal_protection_Rt_ratio_2020_mean = "coastal_protection_Rt_ratio_2020_mean"
+  ),
+  c(
+    n_export_1992_sum = "global_n_export_tnc_esa1992_sum",
+    n_export_2020_sum = "global_n_export_tnc_esa2020_sum",
+    n_retention_1992_sum = "global_n_retention_ESAmar_1992_fertilizer_sum",
+    n_retention_2020_sum = "global_n_retention_ESAmar_2020_fertilizer_sum",
+    sed_export_1992_sum = "global_sed_export_marine_mod_ESA_1992_sum",
+    sed_export_2020_sum = "global_sed_export_marine_mod_ESA_2020_sum",
+    pollination_1992_sum = "realized_polllination_on_ag_ESA1992_sum",
+    pollination_2020_sum = "realized_polllination_on_ag_ESA2020_sum"
+  )
+)
+
+```
+
+::: callout-warning
+**TODO / cleanup (run heavy chunks only when inputs are ready)**
+
+- Paths are centralized via `data_dir()`; keep `GLOBAL_NCP_DATA` set.
+- Keep expensive consolidation chunks `eval: false` until the latest `10k_grid_synth_{serv,benef,coastal}_*.gpkg` files are in `interim/`.
+- Use this file as the living pipeline record; promote stable text to README/methods.
+- Maintain the AOO equal-area grid as canonical; use the 4326 clean copy for raster extraction, then wrap dateline for display/output hygiene.
+:::
+
+# Pipeline Overview
+
+For a detailed description of the full pipeline methodology, see README_pipeline.md.
+
+This notebook focuses on the **consolidation** step: synthesizing zonal stats, calculating change, and preparing the canonical dataset.
+
+::: {.callout-tip icon="true"}
+## Future Tasks & Ideas
+
+Here are some ideas and future tasks for this analysis:
+
+1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
+2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to quantify and visualize the share of total change (from bar plots) that occurs within hotspots versus outside of them, possibly using stacked bar plots.
+:::
+
+## Data Inputs
+
+Global 10 km grid covering terrestrial areas worldwide (polygon-based template).
+
+### Canonical 10 km grid (IUCN AOO, land-only)
+
+We do **not** generate the grid from scratch. We use the published IUCN
+Area of Occupancy (AOO) 10×10 km equal-area grid and subset it to land
+by intersecting with the correspondence polygons. We keep the full grid
+cells that touch land (no clipping) and append attributes used for
+subregional aggregation (country/continent/region/biome).
+
+```{r prep-grid-aoo-land, eval=FALSE}
+library(sf)
+library(dplyr)
+
+grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"))
+land_polys <- st_read(
+  data_vectors("cartographic_ee_ee_r264_correspondence.gpkg"),
+  layer = "ee_r264_correspondence"
+)
+
+if (st_crs(grid_raw) != st_crs(land_polys)) {
+  land_polys <- st_transform(land_polys, st_crs(grid_raw))
+}
+
+# Keep grid cells that intersect any land polygon
+grid_land <- st_filter(grid_raw, land_polys, .predicate = st_intersects)
+
+# Define grouping variables
+GROUPING_VARS <- c("iso3", "nev_name", "continent", "region_un", "region_wb", "income_grp", "WWF_biome")
+
+# Attach attributes for aggregation (spatial join or fid-based join)
+land_attrs <- land_polys |>
+  dplyr::select(all_of(GROUPING_VARS))
+grid_land <- st_join(grid_land, land_attrs, join = st_intersects, left = TRUE)
+
+st_write(
+  grid_land,
+  data_vectors("AOOGrid_10x10km_land.gpkg"),
+  delete_layer = TRUE
+)
+```
+
+```{python}
+#| label: make-grid-valid-shapely
+#| eval: false
+#| message: false
+#| warning: false
+
+# Optional: create a Shapely-validated grid copy to avoid GEOS errors in Python.
+# Requires geopandas/shapely in the Quarto Python environment.
+import os
+import geopandas as gpd
+
+data_root = os.environ.get("GLOBAL_NCP_DATA", "")
+grid_in = os.path.join(data_root, "vector_basedata", "AOOGrid_10x10km_land.gpkg")
+grid_out = os.path.join(data_root, "vector_basedata", "AOOGrid_10x10km_land_shpvalid.gpkg")
+
+gdf = gpd.read_file(grid_in)
+gdf["geometry"] = gdf.geometry.make_valid()
+gdf = gdf[gdf.geometry.notna() & gdf.is_valid]
+
+gdf.to_file(grid_out, driver="GPKG")
+print(f"wrote {len(gdf):,} features -> {grid_out}")
+```
+
+```{python}
+#| label: grid-4326-clean
+#| eval: false
+#| message: false
+#| warning: false
+
+# Create a 4326 version for raster extraction (avoids to_crs errors at runtime).
+# This keeps the same cells, only expressed in EPSG:4326.
+import geopandas as gpd
+from shapely.ops import transform
+from pyproj import Transformer
+
+grid_in = os.path.join(data_root, "vector_basedata", "AOOGrid_10x10km_land_shpvalid.gpkg")
+grid_out = os.path.join(data_root, "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
+
+gdf = gpd.read_file(grid_in)
+transformer = Transformer.from_crs(gdf.crs, "EPSG:4326", always_xy=True)
+
+bad = 0
+new_geoms = []
+for geom in gdf.geometry:
+    try:
+        g = transform(transformer.transform, geom)
+        if g.is_empty or not g.is_valid:
+            bad += 1
+            new_geoms.append(None)
+        else:
+            new_geoms.append(g)
+    except Exception:
+        bad += 1
+        new_geoms.append(None)
+
+gdf["geometry"] = new_geoms
+gdf = gdf[gdf.geometry.notna()]
+gdf = gdf.set_crs("EPSG:4326", allow_override=True)
+gdf.to_file(grid_out, driver="GPKG")
+print(f"dropped {bad:,} invalid geometries; wrote -> {grid_out}")
+```
+
+**Canonical grids used downstream**
+
+- **Equal-area canonical grid**: `AOOGrid_10x10km_land.gpkg`
+- **Extraction grid (EPSG:4326)**: `AOOGrid_10x10km_land_4326_clean.gpkg`
+
+The 4326 file is only for raster extraction; the cell geometry is the same
+10×10 km equal-area grid expressed in a different CRS.
+
+Coastal protection model outputs (1992 and 2020) originally as points spaced \~500 m along shorelines.
+
+Global raster datasets for nitrogen retention/export/ratio, sediment retention/export/USLE, pollination, and nature access (1992 and 2020).
+
+Country polygon dataset for spatial aggregation and attribution.

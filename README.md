@@ -3,8 +3,8 @@
 Jeronimo Rodriguez Escobar
 Affiliation: Global Science, WWF
 Supervisor: Becky Chaplin-Kramer
-Version: v1.0.1
-Last updated: 2026-01-21
+Version: v1.0.2
+Last updated: 2026-01-22
 
 # Overview
 
@@ -182,6 +182,16 @@ The R analysis workflow is conducted through a series of Quarto notebooks locate
 -   **File:** `analysis/KS_tests_hotspots.qmd`
 -   **Purpose:** This final notebook performs a Kolmogorov-Smirnov (KS) statistical analysis. It compares the distributions of the beneficiary variables within the identified hotspots versus non-hotspot areas to identify significant differences.
 
+## 4. Hotspot Intensity & Multi-service Analysis
+
+-   **File:** `analysis/hotspot_intensity.qmd`
+-   **Purpose:** Quantifies the spatial extent of hotspots. Calculates the percentage of land area classified as a hotspot ("Intensity") and the share of global hotspots located within each region/biome.
+    -   **Outputs:** `processed/hotspot_area_stats.csv`, Intensity bar plots.
+
+-   **File:** `analysis/hotspot_multiservice.qmd`
+-   **Purpose:** Analyzes the overlap of hotspots across different services ("Hotness"). Identifies regions with high coincidence of multiple service declines.
+    -   **Outputs:** `processed/hotspot_multiservice_stats.csv`, Hotness distribution plots.
+
 ## Analytical Framework
 The analysis of Global NCP Hotspots (1992–2020) is conducted through two distinct but complementary lenses:
 
@@ -213,7 +223,6 @@ To address mathematical artifacts where the sign of percentage change differs fr
 -   Implement PostgreSQL + PostGIS backend
 -   Normalize values (e.g., population-weighted) during extraction
 -   Extend temporal coverage (e.g., 1990–2020 at 5-year intervals)
--   **TODO:** Merge/integrate the `zonal_stats_toolkit` repository (specifically `change_bars_pixel.R`) into this workflow.
 -   **TODO:** Compare results between the 10km grid-based approach and per-pixel analysis to quantify differences and determine the optimal method.
 -   Add transitions and swap metrics to land cover summaries
 -   Build R + Python dashboards or plug-ins for visualization

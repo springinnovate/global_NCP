@@ -7,12 +7,12 @@ date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
 analysis_version: "v1.0.2"
 format:
-  html:
-    toc: true
-    number-sections: true
-    code-fold: false
-    toc-title: "Contents"
-    theme: cosmo
+#  html:
+#    toc: true
+#   number-sections: true
+#   code-fold: false
+#  toc-title: "Contents"
+#   theme: cosmo
   pdf:
     toc: true
     number-sections: true
@@ -195,11 +195,12 @@ What this chunk does:
 ```{r}
 #| label: make-signed-bars-data
 #| eval: true
+#| echo: false
 #| message: false
 #| warning: false
 
 services <- svc_order
-groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome", "nev_name")
+groupings <- c("income_grp","region_wb","WWF_biome")#, "nev_name") (for country if necessary)
 cut_q <- 0.999
 handle_inf <- "na"  # options: "na", "cap"
 verbose <- TRUE
@@ -416,7 +417,7 @@ The chunk below is kept for reference but set to `eval: false`.
 ```{r}
 #| label: qa-sign-flips
 #| eval: true
-#| echo: true
+#| echo: false
 
 # Purpose: Detect and report sign flips between absolute and percentage change metrics.
 # This helps diagnose counter-intuitive results when baseline values are negative.
@@ -502,8 +503,7 @@ This object is suitable for external review, reproducibility checks, and further
 Hotspot export and KS still expect `plt_long`. To avoid the heavy pivot here, we load the cached table from the processed data directory. If it’s missing, this script can regenerate it.
 
 ```{r}
-#| label: pivot
-#| eval: true
+#| eval: false
 #| echo: false
 #| message: false
 #| warning: false
@@ -569,7 +569,7 @@ message("plt_long generated and cached to: ", rds_path)
 
 We identify per-service hotspots using a 5% percentile rule and **direction vectors**: - `loss_services` (e.g., Nature_Access, Pollination, N/Sed_Ret_Ratio, C_Risk_Red_Ratio) → we flag the **lowest** values; - `gain_services` (Sed_export, N_export, C_Risk) → we flag the **highest** values.
 
-We run this **once globally** and then **once per subregion** (World Bank region, income group, continent, UN region, WWF biome). For each run and for each metric (absolute and percent change) we write a compact **GPKG** containing only the hotspot cells, plus a CSV index:
+We run this **once globally** and then **once per subregion** (World Bank region, income group, WWF biome). For each run and for each metric (absolute and percent change) we write a compact **GPKG** containing only the hotspot cells, plus a CSV index:
 
 -   Output root: `processed/hotspots/`
     -   `abs/global/hotspots_global_abs.gpkg`
@@ -597,6 +597,7 @@ Export switches: choose whether to write GPKGs and/or the CSV index.
 #| label: hotspots_config
 #| include: true
 #| eval: true
+#| echo: false
 HOTS_CFG <- list(
   analysis_name   = "global_NCP_hotspots",
   pct_cutoff      = 0.05,
@@ -650,6 +651,7 @@ cat(paste0(
 #| message: false
 #| warning: false
 #| eval: true
+#| echo: false
 # stopifnot(exists("plt_long"))
 # svc_all <- unique(plt_long$service)
 # if (length(intersect(HOTS_CFG$loss, HOTS_CFG$gain)) > 0) {
@@ -675,7 +677,7 @@ cat(paste0(
 
 ```{r}
 #| label: hotspots_export
-#| eval: true
+#| eval: false
 #| message: true
 #| warning: false
 #| echo: false
@@ -857,183 +859,7 @@ dplyr::glimpse(hot_index, width = 120)
 ```
 
 
-## Trimmed change bar plots
 
-::: callout-note
-**How to read these bars**
-
--   Each bar shows the **trimmed mean absolute change** (\|Δ\|) per service within each group; facet axes are free.
--   Bars are **always positive** by design: height = **magnitude of change**, not direction.
--   Direction-of-concern used elsewhere in the analysis:
-    -   Worse when **up** ➜ `Sed_export`, `N_export`, `C_Risk`.
-    -   Worse when **down** ➜ `Nature_Access`, `Pollination`, `N_Ret_Ratio`, `Sed_Ret_Ratio`, `C_Risk_Red_Ratio`.
--   These bars answer **“where is change largest?”**. See hotspot maps/violins for **up vs. down** patterns.
-:::
-
-Short answer: your current barplots use all grid cells (the full 10-km population), not just hotspots. They summarize trimmed means per subregion/global from plt_long via aggregate_change_simple(), with cut_q=0.999 to cap outliers and (optionally) drop_zeros=TRUE. That’s why every bar is positive—those bars are the magnitude of change, not the direction.
-
-Outputs: PNGs land in `outputs/plots/{abs|pct}/<group_col>/bars_*.png` plus a flat copy in `outputs/plots/latest/bars/` for embedding here. The legacy global-only single-bar chart was removed to keep the gallery focused on grouped views.
-
-```{r}
-#| label: bars_by_region
-#| message: false
-#| warning: false
-#| echo: false
-#| eval: true
-#| cache: false
-
-# --- knobs you can tweak quickly -----------------------------------------
-group_col         <- "region_wb"   # e.g. "income_grp","continent","region_un","WWF_biome"
-metric            <- "pct"         # "pct" or "abs"
-cut_q             <- 0.999         # trim extreme 0.1% so bars aren't dominated by outliers
-include_global    <- FALSE         # TRUE to add a "Global" bar into each facet
-keep_only_ordered <- TRUE          # show only services in your svc_order
-save_plot         <- TRUE
-out_dir           <- file.path("outputs","plots")
-out_stub          <- paste0("bars_", tolower(group_col), "_", metric)
-
-# --- facet order (your canonical set first) --------------------------------
-svc_order <- c(
-  "C_Risk","N_export","Sed_export",
-  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-  "Pollination","Nature_Access"
-)
-
-# --- compute trimmed mean magnitude by region -----------------------------
-stopifnot(group_col %in% names(plt_long))
-gc <- group_col
-
-df_trim <- plt_long |>
-  dplyr::filter(!is.na(.data[[gc]])) |>
-  dplyr::mutate(
-    abs_cell = abs(.data$abs_chg),
-    pct_cell = abs(.data$pct_chg)
-  ) |>
-  dplyr::group_by(.data$service) |>
-  dplyr::mutate(
-    abs_cap = stats::quantile(.data$abs_cell, cut_q, na.rm = TRUE),
-    pct_cap = stats::quantile(.data$pct_cell, cut_q, na.rm = TRUE)
-  ) |>
-  dplyr::ungroup() |>
-  dplyr::mutate(
-    abs_trim = pmin(.data$abs_cell, .data$abs_cap),
-    pct_trim = pmin(.data$pct_cell, .data$pct_cap)
-  ) |>
-  dplyr::group_by(.data$service, .data[[gc]]) |>
-  dplyr::summarise(
-    abs_mean = mean(.data$abs_trim, na.rm = TRUE),
-    pct_mean = mean(.data$pct_trim, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-# optional: add a "Global" reference row per service
-if (isTRUE(include_global)) {
-  glob <- plt_long |>
-    dplyr::mutate(
-      abs_cell = abs(.data$abs_chg),
-      pct_cell = abs(.data$pct_chg)
-    ) |>
-    dplyr::group_by(.data$service) |>
-    dplyr::mutate(
-      abs_cap = stats::quantile(.data$abs_cell, cut_q, na.rm = TRUE),
-      pct_cap = stats::quantile(.data$pct_cell, cut_q, na.rm = TRUE)
-    ) |>
-    dplyr::ungroup() |>
-    dplyr::mutate(
-      abs_trim = pmin(.data$abs_cell, .data$abs_cap),
-      pct_trim = pmin(.data$pct_cell, .data$pct_cap)
-    ) |>
-    dplyr::group_by(.data$service) |>
-    dplyr::summarise(
-      abs_mean = mean(.data$abs_trim, na.rm = TRUE),
-      pct_mean = mean(.data$pct_trim, na.rm = TRUE),
-      .groups = "drop"
-    )
-  glob[[gc]] <- factor("Global")
-  df_trim <- dplyr::bind_rows(df_trim, glob)
-}
-
-# order facets and, by default, drop services not in svc_order
-if (keep_only_ordered) df_trim <- dplyr::filter(df_trim, .data$service %in% svc_order)
-extras <- setdiff(unique(df_trim$service), svc_order)
-df_trim <- dplyr::mutate(df_trim,
-  service = factor(.data$service, levels = c(svc_order, sort(extras)))
-)
-
-# x order: put "Global" first if present, else alphabetical by group
-if (isTRUE(include_global)) {
-  df_trim[[gc]] <- forcats::fct_relevel(as.factor(df_trim[[gc]]), "Global", after = 0)
-} else {
-  df_trim[[gc]] <- as.factor(df_trim[[gc]])
-}
-
-yvar <- if (identical(metric, "abs")) "abs_mean" else "pct_mean"
-
-p_bars <- ggplot2::ggplot(df_trim, ggplot2::aes(x = .data[[gc]], y = .data[[yvar]])) +
-  ggplot2::geom_col() +
-  ggplot2::facet_wrap(~ service, ncol = 3, scales = "free_y", drop = FALSE) +
-  ggplot2::labs(
-    title = paste0("Magnitude of change by ", gc, " (", metric, ")"),
-    x = NULL,
-    y = if (identical(metric, "abs")) "Mean |Δ| (service units)" else "Mean |Δ| (%)"
-  ) +
-  ggplot2::theme_minimal(base_size = 11) +
-  ggplot2::theme(
-    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
-    panel.grid.major.x = ggplot2::element_blank()
-  )
-
-if (isTRUE(save_plot)) {
-  # put plots in outputs/plots/<metric>/<group_col>/
-  out_root <- out_plots()
-  out_dir <- file.path(out_root, metric, tolower(group_col))
-  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-
-  # encode key params in the base name
-  file_base <- paste(
-    "bars",
-    tolower(group_col),
-    metric,
-    paste0("cut", gsub("\\.", "", as.character(cut_q))),
-    if (include_global) "with-global" else "no-global",
-    sep = "_"
-  )
-
-  # avoid overwrite by adding _v02, _v03, …
-  final_path <- file.path(out_dir, paste0(file_base, ".png"))
-  i <- 2
-  while (file.exists(final_path)) {
-    final_path <- file.path(out_dir, sprintf("%s_v%02d.png", file_base, i))
-    i <- i + 1
-  }
-
-  ggplot2::ggsave(
-    filename = final_path,
-    plot = p_bars,
-    width = 12, height = 8, dpi = 300,
-    device = ragg::agg_png,  # crisp text
-    bg = "white"             # <- NO transparency
-  )
-  message("Saved plot to: ", normalizePath(final_path))
-}
-
-p_bars
-
-```
-
-Generate trimmed-mean bar plots (abs & pct) for each grouping. Plots save to `outputs/plots/...` and are embedded below.
-
-#| label: make-all-barplots-inputs
-#| message: false
-#| warning: false
-#| echo: false
-#| cache: false
-#| results: "hold"
-#| eval: true
-if (length(good_bars)) {
-  invisible(file.copy(good_bars, latest_dir_bars, overwrite = TRUE))
-}
-```
 
 ```{r}
 #| label: display-barplots
@@ -1061,15 +887,30 @@ if (length(pngs)) {
 }
 ```
 
-## Hotspot violin plots
+```{r}
+#| label: load-cached-plt-long
+#| echo: false
+#| message: true
 
-Summarize hotspot distributions by group using saved PNGs; skip computation if group columns are absent. Helper `run_
-violins_by()` now lives in `R/hotspot_violins.R`, so we just call it from this report.
+if (!exists("plt_long")) {
+  rds_path <- file.path(cfg$paths$processed_data_dir, "plt_long.rds")
+  if (file.exists(rds_path)) {
+    message("Loading cached plt_long from: ", rds_path)
+    plt_long <- readRDS(rds_path)
+  } else {
+    stop("Cached 'plt_long.rds' not found and the 'pivot' chunk was not run. Please run the pivot chunk once to generate the file.")
+  }
+}
+```
 
-Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/violins_*.png` and mirrored into `outputs/plots/latest/violins/` for embedding.
+## Hotspot boxplots
+
+Summarize hotspot distributions by group using saved PNGs; skip computation if group columns are absent. Helper `run_hotspot_boxplots_by()` now lives in `R/hotspot_violins.R`, so we just call it from this report.
+
+Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/boxplots_*.png` and mirrored into `outputs/plots/latest/boxplots/` for embedding.
 
 ```{r}
-#| label: make-hotspot-violins
+#| label: make-hotspot-boxplots
 #| message: false
 #| warning: false
 #| echo: false
@@ -1078,77 +919,74 @@ Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/violins_*.png`
 #| eval: true
 
 stopifnot(exists("plt_long"))
-groupings <- if (!is.null(HOTS_CFG$groupings) && length(HOTS_CFG$groupings) > 0) {
-  HOTS_CFG$groupings
-} else {
-  c("income_grp","region_wb","continent","region_un","WWF_biome","nev_name")
-}
+groupings <- c("income_grp","region_wb","WWF_biome")
+
 missing_groupings <- setdiff(groupings, names(plt_long))
 if (length(missing_groupings)) {
   warning("Grouping column(s) not found in plt_long and will be skipped: ",
           paste(missing_groupings, collapse = ", "))
 }
 groupings <- intersect(groupings, names(plt_long))
-message("make-hotspot-violins groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
-violin_order <- levels(plt_long$service)
-if (is.null(violin_order)) {
-  violin_order <- unique(plt_long$service)
+message("make-hotspot-boxplots groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
+boxplot_order <- levels(plt_long$service)
+if (is.null(boxplot_order)) {
+  boxplot_order <- unique(plt_long$service)
 }
-violin_order <- as.character(violin_order)
+boxplot_order <- as.character(boxplot_order)
 if (length(groupings) == 0) {
-  warning("No grouping columns found in plt_long; skipping hotspot violins.")
+  warning("No grouping columns found in plt_long; skipping hotspot boxplots.")
 } else {
   for (gc in groupings) {
     # Check for valid data before attempting to plot
     n_valid <- sum(!is.na(plt_long[[gc]]))
     if (n_valid == 0) {
-      message("Skipping violins for ", gc, ": all values are NA.")
+      message("Skipping boxplots for ", gc, ": all values are NA.")
       next
     }
 
-    message("Rendering hotspot violins for: ", gc)
+    message("Rendering hotspot boxplots for: ", gc)
     tryCatch({
-      run_hotspot_violins_by(
+      run_hotspot_boxplots_by(
         df_long          = plt_long,
         group_col         = gc,
         loss              = HOTS_CFG$loss,
         gain              = HOTS_CFG$gain,
         pct_cutoff        = HOTS_CFG$pct_cutoff,
         threshold_mode    = HOTS_CFG$threshold_mode,
-        svc_order         = violin_order,
+        svc_order         = boxplot_order,
         keep_only_ordered = TRUE
       )
     }, error = function(e) {
-      message("Error generating violins for ", gc, ": ", e$message)
+      message("Error generating boxplots for ", gc, ": ", e$message)
     })
   }
 }
-latest_dir_violins <- file.path("outputs","plots","latest","violins")
-dir.create(latest_dir_violins, recursive = TRUE, showWarnings = FALSE)
-old_latest_violins <- list.files(latest_dir_violins, full.names = TRUE, all.files = FALSE)
-if (length(old_latest_violins)) invisible(file.remove(old_latest_violins))
-all_new_violins <- list.files(out_plots(), pattern = "(violins|boxplots)_.*\\.png$",
+latest_dir_boxplots <- file.path("outputs","plots","latest","boxplots")
+dir.create(latest_dir_boxplots, recursive = TRUE, showWarnings = FALSE)
+old_latest_boxplots <- list.files(latest_dir_boxplots, full.names = TRUE, all.files = FALSE)
+if (length(old_latest_boxplots)) invisible(file.remove(old_latest_boxplots))
+all_new_boxplots <- list.files(out_plots(), pattern = "boxplots_.*\\.png$",
                               recursive = TRUE, full.names = TRUE)
-all_new_violins <- all_new_violins[!grepl("/latest/", all_new_violins)]
-good_violins <- all_new_violins[file.info(all_new_violins)$size > 0]
-if (length(good_violins)) {
-  invisible(file.copy(good_violins, latest_dir_violins, overwrite = TRUE))
+all_new_boxplots <- all_new_boxplots[!grepl("/latest/", all_new_boxplots)]
+good_boxplots <- all_new_boxplots[file.info(all_new_boxplots)$size > 0]
+if (length(good_boxplots)) {
+  invisible(file.copy(good_boxplots, latest_dir_boxplots, overwrite = TRUE))
 }
 
 ```
 
 ```{r}
-#| label: display-violins
+#| label: display-boxplots
 #| echo: false
 #| results: 'asis'
 #| cache: false
-vio_dir   <- file.path("outputs","plots","latest","violins")
-vio_files <- list.files(vio_dir, pattern = "violins_.*\\.png$", full.names = FALSE)
-if (length(vio_files)) {
-  rel_paths <- file.path("..", vio_dir, sort(vio_files))
+box_dir   <- file.path("outputs","plots","latest","boxplots")
+box_files <- list.files(box_dir, pattern = "boxplots_.*\\.png$", full.names = FALSE)
+if (length(box_files)) {
+  rel_paths <- file.path("..", box_dir, sort(box_files))
   md <- paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
   knitr::asis_output(md)
 } else {
-  knitr::asis_output("> No violin plots were generated; check upstream chunks.")
+  knitr::asis_output("> No boxplots were generated; check upstream chunks.")
 }
 ```

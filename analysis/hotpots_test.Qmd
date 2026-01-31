@@ -1,0 +1,34 @@
+```r
+# Prototype: T-test for Hotspot vs Median-Spot
+# Run this after hotspots_df and inverse_df are defined
+
+run_t_tests <- function(hot, non, var_name) {
+  # Combine data
+  dat <- dplyr::bind_rows(
+    hot %>% dplyr::mutate(type = "Hotspot"),
+    non %>% dplyr::mutate(type = "Non-Hotspot")
+  ) %>%
+    dplyr::filter(is.finite(.data[[var_name]]))
+  
+  # Run t-test per service
+  dat %>%
+    dplyr::group_by(service) %>%
+    dplyr::summarise(
+      mean_hot = mean(.data[[var_name]][type == "Hotspot"]),
+      mean_non = mean(.data[[var_name]][type == "Non-Hotspot"]),
+      p_value  = t.test(.data[[var_name]] ~ type)$p.value,
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      significance = dplyr::case_when(
+        p_value < 0.001 ~ "***",
+        p_value < 0.01  ~ "**",
+        p_value < 0.05  ~ "*",
+        TRUE ~ "ns"
+      )
+    )
+}
+
+# Example usage:
+# t_results <- run_t_tests(hotspots_df, inverse_df, "rast_gdpTot_1990_2020_30arcsec_2020_sum")
+# print(t_results)

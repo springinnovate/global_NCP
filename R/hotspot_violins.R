@@ -1,4 +1,4 @@
-#' Faceted violins of hotspot change by grouping column
+#' Faceted boxplots of hotspot change by grouping column
 #'
 #' @param df_long Long-form change table (`plt_long` style).
 #' @param group_col Column name to facet by (string).
@@ -10,9 +10,9 @@
 #' @param keep_only_ordered Keep only services in `svc_order`.
 #' @param out_root Directory root for plots (defaults to `out_plots()`).
 #'
-#' @return List with `abs_plot` and `pct_plot` invisibly; also writes PNGs.
+#' @return List with `abs_box` and `pct_box` invisibly; also writes PNGs.
 #' @export
-run_hotspot_violins_by <- function(
+run_hotspot_boxplots_by <- function(
     df_long,
     group_col,
     loss,
@@ -31,7 +31,7 @@ run_hotspot_violins_by <- function(
   }
   svc_order <- as.character(svc_order)
 
-  message("==> Violins by: ", group_col)
+  message("==> Boxplots by: ", group_col)
 
   by_abs <- extract_hotspots_by(
     df_long        = df_long,
@@ -84,48 +84,44 @@ run_hotspot_violins_by <- function(
     return(invisible(NULL))
   }
 
-  # Calculate limits without filtering the data.
-  get_limits <- function(df, var) {
+  # --- Boxplots (Stats on full data, view zoomed to whiskers) ---
+  # We calculate stats manually to ensure the box represents the full distribution
+  # (not the filtered one), but we plot without outliers to "zoom in" the axis.
+  calc_box_stats <- function(df, var) {
     df %>%
-      dplyr::filter(!is.na(.data[[var]]), .data[[var]] != 0) %>%
-      dplyr::group_by(service) %>%
+      dplyr::filter(!is.na(.data[[var]])) %>%
+      dplyr::group_by(service, .data[[group_col]]) %>%
       dplyr::summarise(
-        lo = stats::quantile(.data[[var]], 0.01, na.rm = TRUE),
-        hi = stats::quantile(.data[[var]], 0.99, na.rm = TRUE),
+        middle = stats::median(.data[[var]], na.rm = TRUE),
+        lower  = stats::quantile(.data[[var]], 0.25, na.rm = TRUE),
+        upper  = stats::quantile(.data[[var]], 0.75, na.rm = TRUE),
+        iqr    = stats::IQR(.data[[var]], na.rm = TRUE),
+        # Whiskers: 1.5 IQR from hinge, bounded by data range
+        ymin   = max(min(.data[[var]], na.rm = TRUE), lower - 1.5 * iqr),
+        ymax   = min(max(.data[[var]], na.rm = TRUE), upper + 1.5 * iqr),
         .groups = "drop"
       )
   }
+  stats_abs <- calc_box_stats(vals, "abs_chg")
+  stats_pct <- calc_box_stats(vals, "pct_chg")
 
-  abs_limits <- get_limits(vals, "abs_chg")
-  pct_limits <- get_limits(vals, "pct_chg")
-
-  # Filter data to limits to avoid extreme outliers flattening the violin
-  # This effectively implements the "Y-axis limited to 1st and 99th percentiles"
-  vals_abs <- vals %>%
-    dplyr::inner_join(abs_limits, by = "service") %>%
-    dplyr::filter(abs_chg >= lo & abs_chg <= hi)
-
-  vals_pct <- vals %>%
-    dplyr::inner_join(pct_limits, by = "service") %>%
-    dplyr::filter(pct_chg >= lo & pct_chg <= hi)
-
-  p_abs <- ggplot2::ggplot(vals_abs, ggplot2::aes(x = .data[[group_col]], y = abs_chg)) +
-    ggplot2::geom_violin(trim = TRUE, scale = "width") +
+  p_abs_box <- ggplot2::ggplot(stats_abs, ggplot2::aes(x = .data[[group_col]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
+    ggplot2::geom_boxplot(stat = "identity", fill = "gray90") +
     ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
     ggplot2::labs(
-      title    = paste0("Absolute change in hotspots by ", group_col),
-      subtitle = "Y-axis limited to 1st and 99th percentiles.",
+      title    = paste0("Absolute change (Boxplot) by ", group_col),
+      subtitle = "Whiskers = 1.5*IQR. Outliers hidden to zoom view.",
       x = NULL, y = "Absolute change (service units)"
     ) +
     ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
 
-  p_pct <- ggplot2::ggplot(vals_pct, ggplot2::aes(x = .data[[group_col]], y = pct_chg)) +
-    ggplot2::geom_violin(trim = TRUE, scale = "width") +
+  p_pct_box <- ggplot2::ggplot(stats_pct, ggplot2::aes(x = .data[[group_col]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
+    ggplot2::geom_boxplot(stat = "identity", fill = "gray90") +
     ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
     ggplot2::labs(
-      title    = paste0("Percent change in hotspots by ", group_col),
-      subtitle = "Y-axis limited to 1st and 99th percentiles.",
+      title    = paste0("Percent change (Boxplot) by ", group_col),
+      subtitle = "Whiskers = 1.5*IQR. Outliers hidden to zoom view.",
       x = NULL, y = "Percent change (%)"
     ) +
     ggplot2::theme_minimal(base_size = 11) +
@@ -137,13 +133,13 @@ run_hotspot_violins_by <- function(
   dir.create(dir_pct, recursive = TRUE, showWarnings = FALSE)
 
   ggplot2::ggsave(
-    filename = file.path(dir_abs, paste0("violins_", tolower(group_col), "_abs.png")),
-    plot = p_abs, width = 12, height = 8, dpi = 300, bg = "white"
+    filename = file.path(dir_abs, paste0("boxplots_", tolower(group_col), "_abs.png")),
+    plot = p_abs_box, width = 12, height = 8, dpi = 300, bg = "white"
   )
   ggplot2::ggsave(
-    filename = file.path(dir_pct, paste0("violins_", tolower(group_col), "_pct.png")),
-    plot = p_pct, width = 12, height = 8, dpi = 300, bg = "white"
+    filename = file.path(dir_pct, paste0("boxplots_", tolower(group_col), "_pct.png")),
+    plot = p_pct_box, width = 12, height = 8, dpi = 300, bg = "white"
   )
 
-  invisible(list(abs_plot = p_abs, pct_plot = p_pct))
+  invisible(list(abs_box = p_abs_box, pct_box = p_pct_box))
 }
