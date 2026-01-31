@@ -66,7 +66,7 @@ HOTS_CFG <- list(
   rule_mode       = "vectors",
   loss = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
   gain = c("Sed_export","N_export","C_Risk"),
-  groupings = c("income_grp","region_wb","continent","region_un","WWF_biome","country_name"),
+  groupings = c("income_grp","region_wb","continent","region_un","WWF_biome","nev_name"),
   svc_order = c(
     "C_Risk","N_export","Sed_export",
     "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
@@ -172,32 +172,42 @@ plot_area_stats <- function(df, g_var, metric = "pct_area") {
 
   # If there are many groups (e.g. countries), filter to top 15 per service
   n_groups <- dplyr::n_distinct(d_plot$group)
-  if (n_groups > 20) {
+  is_large_group <- n_groups > 20
+
+  if (is_large_group) {
     d_plot <- d_plot %>%
       dplyr::group_by(service) %>%
       dplyr::slice_max(order_by = .data[[metric]], n = 15) %>%
       dplyr::ungroup()
     subtitle_add <- " (Top 15 per service)"
+
+    # Large groups: Free Y axis, sorted by magnitude
+    d_plot <- d_plot %>%
+      dplyr::mutate(group_ordered = stats::reorder(paste(group, service, sep = "___"), .data[[metric]]))
+    scales_val <- "free_y"
   } else {
     subtitle_add <- ""
-  }
 
-  # Create an ordered factor for plotting (alphabetical: A on top, Z at bottom)
-  # ggplot places the first factor level at the bottom, so we sort Z -> A to get A at the top.
-  d_plot <- d_plot %>%
-    dplyr::arrange(dplyr::desc(group)) %>%
-    dplyr::mutate(group_ordered = factor(paste(group, service, sep = "___"), levels = unique(paste(group, service, sep = "___"))))
+    # Small groups: Shared Y axis, sorted alphabetically (A top)
+    d_plot <- d_plot %>%
+      dplyr::arrange(dplyr::desc(group)) %>%
+      dplyr::mutate(group_ordered = factor(group, levels = unique(group)))
+    scales_val <- "free_x"
+  }
 
   p <- ggplot2::ggplot(d_plot, ggplot2::aes(x = .data[[metric]], y = group_ordered, fill = service)) +
     ggplot2::geom_col(show.legend = FALSE) +
-    ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 3) +
-    ggplot2::scale_y_discrete(labels = function(x) sub("___.*", "", x)) +
+    ggplot2::facet_wrap(~ service, scales = scales_val, ncol = 3) +
     ggplot2::labs(
       title = paste0("Hotspot ", if (metric == "pct_area") "Intensity" else "Distribution", " by ", g_var),
       subtitle = paste0(metric_label, subtitle_add),
       x = metric_label, y = NULL
     ) +
     ggplot2::theme_minimal()
+
+  if (is_large_group) {
+    p <- p + ggplot2::scale_y_discrete(labels = function(x) sub("___.*", "", x))
+  }
 
   # Save plot
   out_file <- file.path(out_plots(), paste0("hotspot_", file_suffix, "_", tolower(g_var), ".png"))

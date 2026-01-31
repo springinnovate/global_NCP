@@ -12,7 +12,7 @@ message("Starting signed bar generation (no long pivot)...")
 gpkg <- file.path(Sys.getenv("GLOBAL_NCP_DATA"), "processed", "10k_change_calc.gpkg")
 stopifnot(file.exists(gpkg))
 
-groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome")
+groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome", "nev_name")
 metrics   <- c("pct","abs")
 cut_q     <- 0.999
 svc_order <- c("C_Risk","N_export","Sed_export",

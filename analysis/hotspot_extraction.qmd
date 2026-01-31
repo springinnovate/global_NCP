@@ -199,7 +199,7 @@ What this chunk does:
 #| warning: false
 
 services <- svc_order
-groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome")
+groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome", "nev_name")
 cut_q <- 0.999
 handle_inf <- "na"  # options: "na", "cap"
 verbose <- TRUE
@@ -535,7 +535,7 @@ if (!exists("sf_f")) {
 
 # 2. Define grouping columns to keep
 #    (Must match what is used in make-signed-bars-data and hotspots_config)
-pivot_groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome","country_name")
+pivot_groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome","nev_name")
 pivot_groupings <- intersect(pivot_groupings, names(sf_f))
 
 # 3. Identify change columns
@@ -609,7 +609,7 @@ HOTS_CFG <- list(
     rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
   ),
 # centralize the grouping columns here
-  groupings = c("income_grp","region_wb","continent","region_un","WWF_biome","country_name"),
+  groupings = c("income_grp","region_wb","continent","region_un","WWF_biome","nev_name"),
   # IO
   write_layers = TRUE,
   write_index  = TRUE,
@@ -675,7 +675,7 @@ cat(paste0(
 
 ```{r}
 #| label: hotspots_export
-#| eval: true
+#| eval: false
 #| message: true
 #| warning: false
 #| echo: false
@@ -817,7 +817,7 @@ run_one_hotset <- function(df, value_col, scope,
 groupings <- if (!is.null(HOTS_CFG$groupings)) {
   HOTS_CFG$groupings
 } else {
-  c("income_grp","region_wb","continent","region_un","WWF_biome","country_name")
+  c("income_grp","region_wb","continent","region_un","WWF_biome","nev_name")
 }
 
 # Run both metrics (hotspot export)
@@ -1081,7 +1081,7 @@ stopifnot(exists("plt_long"))
 groupings <- if (!is.null(HOTS_CFG$groupings) && length(HOTS_CFG$groupings) > 0) {
   HOTS_CFG$groupings
 } else {
-  c("income_grp","region_wb","continent","region_un","WWF_biome","country_name")
+  c("income_grp","region_wb","continent","region_un","WWF_biome","nev_name")
 }
 missing_groupings <- setdiff(groupings, names(plt_long))
 if (length(missing_groupings)) {
@@ -1127,7 +1127,7 @@ latest_dir_violins <- file.path("outputs","plots","latest","violins")
 dir.create(latest_dir_violins, recursive = TRUE, showWarnings = FALSE)
 old_latest_violins <- list.files(latest_dir_violins, full.names = TRUE, all.files = FALSE)
 if (length(old_latest_violins)) invisible(file.remove(old_latest_violins))
-all_new_violins <- list.files(out_plots(), pattern = "violins_.*\\.png$",
+all_new_violins <- list.files(out_plots(), pattern = "(violins|boxplots)_.*\\.png$",
                               recursive = TRUE, full.names = TRUE)
 all_new_violins <- all_new_violins[!grepl("/latest/", all_new_violins)]
 good_violins <- all_new_violins[file.info(all_new_violins)$size > 0]
