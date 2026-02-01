@@ -1,17 +1,16 @@
 # Worklog — Global NCP Hotspots
 
 ## Current focus
-- Migrated AI workflow from ChatGPT Codex Connector to GitHub Copilot due to unrecoverable authentication issues on Remote SSH (lilling).
+- Re-calculating and verifying core ecosystem service ratios (sediment, nitrogen) for the 1992-2020 period.
 - Re-establishing continuity using explicit context and worklog files.
-- Generating difference rasters (2020-1992) for all services to support updated zonal statistics.
+- **Completed** Generating difference rasters (2020-1992) for all services to support updated zonal statistics.
 - **Completed** integration of `zonal_stats_toolkit` for synthesis (replacing legacy pipelines).
-- Next analysis focus: Running zonal synthesis with the new toolkit.
-
+- Current/complementary analysis: Running zonal synthesis with the new toolkit.
+- Revisiting Hotspots Analysis and KS tests: fixing violin limits,, adjusting sample sizes, calcualte percentages of areas and statistical analysis
 ## Environment notes
 - Local machine: Lenovo (Windows 11)
 - Remote: lilling (VS Code Remote SSH)
 - AI assistant: GitHub Copilot + Copilot Chat
-- ChatGPT Codex Connector: broken on remote; reported to publisher.
 - Personal MacBook may still retain Codex history and could be used later to recover past context.
 
 ## Active entry points
@@ -25,9 +24,9 @@
 - Do not use ChatGPT Codex Connector on lilling (auth persists after uninstall).
 
 ## Next steps (short horizon)
-1. Verify difference rasters in `data/global_ncp/2020_1992_chg`.
-2. Configure `zonal_stats_toolkit` to process these difference rasters against the 10km grid.
-3. Update analysis configs to point to new difference rasters.
+1. Finalize and verify the newly calculated ratio rasters (Sediment and Nitrogen Retention) and their corresponding difference rasters. This is the current task.
+2. Configure `zonal_stats_toolkit` to process all difference rasters against the 10km grid.
+3. Update the analysis configuration YAML files (in `analysis_configs/`) to use the new difference rasters as inputs for the zonal statistics pipeline.
 
 ## Future Tasks (Long-term)
 1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
@@ -36,7 +35,7 @@
 ## Session notes
 - 2026-01-05: Created `doc/ai_context.md` and `doc/ai_context.min.md`. Migrated AI workflow to Copilot after Codex auth failure. Sign flip issue remains unresolved and explicitly tracked here.
 - 2026-01-06: Fixed critical bug in `Consolidation.qmd` where `c_fid` was dropped, causing "No hotspots found" errors downstream. Resolved file casing conflict (`Consolidation.Qmd` vs `.qmd`). Regenerated `10k_change_calc.gpkg` and verified ID consistency.
-- 2026-01-06 (cont): Resolved "No hotspots found" by normalizing service names in `hotspot_extraction.qmd` (lowercase -> canonical lookup) to match `HOTS_CFG`. Confirmed successful export with diagnostic logs.
+- 2026-01-06 (cont): Resolved "No hotspots found" by normalizing service names in `hotspot_extraction.qmd` (lowercase -&gt; canonical lookup) to match `HOTS_CFG`. Confirmed successful export with diagnostic logs.
 - 2026-01-06 (cont): Configured `hotspot_extraction.qmd` for PDF generation by disabling heavy computation chunks (`hotspots_export`, `pivot`, plot generation) to rely on cached outputs from the HTML run.
 - 2026-01-06 (cont): Bumped analysis version to v1.0.1 in `Consolidation.qmd` and `hotspot_extraction.qmd` to mark the stable hotspot release.
 - 2026-01-06 (cont): **Hand-off to Agent**:
@@ -56,3 +55,31 @@
     - Archived `analysis/asign_ids_grid.qmd` to `analysis/legacy_asign_ids_grid.qmd` (deprecated rasterization workflow).
     - Updated `README.md` to document helper scripts (`restore_checkpoint.R`, `save_checkpoint.R`) and the deprecated legacy scripts.
     - **Checkpoint**: Committing current state (v1.0.1 cleanup) to prepare for merge to `main`.
+- 2026-01-19: **Created a new script for robust ratio calculations.**
+    - Investigated the codebase to find existing raster ratio calculations.
+    - Created `Python_scripts/calculate_ratios.py` to generate reliable sediment and nitrogen retention ratios for 1992 and 2020, as well as their bi-temporal differences.
+    - Corrected the nitrogen retention formula to the more standard `retention / (retention + export)` to avoid artifacts present in previous calculations.
+    - Engineered the script to be highly performant and robust by:
+        1.  Adding `BIGTIFF=YES` support to handle large output files.
+        2.  Implementing a parallelized, tiled processing approach for speed and memory efficiency.
+        3.  Debugging and resolving thread-safety issues in the parallel implementation related to reading compressed TIFFs.
+    - Updated `environment.yml` to include `tqdm` as a dependency and advised on building a custom Docker image for a reproducible environment.
+    - **Fixes during execution**:
+        - Encountered `ValueError: operands could not be broadcast together` when processing edge tiles (e.g., 3x256 vs 256x256).
+        - **Fix**: Added `boundless=True` to `rasterio.read` calls in `calculate_ratios.py` to ensure consistent tile shapes at image boundaries.
+    - **Status**: Ratio calculations (Sediment/Nitrogen 1992 & 2020) and difference rasters completed successfully.
+    - **Next**: Added automated statistical checks to `calculate_ratios.py` to scan difference rasters for atypical values (outliers outside [-1, 1] range).
+- 2026-01-21: **Technical Issue Resolution & Next Steps**:
+    - **Percentage Change Artifacts**: [RESOLVED / DOCUMENTED]. Confirmed that the "fat tail" at ±200% and bi-modal distributions are inherent properties of the Symmetric Percentage Change (SPC) metric (bounded [-200%, +200%]). Documented in README.
+    - **Sign Flip / Polarity Issues**: [INVESTIGATING]. Persistent "sign flips" remain in specific grid cells. Hypothesis: Inherent noise in original models (InVEST/Spring) or edge-effects during 10km aggregation.
+    - **Action Items**:
+        1. Locate "Flip Identification Report" (CSV).
+        2. Conduct Data Quality Audit on raw source rasters.
+    - **Plan**: Postpone flip investigation. Prioritize "enhanced violins" on a new feature branch.
+    - **New Feature**: Added "Hotspot Area Analysis" to `hotspot_extraction.qmd`. Implemented modular blocks for calculating and visualizing the percentage of land area classified as a hotspot per grouping variable..
+- 2026-01-31: **Refactoring and Scope Refinement**:
+    - **Goal**: Simplify the analysis pipeline for better clarity and maintenance.
+    - **Action**: Initiated the refactoring of `analysis/Consolidation.qmd` by splitting it into `analysis/prepare_data.qmd` (preprocessing) and `analysis/process_data.qmd` (data processing).
+    - **Discussion**: Explored merging `analysis/process_data.qmd` with `analysis/hotspot_extraction.qmd` to create a single, streamlined hotspot generation script.
+    - **Scope Refinement**: Reviewed grouping variables in `hotspot_extraction.qmd`, deciding to focus on `income_grp`, `region_wb`, and `WWF_biome`, deferring country-level analysis (`nev_name`).
+    - **Status**: Paused refactoring to consolidate the work plan. The immediate next step is to re-verify data structures, starting with the main processed file (`10k_change_calc.gpkg`), to ensure a stable base before proceeding with code changes.

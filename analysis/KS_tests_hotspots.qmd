@@ -140,6 +140,7 @@ KS_CFG <- list(
     "rast_adm1_gini_disp_2020_mean"
   ),
   sampling          = "match_hot",  # none | match_hot | cap_nonhot
+  comparison_mode   = "median",     # "random" (all non-hotspots) | "median" (middle 5% of change)
   nonhot_cap        = 100000L,
   permute_n         = 0,            # set >0 for permutation p
   compute_one_sided = TRUE,
@@ -176,13 +177,22 @@ Build `plt_long` from the processed grid, harmonizing service labels and keeping
 #| cache: false
 
 rds_path <- file.path(cfg$paths$processed_data_dir, "plt_long.rds")
+need_reload <- TRUE
 if (file.exists(rds_path)) {
   plt_long <- readRDS(rds_path)
-} else if (!exists("plt_long", inherits = TRUE)) {
-  gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+  if (all(KS_CFG$vars_to_test %in% names(plt_long))) need_reload <- FALSE
+}
+
+if (need_reload) {
+  # Use full QA dataset to ensure socioeconomic variables are present
+  gpkg <- file.path(data_dir(), "processed", "10k_grid_ES_change_benef.gpkg")
+  if (!file.exists(gpkg)) {
+    gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+  }
   stopifnot(file.exists(gpkg))
 
-  sf_f <- sf::st_read(gpkg, layer = "10k_change_calc", quiet = TRUE)
+  lyrs <- sf::st_layers(gpkg)$name
+  sf_f <- sf::st_read(gpkg, layer = lyrs[1], quiet = TRUE)
   if (!"fid" %in% names(sf_f)) sf_f$fid <- seq_len(nrow(sf_f))
   if (!"c_fid" %in% names(sf_f)) {
     if ("c_fid.x" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, c_fid = c_fid.x)
@@ -277,6 +287,36 @@ hotspots_df <- hs$hotspots_df
 inverse_df  <- hs$non_hotspots_df
 
 stopifnot(nrow(hotspots_df) > 0, nrow(inverse_df) > 0)
+
+# Optional: Filter non-hotspots to "Median Spots" (typical change)
+# This compares hotspots specifically to "business as usual" areas,
+# rather than the entire background (which includes extreme gains/losses in the other direction).
+if (KS_CFG$comparison_mode == "median") {
+  message("Filtering non-hotspots to the median 5% range (47.5th-52.5th percentiles) of change...")
+
+  # Helper to filter safely per service
+  filter_median_safe <- function(df, svc_name) {
+    d_svc <- df[df$service == svc_name, ]
+    if (nrow(d_svc) < 100) return(d_svc) # Too few to filter
+
+    # Try narrow median
+    q_lo <- stats::quantile(d_svc$pct_chg, 0.475, na.rm = TRUE)
+    q_hi <- stats::quantile(d_svc$pct_chg, 0.525, na.rm = TRUE)
+    d_filt <- d_svc[d_svc$pct_chg >= q_lo & d_svc$pct_chg <= q_hi, ]
+
+    # Fallback if too aggressive (e.g. sparse data)
+    if (nrow(d_filt) < 50) {
+      message("  Service ", svc_name, ": Median 5% too sparse (n=", nrow(d_filt), "). Using IQR (25-75%) instead.")
+      q_lo <- stats::quantile(d_svc$pct_chg, 0.25, na.rm = TRUE)
+      q_hi <- stats::quantile(d_svc$pct_chg, 0.75, na.rm = TRUE)
+      d_filt <- d_svc[d_svc$pct_chg >= q_lo & d_svc$pct_chg <= q_hi, ]
+    }
+    return(d_filt)
+  }
+
+  inverse_df <- purrr::map_dfr(unique(inverse_df$service), ~filter_median_safe(inverse_df, .x))
+  message("Median spots selected. Rows: ", nrow(inverse_df))
+}
 ```
 
 ## KS tests: hotspots vs non-hotspots
@@ -364,22 +404,65 @@ ecdf_files <- save_ecdf_grids(
   verbose = FALSE
 )
 
+# Directionality plot (Cliff's Delta)
+dir_path <- file.path(ks_plot_dir, "directionality_cliffs_delta.png")
+svc_order <- c(
+  "C_Risk","N_export","Sed_export",
+  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
+  "Pollination","Nature_Access"
+)
+
+# Clean up variable names for plotting
+ks_res_plot <- ks_res %>%
+  mutate(var_label = gsub("_", " ", var)) %>%
+  mutate(var_label = stringr::str_wrap(var_label, 40))
+
+p_direction <- ggplot(ks_res_plot, aes(x = service, y = cliffs_delta, fill = cliffs_delta)) +
+  geom_bar(stat = "identity", position = "identity") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Cliff's Delta") +
+  scale_x_discrete(drop = FALSE, limits = rev(svc_order)) +
+  facet_wrap(~ var_label, ncol = 2, scales = "free_y") +
+  coord_flip() +
+  labs(
+    title = "Directionality of Hotspot Effects (Cliff's Delta)",
+    subtitle = "Cliff's Delta > 0 (red) indicates hotspots have higher values of the covariate.\nCliff's Delta < 0 (blue) indicates hotspots have lower values.",
+    x = "Ecosystem Service",
+    y = "Cliff's Delta (Effect Size)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(size = 8)
+  )
+
+ggsave(
+  dir_path,
+  p_direction,
+  width = 14, height = 10, dpi = 300, bg = "white"
+)
+
 # Optional mountain plot
 mountain_file <- NULL
-if (!is.null(KS_CFG$mountain_service) && !is.null(KS_CFG$mountain_var)) {
-  mountain_file <- file.path(
-    ks_plot_dir,
-    paste0("mountain_", gsub("[^A-Za-z0-9_]+","_", KS_CFG$mountain_service), "_",
-           gsub("[^A-Za-z0-9_]+","_", KS_CFG$mountain_var), ".png")
-  )
-  p_mtn <- plot_ks_mountain(
-    hotspots_df, inverse_df,
-    service_id = KS_CFG$mountain_service,
-    var_id     = KS_CFG$mountain_var,
-    transform  = KS_CFG$mountain_transform
-  )
-  ggplot2::ggsave(mountain_file, p_mtn, width = 8, height = 5, dpi = 300, bg = "white")
-}
+# Skipped for now to avoid "Too few points" errors
+# if (!is.null(KS_CFG$mountain_service) && !is.null(KS_CFG$mountain_var)) {
+#   mountain_file <- file.path(
+#     ks_plot_dir,
+#     paste0("mountain_", gsub("[^A-Za-z0-9_]+","_", KS_CFG$mountain_service), "_",
+#            gsub("[^A-Za-z0-9_]+","_", KS_CFG$mountain_var), ".png")
+#   )
+#   tryCatch({
+#     p_mtn <- plot_ks_mountain(
+#       hotspots_df, inverse_df,
+#       service_id = KS_CFG$mountain_service,
+#       var_id     = KS_CFG$mountain_var,
+#       transform  = KS_CFG$mountain_transform
+#     )
+#     ggplot2::ggsave(mountain_file, p_mtn, width = 8, height = 5, dpi = 300, bg = "white")
+#   }, error = function(e) {
+#     message("Skipping mountain plot: ", e$message)
+#   })
+# }
 
 # Mirror to outputs/plots/latest/ks for embedding
 dir.create(KS_CFG$latest_dir, recursive = TRUE, showWarnings = FALSE)

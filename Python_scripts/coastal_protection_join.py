@@ -56,11 +56,33 @@ def main():
     cp_1992 = _set_geom(cp_1992)
     cp_2020 = _set_geom(cp_2020)
 
+    # Ensure derived columns exist if missing from input
+    for df in [cp_1992, cp_2020]:
+        if "Rt_service" not in df.columns and "Rt" in df.columns and "Rt_nohab_all" in df.columns:
+            df["Rt_service"] = df["Rt_nohab_all"] - df["Rt"]
+
+        if "Rt_ratio" not in df.columns and "Rt_service" in df.columns and "Rt_nohab_all" in df.columns:
+            df["Rt_ratio"] = np.where(
+                df["Rt_nohab_all"] != 0,
+                df["Rt_service"] / df["Rt_nohab_all"],
+                0
+            )
+
     cp_1992 = cp_1992.rename(
-        columns={"Rt": "Rt_1992", "Rt_nohab_all": "Rt_nohab_all_1992"}
+        columns={
+            "Rt": "Rt_1992",
+            "Rt_nohab_all": "Rt_nohab_all_1992",
+            "Rt_service": "Rt_service_1992",
+            "Rt_ratio": "Rt_ratio_1992",
+        }
     )
     cp_2020 = cp_2020.rename(
-        columns={"Rt": "Rt_2020", "Rt_nohab_all": "Rt_nohab_all_2020"}
+        columns={
+            "Rt": "Rt_2020",
+            "Rt_nohab_all": "Rt_nohab_all_2020",
+            "Rt_service": "Rt_service_2020",
+            "Rt_ratio": "Rt_ratio_2020",
+        }
     )
 
     if cp_1992.crs != cp_2020.crs:
@@ -90,6 +112,14 @@ def main():
         joined["Rt_nohab_all_1992"] != 0,
         (joined["Rt_nohab_all_1992"] - joined["Rt_nohab_all_2020"])
         / joined["Rt_nohab_all_1992"]
+        * 100,
+        np.nan,
+    )
+    joined["Rt_ratio_diff_1992_2020"] = joined["Rt_ratio_1992"] - joined["Rt_ratio_2020"]
+    joined["Rt_ratio_pct_chg_1992_2020"] = np.where(
+        joined["Rt_ratio_1992"] != 0,
+        (joined["Rt_ratio_1992"] - joined["Rt_ratio_2020"])
+        / joined["Rt_ratio_1992"]
         * 100,
         np.nan,
     )
