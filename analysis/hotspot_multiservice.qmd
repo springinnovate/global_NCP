@@ -1,0 +1,188 @@
+---
+title: "Multi-service Hotspot Analysis"
+subtitle: "Analyzing the overlap of global hotspots"
+author: "Jerónimo Rodríguez Escobar"
+date: last-modified
+format:
+  html:
+    toc: true
+    number-sections: true
+    theme: cosmo
+editor: source
+---
+
+## Overview
+
+This notebook analyzes the **overlap** of global hotspots. It answers:
+1.  **Multi-service Hotspots**: How many services is a single pixel a hotspot for?
+2.  **Hotness**: Which regions have the highest average number of overlapping hotspots?
+3.  **Distribution**: Where are the most mu./run_merge.sh
+```
+
+## Load Data
+
+```{r}
+#| label: load-data
+
+rds_path <- file.path(data_dir(), "processed", "plt_long.rds")
+
+if (file.exists(rds_path)) {
+  message("Loading data from: ", rds_path)
+  plt_long <- readRDS(rds_path)
+} else {
+  stop("plt_long.rds not found. Please run analysis/hotspot_extraction.qmd first.")
+}
+```
+
+## Configuration
+
+```{r}
+#| label: config
+
+HOTS_CFG <- list(
+  pct_cutoff      = 0.05,
+  threshold_mode  = "percent",
+  rule_mode       = "vectors",
+  loss = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
+  gain = c("Sed_export","N_export","C_Risk"),
+  groupings = c("income_grp","region_wb","continent","region_un","WWF_biome","nev_name")
+)
+```
+
+## Identify Global Hotspots & Calculate Overlap
+
+```{r}
+#| label: identify-hotspots
+
+# Extract hotspots (Global scope)
+hs_global_obj <- extract_hotspots(
+  df = plt_long,
+  value_col = "pct_chg",
+  pct_cutoff = HOTS_CFG$pct_cutoff,
+  threshold_mode = HOTS_CFG$threshold_mode,
+  rule_mode = HOTS_CFG$rule_mode,
+  loss_services = HOTS_CFG$loss,
+  gain_services = HOTS_CFG$gain,
+  combos = NULL,
+  id_cols = c("c_fid")
+)
+
+# Count hotspots per pixel
+# hotspots_df contains one row per service per hotspot pixel
+hotspot_counts <- hs_global_obj$hotspots_df %>%
+  dplyr::group_by(c_fid) %>%
+  dplyr::summarise(hotspot_count = dplyr::n(), .groups = "drop")
+
+# Join back to full grid to include zeros (non-hotspots)
+# We need a unique list of pixels with their attributes
+valid_groupings <- intersect(HOTS_CFG$groupings, names(plt_long))
+pixel_attrs <- plt_long %>%
+  dplyr::select(c_fid, dplyr::all_of(valid_groupings)) %>%
+  dplyr::distinct(c_fid, .keep_all = TRUE)
+
+df_overlap <- pixel_attrs %>%
+  dplyr::left_join(hotspot_counts, by = "c_fid") %>%
+  dplyr::mutate(hotspot_count = tidyr::replace_na(hotspot_count, 0))
+
+# Preview overlap distribution
+table(df_overlap$hotspot_count)
+```
+
+## Analysis: Hotness by Region
+
+We calculate the **Average Hotspot Count** (Hotness) and the distribution of overlap counts for each region.
+
+```{r}
+#| label: hotness-analysis
+#| message: false
+
+exclude_regions <- c("Seven seas (Open Ocean)", "Seven seas (open ocean)", "Antarctica")
+
+# 1. Calculate Stats
+calc_hotness <- function(df, g_var) {
+  df %>%
+    dplyr::filter(!is.na(.data[[g_var]])) %>%
+    dplyr::filter(!.data[[g_var]] %in% exclude_regions) %>%
+    dplyr::group_by(group = .data[[g_var]]) %>%
+    dplyr::summarise(
+      mean_hotspots = mean(hotspot_count),
+      pct_multi = mean(hotspot_count > 1) * 100,
+      n_pixels = dplyr::n()
+    ) %>%
+    dplyr::mutate(grouping = g_var) %>%
+    dplyr::arrange(desc(mean_hotspots))
+}
+
+hotness_stats <- dplyr::bind_rows(lapply(valid_groupings, function(g) {
+  calc_hotness(df_overlap, g)
+}))
+
+# Save stats
+out_csv <- file.path(data_dir(), "processed", "hotspot_multiservice_stats.csv")
+readr::write_csv(hotness_stats, out_csv)
+message("Saved stats to: ", out_csv)
+
+# 2. Plotting Functions
+
+# Plot A: Average Hotspot Count (Hotness)
+plot_hotness <- function(df, g_var) {
+  d_plot <- df %>% dplyr::filter(grouping == g_var)
+  if (nrow(d_plot) > 20) d_plot <- d_plot %>% dplyr::slice_head(n = 15)
+
+  p <- ggplot2::ggplot(d_plot, ggplot2::aes(x = stats::reorder(group, mean_hotspots), y = mean_hotspots)) +
+    ggplot2::geom_col(fill = "#e74c3c") +
+    ggplot2::coord_flip() +
+    ggplot2::labs(
+      title = paste0("Average Hotspot Overlap by ", g_var),
+      subtitle = "Mean number of services per pixel (Hotness)",
+      x = NULL, y = "Avg. Hotspot Count"
+    ) +
+    ggplot2::theme_minimal()
+  ggsave(file.path(out_plots(), paste0("hotness_", tolower(g_var), ".png")), p, width = 10, height = 6, bg = "white")
+  return(p)
+}
+
+# Plot B: Stacked Distribution (1, 2, 3+ services)
+plot_stacked_overlap <- function(df, g_var) {
+  d_summ <- df %>%
+    dplyr::filter(!is.na(.data[[g_var]])) %>%
+    dplyr::filter(!.data[[g_var]] %in% exclude_regions) %>%
+    dplyr::filter(hotspot_count > 0) %>% # Conditional on being a hotspot
+    dplyr::mutate(
+      cat = dplyr::case_when(
+        hotspot_count == 1 ~ "1",
+        hotspot_count == 2 ~ "2",
+        hotspot_count >= 3 ~ "3+",
+        TRUE ~ as.character(hotspot_count)
+      ),
+      cat = factor(cat, levels = c("1", "2", "3+"))
+    ) %>%
+    dplyr::count(group = .data[[g_var]], cat) %>%
+    dplyr::group_by(group) %>%
+    dplyr::mutate(pct = n / sum(n)) %>%
+    dplyr::ungroup()
+
+  # Filter top 15 groups by "3+" share
+  top_groups <- d_summ %>% dplyr::filter(cat == "3+") %>% dplyr::arrange(desc(pct)) %>% dplyr::slice_head(n = 15) %>% dplyr::pull(group)
+  if (length(unique(d_summ$group)) > 20) d_summ <- d_summ %>% dplyr::filter(group %in% top_groups)
+
+  p <- ggplot2::ggplot(d_summ, ggplot2::aes(x = group, y = pct, fill = cat)) +
+    ggplot2::geom_col(position = "fill") +
+    ggplot2::scale_fill_viridis_d(option = "magma", direction = -1, name = "Services") +
+    ggplot2::coord_flip() +
+    ggplot2::labs(
+      title = paste0("Multi-service Hotspot Distribution by ", g_var),
+      subtitle = "Share of hotspot pixels by number of overlapping services",
+      x = NULL, y = "Proportion of Hotspot Pixels"
+    ) +
+    ggplot2::theme_minimal()
+  ggsave(file.path(out_plots(), paste0("hotness_dist_", tolower(g_var), ".png")), p, width = 10, height = 6, bg = "white")
+  return(p)
+}
+
+# Generate Plots
+plots_hotness <- lapply(valid_groupings, function(g) plot_hotness(hotness_stats, g))
+plots_dist    <- lapply(valid_groupings, function(g) plot_stacked_overlap(df_overlap, g))
+
+if (length(plots_hotness) > 0) plots_hotness[[1]]
+```

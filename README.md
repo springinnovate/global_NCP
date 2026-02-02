@@ -2,15 +2,17 @@
 
 Jeronimo Rodriguez Escobar
 Affiliation: Global Science, WWF
-Supervisor: <add name>
-Version: v1.0.0
-Last updated: <add date>
+Supervisor: Becky Chaplin-Kramer
+Version: v1.0.2
+Last updated: 2026-01-22
 
 # Overview
 
 Working version of a structured workflow for extracting, analyzing, and visualizing **zonal summary statistics** from global raster datasets including **ecosystem service (ES)**, **land cover (LC)**, and socioeconomic (beneficiary) layers. The analysis is built around the IUCN AOO **10 km equal-area grid** (land-only) enriched with country/region/biome attributes, with outputs aggregated to countries, regions, income groups, and biomes.
 
 The core extraction workflow uses Python (`taskgraph` + `exactextract`) for zonal summaries; R/Quarto is used for consolidation, change calculations, hotspot extraction, and KS tests.
+
+For a detailed technical description of the pipeline steps, see analysis/README_pipeline.md.
 
 These tools support reproducible extraction and visualization of ES trends and change detection across modeled periods. They enable exploratory and comparative analyses of spatial transformations, ES provision, and relationships to beneficiary groups.
 
@@ -21,6 +23,7 @@ These tools support reproducible extraction and visualization of ES trends and c
 -   Generate land cover change matrices and synthesize metrics like gain, loss, and persistence.
 -   Support hotspot detection using top/bottom thresholds or directional logic.
 -   Enable exploratory visualization and plotting using `ggplot2` or `tmap`.
+-   Assess the distribution of hotspots across services, locations, and demographics using statistical analysis (e.g., KS tests), going beyond simple visualization.
 
 # Input Data
 
@@ -179,21 +182,59 @@ The R analysis workflow is conducted through a series of Quarto notebooks locate
 -   **File:** `analysis/KS_tests_hotspots.qmd`
 -   **Purpose:** This final notebook performs a Kolmogorov-Smirnov (KS) statistical analysis. It compares the distributions of the beneficiary variables within the identified hotspots versus non-hotspot areas to identify significant differences.
 
-# Sign-Flip Diagnostics (pct vs abs)
+## 4. Hotspot Intensity & Multi-service Analysis
 
-We are tracking a few cases where the sign of percent change differs from the sign of absolute change for the same service/group. To diagnose this:
+-   **File:** `analysis/hotspot_intensity.qmd`
+-   **Purpose:** Quantifies the spatial extent of hotspots. Calculates the percentage of land area classified as a hotspot ("Intensity") and the share of global hotspots located within each region/biome.
+    -   **Outputs:** `processed/hotspot_area_stats.csv`, Intensity bar plots.
 
-1. **Shared sampling for pct/abs:** use the same subset of cells for both metrics (e.g., shared trimming mask) so outlier trimming does not differ by metric.
-2. **Baseline inspection:** recheck the baseline (T0) values for the affected service/group to see if near-zero or mixed-sign baselines are driving pct instability.
-3. **Aggregate-then-percent:** compute percent change *after* aggregating to the group level (mean/sum at group, then percent change), rather than per-cell percent first.
+-   **File:** `analysis/hotspot_multiservice.qmd`
+-   **Purpose:** Analyzes the overlap of hotspots across different services ("Hotness"). Identifies regions with high coincidence of multiple service declines.
+    -   **Outputs:** `processed/hotspot_multiservice_stats.csv`, Hotness distribution plots.
+
+## Analytical Framework
+The analysis of Global NCP Hotspots (1992–2020) is conducted through two distinct but complementary lenses:
+
+A. Geographic Distribution (Where are they?)
+
+Objective: To quantify the spatial extent of hotspots across different jurisdictional and ecological boundaries.
+
+Grouping Variables: UN Regions, Biomes, and Sub-regions.
+
+Key Metric: Percent Area (%) — The proportion of land area within each unit classified as a "Hotspot" of change.
+
+B. Socioeconomic Characterization (Who is affected?)
+
+Objective: To determine if hotspots are statistically concentrated in areas with specific socioeconomic profiles compared to non-hotspot areas.
+
+Comparison: "Hotspot" vs. "Non-Hotspot" locations.
+
+Key Metrics: Distributions of GDP per capita, Population Density, and other socioeconomic indicators (analyzed via Violin Plots and KS/ANOVA tests).
+
+# Methodology Notes
+
+## Symmetric Percentage Change
+To address mathematical artifacts where the sign of percentage change differs from absolute change (common when baselines are negative or near-zero), this analysis uses a **symmetric percentage change** calculation (`pct_mode="symm"`). This ensures that the direction of the percentage change always aligns with the absolute difference ($t_1 - t_0$).
+
+**Distribution Limits:** The Symmetric Percentage Change (SPC) metric is bounded between **-200%** (Total Loss) and **+200%** (New Emergence). Consequently, extreme values and clustering at these boundaries, as well as bi-modal distributions (e.g., in Sediment Export), are expected features of the metric rather than data artifacts.
 
 # Future Directions
 
 -   Implement PostgreSQL + PostGIS backend
 -   Normalize values (e.g., population-weighted) during extraction
 -   Extend temporal coverage (e.g., 1990–2020 at 5-year intervals)
+-   **TODO:** Compare results between the 10km grid-based approach and per-pixel analysis to quantify differences and determine the optimal method.
 -   Add transitions and swap metrics to land cover summaries
 -   Build R + Python dashboards or plug-ins for visualization
+
+::: {.callout-tip icon="true"}
+## Future Tasks & Ideas
+
+Here are some ideas and future tasks for this analysis:
+
+1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
+2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to quantify and visualize the share of total change (from bar plots) that occurs within hotspots versus outside of them, possibly using stacked bar plots.
+:::
 
 ## License
 

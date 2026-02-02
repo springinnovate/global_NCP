@@ -16,7 +16,7 @@
 #   "Pollination","Nature_Access"
 # )
 # groupings <- if (!is.null(HOTS_CFG$groupings)) HOTS_CFG$groupings else
-#   c("income_grp","region_wb","continent","region_un","WWF_biome")
+#   c("income_grp","region_wb","continent","region_un","WWF_biome", "nev_name")
 # missing_groupings <- setdiff(groupings, names(plt_long))
 # if (length(missing_groupings)) {
 #   warning("Grouping column(s) not found in plt_long and will be skipped: ",
@@ -399,7 +399,7 @@ dir.create(sandbox_tbl_root, recursive = TRUE, showWarnings = FALSE)
 #| warning: false
 
 services  <- HOTS_CFG$svc_order
-groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome")
+groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome", "nev_name")
 cut_q <- 0.999
 handle_inf <- "na"  # options: "na", "cap"
 verbose <- TRUE

@@ -7,6 +7,7 @@ execute:
 ---
 
 ```{r}
+library(here)
 library(sf)
 library(dplyr)
 library(tidyr)
@@ -54,13 +55,16 @@ plt_long <- plt |>
   dplyr::filter(!is.na(abs_chg) | !is.na(pct_chg)) |>
   dplyr::mutate(service = dplyr::recode(service, !!!service_lookup, .default = service))
 
-out_rds <- file.path("outputs","tables","plt_long.rds")
+source(here::here("R","config.R"))
+
+out_rds <- file.path(cfg$paths$processed_data_dir, "plt_long.rds")
 dir.create(dirname(out_rds), recursive = TRUE, showWarnings = FALSE)
+message("Saving plt_long.rds to: ", normalizePath(out_rds))
 saveRDS(plt_long, out_rds)
 message("Finished writing ", out_rds)
 
 if (requireNamespace("arrow", quietly = TRUE)) {
-  out_feather <- file.path("outputs","tables","plt_long.feather")
+  out_feather <- file.path(cfg$paths$processed_data_dir, "plt_long.feather")
   arrow::write_feather(plt_long, out_feather)
   message("Finished writing ", out_feather)
 }

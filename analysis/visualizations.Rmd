@@ -107,7 +107,7 @@ plt <- plt %>% filter(service!="Usle") # I am keeping the data in the attribute 
 #Remove invalid / Inf records
 plt <- plt%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)  
 
-ct <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg')
+ct <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_nev_name_correspondence.gpkg')
 
 ct <- ct %>% mutate(area_sqkm_country = as.numeric(st_area(geom)) / 10^6)
 ct <- st_drop_geometry(ct)
@@ -160,7 +160,7 @@ df <- plt %>% filter(SUB_AREA > area_threshold)
 
 ```{r, fig.height=8, fig.width=14}
 col <- "HYBAS_ID"
-#col <- "ee_r264_name"
+#col <- "nev_name"
 
 plot_es_changes <- function(data, label_col,
                             filter_type = "top_bottom", filter_val = 10) {
@@ -724,10 +724,10 @@ df <- df %>%
 
 # 3. Reorder countries based on dir_ch_2 (descending)
 df <- df %>%
-  mutate(ee_r264_name = reorder(ee_r264_name, -dir_ch_2))
+  mutate(nev_name = reorder(nev_name, -dir_ch_2))
 df. <- df %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
 # 4. Create plot
-p <- ggplot(df., aes(x = ee_r264_name, y = pct_ch_trans, fill = ee_r264_name)) +
+p <- ggplot(df., aes(x = nev_name, y = pct_ch_trans, fill = nev_name)) +
   geom_violin(trim = FALSE, scale = "width") +
   facet_wrap(~ service, scales = "free_y") +
   scale_fill_viridis_d(option = "D") +
@@ -743,7 +743,7 @@ p <- ggplot(df., aes(x = ee_r264_name, y = pct_ch_trans, fill = ee_r264_name)) +
     legend.position = "none"
   )
 # 4. Create plot
-p2 <- ggplot(df, aes(x = ee_r264_name, y = pct_ch, fill = ee_r264_name)) +
+p2 <- ggplot(df, aes(x = nev_name, y = pct_ch, fill = nev_name)) +
   geom_violin(trim = FALSE, scale = "width") +
   facet_wrap(~ service, scales = "free_y") +
   scale_fill_viridis_d(option = "D") +
@@ -780,11 +780,11 @@ df_top_bottom <- df %>%
 
 # 2. Reorder countries inside the filtered data
 df_top_bottom <- df_top_bottom %>%
-  mutate(ee_r264_name = fct_reorder(ee_r264_name, -dir_ch_2))
+  mutate(nev_name = fct_reorder(nev_name, -dir_ch_2))
 df_top_bottom <- df_top_bottom %>% filter(service != "GDP") %>% filter(service != "Pop_sqkm")
 
 # 3. Create plot (pseudo-log scale)
-p <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch_trans, fill = service)) +
+p <- ggplot(df_top_bottom, aes(x = nev_name, y = pct_ch_trans, fill = service)) +
   geom_violin(trim = FALSE, scale = "width") +
   facet_wrap(~ service, scales = "free_y") +
   scale_fill_viridis_d(option = "D") +
@@ -801,7 +801,7 @@ p <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch_trans, fill = servic
   )
 
 # 4. (Optional) Plot regular % change
-p2 <- ggplot(df_top_bottom, aes(x = ee_r264_name, y = pct_ch, fill = service)) +
+p2 <- ggplot(df_top_bottom, aes(x = nev_name, y = pct_ch, fill = service)) +
   geom_violin(trim = FALSE, scale = "width") +
   facet_wrap(~ service, scales = "free_y") +
   scale_fill_viridis_d(option = "D") +

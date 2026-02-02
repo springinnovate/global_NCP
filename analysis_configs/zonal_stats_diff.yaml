@@ -1,0 +1,41 @@
+# Configuration for Zonal Stats Toolkit on Difference Rasters (1992-2020)
+# Run with: python <path_to_toolkit>/main.py --config analysis_configs/zonal_stats_diff.yaml
+
+workspace_dir:
+  path: "./zonal_stats_diff_workspace"
+
+vector_zones:
+  grid_10km_land:
+    path: "${GLOBAL_NCP_DATA}/vector_basedata/AOOGrid_10x10km_land_4326_clean.gpkg"
+
+raster_layers:
+  usle_diff:
+    path: "${GLOBAL_NCP_DATA}/2020_1992_chg/usle_diff_1992_2020.tif"
+    band: 1
+  nature_access_diff:
+    path: "${GLOBAL_NCP_DATA}/2020_1992_chg/nature_access_diff_1992_2020.tif"
+    band: 1
+  n_ret_ratio_diff:
+    path: "${GLOBAL_NCP_DATA}/2020_1992_chg/n_ret_ratio_diff_1992_2020.tif"
+    band: 1
+  sed_ret_ratio_diff:
+    path: "${GLOBAL_NCP_DATA}/2020_1992_chg/sed_ret_ratio_diff_1992_2020.tif"
+    band: 1
+  n_export_diff:
+    path: "${GLOBAL_NCP_DATA}/2020_1992_chg/n_export_diff_1992_2020.tif"
+    band: 1
+  n_retention_diff:
+    path: "${GLOBAL_NCP_DATA}/2020_1992_chg/n_retention_diff_1992_2020.tif"
+    band: 1
+  sed_export_diff:
+    path: "${GLOBAL_NCP_DATA}/2020_1992_chg/sed_export_diff_1992_2020.tif"
+    band: 1
+  pollination_diff:
+    path: "${GLOBAL_NCP_DATA}/2020_1992_chg/pollination_diff_1992_2020.tif"
+    band: 1
+
+op_stats:
+  - mean
+  - sum
+  - stdev
+  - valid_count
