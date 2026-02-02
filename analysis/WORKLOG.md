@@ -83,3 +83,8 @@
     - **Discussion**: Explored merging `analysis/process_data.qmd` with `analysis/hotspot_extraction.qmd` to create a single, streamlined hotspot generation script.
     - **Scope Refinement**: Reviewed grouping variables in `hotspot_extraction.qmd`, deciding to focus on `income_grp`, `region_wb`, and `WWF_biome`, deferring country-level analysis (`nev_name`).
     - **Status**: Paused refactoring to consolidate the work plan. The immediate next step is to re-verify data structures, starting with the main processed file (`10k_change_calc.gpkg`), to ensure a stable base before proceeding with code changes.
+ - 2026-02-02: **Hotspot Intensity & Area Calculation Fixes**:
+    - Updated `analysis/hotspot_intensity.qmd` to correctly calculate hotspot intensity against the **total area** of spatial units (including pixels with no service data), ensuring accurate representation for regions like Tundra.
+    - Implemented **Enrichment** metric (Observed Share / Expected Share) to highlight disproportionate hotspot concentrations.
+    - Fixed bugs in enrichment calculation (grouping by service) and plotting logic for large groups.
+    - Updated notebook documentation to reflect the three key metrics: Intensity, Global Share, and Enrichment.
