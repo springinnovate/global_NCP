@@ -64,3 +64,14 @@ This approach provides the spatial representation of the pixel-based method whil
 ## Key Analysis Parameters
 
 -   **Hotspot Threshold:** The threshold for identifying hotspots is defined in `analysis/hotspot_extraction.qmd`. It is configured in an R object named `HOTS_CFG` with the parameter `pct_cutoff = 0.05`, representing the top/bottom 5% of SPC values.
+
+## Aggregation Logic: Sum vs. Mean
+
+A common question regarding Path B is the comparability of variables aggregated via **sum** (extensive variables like Nitrogen Export) versus those aggregated via **mean** (intensive variables like Risk Indices).
+
+**Why this approach is robust:**
+
+1.  **Physical Correctness:** It is physically correct to sum total loads and average representative conditions.
+2.  **Equal-Area Grid:** The analysis uses the IUCN equal-area grid. Since cell area is constant, $Sum$ and $Mean$ are perfectly proportional ($Sum = Mean \times Area$).
+3.  **Mathematical Identity:** For relative metrics used in this analysis (percent change, percentile rankings, KS test statistics), the results are identical regardless of whether sum or mean is used.
+4.  **Comparability:** Comparing relative magnitudes of change (e.g., percentage change) strips away the units, allowing valid comparisons between total loads and average indices.

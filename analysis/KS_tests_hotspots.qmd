@@ -6,12 +6,12 @@ analysis_version: "v1.0.1"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
 format:
-  html:
-    toc: true
-    number-sections: true
-    code-fold: false
-    toc-title: "Contents"
-    theme: cosmo
+#  html:
+#    toc: true
+#    number-sections: true
+#    code-fold: false
+#    toc-title: "Contents"
+#    theme: cosmo
   pdf:
     toc: true
     number-sections: true
@@ -51,7 +51,7 @@ Uses the hotspot definition from the extraction report to compare hotspots vs no
 - **Limitations:** KS tests are sensitive to distribution shape, not just mean differences. Always consider the context and possible confounders.
 
 ::: callout-note
-**Exporting KS results for peer review and further interpretation**
+**Exporting KS results for review and further interpretation**
 
 The full KS results are saved as a CSV in the processed data directory (typically `/home/jeronimo/data/global_ncp/processed/ks_results_hot_vs_non.csv`). You can share this file for external review, meta-analysis, or further interpretation in any statistical software.
 
@@ -67,9 +67,6 @@ The full KS results are saved as a CSV in the processed data directory (typicall
   processed_data_dir = "/home/jeronimo/data/global_ncp/processed"
   ks_res = pd.read_csv(f'{processed_data_dir}/ks_results_hot_vs_non.csv')
   ```
-- **For other tools:** CSV is a universal format and can be imported into Excel, Stata, etc.
-
-If you need a different format (e.g., Feather, Parquet), you can easily convert it in R or Python.
 :::
 ## Setup
 
@@ -162,7 +159,8 @@ KS_CFG <- list(
   # outputs
   out_table  = file.path(cfg$paths$processed_data_dir, "ks_results_hot_vs_non.csv"),
   out_dir    = out_plots("ks"),
-  latest_dir = out_plots("latest","ks")
+  latest_dir = out_plots("latest","ks"),
+  service_suffix_pattern = "_(mean|sum)$"
 )
 ```
 
@@ -182,7 +180,7 @@ rds_path <- file.path(cfg$paths$processed_data_dir, "plt_long.rds")
 need_reload <- TRUE
 if (file.exists(rds_path)) {
   plt_long <- readRDS(rds_path)
-  if (all(KS_CFG$vars_to_test %in% names(plt_long))) need_reload <- FALSE
+  if (all(KS_CFG$vars_to_test %in% names(plt_long)) && "N_export" %in% unique(plt_long$service)) need_reload <- FALSE
 }
 
 if (need_reload) {
@@ -211,14 +209,29 @@ if (need_reload) {
   chg_cols <- grep("_(abs|pct)_chg$", names(plt), value = TRUE)
   socio_vars <- setdiff(names(plt), c("fid","c_fid", chg_cols))
 
+  # Optimization: Deduplicate columns mapping to the same service before pivoting
+  # This prevents exploding the dataframe size and avoids expensive group_by/slice later
+  matches <- stringr::str_match(chg_cols, "^(.*)_(abs|pct)_chg$")
+  col_map <- tibble::tibble(
+    col  = chg_cols,
+    base = matches[,2],
+    type = matches[,3]
+  ) |>
+    dplyr::mutate(service_norm = stringr::str_remove(base, KS_CFG$service_suffix_pattern)) |>
+    dplyr::group_by(service_norm, type) |>
+    dplyr::slice(1) |>
+    dplyr::ungroup()
+
+  cols_to_pivot <- col_map$col
+
   plt_long <- plt |>
     tidyr::pivot_longer(
-      cols = tidyselect::all_of(chg_cols),
+      cols = tidyselect::all_of(cols_to_pivot),
       names_to = c("service", "chg_type"),
       names_pattern = "^(.*)_(abs|pct)_chg$",
       values_to = "chg_value"
     ) |>
-    dplyr::mutate(service = stringr::str_remove(service, "_mean$")) |>
+    dplyr::mutate(service = stringr::str_remove(service, KS_CFG$service_suffix_pattern)) |>
     tidyr::pivot_wider(
       names_from  = chg_type,
       values_from = chg_value,
@@ -357,21 +370,30 @@ dplyr::glimpse(ks_res, width = 120)
 
 Heatmap, per-variable bars, ECDF overlays (top-K services per variable), and an optional mountain plot. Plots are saved under `outputs/plots/ks/` and mirrored to `outputs/plots/latest/ks/` for embedding.
 
+### KS Heatmap
+
+This heatmap summarizes the Kolmogorov-Smirnov (KS) statistic ($D$) for all service-covariate pairs. The $D$ statistic ranges from 0 to 1 and measures the maximum distance between the cumulative distribution functions of hotspots and non-hotspots. Brighter colors indicate a larger $D$, meaning the hotspot locations are distinct from the rest of the landscape for that variable. Use this to quickly identify which socioeconomic factors are most strongly associated with hotspots of each service.
+
 ```{r}
-#| label: ks-plots
+#| label: ks-plots-heatmap
 #| message: false
 #| warning: false
 #| echo: false
 
 ks_plot_dir <- KS_CFG$out_dir
+# Clean up previous run outputs in the main KS folder to avoid stale plots
+if (dir.exists(ks_plot_dir)) {
+  unlink(list.files(ks_plot_dir, full.names = TRUE), recursive = TRUE)
+}
 dir.create(ks_plot_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Heatmap
 heat_path <- file.path(ks_plot_dir, "ks_heatmap.png")
 svc_order <- c(
-  "C_Risk","N_export","Sed_export",
-  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-  "Pollination","Nature_Access"
+  "C_Risk", "C_Risk_Red_Ratio",
+  "N_export", "N_Ret_Ratio",
+  "Sed_export", "Sed_Ret_Ratio",
+  "Pollination", "Nature_Access"
 )
 
 # Adjust color ramp: 'sqrt' transform helps visualize differences in lower D values
@@ -398,6 +420,18 @@ for (v in KS_CFG$vars_to_test) {
   bar_files <- c(bar_files, out)
 }
 
+```
+
+### ECDF Overlays
+
+The Empirical Cumulative Distribution Function (ECDF) plots visualize the full distribution of covariate values for hotspots (Red) versus non-hotspots (Blue). A gap between the curves indicates a difference in distribution.
+
+**Note on Transformations:** We use a `log1p` transformation ($\log(x+1)$) for variables with highly skewed distributions (e.g., GDP, Population) to compress the scale and make differences in the lower range visible. Variables that are already indices (e.g., HDI, GINI) are plotted on their raw scale.
+
+```{r}
+#| label: ks-plots-ecdf
+#| echo: false
+ks_plot_dir <- KS_CFG$out_dir
 # ECDF grids
 ecdf_dir <- file.path(ks_plot_dir, "ecdf")
 dir.create(ecdf_dir, recursive = TRUE, showWarnings = FALSE)
@@ -415,12 +449,23 @@ ecdf_files <- save_ecdf_grids(
   verbose = FALSE
 )
 
+```
+
+### Directionality (Cliff's Delta)
+
+The bar plots below display **Cliff's Delta**, a non-parametric effect size measure quantifying the difference between hotspot and non-hotspot distributions. Positive values (Red) indicate that the covariate is consistently **higher** in hotspots, while negative values (Blue) indicate it is **lower**. The magnitude represents the strength of the separation.
+
+```{r}
+#| label: ks-plots-direction
+#| echo: false
+ks_plot_dir <- KS_CFG$out_dir
 # Directionality plot (Cliff's Delta)
 dir_path <- file.path(ks_plot_dir, "directionality_cliffs_delta.png")
 svc_order <- c(
-  "C_Risk","N_export","Sed_export",
-  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-  "Pollination","Nature_Access"
+  "C_Risk", "C_Risk_Red_Ratio",
+  "N_export", "N_Ret_Ratio",
+  "Sed_export", "Sed_Ret_Ratio",
+  "Pollination", "Nature_Access"
 )
 
 # Clean up variable names for plotting
@@ -428,10 +473,17 @@ ks_res_plot <- ks_res %>%
   mutate(var_label = gsub("_", " ", var)) %>%
   mutate(var_label = stringr::str_wrap(var_label, 40))
 
+# Define signed 4th root transform to further improve visibility of low values in divergent scale
+signed_pow4 <- scales::trans_new(
+  "signed_pow4",
+  transform = function(x) sign(x) * abs(x)^0.25,
+  inverse = function(x) sign(x) * abs(x)^4
+)
+
 p_direction <- ggplot(ks_res_plot, aes(x = service, y = cliffs_delta, fill = cliffs_delta)) +
   geom_bar(stat = "identity", position = "identity") +
   geom_hline(yintercept = 0, linetype = "dashed") +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Cliff's Delta") +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Cliff's Delta", trans = signed_pow4) +
   scale_x_discrete(drop = FALSE, limits = rev(svc_order)) +
   facet_wrap(~ var_label, ncol = 2, scales = "free_y") +
   coord_flip() +
@@ -477,8 +529,8 @@ mountain_file <- NULL
 
 # Mirror to outputs/plots/latest/ks for embedding
 dir.create(KS_CFG$latest_dir, recursive = TRUE, showWarnings = FALSE)
-old_latest <- list.files(KS_CFG$latest_dir, full.names = TRUE, all.files = FALSE)
-if (length(old_latest)) invisible(file.remove(old_latest))
+# Clean up latest dir
+unlink(list.files(KS_CFG$latest_dir, full.names = TRUE), recursive = TRUE)
 
 all_pngs <- list.files(ks_plot_dir, pattern = "\\.png$", recursive = TRUE, full.names = TRUE)
 all_pngs <- all_pngs[!grepl("/latest/", all_pngs)]
@@ -494,11 +546,11 @@ if (length(all_pngs)) {
 #| echo: false
 #| results: 'asis'
 
-ks_latest_abs <- KS_CFG$latest_dir
-pngs <- list.files(ks_latest_abs, pattern = "\\.png$", full.names = FALSE)
+ks_plot_dir <- KS_CFG$out_dir
+pngs <- list.files(ks_plot_dir, pattern = "\\.png$", recursive = TRUE, full.names = FALSE)
 if (length(pngs)) {
-  rel_dir <- file.path("..", "outputs", "plots", "latest", "ks")
-  rel_paths <- file.path(rel_dir, sort(pngs))
+  rel_dir <- file.path("..", "outputs", "plots", "ks")
+  rel_paths <- file.path(rel_dir, pngs)
   md <- paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
   knitr::asis_output(md)
 } else {

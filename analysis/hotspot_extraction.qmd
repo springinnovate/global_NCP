@@ -239,7 +239,7 @@ stopifnot("fid" %in% names(sf_f), "c_fid" %in% names(sf_f))
 chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
 vmsg("Found ", length(chg_cols), " change columns; mapping services...")
 services_raw   <- unique(sub("_(abs|pct)_chg$", "", chg_cols))     # as in file (may include _mean)
-services_clean <- stringr::str_remove(services_raw, "_mean$")
+services_clean <- stringr::str_remove(services_raw, service_suffix_pattern)
 services_lower <- tolower(services_clean)
 svc_map <- tibble::tibble(
   col_base  = c(services_raw, services_clean),
@@ -541,6 +541,19 @@ pivot_groupings <- intersect(pivot_groupings, names(sf_f))
 # 3. Identify change columns
 chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
 
+# Optimization: Deduplicate columns mapping to the same service before pivoting
+matches <- stringr::str_match(chg_cols, "^(.*)_(abs|pct)_chg$")
+col_map <- tibble::tibble(
+  col  = chg_cols,
+  base = matches[,2],
+  type = matches[,3]
+) |>
+  dplyr::mutate(service_norm = stringr::str_remove(base, "_(mean|sum)$")) |>
+  dplyr::group_by(service_norm, type) |>
+  dplyr::slice(1) |>
+  dplyr::ungroup()
+chg_cols <- col_map$col
+
 message("Pivoting ", length(chg_cols), " change columns to long format...")
 
 # 4. Pivot to long format
@@ -553,6 +566,7 @@ plt_long <- sf_f |>
     names_pattern = "^(.*)_(abs|pct)_chg$"
   ) |>
   # Normalize service names to canonical forms (matching HOTS_CFG)
+  dplyr::mutate(service = stringr::str_remove(service, "_(mean|sum)$")) |>
   dplyr::mutate(service = tolower(service)) |>
   dplyr::mutate(service = dplyr::recode(service, !!!canonical_lookup)) |>
   dplyr::rename(abs_chg = abs, pct_chg = pct) |>

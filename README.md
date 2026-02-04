@@ -218,6 +218,19 @@ To address mathematical artifacts where the sign of percentage change differs fr
 
 **Distribution Limits:** The Symmetric Percentage Change (SPC) metric is bounded between **-200%** (Total Loss) and **+200%** (New Emergence). Consequently, extreme values and clustering at these boundaries, as well as bi-modal distributions (e.g., in Sediment Export), are expected features of the metric rather than data artifacts.
 
+## Aggregation Logic: Sum vs. Mean
+
+When extracting zonal statistics for the 10km grid, variables are aggregated based on their physical nature:
+
+*   **Extensive variables** (e.g., Nitrogen Export in kg, Population count) are **summed** to get the total load/count per cell.
+*   **Intensive variables** (e.g., Risk Index, Nature Access score) are **averaged** to get the representative condition per cell.
+
+**Robustness for Comparison:**
+Since the analysis uses the **IUCN equal-area grid**, the cell area is effectively constant.
+*   $Sum = Mean \times Area$. Because Area is constant, the Sum and Mean are perfectly proportional.
+*   Metrics like **percent change**, **hotspot ranking** (percentiles), and **KS test statistics** are mathematically identical regardless of whether sum or mean is used.
+*   Comparing relative change (e.g., "50% increase in Total Nitrogen" vs "50% increase in Average Risk") is a valid comparison of magnitude.
+
 # Future Directions
 
 -   Implement PostgreSQL + PostGIS backend
