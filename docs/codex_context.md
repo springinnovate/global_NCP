@@ -73,16 +73,19 @@ Pollination, Nature_Access
 ```
 project root
 ├── analysis/
-│   └── hotspot_extraction.qmd        # main narrative & orchestration
+│   ├── prepare_data.qmd              # preprocessing & consolidation
+│   ├── process_data.qmd              # change calculation & metric derivation
+│   ├── hotspot_extraction.qmd        # main narrative & orchestration
+│   ├── hotspot_intensity.qmd         # area intensity & enrichment analysis
+│   ├── hotspot_multiservice.qmd      # overlap & "hotness" analysis
+│   ├── KS_tests_hotspots.qmd         # statistical comparisons (KS tests)
 │   └── restore_checkpoint.R          # restores big tidy tables (plt_long, grid_sf)
 ├── R/
 │   ├── paths.R                       # data_dir(), ncp_data_root(), etc.
 │   ├── extract_hotspots.R            # extract_hotspots(); returns list of outputs
-│   ├── hotspots_export.R             # run_one_hotset(); writes GPKGs + index
-│   ├── aggregate_change_simple.R     # aggregation helpers; aliased if needed
-│   ├── plotting_bars.R               # build_barplots_by(); consistent styling
-│   ├── plotting_violins.R            # build_violinplots_by(); consistent styling
-│   └── utils.R                       # slug(), sanity helpers, etc.
+│   ├── hotspot_violins.R             # run_hotspot_boxplots_by()
+│   ├── utils_hotspot.R               # shared hotspot utils
+│   └── ...                           # other helpers
 ├── analysis_configs/
 │   └── service_meta.csv              # (planned) service labels & directions
 ├── data/                             # (mounted by data_dir())

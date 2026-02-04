@@ -2,7 +2,7 @@
 
 ## Goal
 
-Global NCP time-series: extract hotspots of change per service; summarize + plot globally and by subregions (WB region, income group, continent, UN region, WWF biome). Produce bar/violin plots and KS tests later.
+Global NCP time-series: extract hotspots of change per service; summarize + plot globally and by subregions (WB region, income group, WWF biome). Produce bar/violin plots and KS tests later.
 
 ## Invariants (don’t change)
 
@@ -19,7 +19,7 @@ Global NCP time-series: extract hotspots of change per service; summarize + plot
   * loss = `Nature_Access, Pollination, N_Ret_Ratio, Sed_Ret_Ratio, C_Risk_Red_Ratio`
   * gain = `Sed_export, N_export, C_Risk`
   * combos = `deg_combo`, `rec_combo`
-  * groupings = `income_grp, region_wb, continent, region_un, WWF_biome`
+  * groupings = `income_grp, region_wb, WWF_biome`
 * Outputs:
 
   * Hotspots gpkg: `processed/hotspots/{abs|pct}/{global|<group_col>}/hotspots_*.gpkg`
@@ -28,7 +28,9 @@ Global NCP time-series: extract hotspots of change per service; summarize + plot
 
 ## Entry Points
 
-* Build long table: QMD chunk “Prepare data for analysis” → optionally save `plt_long.rds`.
+* Data Prep: `analysis/prepare_data.qmd` & `analysis/process_data.qmd`.
+* Hotspots: `analysis/hotspot_extraction.qmd` (builds `plt_long`, extracts layers).
+* Analysis: `analysis/hotspot_intensity.qmd`, `analysis/hotspot_multiservice.qmd`, `analysis/KS_tests_hotspots.qmd`.
 * Extract hotspots: `R/extract_hotspots.R`, `R/run_one_hotset.R`.
 * Bars: `make_change_bars()` (facet order fixed; optional Global bar rightmost with outline).
 * Violins: `run_hotspot_violins_by()` in `R/hotspot_violins.R` (free y scales; per-service trim at 99.9%; shared helper).
