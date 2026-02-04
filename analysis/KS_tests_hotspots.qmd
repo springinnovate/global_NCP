@@ -146,6 +146,8 @@ KS_CFG <- list(
   compute_one_sided = TRUE,
   adjust_method     = "BH",
   # ECDF / plotting switches
+  # Note: Log transformation is used for visualization (ECDFs) of highly skewed variables (GDP, Pop).
+  # It does NOT affect the KS test statistic (D) or p-value, as KS is rank-based (invariant to monotonic transformations).
   transform_default = "auto",
   transform_by_var = c(
     "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "log1p",
@@ -170,7 +172,7 @@ Build `plt_long` from the processed grid, harmonizing service labels and keeping
 
 ```{r}
 #| label: pivot
-#| eval: false
+#| eval: true
 #| include: false
 #| echo: false
 #| results: hide
@@ -273,7 +275,7 @@ Apply the hotspot definition to `plt_long` to get `hotspots_df` and `non_hotspot
 #| label: build-hotspots
 #| message: false
 #| warning: false
-#| eval: false
+#| eval: true
 #| echo: false
 
 svc_keep <- KS_CFG$include_services %||% levels(plt_long$service) %||% unique(plt_long$service)
@@ -372,6 +374,8 @@ svc_order <- c(
   "Pollination","Nature_Access"
 )
 
+# Adjust color ramp: 'sqrt' transform helps visualize differences in lower D values
+# when a few high values might otherwise compress the scale.
 ggplot2::ggsave(
   heat_path,
   plot_ks_heatmap(
@@ -379,7 +383,8 @@ ggplot2::ggsave(
     fill_limits = c(0, NA),
     reorder = FALSE
   ) +
-    ggplot2::scale_x_discrete(drop = FALSE, limits = svc_order),
+    ggplot2::scale_x_discrete(drop = FALSE, limits = svc_order) +
+    ggplot2::scale_fill_viridis_c(name = "KS Statistic (D)", option = "magma", trans = "sqrt"),
   width = 10, height = 6, dpi = 300, bg = "white"
 )
 
