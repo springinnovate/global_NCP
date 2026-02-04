@@ -170,7 +170,7 @@ Build `plt_long` from the processed grid, harmonizing service labels and keeping
 
 ```{r}
 #| label: pivot
-#| eval: true
+#| eval: false
 #| include: false
 #| echo: false
 #| results: hide
@@ -201,6 +201,10 @@ if (need_reload) {
   }
   sf_f <- dplyr::select(sf_f, -dplyr::any_of(c("c_fid.x","c_fid.y")))
   plt <- sf::st_drop_geometry(sf_f)
+
+  if ("continent" %in% names(plt)) {
+    plt <- dplyr::filter(plt, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+  }
 
   chg_cols <- grep("_(abs|pct)_chg$", names(plt), value = TRUE)
   socio_vars <- setdiff(names(plt), c("fid","c_fid", chg_cols))
@@ -269,6 +273,8 @@ Apply the hotspot definition to `plt_long` to get `hotspots_df` and `non_hotspot
 #| label: build-hotspots
 #| message: false
 #| warning: false
+#| eval: false
+#| echo: false
 
 svc_keep <- KS_CFG$include_services %||% levels(plt_long$service) %||% unique(plt_long$service)
 hs <- extract_hotspots(

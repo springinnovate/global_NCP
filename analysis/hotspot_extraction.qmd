@@ -194,7 +194,7 @@ What this chunk does:
 
 ```{r}
 #| label: make-signed-bars-data
-#| eval: true
+#| eval: false
 #| echo: false
 #| message: false
 #| warning: false
@@ -307,7 +307,7 @@ print(dplyr::count(signed_drop0, grouping, metric, service))
 
 ```{r}
 #| label: compute-global-refs
-#| eval: true
+#| eval: false
 #| message: false
 #| warning: false
 #| echo: false
@@ -349,7 +349,7 @@ glob_drop0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
 
 ```{r}
 #| label: make-signed-bars-plot
-#| eval: true
+#| eval: false
 #| message: false
 #| warning: false
 #| echo: false
@@ -416,7 +416,7 @@ The chunk below is kept for reference but set to `eval: false`.
 
 ```{r}
 #| label: qa-sign-flips
-#| eval: true
+#| eval: false
 #| echo: false
 
 # Purpose: Detect and report sign flips between absolute and percentage change metrics.
@@ -610,7 +610,7 @@ HOTS_CFG <- list(
     rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
   ),
 # centralize the grouping columns here
-  groupings = c("income_grp","region_wb","continent","region_un","WWF_biome","nev_name"),
+  groupings = c("income_grp","region_wb","WWF_biome"),
   # IO
   write_layers = TRUE,
   write_index  = TRUE,
@@ -863,6 +863,7 @@ dplyr::glimpse(hot_index, width = 120)
 
 ```{r}
 #| label: display-barplots
+#| eval: false
 #| echo: false
 #| results: 'asis'
 #| cache: false
@@ -919,7 +920,16 @@ Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/boxplots_*.png
 #| eval: true
 
 stopifnot(exists("plt_long"))
-groupings <- c("income_grp","region_wb","WWF_biome")
+groupings <- HOTS_CFG$groupings
+
+# Filter out Antarctica and Seven Seas for plotting
+if ("continent" %in% names(plt_long)) {
+  plt_long <- dplyr::filter(plt_long, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+}
+
+# Define service lists for directing plotting logic
+volumetric_services <- c("Nature_Access", "Pollination", "Sed_export", "N_export")
+ratio_services <- c("C_Risk", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio")
 
 missing_groupings <- setdiff(groupings, names(plt_long))
 if (length(missing_groupings)) {
@@ -947,14 +957,16 @@ if (length(groupings) == 0) {
     message("Rendering hotspot boxplots for: ", gc)
     tryCatch({
       run_hotspot_boxplots_by(
-        df_long          = plt_long,
-        group_col         = gc,
-        loss              = HOTS_CFG$loss,
-        gain              = HOTS_CFG$gain,
-        pct_cutoff        = HOTS_CFG$pct_cutoff,
-        threshold_mode    = HOTS_CFG$threshold_mode,
-        svc_order         = boxplot_order,
-        keep_only_ordered = TRUE
+        df_long             = plt_long,
+        group_col           = gc,
+        loss                = HOTS_CFG$loss,
+        gain                = HOTS_CFG$gain,
+        pct_cutoff          = HOTS_CFG$pct_cutoff,
+        threshold_mode      = HOTS_CFG$threshold_mode,
+        svc_order           = boxplot_order,
+        keep_only_ordered   = TRUE,
+        volumetric_services = volumetric_services,
+        ratio_services      = ratio_services
       )
     }, error = function(e) {
       message("Error generating boxplots for ", gc, ": ", e$message)

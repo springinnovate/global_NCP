@@ -27,6 +27,8 @@
 1. Finalize and verify the newly calculated ratio rasters (Sediment and Nitrogen Retention) and their corresponding difference rasters. This is the current task.
 2. Configure `zonal_stats_toolkit` to process all difference rasters against the 10km grid.
 3. Update the analysis configuration YAML files (in `analysis_configs/`) to use the new difference rasters as inputs for the zonal statistics pipeline.
+4. **Coastal Risk Reduction Ratio**: Address the pending calculation issue (waiting for pipeline fix from Rich). Verify how `hotspot_extraction.qmd` handles this service once the data is corrected.
+5. **Reporting**: Synthesize recent hotspot intensity and multi-service findings into the slide deck and draft the report for the supervisor.
 
 ## Future Tasks (Long-term)
 1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
@@ -88,3 +90,7 @@
     - Implemented **Enrichment** metric (Observed Share / Expected Share) to highlight disproportionate hotspot concentrations.
     - Fixed bugs in enrichment calculation (grouping by service) and plotting logic for large groups.
     - Updated notebook documentation to reflect the three key metrics: Intensity, Global Share, and Enrichment.
+ - 2026-02-02 (cont): **Multi-service Hotspot Analysis Fixes**:
+    - Fixed `analysis/hotspot_multiservice.qmd` by adding the missing setup chunk to initialize project paths and functions.
+    - Corrected typos in the overview text.
+    - Verified that the notebook renders correctly and produces the "Hotness" and "Distribution" plots with alphabetical ordering.

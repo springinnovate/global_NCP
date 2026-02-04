@@ -13,12 +13,31 @@ editor: source
 
 ## Overview
 
-This notebook analyzes the **overlap** of global hotspots. It answers:
 1.  **Multi-service Hotspots**: How many services is a single pixel a hotspot for?
 2.  **Hotness**: Which regions have the highest average number of overlapping hotspots?
 3.  **Distribution**: Where are the most mu./run_merge.sh
-```
+3.  **Distribution**: Where are the most multi-service hotspots located?
 
+## Setup
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(here)
+library(devtools)
+
+# Initialize paths and load project functions
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R","paths.R"))
+devtools::load_all(quiet = TRUE)
+
+options(dplyr.summarise.inform = FALSE)
+```
 ## Load Data
 
 ```{r}
@@ -129,7 +148,10 @@ plot_hotness <- function(df, g_var) {
   d_plot <- df %>% dplyr::filter(grouping == g_var)
   if (nrow(d_plot) > 20) d_plot <- d_plot %>% dplyr::slice_head(n = 15)
 
-  p <- ggplot2::ggplot(d_plot, ggplot2::aes(x = stats::reorder(group, mean_hotspots), y = mean_hotspots)) +
+  # Order alphabetically (reversed for coord_flip to show A at top)
+  d_plot <- d_plot %>% dplyr::mutate(group = factor(group, levels = rev(sort(unique(as.character(group))))))
+
+  p <- ggplot2::ggplot(d_plot, ggplot2::aes(x = group, y = mean_hotspots)) +
     ggplot2::geom_col(fill = "#e74c3c") +
     ggplot2::coord_flip() +
     ggplot2::labs(
@@ -165,6 +187,9 @@ plot_stacked_overlap <- function(df, g_var) {
   # Filter top 15 groups by "3+" share
   top_groups <- d_summ %>% dplyr::filter(cat == "3+") %>% dplyr::arrange(desc(pct)) %>% dplyr::slice_head(n = 15) %>% dplyr::pull(group)
   if (length(unique(d_summ$group)) > 20) d_summ <- d_summ %>% dplyr::filter(group %in% top_groups)
+
+  # Order alphabetically (reversed for coord_flip to show A at top)
+  d_summ <- d_summ %>% dplyr::mutate(group = factor(group, levels = rev(sort(unique(as.character(group))))))
 
   p <- ggplot2::ggplot(d_summ, ggplot2::aes(x = group, y = pct, fill = cat)) +
     ggplot2::geom_col(position = "fill") +

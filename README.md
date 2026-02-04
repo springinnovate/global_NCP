@@ -199,7 +199,7 @@ A. Geographic Distribution (Where are they?)
 
 Objective: To quantify the spatial extent of hotspots across different jurisdictional and ecological boundaries.
 
-Grouping Variables: UN Regions, Biomes, and Sub-regions.
+Grouping Variables: World Bank Regions, Income Groups, and Biomes.
 
 Key Metric: Percent Area (%) — The proportion of land area within each unit classified as a "Hotspot" of change.
 
