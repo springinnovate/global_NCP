@@ -121,7 +121,9 @@ rm -f summary_pipeline_workspace/taskgraph_data.db
 ## Coastal Protection Rasterization (points → rasters)
 
 Coastal protection outputs are provided as point features. Rasterize them to the
-ESA 300 m land cover template before running zonal summaries:
+ESA 300 m land cover template before running zonal summaries: 
+
+This is an older version (the one run first for the hotpot analyisis, but we are moving to a direct pipline point data -> zonal stats without the rasterizing part)
 
 ``` bash
 # requires GLOBAL_NCP_DATA to be set (e.g., /home/jeronimo/data/global_ncp)

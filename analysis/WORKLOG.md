@@ -1,7 +1,7 @@
 # Worklog — Global NCP Hotspots
 
 ## Current focus
-- Re-calculating and verifying core ecosystem service ratios (sediment, nitrogen) for the 1992-2020 period.
+- **Completed** Re-calculating and verifying core ecosystem service ratios (sediment, nitrogen) for the 1992-2020 period.
 - Re-establishing continuity using explicit context and worklog files.
 - **Completed** Generating difference rasters (2020-1992) for all services to support updated zonal statistics.
 - **Completed** integration of `zonal_stats_toolkit` for synthesis (replacing legacy pipelines).
