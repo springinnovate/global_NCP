@@ -239,7 +239,7 @@ stopifnot("fid" %in% names(sf_f), "c_fid" %in% names(sf_f))
 chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
 vmsg("Found ", length(chg_cols), " change columns; mapping services...")
 services_raw   <- unique(sub("_(abs|pct)_chg$", "", chg_cols))     # as in file (may include _mean)
-services_clean <- stringr::str_remove(services_raw, service_suffix_pattern)
+services_clean <- stringr::str_remove(services_raw, "_mean$")
 services_lower <- tolower(services_clean)
 svc_map <- tibble::tibble(
   col_base  = c(services_raw, services_clean),
@@ -548,7 +548,7 @@ col_map <- tibble::tibble(
   base = matches[,2],
   type = matches[,3]
 ) |>
-  dplyr::mutate(service_norm = stringr::str_remove(base, "_(mean|sum)$")) |>
+  dplyr::mutate(service_norm = stringr::str_remove(base, service_suffix_pattern)) |>
   dplyr::group_by(service_norm, type) |>
   dplyr::slice(1) |>
   dplyr::ungroup()
@@ -566,7 +566,7 @@ plt_long <- sf_f |>
     names_pattern = "^(.*)_(abs|pct)_chg$"
   ) |>
   # Normalize service names to canonical forms (matching HOTS_CFG)
-  dplyr::mutate(service = stringr::str_remove(service, "_(mean|sum)$")) |>
+  dplyr::mutate(service = stringr::str_remove(service, service_suffix_pattern)) |>
   dplyr::mutate(service = tolower(service)) |>
   dplyr::mutate(service = dplyr::recode(service, !!!canonical_lookup)) |>
   dplyr::rename(abs_chg = abs, pct_chg = pct) |>
@@ -582,6 +582,11 @@ message("plt_long generated and cached to: ", rds_path)
 ## Hotspot extraction workflow (global + subregional)
 
 We identify per-service hotspots using a 5% percentile rule and **direction vectors**: - `loss_services` (e.g., Nature_Access, Pollination, N/Sed_Ret_Ratio, C_Risk_Red_Ratio) → we flag the **lowest** values; - `gain_services` (Sed_export, N_export, C_Risk) → we flag the **highest** values.
+**Definition of a Hotspot:**
+A hotspot is defined as a grid cell representing the **most detrimental 5% of change** globally for a given service.
+
+*   **For Beneficial Services** (e.g., Nature Access, Pollination, Retention Ratios): Hotspots are cells with the **steepest declines** (bottom 5% of the distribution).
+*   **For Detrimental Flows/Risks** (e.g., N/Sed Export, Coastal Risk): Hotspots are cells with the **steepest increases** (top 5% of the distribution).
 
 We run this **once globally** and then **once per subregion** (World Bank region, income group, WWF biome). For each run and for each metric (absolute and percent change) we write a compact **GPKG** containing only the hotspot cells, plus a CSV index:
 
@@ -733,6 +738,22 @@ if (!"c_fid" %in% names(geom_sf)) {
 }
 geom_sf <- dplyr::select(geom_sf, fid, c_fid)  # keep it slim
 stopifnot("fid" %in% names(geom_sf), !any(duplicated(geom_sf$fid)))
+
+# Join Land Cover Transitions (diffeR output from LC_change.qmd)
+lc_gpkg <- file.path(data_dir(), "processed", "10k_lcc_metrics.gpkg")
+if (file.exists(lc_gpkg)) {
+  # Load only the relevant metrics (Loss/Gain of Natural for 1992-2020)
+  # We assume the column naming convention from LC_change.qmd: Loss_2_1992_2020
+  lc_sf <- sf::st_read(lc_gpkg, quiet = TRUE)
+  lc_df <- sf::st_drop_geometry(lc_sf)
+
+  # Select columns dynamically: Loss_2 (Conversion) and Gain_2 (Restoration)
+  cols_to_keep <- grep("(Loss|Gain)_2_.*", names(lc_df), value = TRUE)
+  lc_df <- lc_df %>% dplyr::select(fid, dplyr::all_of(cols_to_keep))
+
+  geom_sf <- dplyr::left_join(geom_sf, lc_df, by = "fid")
+  cat("Joined Land Cover metrics to geometry.\n", file = stderr())
+}
 
 # Diagnostic: check ID overlap
 n_overlap <- length(intersect(unique(plt_long$c_fid), unique(geom_sf$c_fid)))

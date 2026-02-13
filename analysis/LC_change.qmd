@@ -1,0 +1,400 @@
+---
+title: "Land Cover Change Metrics Workflow"
+author: "Jeronimo Rodriguez-Escobar"
+date: last-modified
+format:
+  html:
+    toc: true
+    theme: cosmo
+editor: source
+---
+
+---
+
+This Quarto document shows how to:
+
+1. Load land cover classification rasters and polygon units
+2. Apply `extract_zonal_lcc_metrics()` and `iterate_zonal_lcc_metrics()`
+3. Append the extracted metrics to the input polygon data.
+4. Summarize and plot key land cover transition metrics [pending]
+
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(parallel)
+library(devtools)
+
+# Initialize paths
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R", "paths.R"))
+devtools::load_all(quiet = TRUE)
+
+# source the helper functions
+# source(here::here("R", "utils_lcc_metrics.R")) # Should be loaded by load_all() if in R/
+# source(here("R","pct_change.R")) # Should be loaded by load_all()
+```
+
+# Prepare data
+
+**Data Sources:**
+
+*   **1992-2015:** ESA Climate Change Initiative (CCI) Land Cover v2.0.7.
+    *   *Citation:* Defourny, P., Lamarche, C., Brockmann, C., Boettcher, M., Bontemps, S., De Maet, T., Duveiller, G. L. Harper, K., Hartley A., Kirches, G., Moreau, I., Peylin, P., Ottlé, C., Radoux J., Van Bogaert, E., Ramoino, F., Albergel, C., and Arino, O.: Observed annual global land-use change from 1992 to 2020 three times more dynamic than reported by inventory-based statistics, in preparation, 2023.
+    *   *User Guide:* Defourny, P., Lamarche, C., Bontemps, S., De Maet, T., Van Bogaert, E., Moreau, I., Brockmann, C., Boettcher, M., Kirches, G., Wevers, J., Santoro, M., Ramoino, F., & Arino, O. (2017). Land Cover Climate Change Initiative - Product User Guide v2. Issue 2.0. [Download PDF](http://maps.elie.ucl.ac.be/CCI/viewer/download/ESACCI-LC-Ph2-PUGv2_2.0.pdf).
+    *   *Download:* [ESA CCI Viewer](https://maps.elie.ucl.ac.be/CCI/viewer/download.php)
+*   **2016-2020:** Copernicus Climate Change Service (C3S) Global Land Cover v2.1.1.
+    *   Consistent with the ESA CCI series.
+    *   *Download:* Copernicus Climate Change Service (C3S) Climate Data Store (CDS).
+
+**Processing:**
+This workflow reclassifies the original LC maps into:
+a) A simplified 9-class map (`landcover_gl_[year].tif`)
+b) A binary Natural/Transformed map (`rec_landcover_gl_[year].tif`)
+
+```{r}
+#| label: reclassify-lc-maps
+#| eval: false
+#| include: false
+
+# This chunk processes all available raw land cover data into reclassified versions.
+
+# 1. Configuration
+raw_lc_dir <- data_raw("LandCovers")
+mask_poly <- st_read(data_vectors("hydrosheds_lv6_synth.gpkg"), quiet = TRUE)
+
+# Reclassification matrix: Original ESA classes to 9 simplified classes
+reclass_9_class_tbl <- data.frame(
+  from = c(10, 11, 12, 20, 30, 40, 50, 60, 61, 62, 70, 71, 72, 80, 81, 82, 90, 100,
+           110, 120, 121, 122, 130, 140, 150, 151, 152, 153, 160, 170, 180,
+           190, 200, 201, 202, 210, 220),
+  to = c(1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 6, 7, 7, 7, 8, 9)
+)
+
+# Reclassification matrix: 9 simplified classes to 2 binary classes
+reclass_2_class_tbl <- data.frame(
+  from = c(3,4,5,6,7,8,9),
+  to = c(2,2,2,1,2,2,2)
+)
+
+# 2. Helper function to process one raster layer
+process_lc_raster <- function(r, year, out_dir, mask_poly, reclass_9, reclass_2) {
+  message("Processing year: ", year)
+
+  # --- 9-Class Reclassification ---
+  out_9_path <- file.path(out_dir, paste0("landcover_gl_", year, ".tif"))
+  if (!file.exists(out_9_path)) {
+    r_9class <- subst(r, from = reclass_9$from, to = reclass_9$to)
+    writeRaster(r_9class, out_9_path, overwrite = TRUE, gdal=c("COMPRESS=LZW", "TILED=YES"))
+    message("  Saved 9-class: ", basename(out_9_path))
+  } else {
+    message("  9-class file already exists, skipping.")
+    r_9class <- rast(out_9_path) # Load existing for next step
+  }
+
+  # --- 2-Class Reclassification ---
+  out_2_path <- file.path(out_dir, paste0("rec_landcover_gl_", year, ".tif"))
+  if (!file.exists(out_2_path)) {
+    r_2class <- subst(r_9class, from = reclass_2$from, to = reclass_2$to)
+    r_2class_masked <- mask(r_2class, mask_poly)
+    writeRaster(r_2class_masked, out_2_path, overwrite = TRUE, gdal=c("COMPRESS=LZW", "TILED=YES"))
+    message("  Saved 2-class: ", basename(out_2_path))
+  } else {
+    message("  2-class file already exists, skipping.")
+  }
+}
+
+# 3. Process the 1992-2015 multi-band stack
+stack_v207_path <- file.path(raw_lc_dir, "ESACCI-LC-L4-LCCS-Map-300m-P1Y-1992_2015-v2.0.7.tif")
+if (file.exists(stack_v207_path)) {
+  message("Processing 1992-2015 stack...")
+  r_stack <- rast(stack_v207_path)
+  # Extract years from band names, e.g., "ESACCI-LC-L4-LCCS-Map-300m-P1Y-1992-v2.0.7"
+  years <- as.integer(stringr::str_extract(names(r_stack), "\\d{4}"))
+
+  for (i in 1:nlyr(r_stack)) {
+    process_lc_raster(r_stack[[i]], years[i], raw_lc_dir, mask_poly, reclass_9_class_tbl, reclass_2_class_tbl)
+  }
+}
+
+# 4. Process the 2016-2020 individual files
+message("Processing 2016-2020 individual files...")
+years_v211 <- 2016:2020
+for (year in years_v211) {
+  # First, convert NetCDF to GeoTIFF if needed
+  nc_file <- file.path(raw_lc_dir, sprintf("C3S-LC-L4-LCCS-Map-300m-P1Y-%d-v2.1.1.nc", year))
+  tif_file <- file.path(raw_lc_dir, sprintf("C3S-LC-L4-LCCS-Map-300m-P1Y-%d-v2.1.1.tif", year))
+  if (!file.exists(tif_file) && file.exists(nc_file)) {
+    message("Converting ", basename(nc_file), " to GeoTIFF...")
+    cmd <- sprintf(
+      "gdalwarp -of Gtiff -co COMPRESS=LZW -co TILED=YES -ot Byte -te -180 -90 180 90 -tr 0.002777777777778 0.002777777777778 -t_srs EPSG:4326 NETCDF:\"%s\":lccs_class \"%s\"",
+      nc_file, tif_file
+    )
+    system(cmd)
+  }
+
+  # Now process the GeoTIFF
+  if (file.exists(tif_file)) {
+    r <- rast(tif_file)
+    process_lc_raster(r, year, raw_lc_dir, mask_poly, reclass_9_class_tbl, reclass_2_class_tbl)
+  } else {
+    warning("Could not find source file for year ", year)
+  }
+}
+message("Reclassification process complete.")
+```
+
+## Load Inputs
+
+```{r}
+#| label: load-data
+
+# Example file paths (replace with actual paths)
+inpath <- data_raw("LandCovers")
+landcover_files <- list.files(
+  inpath,
+  pattern = "rec.*\\.tif$",
+  full.names = TRUE
+)
+# Define the specific years for the analysis. This is more robust than index-based selection.
+years_to_process <- c(1992, 2020)
+
+# Create a regex pattern to match any of the desired years in the filename.
+year_pattern <- paste(years_to_process, collapse = "|")
+
+# Filter the file list to include only files for the desired years.
+landcover_files <- landcover_files[stringr::str_detect(basename(landcover_files), year_pattern)]
+# Name rasters by year
+names(landcover_files) <- stringr::str_extract(basename(landcover_files), "\\d{4}")
+# Load rasters as a list
+landcover_rasters <- lapply(landcover_files, terra::rast)
+
+# Load canonical spatial units
+# We use the 10km grid as the primary unit. Other available vectors in vector_basedata include:
+# - Biome.gpkg (WWF Biomes)
+# - cartographic_ee_r264_correpondence.gpkg (Regions/Countries)
+
+# Load the raw canonical 10km grid (geometry only) to keep it lightweight
+grid_path <- data_vectors("AOOGrid_10x10km_land_4326_clean.gpkg")
+spatial_units <- st_read(grid_path, quiet = TRUE)
+
+# Ensure we have a valid ID column (usually 'fid' in the canonical grid)
+if (!"fid" %in% names(spatial_units)) {
+  spatial_units$fid <- seq_len(nrow(spatial_units))
+}
+spatial_units <- spatial_units %>%
+  dplyr::select(fid) # Keep only the ID for the extraction step
+id_col_name <- "fid"
+```
+
+## Run Land Cover Change Metric Extraction
+
+```{r}
+#| label: run-lcc-extraction
+#| message: true
+#| warning: false
+
+# This chunk runs the core land cover change metric extraction using the `diffeR`
+# package logic wrapped in our helper functions.
+
+# 1. Iterate over all time steps defined by the input raster list.
+#    This calculates Gain, Loss, Persistence, etc. for each polygon in `spatial_units`.
+message("Running LCC metric extraction for all time steps...")
+lcc_m <- iterate_lcc_metrics(
+  landcover_rasters,
+  spatial_units,
+  id_col = id_col_name,
+  percent = TRUE,
+  verbose = TRUE,
+  mc = TRUE,
+  ncores = 8,
+  digits = 4
+)
+
+# 2. Calculate net change direction (Gain - Loss) for easier interpretation.
+lcc_m <- lcc_m %>%
+  mutate(
+    Gain = as.numeric(Gain),
+    Loss = as.numeric(Loss),
+    dir_ch = round(Gain - Loss, digits = 4)
+  )
+
+# 3. Pivot the long-format metrics table to a wide format, where each
+#    metric for each class and time step becomes a separate column.
+message("Pivoting results to wide format...")
+lcc_metrics_wide <- lcc_m %>%
+  tidyr::pivot_wider(
+    id_cols = all_of(id_col_name),
+    names_from = c(Category, year_step),
+    values_from = c(Gain, Persistence, Loss, Quantity, Exchange, dir_ch),
+    names_glue = "{.value}_{Category}_{year_step}"
+  ) %>%
+  mutate(
+    # Ensure the ID column type is correct for joining
+    !!id_col_name := as.double(.data[[id_col_name]])
+  )
+
+# 4. Attribute the grid with Biomes and Regions (Spatial Join)
+#    We do this NOW using the raw vectors, instead of relying on the pre-processed ES file.
+message("Attributing grid with Biomes and Regions...")
+
+biome_path <- data_vectors("Biome.gpkg")
+# Use pattern matching to find the correspondence file (handles spelling variations)
+ee_files <- list.files(data_vectors(), pattern = "cartographic_ee.*\\.gpkg$", full.names = TRUE)
+regions_path <- if(length(ee_files) > 0) ee_files[1] else ""
+
+if (file.exists(biome_path) && file.exists(regions_path)) {
+  # Load vectors
+  biomes_sf <- st_read(biome_path, quiet = TRUE) %>% st_transform(st_crs(spatial_units))
+  regions_sf <- st_read(regions_path, quiet = TRUE) %>% st_transform(st_crs(spatial_units))
+
+  # Use point-on-surface for robust spatial join (avoids 1 cell matching 2 polygons)
+  spatial_units_pts <- st_point_on_surface(spatial_units)
+
+  # Join attributes to the points
+  spatial_units_attr <- spatial_units_pts %>%
+    st_join(biomes_sf %>% select(any_of(c("WWF_biome", "BIOME")))) %>%
+    st_join(regions_sf %>% select(any_of(c("iso3", "region_wb", "income_grp", "nev_name")))) %>%
+    st_drop_geometry() %>%
+    select(fid, any_of(c("WWF_biome", "iso3", "region_wb", "income_grp", "nev_name")))
+
+  # Join attributes back to the main grid geometry
+  spatial_units <- left_join(spatial_units, spatial_units_attr, by = "fid")
+  message("Attributes joined successfully.")
+} else {
+  warning("Raw attribute vectors not found. Skipping spatial join.")
+}
+
+# 5. Join the LCC metrics to the attributed grid
+message("Joining LCC metrics to attributed grid...")
+spatial_units_with_lcc <- left_join(spatial_units, lcc_metrics_wide, by = id_col_name)
+
+# 6. Save the final enriched GeoPackage
+out_gpkg <- file.path(data_dir(), "processed", "10k_lcc_metrics.gpkg")
+message("Saving output to: ", out_gpkg)
+sf::st_write(spatial_units_with_lcc, out_gpkg, append = FALSE, delete_dsn = TRUE)
+
+message("LCC metric extraction complete.")
+
+```
+
+## Inspect Results
+
+```{r summarize-results}
+#| label: summarize-results
+
+# Summarize by year and metric
+summary_df <- lcc_m %>%
+  group_by(year_step, Category) %>%
+  summarize(across(c(Gain, Persistence, Loss, Quantity, Exchange, Shift),
+                   mean, na.rm = TRUE), .groups = "drop")
+
+# Preview
+head(summary_df)
+```
+
+```{r summarize-by-groups}
+#| label: summarize-by-groups
+#| message: false
+
+# Define the grouping columns of interest
+grouping_cols <- c("region_wb", "income_grp", "nev_name", "WWF_biome")
+existing_groups <- grouping_cols[grouping_cols %in% names(spatial_units_with_lcc)]
+
+if (length(existing_groups) > 0) {
+  message("Summarizing LCC metrics by groups: ", paste(existing_groups, collapse = ", "))
+
+  group_summaries <- list()
+
+  for (g in existing_groups) {
+    # Calculate mean metrics per group (assuming equal area grid, mean % is appropriate)
+    summary_g <- spatial_units_with_lcc %>%
+      sf::st_drop_geometry() %>%
+      group_by(across(all_of(g)), year_step, Category) %>%
+      summarize(across(c(Gain, Persistence, Loss, Quantity, Exchange, Shift, dir_ch),
+                       mean, na.rm = TRUE), .groups = "drop") %>%
+      mutate(grouping_var = g) %>%
+      rename(group_val = !!g)
+
+    group_summaries[[g]] <- summary_g
+  }
+
+  all_group_summaries <- bind_rows(group_summaries)
+
+  # Save the grouped summary
+  out_csv <- file.path(data_dir(), "processed", "lcc_summary_by_group.csv")
+  readr::write_csv(all_group_summaries, out_csv)
+  message("Grouped summaries saved to: ", out_csv)
+
+  print(head(all_group_summaries))
+} else {
+  message("No grouping columns found in spatial units.")
+}
+```
+
+```{r}
+#| label: summarize-results-old
+#| eval: false
+#| include: false
+
+# Summarize by year and metric
+summary_df <- lcc_m %>%
+  group_by(year_step, Category) %>%
+  summarize(across(c(Gain, Persistence, Loss, Quantity, Exchange, Shift),
+                   mean, na.rm = TRUE), .groups = "drop")
+
+# Preview
+head(summary_df)
+```
+
+The previous pivoting step produces many columns with complex, machine-generated names (e.g., `Gain_2_1995_2000`). Instead of manually decoding them, the following chunk acts as a **dynamic data dictionary generator**. It programmatically parses those names to create a clear, human-readable reference table (`ref_df`). This ensures that our documentation of what each column represents stays automatically in sync with the data
+
+```{r}
+#| label: produce-reference-for-attributes
+
+col_names <- names(lcc_metrics_wide)[!names(lcc_metrics_wide) %in% id_col_name]
+
+# Parse components from column names using regex
+ref_df <- tibble(
+  column_name = col_names
+) %>%
+  mutate(
+    component = str_extract(column_name, "^(Gain|Persistence|Loss|Quantity|Exchange|Shift)"),
+    class = case_when(
+      str_detect(column_name, "_1_") ~ "Transformed (class 1)",
+      str_detect(column_name, "_2_") ~ "Natural (class 2)",
+      str_detect(column_name, "_Overall_") ~ "Overall change",
+      TRUE ~ "Unknown"
+    ),
+    year_step = str_extract(column_name, "[0-9]{4}_[0-9]{4}"),
+    description = paste(component, "for", class, "during", year_step)
+  )
+
+# Optional: arrange for readability
+ref_df <- ref_df %>% select(column_name, description)
+
+```
+## Plot Change Metrics Over Time
+
+```{r}
+#| label: plot-changes
+ggplot(summary_df, aes(x = year_step, y = Gain, group = as.factor(Category), color = as.factor(Category))) +
+  geom_line(size = 1) +
+  geom_point() +
+  labs(title = "Average Gain in Transformed vs Natural Land Over Time",
+       x = "Year Step",
+       y = "% Area Changed") +
+  theme_minimal()
+```

@@ -1,12 +1,31 @@
 # Worklog — Global NCP Hotspots
 
 ## Current focus
-- Re-calculating and verifying core ecosystem service ratios (sediment, nitrogen) for the 1992-2020 period.
-- Re-establishing continuity using explicit context and worklog files.
-- **Completed** Generating difference rasters (2020-1992) for all services to support updated zonal statistics.
-- **Completed** integration of `zonal_stats_toolkit` for synthesis (replacing legacy pipelines).
-- Current/complementary analysis: Running zonal synthesis with the new toolkit.
-- Revisiting Hotspots Analysis and KS tests: fixing violin limits,, adjusting sample sizes, calcualte percentages of areas and statistical analysis
+- **Completed** KS Analysis, Hotspot Intensity, and Multi-service workflows (v1.0.2).
+- **Completed** Re-calculating core ecosystem service ratios and difference rasters.
+- **Completed** LCC Pipeline Development: Finalized `analysis/LC_change.qmd` using `diffeR` for robust transition metrics (1992-2020).
+- **Active** Execution: Running LCC extraction on the 10km grid (currently processing).
+- **Active** Synthesis: Integrating LCC metrics into `analysis/hotspot_extraction.qmd` to visualize the overlap between ES Hotspots and Land Conversion.
+
+## Strategic Narrative / Pitch (2026-02-11)
+
+**Subject:** Status Update: Integrating Land Cover Drivers into Global NCP Hotspots
+
+**Where we are:**
+We have successfully stabilized the core **Hotspot Identification Pipeline (v1.0.2)**. We can now confidently pinpoint *where* ecosystem services are changing most drastically across the globe, with breakdowns by Biome, Income Group, and Region.
+
+**The Missing Piece:**
+Knowing *where* hotspots are is only half the battle. We need to explain *why* they are there. Specifically, we need to distinguish between hotspots driven by **Land Conversion** (e.g., deforestation, urbanization) versus those driven by **Degradation/Intensification** (changing conditions within the same land use).
+
+**What we are doing:**
+We have implemented a robust Land Cover Change (LCC) module using the `diffeR` methodology (Pontius et al.).
+1.  **Methodology:** Instead of simple overlaps, we are calculating precise transition metrics (Gross Loss, Gross Gain, Persistence) for every 10km grid cell between 1992 and 2020.
+2.  **Integration:** We are treating "Gross Loss of Natural Land" as a primary driver.
+3.  **Synthesis:** We are currently computing these metrics. Once complete, we will overlay them with our ES hotspots to quantify the "Attribution Gap"—e.g., *"X% of Nitrogen Export hotspots are explained by direct land conversion."*
+
+**Next Deliverable:**
+A "Drivers of Change" visualization that ranks ecosystem services by their sensitivity to land cover change.
+
 ## Environment notes
 - Local machine: Lenovo (Windows 11)
 - Remote: lilling (VS Code Remote SSH)
@@ -24,11 +43,10 @@
 - Do not use ChatGPT Codex Connector on lilling (auth persists after uninstall).
 
 ## Next steps (short horizon)
-1. Finalize and verify the newly calculated ratio rasters (Sediment and Nitrogen Retention) and their corresponding difference rasters. This is the current task.
-2. Configure `zonal_stats_toolkit` to process all difference rasters against the 10km grid.
-3. Update the analysis configuration YAML files (in `analysis_configs/`) to use the new difference rasters as inputs for the zonal statistics pipeline.
-4. **Coastal Risk Reduction Ratio**: Address the pending calculation issue (waiting for pipeline fix from Rich). Verify how `hotspot_extraction.qmd` handles this service once the data is corrected.
-5. **Reporting**: Synthesize recent hotspot intensity and multi-service findings into the slide deck and draft the report for the supervisor.
+1. **Await LCC Results**: Wait for `analysis/LC_change.qmd` to finish generating `processed/10k_lcc_metrics.gpkg`.
+2. **Render Hotspots Report**: Run `analysis/hotspot_extraction.qmd` to generate the new "Drivers of Change" overlap plots.
+3. **Reporting**: Incorporate the LCC overlap findings into the final slide deck.
+4. **Coastal Risk Reduction**: Follow up on the pending calculation issue (waiting for pipeline fix).
 
 ## Future Tasks (Long-term)
 1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
@@ -94,3 +112,24 @@
     - Fixed `analysis/hotspot_multiservice.qmd` by adding the missing setup chunk to initialize project paths and functions.
     - Corrected typos in the overview text.
     - Verified that the notebook renders correctly and produces the "Hotness" and "Distribution" plots with alphabetical ordering.
+
+## 2026-02-04: KS Analysis Finalization & Methodology Refinement
+
+**Focus:** Finalizing the Kolmogorov-Smirnov (KS) analysis pipeline, refining visualizations, and synchronizing documentation.
+
+**Key Changes:**
+*   **KS Analysis (`analysis/KS_tests_hotspots.qmd`):**
+    *   Optimized data pivoting to handle `_sum` vs `_mean` suffixes robustly, preventing memory bloat and missing variables.
+    *   Implemented "signed power" transformations for Cliff's Delta and Heatmap plots to improve visibility of small but significant effects.
+    *   Added narrative descriptions for all major plot types (Heatmap, ECDF, Directionality).
+    *   Centralized configuration for service suffix patterns.
+*   **Refined Groupings:**
+    *   Removed `region_un` and `continent` from analysis loops to focus on `income_grp`, `region_wb`, and `WWF_biome`.
+    *   Filtered "Antarctica" and "Seven seas" from all extraction and plotting steps.
+*   **Documentation:**
+    *   Updated `README.md` and `README_Methodology.md` to explicitly explain the robustness of Sum vs. Mean aggregation on equal-area grids.
+    *   Synced `docs/codex_context.md` with the current file structure.
+- 2026-02-10: **Land Cover Change Integration**:
+    - Shifted focus to attributing hotspots with Land Cover dynamics.
+    - Created `analysis/land_cover_change.qmd` to compute binary transitions (Natural/Transformed) from ESA 300m maps.
+    - Updated `analysis/hotspot_extraction.qmd` to join LCC metrics to the hotspot geometry during export.

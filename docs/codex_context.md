@@ -1,6 +1,6 @@
 # Global NCP – Hotspots Time‑Series Workflow (Long Context)
 
-*Last updated: 2025‑11‑27 (PST)*
+*Last updated: 2026-02-04*
 
 This document captures the full project context for assistants (e.g., Codex in VS Code) and collaborators. Use it alongside the slimmer spec in `doc/codex_context.min.md`. When coding or refactoring, prefer the **minimal** file as your primary context and consult this long version for rationale and narrative background.
 
@@ -22,6 +22,7 @@ This document captures the full project context for assistants (e.g., Codex in V
 1. Processed 10‑km grid with subregional tags (`processed/10k_change_calc.gpkg`).
 2. Hotspot feature layers (global and per‑group) as compact GPKGs under `processed/hotspots/` plus an index CSV.
 3. Reusable tidy table `plt_long` (cell × service with `abs_chg`/`pct_chg`).
+4. **Intensity & Enrichment**: Metrics quantifying hotspot coverage and disproportionate concentration per region (`hotspot_area_stats.csv`).
 4. Figures: trimmed **barplots** of magnitudes (all cells), **violins** of hotspot distributions, and (later) **KS** tables/plots.
 
 ---
@@ -61,6 +62,11 @@ Pollination, Nature_Access
 * **Gain services** (bad when they go **up**): `Sed_export`, `N_export`, `C_Risk` → keep **highest** tail.
 
 **Assumptions.**
+
+* **Methodological Dual-Path**:
+  * **Path A (Pixel-Level)**: Direct difference of rasters. Used for raw change summaries.
+  * **Path B (Grid-Level)**: Aggregation to 10km grid first, then difference. Used for **hotspot identification** and regional synthesis.
+* **Aggregation Logic**: Extensive variables (e.g. Nitrogen kg) are **summed**; Intensive variables (e.g. Risk Index) are **averaged**. On an equal-area grid, these are proportional and comparable for relative change.
 
 * `fid` is unique and stable across all outputs.
 * `c_fid` references the country polygon key used elsewhere.
@@ -192,22 +198,30 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 * Output: `outputs/plots/violins/<group_col>/*_{abs|pct}_change_violins.png`.
 * Make background **white** (e.g., device `ragg_png()` and `theme_minimal()`; avoid transparent PNGs in dark UIs).
 
-### 4.7 KS tests (planned)
+### 4.7 KS tests (Implemented)
 
 * Compare the **ECDFs** of hotspot magnitudes between a subregion and the **global** distribution, or between pairs of subregions.
 * Provide both the **statistic** and **adjusted p‑values** (e.g., BH FDR) across services and metrics.
-* Summarize in a tidy table and a small heatmap per service.
+* **Visuals**: Heatmaps of KS statistics, ECDF overlays, and **Cliff's Delta** (directionality) bar plots.
+* **Transformations**: Signed power transformations used to visualize small but significant effects.
 * Clarify in text that bars (magnitude plots) are **direction‑agnostic** (absolute size of change), while violins + KS can be run on **absolute** or **percent** changes depending on the question.
 
-### 4.8 Current run status / next steps
+### 4.8 Hotspot Intensity & Multi-service
 
-- Heavy chunks wired: pivot (`plt_long`), HOTS_CFG validation, hotspot export, trimmed bars, hotspot violins (plots land in `/outputs/plots/…`).
-- Violins now use `run_hotspot_violins_by()` from `R/hotspot_violins.R`; no inline redefinition inside the QMD.
-- Immediate to‑dos:
-  1. Cache hotspot subsets once (after `hotspots_export`) and reuse them for violins/KS.
-  2. Build KS runner (global vs. subregion) + tidy output + optional heatmap.
-  3. Externalize service metadata (`analysis_configs/service_meta.csv`) and load during pivot.
-  4. Add smoke tests (e.g., `extract_hotspots` modes) and refresh the presentation deck when figures stabilize.
+* **Intensity**: % of land area classified as hotspot per region.
+* **Enrichment**: Ratio of (Observed Share of Hotspots / Expected Share based on Area). Values > 1 indicate disproportionate concentration.
+* **Hotness**: Average number of overlapping service hotspots per pixel.
+
+### 4.9 Current run status / next steps
+
+- **Completed**:
+  - Core hotspot extraction (v1.0.2).
+  - KS Analysis pipeline (robust to suffixes, improved visuals).
+  - Intensity/Enrichment metrics.
+  - Documentation of Sum vs Mean aggregation logic.
+- **Next**:
+  - Land Cover change analysis (new branch).
+  - Final report drafting.
 
 ---
 
