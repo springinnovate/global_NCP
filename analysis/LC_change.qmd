@@ -165,7 +165,7 @@ message("Reclassification process complete.")
 inpath <- data_raw("LandCovers")
 landcover_files <- list.files(
   inpath,
-  pattern = "rec.*\\.tif$",
+  pattern = "^rec_landcover_gl_\\d{4}\\.tif$",
   full.names = TRUE
 )
 # Define the specific years for the analysis. This is more robust than index-based selection.
@@ -180,6 +180,11 @@ landcover_files <- landcover_files[stringr::str_detect(basename(landcover_files)
 names(landcover_files) <- stringr::str_extract(basename(landcover_files), "\\d{4}")
 # Load rasters as a list
 landcover_rasters <- lapply(landcover_files, terra::rast)
+
+# Check for duplicates to prevent list-columns in pivot_wider
+if (any(duplicated(names(landcover_files)))) {
+  stop("Duplicate land cover files found for the same year. Please check the input directory for multiple files matching the pattern.")
+}
 
 # Load canonical spatial units
 # We use the 10km grid as the primary unit. Other available vectors in vector_basedata include:
@@ -280,6 +285,14 @@ if (file.exists(biome_path) && file.exists(regions_path)) {
 # 5. Join the LCC metrics to the attributed grid
 message("Joining LCC metrics to attributed grid...")
 spatial_units_with_lcc <- left_join(spatial_units, lcc_metrics_wide, by = id_col_name)
+
+# Check for list columns which cause st_write to fail (excluding geometry)
+list_cols <- sapply(spatial_units_with_lcc, is.list)
+geom_col <- attr(spatial_units_with_lcc, "sf_column")
+bad_cols <- list_cols & names(spatial_units_with_lcc) != geom_col
+if (any(bad_cols)) {
+  stop("List columns detected in output (likely due to duplicate keys in pivot): ", paste(names(spatial_units_with_lcc)[bad_cols], collapse = ", "))
+}
 
 # 6. Save the final enriched GeoPackage
 out_gpkg <- file.path(data_dir(), "processed", "10k_lcc_metrics.gpkg")

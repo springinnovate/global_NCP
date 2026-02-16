@@ -5,7 +5,7 @@ author: "Jerónimo Rodríguez Escobar"
 email: "jeronimo.rodriguez@wwfus.org"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
-analysis_version: "v1.0.2"
+analysis_version: "v1.1.0"
 format:
 #  html:
 #    toc: true
@@ -21,7 +21,7 @@ format:
 editor: source
 
 params:
-  analysis_version: "v1.0.2"
+  analysis_version: "v1.1.0"
 ---
 
 ## Overview
@@ -1035,5 +1035,92 @@ if (length(box_files)) {
   knitr::asis_output(md)
 } else {
   knitr::asis_output("> No boxplots were generated; check upstream chunks.")
+}
+```
+
+## Drivers of Change: Land Cover Overlap
+This section explores the relationship between Ecosystem Service hotspots and Land Cover change, specifically focusing on Land Conversion (Loss of Natural Land). We define Conversion Hotspots as the top 5% of grid cells with the highest gross loss of natural land (Loss_2). We then calculate the overlap: What percentage of ES hotspots are also Conversion Hotspots?
+```{r}
+#| label: lc-hotspot-overlap-setup
+#| eval: true
+#| echo: false
+#| message: false
+#| warning: false
+
+# 1. Load LC Data
+lc_gpkg <- file.path(data_dir(), "processed", "10k_lcc_metrics.gpkg")
+lc_data_ready <- FALSE
+lc_df <- NULL
+loss_col <- NULL
+if (file.exists(lc_gpkg) && exists("plt_long")) {
+  lc_df <- sf::st_read(lc_gpkg, quiet = TRUE) %>% sf::st_drop_geometry()
+  # Identify the specific column for Loss of Natural (1992-2020)
+  loss_col <- grep("Loss_2_.*", names(lc_df), value = TRUE)[1]
+  if (!is.na(loss_col)) {
+    message("Using LC column: ", loss_col, " as proxy for Land Conversion.")
+    lc_data_ready <- TRUE
+  } else {
+    message("No 'Loss_2' column found in LC data.")
+  }
+} else {
+  message("LC data or plt_long missing.")
+}
+```
+
+```{r}
+#| label: lc-hotspot-overlap-calc
+#| eval: true
+#| echo: false
+#| message: false
+#| warning: false
+
+overlap_stats <- NULL
+if (lc_data_ready) {
+  # Define LC Hotspots (Top 5% of Loss)
+  cutoff <- quantile(lc_df[[loss_col]], 0.95, na.rm = TRUE)
+  lc_hotspots <- lc_df %>%
+    filter(.data[[loss_col]] > cutoff) %>%
+    pull(fid)
+
+  # Calculate Overlap for each Service
+  overlap_stats <- plt_long %>%
+    group_by(service) %>%
+    summarize(
+      n_es_hotspots = sum(
+        (service %in% HOTS_CFG$loss & pct_chg <= quantile(pct_chg, HOTS_CFG$pct_cutoff, na.rm=TRUE)) |
+        (service %in% HOTS_CFG$gain & pct_chg >= quantile(pct_chg, 1-HOTS_CFG$pct_cutoff, na.rm=TRUE)),
+        na.rm = TRUE
+      ),
+      n_overlap = sum(
+        fid %in% lc_hotspots &
+        ((service %in% HOTS_CFG$loss & pct_chg <= quantile(pct_chg, HOTS_CFG$pct_cutoff, na.rm=TRUE)) |
+         (service %in% HOTS_CFG$gain & pct_chg >= quantile(pct_chg, 1-HOTS_CFG$pct_cutoff, na.rm=TRUE))),
+        na.rm = TRUE
+      )
+    ) %>%
+    mutate(pct_overlap = (n_overlap / n_es_hotspots) * 100) %>%
+    arrange(desc(pct_overlap))
+}
+```
+
+```{r}
+#| label: lc-hotspot-overlap-plot
+#| eval: true
+#| echo: false
+#| message: false
+#| warning: false
+
+if (!is.null(overlap_stats)) {
+  # Plot
+  p <- ggplot(overlap_stats, aes(x = reorder(service, pct_overlap), y = pct_overlap)) +
+   geom_col(fill = "#d95f02") +
+   coord_flip() +
+   labs(title = "Overlap with Land Conversion Hotspots",
+        subtitle = paste0("% of ES Hotspots that are also in the top 5% of ", loss_col),
+        x = "Service", y = "% Overlap") +
+   theme_minimal()
+  print(p)
+} else {
+  message("Skipping overlap analysis (data not ready).")
 }
 ```

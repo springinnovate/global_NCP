@@ -75,3 +75,15 @@ A common question regarding Path B is the comparability of variables aggregated 
 2.  **Equal-Area Grid:** The analysis uses the IUCN equal-area grid. Since cell area is constant, $Sum$ and $Mean$ are perfectly proportional ($Sum = Mean \times Area$).
 3.  **Mathematical Identity:** For relative metrics used in this analysis (percent change, percentile rankings, KS test statistics), the results are identical regardless of whether sum or mean is used.
 4.  **Comparability:** Comparing relative magnitudes of change (e.g., percentage change) strips away the units, allowing valid comparisons between total loads and average indices.
+
+## Land Cover Change Attribution
+
+To explain *why* hotspots occur, we integrate Land Cover Change (LCC) metrics derived from ESA CCI (1992) and C3S (2020) maps.
+
+**Methodology:**
+Instead of simple "Net Change" (which masks simultaneous loss and gain), we use the **`diffeR` methodology** (Pontius et al.) to calculate:
+*   **Gross Loss:** The specific area of natural land lost to transformation.
+*   **Gross Gain:** The area of natural land recovered.
+*   **Exchange:** Shifts that don't affect the net total but represent dynamic turnover.
+
+These metrics are aggregated to the 10km grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation).

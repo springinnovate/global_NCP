@@ -4,8 +4,10 @@
 - **Completed** KS Analysis, Hotspot Intensity, and Multi-service workflows (v1.0.2).
 - **Completed** Re-calculating core ecosystem service ratios and difference rasters.
 - **Completed** LCC Pipeline Development: Finalized `analysis/LC_change.qmd` using `diffeR` for robust transition metrics (1992-2020).
-- **Active** Execution: Running LCC extraction on the 10km grid (currently processing).
-- **Active** Synthesis: Integrating LCC metrics into `analysis/hotspot_extraction.qmd` to visualize the overlap between ES Hotspots and Land Conversion.
+- **Active** Execution: `analysis/LC_change.qmd` is currently running (long-process extraction of 1992-2020 transitions).
+- **Completed** Synthesis: Updated `analysis/hotspot_extraction.qmd` with the "Drivers of Change" section to calculate ES/LCC overlaps.
+- **Active** Documentation: Updating READMEs to reflect the `diffeR` methodology and attribution workflow.
+- **Active** Versioning: Bumped analysis version to **v1.1.0** to reflect the addition of the Land Cover Change module.
 
 ## Strategic Narrative / Pitch (2026-02-11)
 
@@ -133,3 +135,8 @@ A "Drivers of Change" visualization that ranks ecosystem services by their sensi
     - Shifted focus to attributing hotspots with Land Cover dynamics.
     - Created `analysis/land_cover_change.qmd` to compute binary transitions (Natural/Transformed) from ESA 300m maps.
     - Updated `analysis/hotspot_extraction.qmd` to join LCC metrics to the hotspot geometry during export.
+
+- 2026-02-13: **LCC Integration & Documentation**:
+    - Validated `analysis/hotspot_extraction.qmd` logic for LCC overlap (Drivers of Change).
+    - Waiting for `analysis/LC_change.qmd` extraction to complete.
+    - Updated documentation (`README.md`, `README_Methodology.md`) to formally include the LCC pipeline and `diffeR` methodology.
