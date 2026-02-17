@@ -195,6 +195,10 @@ if (any(duplicated(names(landcover_files)))) {
 grid_path <- data_vectors("AOOGrid_10x10km_land_4326_clean.gpkg")
 spatial_units <- st_read(grid_path, quiet = TRUE)
 
+# FOR TESTING: Use a small subset of spatial units to speed up processing.
+# Remove or comment out this line for the full analysis.
+# spatial_units <- spatial_units %>% dplyr::slice_head(n = 500)
+
 # Ensure we have a valid ID column (usually 'fid' in the canonical grid)
 if (!"fid" %in% names(spatial_units)) {
   spatial_units$fid <- seq_len(nrow(spatial_units))
@@ -271,9 +275,10 @@ if (file.exists(biome_path) && file.exists(regions_path)) {
   # Join attributes to the points
   spatial_units_attr <- spatial_units_pts %>%
     st_join(biomes_sf %>% select(any_of(c("WWF_biome", "BIOME")))) %>%
-    st_join(regions_sf %>% select(any_of(c("iso3", "region_wb", "income_grp", "nev_name")))) %>%
+    st_join(regions_sf %>% select(any_of(c("region_wb", "income_grp", "nev_name")))) %>%
     st_drop_geometry() %>%
-    select(fid, any_of(c("WWF_biome", "iso3", "region_wb", "income_grp", "nev_name")))
+    select(fid, any_of(c("WWF_biome", "region_wb", "income_grp", "nev_name"))) %>%
+    distinct(fid, .keep_all = TRUE)
 
   # Join attributes back to the main grid geometry
   spatial_units <- left_join(spatial_units, spatial_units_attr, by = "fid")
@@ -294,8 +299,30 @@ if (any(bad_cols)) {
   stop("List columns detected in output (likely due to duplicate keys in pivot): ", paste(names(spatial_units_with_lcc)[bad_cols], collapse = ", "))
 }
 
+# NEW: Check for and repair invalid geometries before saving
+if (any(!sf::st_is_valid(spatial_units_with_lcc))) {
+  message("Warning: Found invalid geometries. Attempting to repair with st_make_valid().")
+  spatial_units_with_lcc <- sf::st_make_valid(spatial_units_with_lcc)
+}
+
+# NEW: Check for and remove empty geometries
+if (any(st_is_empty(spatial_units_with_lcc))) {
+  message("Warning: Found ", sum(st_is_empty(spatial_units_with_lcc)), " empty geometries. Removing them before saving.")
+  spatial_units_with_lcc <- spatial_units_with_lcc[!st_is_empty(spatial_units_with_lcc), ]
+}
+
 # 6. Save the final enriched GeoPackage
 out_gpkg <- file.path(data_dir(), "processed", "10k_lcc_metrics.gpkg")
+
+# Ensure output directory exists
+if (!dir.exists(dirname(out_gpkg))) dir.create(dirname(out_gpkg), recursive = TRUE)
+
+# Rename 'fid' to 'grid_fid' to avoid conflict with GeoPackage reserved primary key
+if ("fid" %in% names(spatial_units_with_lcc)) {
+  message("Renaming 'fid' column to 'grid_fid' to avoid GPKG driver conflict.")
+  names(spatial_units_with_lcc)[names(spatial_units_with_lcc) == "fid"] <- "grid_fid"
+}
+
 message("Saving output to: ", out_gpkg)
 sf::st_write(spatial_units_with_lcc, out_gpkg, append = FALSE, delete_dsn = TRUE)
 
@@ -306,7 +333,6 @@ message("LCC metric extraction complete.")
 ## Inspect Results
 
 ```{r summarize-results}
-#| label: summarize-results
 
 # Summarize by year and metric
 summary_df <- lcc_m %>%
@@ -319,11 +345,10 @@ head(summary_df)
 ```
 
 ```{r summarize-by-groups}
-#| label: summarize-by-groups
 #| message: false
 
 # Define the grouping columns of interest
-grouping_cols <- c("region_wb", "income_grp", "nev_name", "WWF_biome")
+grouping_cols <- c("region_wb", "income_grp") #, "nev_name", "WWF_biome")
 existing_groups <- grouping_cols[grouping_cols %in% names(spatial_units_with_lcc)]
 
 if (length(existing_groups) > 0) {
@@ -333,10 +358,15 @@ if (length(existing_groups) > 0) {
 
   for (g in existing_groups) {
     # Calculate mean metrics per group (assuming equal area grid, mean % is appropriate)
-    summary_g <- spatial_units_with_lcc %>%
+    # Use lcc_m (long format) joined with attributes from spatial_units to preserve structure
+    attrs <- spatial_units %>%
       sf::st_drop_geometry() %>%
+      dplyr::select(all_of(id_col_name), all_of(g))
+
+    summary_g <- lcc_m %>%
+      dplyr::left_join(attrs, by = id_col_name) %>%
       group_by(across(all_of(g)), year_step, Category) %>%
-      summarize(across(c(Gain, Persistence, Loss, Quantity, Exchange, Shift, dir_ch),
+      summarize(across(any_of(c("Gain", "Persistence", "Loss", "Quantity", "Exchange", "Shift", "dir_ch")),
                        mean, na.rm = TRUE), .groups = "drop") %>%
       mutate(grouping_var = g) %>%
       rename(group_val = !!g)

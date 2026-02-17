@@ -86,4 +86,4 @@ Instead of simple "Net Change" (which masks simultaneous loss and gain), we use 
 *   **Gross Gain:** The area of natural land recovered.
 *   **Exchange:** Shifts that don't affect the net total but represent dynamic turnover.
 
-These metrics are aggregated to the 10km grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation).
+These metrics are aggregated to the 10km grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation). We further summarize these transitions by World Bank Region, Income Group, and Biome to identify geographically distinct drivers of change.

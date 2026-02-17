@@ -140,3 +140,9 @@ A "Drivers of Change" visualization that ranks ecosystem services by their sensi
     - Validated `analysis/hotspot_extraction.qmd` logic for LCC overlap (Drivers of Change).
     - Waiting for `analysis/LC_change.qmd` extraction to complete.
     - Updated documentation (`README.md`, `README_Methodology.md`) to formally include the LCC pipeline and `diffeR` methodology.
+
+- 2026-02-17: **LCC Pipeline Finalization**:
+    - Fixed `fid` vs `grid_fid` conflict in `analysis/LC_change.qmd` preventing GPKG export.
+    - Fixed grouping aggregation logic (joining attributes to long-format metrics) to successfully generate `lcc_summary_by_group.csv`.
+    - Removed testing limits to allow full global extraction.
+    - **Status**: `analysis/LC_change.qmd` is now stable and running for the full dataset.

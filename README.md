@@ -176,7 +176,7 @@ The R analysis workflow is conducted through a series of Quarto notebooks locate
 
 -   **File:** `analysis/LC_change.qmd`
 -   **Purpose:** Calculates pixel-to-grid transition metrics (Gross Loss, Gross Gain, Persistence) using the `diffeR` package. This provides the "Driver" layer for attributing ES change.
--   **Outputs:** `processed/10k_lcc_metrics.gpkg`.
+-   **Outputs:** `processed/10k_lcc_metrics.gpkg` (spatial) and `processed/lcc_summary_by_group.csv` (tabular summaries).
 
 ## 3. Hotspot Extraction and Beneficiary Data Integration
 
