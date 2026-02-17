@@ -145,4 +145,5 @@ A "Drivers of Change" visualization that ranks ecosystem services by their sensi
     - Fixed `fid` vs `grid_fid` conflict in `analysis/LC_change.qmd` preventing GPKG export.
     - Fixed grouping aggregation logic (joining attributes to long-format metrics) to successfully generate `lcc_summary_by_group.csv`.
     - Removed testing limits to allow full global extraction.
+    - **Optimization**: Implemented chunked processing (50k cells/chunk) in `analysis/LC_change.qmd` to handle global scale (2.5M cells) without memory exhaustion and to enable checkpointing/resuming.
     - **Status**: `analysis/LC_change.qmd` is now stable and running for the full dataset.

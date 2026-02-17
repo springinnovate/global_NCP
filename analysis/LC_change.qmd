@@ -219,18 +219,56 @@ id_col_name <- "fid"
 # package logic wrapped in our helper functions.
 
 # 1. Iterate over all time steps defined by the input raster list.
-#    This calculates Gain, Loss, Persistence, etc. for each polygon in `spatial_units`.
-message("Running LCC metric extraction for all time steps...")
-lcc_m <- iterate_lcc_metrics(
-  landcover_rasters,
-  spatial_units,
-  id_col = id_col_name,
-  percent = TRUE,
-  verbose = TRUE,
-  mc = TRUE,
-  ncores = 8,
-  digits = 4
-)
+#    This calculates Gain, Persistence, Loss, etc. for each polygon in `spatial_units`.
+#    We use chunking to handle the large dataset (2.5M cells) robustly.
+
+chunk_size <- 50000  # Process 50k cells at a time
+n_total <- nrow(spatial_units)
+n_chunks <- ceiling(n_total / chunk_size)
+chunk_dir <- file.path(data_dir(), "processed", "lcc_chunks")
+
+if (!dir.exists(chunk_dir)) dir.create(chunk_dir, recursive = TRUE)
+
+message(glue::glue("Processing {n_total} spatial units in {n_chunks} chunks of {chunk_size}..."))
+
+lcc_m_list <- list()
+
+for (i in 1:n_chunks) {
+  chunk_file <- file.path(chunk_dir, paste0("lcc_chunk_", i, ".rds"))
+
+  if (file.exists(chunk_file)) {
+    message(glue::glue("Chunk {i}/{n_chunks} already exists. Loading..."))
+    lcc_m_list[[i]] <- readRDS(chunk_file)
+  } else {
+    message(glue::glue("Processing chunk {i}/{n_chunks}..."))
+
+    # Subset spatial units
+    idx_start <- (i - 1) * chunk_size + 1
+    idx_end <- min(i * chunk_size, n_total)
+    chunk_units <- spatial_units[idx_start:idx_end, ]
+
+    # Run extraction for this chunk
+    chunk_res <- iterate_lcc_metrics(
+      landcover_rasters,
+      chunk_units,
+      id_col = id_col_name,
+      percent = TRUE,
+      verbose = FALSE,
+      mc = TRUE,
+      ncores = 8,
+      digits = 4
+    )
+
+    saveRDS(chunk_res, chunk_file)
+    lcc_m_list[[i]] <- chunk_res
+
+    rm(chunk_units, chunk_res)
+    gc()
+  }
+}
+
+message("Assembling chunks...")
+lcc_m <- dplyr::bind_rows(lcc_m_list)
 
 # 2. Calculate net change direction (Gain - Loss) for easier interpretation.
 lcc_m <- lcc_m %>%
