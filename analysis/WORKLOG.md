@@ -8,6 +8,21 @@
 - **Completed** Synthesis: Updated `analysis/hotspot_extraction.qmd` with the "Drivers of Change" section to calculate ES/LCC overlaps.
 - **Active** Documentation: Updating READMEs to reflect the `diffeR` methodology and attribution workflow.
 - **Active** Versioning: Bumped analysis version to **v1.1.0** to reflect the addition of the Land Cover Change module.
+- **Completed** Coastal Risk Reduction: Resolved calculation issue, incorporated into analysis, and updated charts.
+- **Completed** Execution: `analysis/LC_change.qmd` finished successfully (generated `processed/10k_lcc_metrics.gpkg`).
+- **Active** Interpretation: Analyzing "Drivers of Change" (LCC vs ES correlations) and rendering final reports.
+- **Active** Zonal Stats: Calculating summary statistics for base years (1992 & 2020) independently to enable precise Symmetric Percentage Change calculations alongside absolute change.
+
+## 2026-02-20
+
+*   **Granular Land Cover Change Analysis:**
+    *   Created `analysis/LC_change_granular.qmd` to implement specific driver models:
+        *   **Forest Loss:** Binary classification (Forest vs. Non-Forest) to track deforestation/reforestation.
+        *   **Expansion:** Multi-class (Urban, Cropland, Other) to track anthropogenic expansion.
+    *   Implemented `diffeR` metric extraction (Gain, Loss, Persistence, etc.) for these specific models.
+    *   Added safety logic to rename `fid` to `grid_fid` in the output GPKG to prevent driver conflicts.
+*   **Hotspot Workflow Flexibility:**
+    *   Refactored `analysis/hotspot_extraction.qmd` to parameterize the input GPKG path (`params$input_gpkg_path`). This allows easy switching between the standard consolidated data and new experimental outputs without code changes.
 
 ## Strategic Narrative / Pitch (2026-02-11)
 
@@ -45,10 +60,9 @@ A "Drivers of Change" visualization that ranks ecosystem services by their sensi
 - Do not use ChatGPT Codex Connector on lilling (auth persists after uninstall).
 
 ## Next steps (short horizon)
-1. **Await LCC Results**: Wait for `analysis/LC_change.qmd` to finish generating `processed/10k_lcc_metrics.gpkg`.
-2. **Render Hotspots Report**: Run `analysis/hotspot_extraction.qmd` to generate the new "Drivers of Change" overlap plots.
-3. **Reporting**: Incorporate the LCC overlap findings into the final slide deck.
-4. **Coastal Risk Reduction**: Follow up on the pending calculation issue (waiting for pipeline fix).
+1. **Render Hotspots Report**: Run `analysis/hotspot_extraction.qmd` to generate the consolidated PDF with correlation plots.
+2. **Interpretation**: Analyze scatterplots to distinguish "Conversion-driven" vs "Degradation-driven" hotspots.
+3. **Reporting**: Summarize the "Attribution Gap" findings for the manuscript/presentation.
 
 ## Future Tasks (Long-term)
 1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.

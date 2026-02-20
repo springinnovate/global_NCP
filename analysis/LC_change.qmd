@@ -386,7 +386,7 @@ head(summary_df)
 #| message: false
 
 # Define the grouping columns of interest
-grouping_cols <- c("region_wb", "income_grp") #, "nev_name", "WWF_biome")
+grouping_cols <- c("region_wb", "income_grp", "nev_name", "WWF_biome")
 existing_groups <- grouping_cols[grouping_cols %in% names(spatial_units_with_lcc)]
 
 if (length(existing_groups) > 0) {
@@ -478,4 +478,81 @@ ggplot(summary_df, aes(x = year_step, y = Gain, group = as.factor(Category), col
        x = "Year Step",
        y = "% Area Changed") +
   theme_minimal()
+```
+
+
+```{r}
+#| label: plot-regional-summary
+#| message: false
+#| warning: false
+
+# Visualization: Gross Loss of Natural Land by Region
+if (exists("all_group_summaries") && "region_wb" %in% all_group_summaries$grouping_var) {
+  plot_data <- all_group_summaries %>%
+    dplyr::filter(grouping_var == "region_wb", Category == 2) # Category 2 = Natural
+
+  p <- ggplot(plot_data, aes(x = reorder(group_val, Loss), y = Loss)) +
+    geom_col(fill = "#d95f02", alpha = 0.8) +
+    coord_flip() +
+    labs(title = "Gross Loss of Natural Land (1992-2020)",
+         subtitle = "Average % Loss per 10km Grid Cell by Region",
+         x = NULL, y = "Gross Loss (%)") +
+    theme_minimal() +
+    theme(panel.grid.major.y = element_blank())
+
+  print(p)
+}
+```
+
+```{r}
+#| label: map-net-change
+#| message: false
+#| warning: false
+
+# Visualization: Map of Net Change in Natural Land (dir_ch_2)
+# Negative = Net Loss, Positive = Net Gain
+target_col <- "dir_ch_2_2020_1992"
+lcc_gpkg <- file.path(data_dir(), "processed", "10k_lcc_metrics.gpkg")
+
+if (file.exists(lcc_gpkg)) {
+  # Read data
+  lcc_sf <- st_read(lcc_gpkg, quiet = TRUE)
+
+  if (target_col %in% names(lcc_sf)) {
+    # Filter Antarctica for better global view if continent column exists
+    if ("continent" %in% names(lcc_sf)) {
+      lcc_sf <- lcc_sf %>%
+        dplyr::filter(!continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+    }
+
+    # Plot
+    p_map <- ggplot(lcc_sf) +
+      geom_sf(aes(fill = .data[[target_col]]), color = NA) +
+      scale_fill_gradient2(
+        low = "#d73027",   # Red for Loss
+        mid = "#f7f7f7",   # White for Stable
+        high = "#1a9850",  # Green for Gain
+        midpoint = 0,
+        limits = c(-100, 100),
+        oob = scales::squish,
+        name = "Net Change (%)"
+      ) +
+      labs(
+        title = "Net Change of Natural Cover (1992-2020)",
+        subtitle = "Net Change = Gain - Loss (Class 2)"
+      ) +
+      theme_minimal() +
+      theme(legend.position = "bottom")
+
+    # Save
+    out_png <- file.path(out_plots(), "map_net_change_natural.png")
+    ggsave(out_png, p_map, width = 12, height = 6, bg = "white")
+
+    # Display saved image to avoid rendering heavy vector graphics in notebook output
+    knitr::include_graphics(out_png)
+  } else {
+    message("Column ", target_col, " not found. Check column names.")
+  }
+}
+```
 ```

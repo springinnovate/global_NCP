@@ -2,12 +2,12 @@
 
 Most functions are already split into thematic files, but here’s a quick map so we can gradually consolidate without breaking the package structure:
 
-- **Hotspot core**:  
+- **Hotspot core**:
   `extract_hotspots.R`, `hotposts_export.R`, `get_hotspots.R`, `identify_hotspots.R`, `KS_helpers.R`, `ks_hotspots.R`.
-- **Plotting** (bar/violin/KS/ECDF):  
+- **Plotting** (bar/violin/KS/ECDF):
   `change_bars.R`, `hotspot_violins.R`, `plot_hotspots.R`, `plot_hotspot_boxviolin.R`, `plot_hotspot_density_bin2d.R`, `plot_ks_*`, `save_ECDF.R`, `ecdf_grid.R`.
-- **Data prep / geometry utilities**:  
-  `agg_change*.R`, `pct_change_calc.R`, `paths.R`, `cookiecutteR.R`, `coalesced_left_join_sf.R`, `rast_alignR.R`, `iterate_lcc_metrics.R`, etc.
+- **Data prep / geometry utilities**:
+  `agg_change*.R`, `pct_change.R`, `paths.R`, `cookiecutteR.R`, `coalesced_left_join_sf.R`, `rast_alignR.R`, `iterate_lcc_metrics.R`, etc.
 
 When moving helpers into subdirectories, remember:
 

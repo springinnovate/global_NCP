@@ -452,7 +452,9 @@ if (!file.exists(qa_gpkg_path)) {
         # Recalculate baseline to demonstrate the cause
         diagnostic_df <- sign_flips_df %>%
           dplyr::mutate(
-            recalculated_t0 = .data[[abs_col]] / (.data[[pct_col]] / 100),
+            # Inverse of Symmetric Percentage Change: V1 = A * (100/P - 0.5)
+            # (Standard formula V1 = A / (P/100) is incorrect for symmetric change)
+            recalculated_t0 = .data[[abs_col]] * (100 / .data[[pct_col]] - 0.5),
             recalculated_t1 = .data[[abs_col]] + recalculated_t0
           ) %>%
           dplyr::select(
@@ -746,6 +748,11 @@ if (file.exists(lc_gpkg)) {
   # We assume the column naming convention from LC_change.qmd: Loss_2_1992_2020
   lc_sf <- sf::st_read(lc_gpkg, quiet = TRUE)
   lc_df <- sf::st_drop_geometry(lc_sf)
+
+  # Handle column rename from LC_change.qmd (fid -> grid_fid)
+  if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df)) {
+    lc_df <- dplyr::rename(lc_df, fid = grid_fid)
+  }
 
   # Select columns dynamically: Loss_2 (Conversion) and Gain_2 (Restoration)
   cols_to_keep <- grep("(Loss|Gain)_2_.*", names(lc_df), value = TRUE)
@@ -1052,10 +1059,18 @@ lc_gpkg <- file.path(data_dir(), "processed", "10k_lcc_metrics.gpkg")
 lc_data_ready <- FALSE
 lc_df <- NULL
 loss_col <- NULL
+  net_col <- NULL
 if (file.exists(lc_gpkg) && exists("plt_long")) {
   lc_df <- sf::st_read(lc_gpkg, quiet = TRUE) %>% sf::st_drop_geometry()
+
+  # Handle column rename from LC_change.qmd (fid -> grid_fid)
+  if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df)) {
+    lc_df <- dplyr::rename(lc_df, fid = grid_fid)
+  }
+
   # Identify the specific column for Loss of Natural (1992-2020)
   loss_col <- grep("Loss_2_.*", names(lc_df), value = TRUE)[1]
+  net_col <- grep("dir_ch_2_.*", names(lc_df), value = TRUE)[1]
   if (!is.na(loss_col)) {
     message("Using LC column: ", loss_col, " as proxy for Land Conversion.")
     lc_data_ready <- TRUE
@@ -1122,5 +1137,51 @@ if (!is.null(overlap_stats)) {
   print(p)
 } else {
   message("Skipping overlap analysis (data not ready).")
+}
+```
+
+```{r}
+#| label: lc-es-correlation
+#| eval: true
+#| echo: false
+#| message: false
+#| warning: false
+
+if (lc_data_ready && !is.null(net_col)) {
+  # Join ES change (plt_long) with Net LC Change
+  # We correlate ES Change (pct_chg) with Net Natural Change (dir_ch_2)
+  # Hypothesis: Loss of Natural (negative dir_ch) -> Loss of ES (negative pct_chg for loss services)
+
+  cor_data <- plt_long %>%
+    dplyr::inner_join(lc_df %>% dplyr::select(fid, dplyr::all_of(net_col)), by = "fid") %>%
+    dplyr::filter(!is.na(pct_chg), !is.na(.data[[net_col]]))
+
+  # Calculate correlation per service
+  cor_stats <- cor_data %>%
+    dplyr::group_by(service) %>%
+    dplyr::summarize(
+      pearson_r = cor(pct_chg, .data[[net_col]], method = "pearson"),
+      spearman_rho = cor(pct_chg, .data[[net_col]], method = "spearman"),
+      n = n()
+    ) %>%
+    dplyr::arrange(desc(abs(spearman_rho)))
+
+  print(knitr::kable(cor_stats, digits = 3, caption = "Correlation between ES % Change and Net Natural Land Change"))
+
+  # Plot for all services (subsampled for speed)
+  services_to_plot <- cor_stats$service
+
+  for (svc in services_to_plot) {
+    p_cor <- ggplot(cor_data %>% dplyr::filter(service == svc) %>% dplyr::sample_n(min(n(), 10000)),
+                    aes(x = .data[[net_col]], y = pct_chg)) +
+      geom_point(alpha = 0.1) +
+      geom_smooth(method = "lm", color = "red") +
+      labs(title = paste("ES Change vs. Net Natural Change:", svc),
+           x = "Net Change in Natural Land (%)",
+           y = "ES Change (%)") +
+      theme_minimal()
+
+    print(p_cor)
+  }
 }
 ```
