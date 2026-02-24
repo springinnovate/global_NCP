@@ -1,0 +1,125 @@
+---
+title: "Prepare Granular Land Cover Data"
+author: "Jeronimo Rodriguez-Escobar"
+date: last-modified
+format:
+  html:
+    toc: true
+    theme: cosmo
+editor: source
+---
+
+## Overview
+
+This script prepares the land cover data for the granular Land Cover Change analysis.
+It extracts raw ESA CCI (1992) and C3S (2020) data from the source zip file and reclassifies them into a simplified 9-class scheme.
+
+Crucially, this reclassification ensures that **Flooded Trees (classes 160, 170)** are mapped to **Forest**, which differs from some standard aggregations that might map them to wetlands or generic vegetation. This is essential for the "Forest Loss" model.
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(terra)
+library(glue)
+library(here)
+library(devtools)
+
+# Initialize paths
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R", "paths.R"))
+devtools::load_all(quiet = TRUE)
+```
+
+## Configuration
+
+```{r}
+#| label: config
+
+years_to_process <- c(1992, 2020)
+
+# Output directory for granular analysis inputs
+lc_dir_granular <- data_raw("LandCovers_Granular")
+if (!dir.exists(lc_dir_granular)) dir.create(lc_dir_granular, recursive = TRUE)
+
+# Raw zip file location
+raw_zip_path <- file.path(data_raw(), "6e774a4e4a552fd229bcb88b4d3c02e6.zip")
+
+# Reclassification matrix: Original ESA (37 classes) -> 9 simplified classes
+# 1:Cropland, 2:Forest, 3:Grassland/Shrubland, 4:Sparse, 5:Wetland, 6:Urban, 7:Bare, 8:Water, 9:Snow
+# Note: 160/170 (Flooded Trees) mapped to 2 (Forest) to capture mangroves/swamp forests.
+reclass_37_to_9 <- matrix(c(
+  10, 1, 11, 1, 12, 1, 20, 1, 30, 1, 40, 1,
+  50, 2, 60, 2, 61, 2, 62, 2, 70, 2, 71, 2, 72, 2, 80, 2, 81, 2, 82, 2, 90, 2, 100, 2,
+  110, 3, 120, 3, 121, 3, 122, 3, 130, 3,
+  140, 4, 150, 4, 151, 4, 152, 4, 153, 4,
+  160, 2, 170, 2, 180, 5,
+  190, 6,
+  200, 7, 201, 7, 202, 7,
+  210, 8,
+  220, 9
+), ncol = 2, byrow = TRUE)
+```
+
+## Processing
+
+```{r}
+#| label: process-rasters
+
+for (year in years_to_process) {
+  out_file <- file.path(lc_dir_granular, paste0("landcover_gl_", year, ".tif"))
+
+  # Force regeneration to ensure the correct classification (e.g. flooded trees) is applied.
+  # if (file.exists(out_file)) {
+  #   message(glue::glue("File for {year} already exists at {out_file}. Skipping."))
+  #   next
+  # }
+
+  message(glue::glue("Processing {year} from raw zip..."))
+
+  if (!file.exists(raw_zip_path)) {
+    stop("Raw zip file not found at: ", raw_zip_path)
+  }
+  if (file.size(raw_zip_path) < 10000) {
+    stop("Raw zip file appears corrupted or too small (<10KB): ", raw_zip_path)
+  }
+
+  # Unzip specific year file to temp
+  ex_dir <- tempdir()
+  file_list <- unzip(raw_zip_path, list = TRUE)
+
+  # Find file matching year (NetCDF or TIF)
+  # Pattern matches C3S/ESA naming conventions
+  raw_file_name <- grep(paste0(year, ".*(nc|tif)$"), file_list$Name, value = TRUE)[1]
+
+  if (is.na(raw_file_name)) {
+    stop("Could not find raw file for year ", year, " in zip.")
+  }
+
+  message("Unzipping ", raw_file_name, "...")
+  unzip(raw_zip_path, files = raw_file_name, exdir = ex_dir)
+  raw_file_path <- file.path(ex_dir, raw_file_name)
+
+  # Load and reclassify
+  message("Reclassifying to 9 classes...")
+  r_raw <- terra::rast(raw_file_path)
+
+  # If NetCDF, it might have multiple layers, usually 'lccs_class' is what we want
+  if (terra::nlyr(r_raw) > 1) {
+    if ("lccs_class" %in% names(r_raw)) {
+      r_raw <- r_raw[["lccs_class"]]
+    } else {
+      r_raw <- r_raw[[1]]
+    }
+  }
+
+  r_9 <- terra::classify(r_raw, reclass_37_to_9, filename = out_file,
+                         gdal = c("COMPRESS=LZW", "TILED=YES"), overwrite = TRUE)
+
+  message("Generated: ", out_file)
+  unlink(raw_file_path) # Clean up temp
+}
+
+message("Data preparation complete.")
+```

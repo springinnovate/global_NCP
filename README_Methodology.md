@@ -65,6 +65,12 @@ This approach provides the spatial representation of the pixel-based method whil
 
 -   **Hotspot Threshold:** The threshold for identifying hotspots is defined in `analysis/hotspot_extraction.qmd`. It is configured in an R object named `HOTS_CFG` with the parameter `pct_cutoff = 0.05`, representing the top/bottom 5% of SPC values.
 
+## Symmetric Percentage Change
+
+To address mathematical artifacts where the sign of percentage change differs from absolute change (common when baselines are negative or near-zero), this analysis uses a **symmetric percentage change** calculation (`pct_mode="symm"`). This ensures that the direction of the percentage change always aligns with the absolute difference ($t_1 - t_0$).
+
+**Distribution Limits:** The Symmetric Percentage Change (SPC) metric is bounded between **-200%** (Total Loss) and **+200%** (New Emergence). Consequently, extreme values and clustering at these boundaries, as well as bi-modal distributions (e.g., in Sediment Export), are expected features of the metric rather than data artifacts.
+
 ## Aggregation Logic: Sum vs. Mean
 
 A common question regarding Path B is the comparability of variables aggregated via **sum** (extensive variables like Nitrogen Export) versus those aggregated via **mean** (intensive variables like Risk Indices).
@@ -86,4 +92,14 @@ Instead of simple "Net Change" (which masks simultaneous loss and gain), we use 
 *   **Gross Gain:** The area of natural land recovered.
 *   **Exchange:** Shifts that don't affect the net total but represent dynamic turnover.
 
-These metrics are aggregated to the 10km grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation). We further summarize these transitions by World Bank Region, Income Group, and Biome to identify geographically distinct drivers of change.
+These metrics are aggregated to the 10km grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation).
+
+**Granular Models:**
+To move beyond binary "Natural vs. Transformed" analysis, we implement two specific driver models:
+
+1.  **Forest Loss Model:**
+    *   **Reclassification:** Maps ESA classes to **Forest** vs. **Non-Forest**. Crucially, Flooded Trees (classes 160, 170) are mapped to Forest to capture mangrove/swamp forest dynamics.
+    *   **Metric:** Tracks Gross Loss of Forest cover.
+2.  **Expansion Model:**
+    *   **Reclassification:** Maps ESA classes to **Urban**, **Cropland**, and **Other**.
+    *   **Metric:** Tracks the specific expansion of Urban and Cropland areas into other land cover types.

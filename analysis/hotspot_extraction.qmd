@@ -5,7 +5,7 @@ author: "Jerónimo Rodríguez Escobar"
 email: "jeronimo.rodriguez@wwfus.org"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
-analysis_version: "v1.1.0"
+analysis_version: "v1.2.0"
 format:
 #  html:
 #    toc: true
@@ -21,7 +21,7 @@ format:
 editor: source
 
 params:
-  analysis_version: "v1.1.0"
+  analysis_version: "v1.2.0"
 ---
 
 ## Overview
@@ -1055,7 +1055,7 @@ This section explores the relationship between Ecosystem Service hotspots and La
 #| warning: false
 
 # 1. Load LC Data
-lc_gpkg <- file.path(data_dir(), "processed", "10k_lcc_metrics.gpkg")
+lc_gpkg <- file.path(data_dir(), "processed", "10k_lcc_granular_metrics.gpkg")
 lc_data_ready <- FALSE
 lc_df <- NULL
 loss_col <- NULL
@@ -1068,14 +1068,27 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
     lc_df <- dplyr::rename(lc_df, fid = grid_fid)
   }
 
-  # Identify the specific column for Loss of Natural (1992-2020)
-  loss_col <- grep("Loss_2_.*", names(lc_df), value = TRUE)[1]
-  net_col <- grep("dir_ch_2_.*", names(lc_df), value = TRUE)[1]
-  if (!is.na(loss_col)) {
-    message("Using LC column: ", loss_col, " as proxy for Land Conversion.")
+  # Identify specific driver columns (Granular Analysis)
+  # We look for Forest Loss and Urban/Cropland Expansion
+  # Explicitly targeting 1992-2020 transitions based on LCC_column_dictionary.md
+  drivers <- list(
+    "Forest_Loss" = "ForestLoss_Loss_Forest_2020_1992",
+    "Urban_Exp"   = "Expansion_Gain_Urban_2020_1992",
+    "Crop_Exp"    = "Expansion_Gain_Cropland_2020_1992"
+  )
+
+  # Filter out columns that don't exist in the data
+  drivers <- drivers[sapply(drivers, function(x) x %in% names(lc_df))]
+
+  # Identify Net Forest Change for correlation analysis
+  net_col <- "ForestLoss_dir_ch_Forest_2020_1992"
+  if (!net_col %in% names(lc_df)) net_col <- NULL
+
+  if (length(drivers) > 0) {
+    message("Found granular LC drivers: ", paste(names(drivers), collapse = ", "))
     lc_data_ready <- TRUE
   } else {
-    message("No 'Loss_2' column found in LC data.")
+    message("No granular driver columns found in LC data.")
   }
 } else {
   message("LC data or plt_long missing.")
@@ -1091,29 +1104,44 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
 
 overlap_stats <- NULL
 if (lc_data_ready) {
-  # Define LC Hotspots (Top 5% of Loss)
-  cutoff <- quantile(lc_df[[loss_col]], 0.95, na.rm = TRUE)
-  lc_hotspots <- lc_df %>%
-    filter(.data[[loss_col]] > cutoff) %>%
-    pull(fid)
+  overlap_list <- list()
 
-  # Calculate Overlap for each Service
-  overlap_stats <- plt_long %>%
-    group_by(service) %>%
-    summarize(
-      n_es_hotspots = sum(
-        (service %in% HOTS_CFG$loss & pct_chg <= quantile(pct_chg, HOTS_CFG$pct_cutoff, na.rm=TRUE)) |
-        (service %in% HOTS_CFG$gain & pct_chg >= quantile(pct_chg, 1-HOTS_CFG$pct_cutoff, na.rm=TRUE)),
-        na.rm = TRUE
-      ),
-      n_overlap = sum(
-        fid %in% lc_hotspots &
-        ((service %in% HOTS_CFG$loss & pct_chg <= quantile(pct_chg, HOTS_CFG$pct_cutoff, na.rm=TRUE)) |
-         (service %in% HOTS_CFG$gain & pct_chg >= quantile(pct_chg, 1-HOTS_CFG$pct_cutoff, na.rm=TRUE))),
-        na.rm = TRUE
+  for (d_name in names(drivers)) {
+    d_col <- drivers[[d_name]]
+
+    # Define Driver Hotspots (Top 5% of change)
+    # For Loss columns (ForestLoss), high values = high loss.
+    # For Gain columns (Urban/Crop), high values = high expansion.
+    cutoff <- quantile(lc_df[[d_col]], 0.95, na.rm = TRUE)
+    driver_hotspots <- lc_df %>%
+      filter(.data[[d_col]] > cutoff) %>%
+      pull(fid)
+
+    # Calculate Overlap
+    stats <- plt_long %>%
+      group_by(service) %>%
+      summarize(
+        n_es_hotspots = sum(
+          (service %in% HOTS_CFG$loss & pct_chg <= quantile(pct_chg, HOTS_CFG$pct_cutoff, na.rm=TRUE)) |
+          (service %in% HOTS_CFG$gain & pct_chg >= quantile(pct_chg, 1-HOTS_CFG$pct_cutoff, na.rm=TRUE)),
+          na.rm = TRUE
+        ),
+        n_overlap = sum(
+          fid %in% driver_hotspots &
+          ((service %in% HOTS_CFG$loss & pct_chg <= quantile(pct_chg, HOTS_CFG$pct_cutoff, na.rm=TRUE)) |
+           (service %in% HOTS_CFG$gain & pct_chg >= quantile(pct_chg, 1-HOTS_CFG$pct_cutoff, na.rm=TRUE))),
+          na.rm = TRUE
+        )
+      ) %>%
+      mutate(
+        pct_overlap = (n_overlap / n_es_hotspots) * 100,
+        driver = d_name
       )
-    ) %>%
-    mutate(pct_overlap = (n_overlap / n_es_hotspots) * 100) %>%
+
+    overlap_list[[d_name]] <- stats
+  }
+
+  overlap_stats <- bind_rows(overlap_list) %>%
     arrange(desc(pct_overlap))
 }
 ```
@@ -1127,11 +1155,12 @@ if (lc_data_ready) {
 
 if (!is.null(overlap_stats)) {
   # Plot
-  p <- ggplot(overlap_stats, aes(x = reorder(service, pct_overlap), y = pct_overlap)) +
-   geom_col(fill = "#d95f02") +
+  p <- ggplot(overlap_stats, aes(x = reorder(service, pct_overlap), y = pct_overlap, fill = driver)) +
+   geom_col(position = "dodge") +
+   scale_fill_brewer(palette = "Set2") +
    coord_flip() +
-   labs(title = "Overlap with Land Conversion Hotspots",
-        subtitle = paste0("% of ES Hotspots that are also in the top 5% of ", loss_col),
+   labs(title = "Attribution of ES Hotspots to Land Cover Drivers",
+        subtitle = "% of ES Hotspots overlapping with Top 5% of Driver Change",
         x = "Service", y = "% Overlap") +
    theme_minimal()
   print(p)

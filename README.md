@@ -14,6 +14,14 @@ The core extraction workflow uses Python (`taskgraph` + `exactextract`) for zona
 
 For a detailed technical description of the pipeline steps, see analysis/README_pipeline.md.
 
+## Documentation Structure
+
+To keep information organized, this project uses the following structure:
+
+*   **`README.md` (This file):** High-level project overview, setup, and pipeline usage.
+*   **`README_Methodology.md`:** Detailed theoretical framework, mathematical definitions (e.g., Symmetric Percentage Change), and aggregation logic.
+*   **`analysis/README.md`:** A technical **Runbook** for executing the R/Quarto analysis scripts in the correct order.
+
 These tools support reproducible extraction and visualization of ES trends and change detection across modeled periods. They enable exploratory and comparative analyses of spatial transformations, ES provision, and relationships to beneficiary groups.
 
 # Objectives
@@ -214,28 +222,6 @@ B. Socioeconomic Characterization (Who is affected?)
 Objective: To determine if hotspots are statistically concentrated in areas with specific socioeconomic profiles compared to non-hotspot areas.
 
 Comparison: "Hotspot" vs. "Non-Hotspot" locations.
-
-Key Metrics: Distributions of GDP per capita, Population Density, and other socioeconomic indicators (analyzed via Violin Plots and KS/ANOVA tests).
-
-# Methodology Notes
-
-## Symmetric Percentage Change
-To address mathematical artifacts where the sign of percentage change differs from absolute change (common when baselines are negative or near-zero), this analysis uses a **symmetric percentage change** calculation (`pct_mode="symm"`). This ensures that the direction of the percentage change always aligns with the absolute difference ($t_1 - t_0$).
-
-**Distribution Limits:** The Symmetric Percentage Change (SPC) metric is bounded between **-200%** (Total Loss) and **+200%** (New Emergence). Consequently, extreme values and clustering at these boundaries, as well as bi-modal distributions (e.g., in Sediment Export), are expected features of the metric rather than data artifacts.
-
-## Aggregation Logic: Sum vs. Mean
-
-When extracting zonal statistics for the 10km grid, variables are aggregated based on their physical nature:
-
-*   **Extensive variables** (e.g., Nitrogen Export in kg, Population count) are **summed** to get the total load/count per cell.
-*   **Intensive variables** (e.g., Risk Index, Nature Access score) are **averaged** to get the representative condition per cell.
-
-**Robustness for Comparison:**
-Since the analysis uses the **IUCN equal-area grid**, the cell area is effectively constant.
-*   $Sum = Mean \times Area$. Because Area is constant, the Sum and Mean are perfectly proportional.
-*   Metrics like **percent change**, **hotspot ranking** (percentiles), and **KS test statistics** are mathematically identical regardless of whether sum or mean is used.
-*   Comparing relative change (e.g., "50% increase in Total Nitrogen" vs "50% increase in Average Risk") is a valid comparison of magnitude.
 
 # Future Directions
 

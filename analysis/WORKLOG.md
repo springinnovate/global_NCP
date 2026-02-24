@@ -4,14 +4,15 @@
 - **Completed** KS Analysis, Hotspot Intensity, and Multi-service workflows (v1.0.2).
 - **Completed** Re-calculating core ecosystem service ratios and difference rasters.
 - **Completed** LCC Pipeline Development: Finalized `analysis/LC_change.qmd` using `diffeR` for robust transition metrics (1992-2020).
-- **Active** Execution: `analysis/LC_change.qmd` is currently running (long-process extraction of 1992-2020 transitions).
 - **Completed** Synthesis: Updated `analysis/hotspot_extraction.qmd` with the "Drivers of Change" section to calculate ES/LCC overlaps.
 - **Active** Documentation: Updating READMEs to reflect the `diffeR` methodology and attribution workflow.
-- **Active** Versioning: Bumped analysis version to **v1.1.0** to reflect the addition of the Land Cover Change module.
+- **Completed** Versioning: Bumped analysis version to **v1.1.0** (Binary Land Cover Change).
+- **Active** Versioning: Bumped analysis version to **v1.2.0** (Granular Land Cover Change).
 - **Completed** Coastal Risk Reduction: Resolved calculation issue, incorporated into analysis, and updated charts.
 - **Completed** Execution: `analysis/LC_change.qmd` finished successfully (generated `processed/10k_lcc_metrics.gpkg`).
 - **Active** Interpretation: Analyzing "Drivers of Change" (LCC vs ES correlations) and rendering final reports.
 - **Active** Zonal Stats: Calculating summary statistics for base years (1992 & 2020) independently to enable precise Symmetric Percentage Change calculations alongside absolute change.
+- **Active** Granular LCC: Setting up and running `analysis/LC_change_granular.qmd` for Forest Loss and Urban/Cropland Expansion.
 
 ## 2026-02-20
 
@@ -23,6 +24,16 @@
     *   Added safety logic to rename `fid` to `grid_fid` in the output GPKG to prevent driver conflicts.
 *   **Hotspot Workflow Flexibility:**
     *   Refactored `analysis/hotspot_extraction.qmd` to parameterize the input GPKG path (`params$input_gpkg_path`). This allows easy switching between the standard consolidated data and new experimental outputs without code changes.
+
+## 2026-02-24
+
+*   **Refined Granular LCC Workflow:**
+    *   **Data Preparation:** Created `analysis/LC_change_preparation.qmd` to handle raw ESA CCI/C3S zip extraction and reclassification. This ensures consistent mapping (e.g., Flooded Trees -> Forest) and separates heavy I/O from analysis.
+    *   **Granular Analysis:** Updated `analysis/LC_change_granular.qmd` to consume the pre-processed 9-class rasters, removing redundant processing logic.
+    *   **Visualization:** Created `analysis/viz_granular_lcc.qmd` for quick inspection of Forest Loss and Urban/Cropland Expansion maps.
+    *   **Documentation:** Updated READMEs to reflect the new modular LCC pipeline and granular methodology.
+    *   **Optimization:** Modified `analysis/LC_change_granular.qmd` test mode to sample **contiguous** grid cells instead of random ones, significantly reducing raster I/O overhead during testing.
+
 
 ## Strategic Narrative / Pitch (2026-02-11)
 

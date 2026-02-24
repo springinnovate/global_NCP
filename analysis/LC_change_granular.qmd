@@ -44,7 +44,7 @@ devtools::load_all(quiet = TRUE)
 
 ## 1. Load Input Data
 
-This analysis uses the pre-processed 9-class land cover maps (`landcover_gl_[year].tif`) as a starting point. These maps provide a consistent, simplified classification across all years.
+This analysis relies on simplified 9-class land cover maps (`landcover_gl_[year].tif`) prepared by `analysis/LC_change_preparation.qmd`.
 
 ```{r}
 #| label: load-data
@@ -53,11 +53,14 @@ This analysis uses the pre-processed 9-class land cover maps (`landcover_gl_[yea
 years_to_process <- c(1992, 2020)
 
 # Path to pre-processed 9-class rasters
-inpath <- data_raw("LandCovers")
+lc_dir_granular <- data_raw("LandCovers_Granular")
+if (!dir.exists(lc_dir_granular)) {
+  stop("Granular LC directory not found. Run analysis/LC_change_preparation.qmd first.")
+}
 
 # Find the files for the specified years
 landcover_files <- list.files(
-  inpath,
+  lc_dir_granular,
   pattern = paste0("landcover_gl_(", paste(years_to_process, collapse = "|"), ")\\.tif$"),
   full.names = TRUE
 )
@@ -82,6 +85,17 @@ if (!"fid" %in% names(spatial_units)) {
 }
 spatial_units <- spatial_units %>% dplyr::select(fid)
 id_col_name <- "fid"
+
+# --- TESTING MODE ---
+# Set to TRUE to run on a small subset for verification.
+TEST_MODE <- FALSE
+if (TEST_MODE) {
+  message("!!! RUNNING IN TEST MODE (subset of 1000 contiguous cells) !!!")
+  # Select a contiguous block of cells to optimize raster I/O during testing
+  set.seed(123)
+  start_idx <- sample(seq_len(nrow(spatial_units) - 1000), 1)
+  spatial_units <- spatial_units %>% dplyr::slice(start_idx:(start_idx + 999))
+}
 
 message("Loaded ", nrow(spatial_units), " spatial units from the 10km grid.")
 ```
@@ -108,6 +122,10 @@ run_granular_lcc_analysis <- function(model_name, rasters_9class, reclass_matrix
   n_total <- nrow(spatial_units)
   n_chunks <- ceiling(n_total / chunk_size)
   chunk_dir <- file.path(data_dir(), "processed", "lcc_chunks", model_name)
+  # Isolate test chunks to prevent them from blocking a full run later
+  if (exists("TEST_MODE") && TEST_MODE) {
+    chunk_dir <- paste0(chunk_dir, "_test")
+  }
   if (!dir.exists(chunk_dir)) dir.create(chunk_dir, recursive = TRUE)
 
   message(glue::glue("Processing {n_total} units in {n_chunks} chunks..."))
@@ -165,8 +183,8 @@ forest_reclass_matrix <- matrix(c(
   1, 2, # Cropland -> Non-Forest
   2, 1, # Forest -> Forest
   3, 2, # Grassland -> Non-Forest
-  4, 2, # Shrubland -> Non-Forest
-  5, 2, # Sparse Veg -> Non-Forest
+  4, 2, # Sparse -> Non-Forest
+  5, 2, # Wetland -> Non-Forest
   6, 2, # Urban -> Non-Forest
   7, 2, # Bare -> Non-Forest
   8, 2, # Water -> Non-Forest
@@ -197,8 +215,8 @@ expansion_reclass_matrix <- matrix(c(
   1, 1, # Cropland -> Cropland
   2, 3, # Forest -> Other
   3, 3, # Grassland -> Other
-  4, 3, # Shrubland -> Other
-  5, 3, # Sparse Veg -> Other
+  4, 3, # Sparse -> Other
+  5, 3, # Wetland -> Other
   6, 2, # Urban -> Urban
   7, 3, # Bare -> Other
   8, 3, # Water -> Other
@@ -254,6 +272,9 @@ if (any(!sf::st_is_valid(spatial_units_with_granular_lcc))) {
 
 # Save the final enriched GeoPackage
 out_gpkg <- file.path(data_dir(), "processed", "10k_lcc_granular_metrics.gpkg")
+if (exists("TEST_MODE") && TEST_MODE) {
+  out_gpkg <- file.path(data_dir(), "processed", "10k_lcc_granular_metrics_test.gpkg")
+}
 if (!dir.exists(dirname(out_gpkg))) dir.create(dirname(out_gpkg), recursive = TRUE)
 
 # Rename 'fid' to 'grid_fid' to avoid conflict with GeoPackage reserved primary key
