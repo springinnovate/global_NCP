@@ -9,15 +9,14 @@ format:
 editor: source
 ---
 
----
+------------------------------------------------------------------------
 
 This Quarto document shows how to:
 
-1. Load land cover classification rasters and polygon units
-2. Apply `extract_zonal_lcc_metrics()` and `iterate_zonal_lcc_metrics()`
-3. Append the extracted metrics to the input polygon data.
-4. Summarize and plot key land cover transition metrics [pending]
-
+1.  Load land cover classification rasters and polygon units
+2.  Apply `extract_zonal_lcc_metrics()` and `iterate_zonal_lcc_metrics()`
+3.  Append the extracted metrics to the input polygon data.
+4.  Summarize and plot key land cover transition metrics \[pending\]
 
 ```{r}
 #| label: setup
@@ -51,18 +50,15 @@ devtools::load_all(quiet = TRUE)
 
 **Data Sources:**
 
-*   **1992-2015:** ESA Climate Change Initiative (CCI) Land Cover v2.0.7.
-    *   *Citation:* Defourny, P., Lamarche, C., Brockmann, C., Boettcher, M., Bontemps, S., De Maet, T., Duveiller, G. L. Harper, K., Hartley A., Kirches, G., Moreau, I., Peylin, P., Ottlé, C., Radoux J., Van Bogaert, E., Ramoino, F., Albergel, C., and Arino, O.: Observed annual global land-use change from 1992 to 2020 three times more dynamic than reported by inventory-based statistics, in preparation, 2023.
-    *   *User Guide:* Defourny, P., Lamarche, C., Bontemps, S., De Maet, T., Van Bogaert, E., Moreau, I., Brockmann, C., Boettcher, M., Kirches, G., Wevers, J., Santoro, M., Ramoino, F., & Arino, O. (2017). Land Cover Climate Change Initiative - Product User Guide v2. Issue 2.0. [Download PDF](http://maps.elie.ucl.ac.be/CCI/viewer/download/ESACCI-LC-Ph2-PUGv2_2.0.pdf).
-    *   *Download:* [ESA CCI Viewer](https://maps.elie.ucl.ac.be/CCI/viewer/download.php)
-*   **2016-2020:** Copernicus Climate Change Service (C3S) Global Land Cover v2.1.1.
-    *   Consistent with the ESA CCI series.
-    *   *Download:* Copernicus Climate Change Service (C3S) Climate Data Store (CDS).
+-   **1992-2015:** ESA Climate Change Initiative (CCI) Land Cover v2.0.7.
+    -   *Citation:* Defourny, P., Lamarche, C., Brockmann, C., Boettcher, M., Bontemps, S., De Maet, T., Duveiller, G. L. Harper, K., Hartley A., Kirches, G., Moreau, I., Peylin, P., Ottlé, C., Radoux J., Van Bogaert, E., Ramoino, F., Albergel, C., and Arino, O.: Observed annual global land-use change from 1992 to 2020 three times more dynamic than reported by inventory-based statistics, in preparation, 2023.
+    -   *User Guide:* Defourny, P., Lamarche, C., Bontemps, S., De Maet, T., Van Bogaert, E., Moreau, I., Brockmann, C., Boettcher, M., Kirches, G., Wevers, J., Santoro, M., Ramoino, F., & Arino, O. (2017). Land Cover Climate Change Initiative - Product User Guide v2. Issue 2.0. [Download PDF](http://maps.elie.ucl.ac.be/CCI/viewer/download/ESACCI-LC-Ph2-PUGv2_2.0.pdf).
+    -   *Download:* [ESA CCI Viewer](https://maps.elie.ucl.ac.be/CCI/viewer/download.php)
+-   **2016-2020:** Copernicus Climate Change Service (C3S) Global Land Cover v2.1.1.
+    -   Consistent with the ESA CCI series.
+    -   *Download:* Copernicus Climate Change Service (C3S) Climate Data Store (CDS).
 
-**Processing:**
-This workflow reclassifies the original LC maps into:
-a) A simplified 9-class map (`landcover_gl_[year].tif`)
-b) A binary Natural/Transformed map (`rec_landcover_gl_[year].tif`)
+**Processing:** This workflow reclassifies the original LC maps into: a) A simplified 9-class map (`landcover_gl_[year].tif`) b) A binary Natural/Transformed map (`rec_landcover_gl_[year].tif`)
 
 ```{r}
 #| label: reclassify-lc-maps
@@ -467,6 +463,7 @@ ref_df <- tibble(
 ref_df <- ref_df %>% select(column_name, description)
 
 ```
+
 ## Plot Change Metrics Over Time
 
 ```{r}
@@ -479,7 +476,6 @@ ggplot(summary_df, aes(x = year_step, y = Gain, group = as.factor(Category), col
        y = "% Area Changed") +
   theme_minimal()
 ```
-
 
 ```{r}
 #| label: plot-regional-summary
@@ -555,4 +551,5 @@ if (file.exists(lcc_gpkg)) {
   }
 }
 ```
-```
+
+\`\`\`

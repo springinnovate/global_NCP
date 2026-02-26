@@ -13,9 +13,10 @@ source(here::here("R", "paths.R"))
 
 # --- Configuration ---
 chunk_dir <- file.path(data_dir(), "processed", "lcc_chunks")
-# Total chunks is approx 2.5M cells / 50k chunk size = 51 chunks.
-# Adjust this if you changed the chunk size or dataset.
-total_chunks_est <- 51
+# Granular analysis runs 2 models (ForestLoss, Expansion)
+# ~2.5M cells / 50k chunk size = 50 chunks per model * 2 models = ~100 chunks
+# Setting to 68 to be safe
+total_chunks_est <- 68
 
 message("==================================================")
 message(" LCC Extraction Monitor")
@@ -25,7 +26,8 @@ message("==================================================")
 
 while (TRUE) {
   # 1. Count completed chunks
-  files <- list.files(chunk_dir, pattern = "lcc_chunk_.*\\.rds$", full.names = TRUE)
+  # Recursive = TRUE is needed to find files inside ForestLoss/ and Expansion/ subfolders
+  files <- list.files(chunk_dir, pattern = "lcc_chunk_.*\\.rds$", full.names = TRUE, recursive = TRUE)
   n_done <- length(files)
 
   # 2. Calculate Progress

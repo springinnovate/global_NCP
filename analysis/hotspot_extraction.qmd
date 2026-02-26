@@ -687,6 +687,20 @@ cat(paste0(
 # }
 ```
 
+```{r}
+#| label: ensure-plt-long-loaded
+#| echo: false
+if (!exists("plt_long")) {
+  rds_path <- file.path(data_dir(), "processed", "plt_long.rds")
+  if (file.exists(rds_path)) {
+    message("Loading cached plt_long from: ", rds_path)
+    plt_long <- readRDS(rds_path)
+  } else {
+    stop("Cached 'plt_long.rds' not found. Please enable the pivot chunk to generate it.")
+  }
+}
+```
+
 ### Export hotspot layers
 
 ::: callout-note
@@ -1061,11 +1075,14 @@ lc_df <- NULL
 loss_col <- NULL
   net_col <- NULL
 if (file.exists(lc_gpkg) && exists("plt_long")) {
-  lc_df <- sf::st_read(lc_gpkg, quiet = TRUE) %>% sf::st_drop_geometry()
+  # Load data with geometry to allow export of driver hotspots later
+  lc_sf_full <- sf::st_read(lc_gpkg, quiet = TRUE)
+  lc_df <- sf::st_drop_geometry(lc_sf_full)
 
   # Handle column rename from LC_change.qmd (fid -> grid_fid)
   if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df)) {
     lc_df <- dplyr::rename(lc_df, fid = grid_fid)
+    lc_sf_full <- dplyr::rename(lc_sf_full, fid = grid_fid)
   }
 
   # Identify specific driver columns (Granular Analysis)
@@ -1116,6 +1133,19 @@ if (lc_data_ready) {
     driver_hotspots <- lc_df %>%
       filter(.data[[d_col]] > cutoff) %>%
       pull(fid)
+
+    # Export Driver Hotspots (Top 5%) to GPKG
+    driver_out_dir <- file.path(data_dir(), "processed", "hotspots", "drivers")
+    if (!dir.exists(driver_out_dir)) dir.create(driver_out_dir, recursive = TRUE)
+
+    driver_layer_name <- paste0("hotspots_", d_name, ".gpkg")
+    out_path <- file.path(driver_out_dir, driver_layer_name)
+
+    lc_sf_full %>%
+      filter(fid %in% driver_hotspots) %>%
+      select(fid, value = all_of(d_col)) %>%
+      st_write(out_path, quiet = TRUE, delete_dsn = TRUE)
+    message("Exported driver hotspot layer: ", out_path)
 
     # Calculate Overlap
     stats <- plt_long %>%

@@ -33,7 +33,8 @@
     *   **Visualization:** Created `analysis/viz_granular_lcc.qmd` for quick inspection of Forest Loss and Urban/Cropland Expansion maps.
     *   **Documentation:** Updated READMEs to reflect the new modular LCC pipeline and granular methodology.
     *   **Optimization:** Modified `analysis/LC_change_granular.qmd` test mode to sample **contiguous** grid cells instead of random ones, significantly reducing raster I/O overhead during testing.
-
+    *   **Execution:** Aborted initial render and restarted `analysis/LC_change_granular.qmd` inside a `screen` session to ensure stability for the long-running process (>24h expected).
+    *   **Completion:** Granular LCC analysis finished (~48h runtime). Output: `processed/10k_lcc_granular_metrics.gpkg`.
 
 ## Strategic Narrative / Pitch (2026-02-11)
 
