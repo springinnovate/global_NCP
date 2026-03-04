@@ -1,0 +1,147 @@
+---
+title: "Comparison of V1 vs V2 Hotspots"
+author: "Jeronimo Rodriguez Escobar"
+date: last-modified
+format:
+  html:
+    toc: true
+    df-print: kable
+editor: source
+---
+
+## Overview
+
+This script compares the hotspot results from **V1** (Original Absolute/Relative Change) and **V2** (Symmetric Percentage Change). It checks for changes in the total number of hotspots and calculates the spatial overlap (Jaccard Index) to quantify how much the hotspot locations have shifted.
+
+```{r setup}
+#| message: false
+#| warning: false
+
+library(dplyr)
+library(readr)
+library(sf)
+library(here)
+library(ggplot2)
+library(tidyr)
+library(devtools)
+
+# Initialize paths
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R", "paths.R"))
+devtools::load_all(quiet = TRUE)
+
+# Define paths
+v1_dir <- file.path(data_dir(), "processed", "hotspots")
+v2_dir <- file.path(data_dir(), "processed", "hotspots_v2")
+
+v1_index_path <- file.path(v1_dir, "_hotspots_index.csv")
+v2_index_path <- file.path(v2_dir, "_hotspots_index_v2.csv")
+```
+
+## 1. Compare Global Counts
+
+```{r compare-counts}
+if (!file.exists(v1_index_path) || !file.exists(v2_index_path)) {
+  stop("One or both index files are missing. Ensure both V1 and V2 extractions have run.")
+}
+
+idx1 <- read_csv(v1_index_path, show_col_types = FALSE) %>% mutate(version = "v1")
+idx2 <- read_csv(v2_index_path, show_col_types = FALSE) %>% mutate(version = "v2")
+
+# Combine and pivot
+combined <- bind_rows(idx1, idx2)
+
+# Filter for Global scope summary
+global_comp <- combined %>%
+  filter(scope == "global") %>%
+  select(metric, version, n_hot) %>%
+  pivot_wider(names_from = version, values_from = n_hot) %>%
+  mutate(
+    diff = v2 - v1,
+    pct_diff = round((diff / v1) * 100, 1)
+  )
+
+print(global_comp)
+```
+
+## 2. Spatial Overlap (Jaccard Index)
+
+We calculate the Jaccard Index ($J = \frac{|A \cap B|}{|A \cup B|}$) for each service to see how much the hotspot locations overlap between versions.
+
+```{r spatial-overlap}
+#| message: false
+#| warning: false
+
+calc_overlap <- function(metric_type) {
+  # Paths to global GPKGs
+  gpkg1 <- file.path(v1_dir, metric_type, "global", paste0("hotspots_global_", metric_type, ".gpkg"))
+  gpkg2 <- file.path(v2_dir, metric_type, "global", paste0("hotspots_global_", metric_type, ".gpkg"))
+
+  if (!file.exists(gpkg1) || !file.exists(gpkg2)) {
+    message("Missing GPKGs for metric: ", metric_type)
+    return(NULL)
+  }
+
+  sf1 <- st_read(gpkg1, quiet = TRUE)
+  sf2 <- st_read(gpkg2, quiet = TRUE)
+
+  # Normalize ID columns (V2 uses grid_fid, V1 might use fid)
+  if ("grid_fid" %in% names(sf1)) sf1 <- rename(sf1, fid = grid_fid)
+  if ("grid_fid" %in% names(sf2)) sf2 <- rename(sf2, fid = grid_fid)
+
+  # Identify common services (columns present in both that are not metadata)
+  meta_cols <- c("fid", "geom", "geometry", "n_hot", "n_hot_deg_combo", "n_hot_rec_combo")
+  services <- intersect(setdiff(names(sf1), meta_cols), setdiff(names(sf2), meta_cols))
+
+  results <- list()
+
+  for (svc in services) {
+    fids1 <- sf1$fid[sf1[[svc]] == 1]
+    fids2 <- sf2$fid[sf2[[svc]] == 1]
+
+    intersection <- length(intersect(fids1, fids2))
+    union <- length(union(fids1, fids2))
+    jaccard <- if (union > 0) intersection / union else 0
+
+    results[[svc]] <- tibble(
+      service = svc,
+      metric = metric_type,
+      v1_count = length(fids1),
+      v2_count = length(fids2),
+      overlap_count = intersection,
+      jaccard_index = round(jaccard, 3)
+    )
+  }
+  bind_rows(results)
+}
+
+overlap_abs <- calc_overlap("abs")
+overlap_pct <- calc_overlap("pct")
+overlap_all <- bind_rows(overlap_abs, overlap_pct)
+
+print(overlap_all)
+```
+
+### Visualization
+
+```{r plot-overlap}
+#| fig.width: 10
+#| fig.height: 6
+
+if (!is.null(overlap_all) && nrow(overlap_all) > 0) {
+  ggplot(overlap_all, aes(x = reorder(service, jaccard_index), y = jaccard_index, fill = metric)) +
+    geom_col(position = "dodge") +
+    coord_flip() +
+    scale_y_continuous(limits = c(0, 1), labels = scales::percent) +
+    labs(
+      title = "Stability of Hotspots: V1 vs V2 (Jaccard Index)",
+      subtitle = "Higher values indicate high spatial agreement between versions",
+      y = "Spatial Overlap (Jaccard Index)",
+      x = "Ecosystem Service"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "bottom")
+} else {
+  message("No overlap data to plot.")
+}
+```

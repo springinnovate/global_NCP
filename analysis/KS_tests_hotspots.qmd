@@ -20,6 +20,10 @@ format:
 editor: source
 execute:
   freeze: auto
+params:
+  input_gpkg: "10k_change_calc.gpkg"
+  input_plt_long: "plt_long.rds"
+  output_suffix: "" # e.g., "_v2"
 ---
 
 ## Overview
@@ -157,9 +161,9 @@ KS_CFG <- list(
   mountain_var            = "rast_gdpTot_1990_2020_30arcsec_2020_sum",
   mountain_transform      = "log1p",
   # outputs
-  out_table  = file.path(cfg$paths$processed_data_dir, "ks_results_hot_vs_non.csv"),
-  out_dir    = out_plots("ks"),
-  latest_dir = out_plots("latest","ks"),
+  out_table  = file.path(cfg$paths$processed_data_dir, paste0("ks_results_hot_vs_non", params$output_suffix, ".csv")),
+  out_dir    = out_plots(paste0("ks", params$output_suffix)),
+  latest_dir = out_plots("latest", paste0("ks", params$output_suffix)),
   service_suffix_pattern = "_(mean|sum)$"
 )
 ```
@@ -176,7 +180,7 @@ Build `plt_long` from the processed grid, harmonizing service labels and keeping
 #| results: hide
 #| cache: false
 
-rds_path <- file.path(cfg$paths$processed_data_dir, "plt_long.rds")
+rds_path <- file.path(cfg$paths$processed_data_dir, params$input_plt_long)
 need_reload <- TRUE
 if (file.exists(rds_path)) {
   plt_long <- readRDS(rds_path)
@@ -185,9 +189,10 @@ if (file.exists(rds_path)) {
 
 if (need_reload) {
   # Use full QA dataset to ensure socioeconomic variables are present
-  gpkg <- file.path(data_dir(), "processed", "10k_grid_ES_change_benef.gpkg")
+  # Default to params$input_gpkg, but check for QA file if using default
+  gpkg <- file.path(data_dir(), "processed", params$input_gpkg)
   if (!file.exists(gpkg)) {
-    gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+    gpkg <- file.path(data_dir(), "processed", "10k_grid_ES_change_benef.gpkg")
   }
   stopifnot(file.exists(gpkg))
 
@@ -268,6 +273,14 @@ if (need_reload) {
     dplyr::mutate(service = dplyr::recode(service, !!!canonical_lookup))
 
   saveRDS(plt_long, rds_path)
+}
+
+# Apply filters to plt_long (whether cached or new)
+if ("continent" %in% names(plt_long)) {
+  plt_long <- dplyr::filter(plt_long, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+}
+if ("WWF_biome" %in% names(plt_long)) {
+  plt_long <- dplyr::filter(plt_long, !WWF_biome %in% c("Lakes", "Rock & Ice"))
 }
 
 svc_order <- c(
@@ -549,7 +562,7 @@ if (length(all_pngs)) {
 ks_plot_dir <- KS_CFG$out_dir
 pngs <- list.files(ks_plot_dir, pattern = "\\.png$", recursive = TRUE, full.names = FALSE)
 if (length(pngs)) {
-  rel_dir <- file.path("..", "outputs", "plots", "ks")
+  rel_dir <- file.path("..", "outputs", "plots", paste0("ks", params$output_suffix))
   rel_paths <- file.path(rel_dir, pngs)
   md <- paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
   knitr::asis_output(md)

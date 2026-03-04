@@ -15,7 +15,7 @@ Format: `{Model}_{Metric}_{Category}_{YearRange}`
 -   **Model**: `ForestLoss` or `Expansion`
 -   **Metric**: `Gain`, `Loss`, `Persistence`, `Quantity`, `Exchange`, `Shift`, `dir_ch`
 -   **Category**: The land cover class being analyzed (e.g., `Forest`, `Urban`)
--   **YearRange**: `2020_1992` (Indicates the comparison interval between these two years)
+-   **YearRange**: `1992_2020` (Indicates the comparison interval between these two years)
 
 ## Key Columns for Analysis
 
@@ -23,11 +23,11 @@ These are the most relevant metrics for attributing Ecosystem Service hotspots.
 
 | Column Name | Interpretation | Relevance |
 |:-------------------------------|:-------------------|:-------------------|
-| **`ForestLoss_Loss_Forest_...`** | **Gross Deforestation**. The specific area of Forest that converted to Non-Forest. | **High**. Primary driver for biodiversity and carbon loss. |
-| **`ForestLoss_Gain_Forest_...`** | **Gross Reforestation**. The area of Non-Forest that converted to Forest. | **High**. Potential recovery signal. |
-| **`ForestLoss_dir_ch_Forest_...`** | **Net Forest Change**. (Gain - Loss). Negative values indicate net deforestation. | **High**. Summary metric. |
-| **`Expansion_Gain_Urban_...`** | **Urbanization**. The area converted to Urban from any other class. | **High**. Driver of coastal risk, N-export, etc. |
-| **`Expansion_Gain_Cropland_...`** | **Agricultural Expansion**. The area converted to Cropland from any other class. | **High**. Driver of sediment, N-export, pollination loss. |
+| **`ForestLoss_Loss_Forest_1992_2020`** | **Gross Deforestation**. The specific area of Forest that converted to Non-Forest. | **High**. Primary driver for biodiversity and carbon loss. |
+| **`ForestLoss_Gain_Forest_1992_2020`** | **Gross Reforestation**. The area of Non-Forest that converted to Forest. | **High**. Potential recovery signal. |
+| **`ForestLoss_dir_ch_Forest_1992_2020`** | **Net Forest Change**. (Gain - Loss). Negative values indicate net deforestation. | **High**. Summary metric. |
+| **`Expansion_Gain_Urban_1992_2020`** | **Urbanization**. The area converted to Urban from any other class. | **High**. Driver of coastal risk, N-export, etc. |
+| **`Expansion_Gain_Cropland_1992_2020`** | **Agricultural Expansion**. The area converted to Cropland from any other class. | **High**. Driver of sediment, N-export, pollination loss. |
 
 ## Detailed Metric Definitions
 

@@ -22,6 +22,8 @@ editor: source
 
 params:
   analysis_version: "v1.2.0"
+  input_gpkg: "10k_change_calc.gpkg"
+  output_suffix: "" # e.g., "_v2"
 ---
 
 ## Overview
@@ -193,11 +195,13 @@ What this chunk does:
 - A later chunk computes global reference means; plotting is in its own chunk so you can skip it when debugging.
 
 ```{r}
+
 #| label: make-signed-bars-data
-#| eval: false
+#| eval: true
 #| echo: false
-#| message: false
+#| message: true
 #| warning: false
+#| cache: false
 
 services <- svc_order
 groupings <- c("income_grp","region_wb","WWF_biome")#, "nev_name") (for country if necessary)
@@ -210,7 +214,7 @@ vmsg <- function(...) if (isTRUE(verbose)) message(...)
 
 # Load canonical grid + change data from Consolidation.qmd output.
 # This file is the single source of truth for grid attributes and grouping joins.
-gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+gpkg <- file.path(data_dir(), "processed", params$input_gpkg)
 if (!file.exists(gpkg)) {
   stop("Consolidation.qmd must be run first to produce 10k_change_calc.gpkg\nExpected at: ", gpkg)
 }
@@ -219,9 +223,23 @@ vmsg("Reading canonical grid + change: ", gpkg)
 sf_f <- sf::st_read(gpkg, quiet = TRUE)
 sf_f <- sf::st_drop_geometry(sf_f)
 
+# Handle grid_fid if present (renaming to fid for consistency)
+if ("grid_fid" %in% names(sf_f) && !"fid" %in% names(sf_f)) {
+  sf_f <- dplyr::rename(sf_f, fid = grid_fid)
+}
+
+# Diagnostic: Check loaded columns
+vmsg("Loaded columns: ", paste(head(names(sf_f), 10), collapse=", "), " ...")
+vmsg("Total columns: ", ncol(sf_f))
+
 # Filter out Antarctica and Seven Seas from the dataset as they contain no relevant data for this analysis
 if ("continent" %in% names(sf_f)) {
   sf_f <- dplyr::filter(sf_f, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+}
+
+# Filter out Lakes and Rock & Ice from WWF_biome
+if ("WWF_biome" %in% names(sf_f)) {
+  sf_f <- dplyr::filter(sf_f, !WWF_biome %in% c("Lakes", "Rock & Ice"))
 }
 
 # Ensure required keys present; rebuild if missing (e.g. if dropped during IO)
@@ -239,7 +257,9 @@ stopifnot("fid" %in% names(sf_f), "c_fid" %in% names(sf_f))
 chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
 vmsg("Found ", length(chg_cols), " change columns; mapping services...")
 services_raw   <- unique(sub("_(abs|pct)_chg$", "", chg_cols))     # as in file (may include _mean)
-services_clean <- stringr::str_remove(services_raw, "_mean$")
+services_raw   <- services_raw[!grepl("^(stdev|valid_count)_", services_raw)]
+services_clean <- stringr::str_remove(services_raw, "_(mean|sum)$")
+services_clean <- stringr::str_remove(services_clean, "^(mean|sum)_")
 services_lower <- tolower(services_clean)
 svc_map <- tibble::tibble(
   col_base  = c(services_raw, services_clean),
@@ -301,13 +321,20 @@ signed_keep0 <- agg_by_group(sf_f, services, groupings, cut_q = cut_q,
                              handle_inf = handle_inf, drop_zero = FALSE)
 signed_drop0 <- agg_by_group(sf_f, services, groupings, cut_q = cut_q,
                              handle_inf = handle_inf, drop_zero = TRUE)
-print(dplyr::count(signed_keep0, grouping, metric, service))
-print(dplyr::count(signed_drop0, grouping, metric, service))
+
+if (nrow(signed_keep0) > 0) {
+  print(dplyr::count(signed_keep0, grouping, metric, service))
+} else {
+  message("WARNING: signed_keep0 is empty. Check groupings or service mapping.")
+}
+if (nrow(signed_drop0) > 0) {
+  print(dplyr::count(signed_drop0, grouping, metric, service))
+}
 ```
 
 ```{r}
 #| label: compute-global-refs
-#| eval: false
+#| eval: true
 #| message: false
 #| warning: false
 #| echo: false
@@ -349,7 +376,7 @@ glob_drop0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
 
 ```{r}
 #| label: make-signed-bars-plot
-#| eval: false
+#| eval: true
 #| message: false
 #| warning: false
 #| echo: false
@@ -358,13 +385,17 @@ plot_signed_alt <- function(df, grouping, metric,
                             refs,
                             variant_label = "keep0",
                             variant_desc  = "Zeros kept",
-                            out_dir = "outputs/plots/signed_alt") {
+                            out_dir_base = "outputs/plots") {
   d <- dplyr::filter(df, grouping == !!grouping, metric == !!metric)
   if (!nrow(d)) return(invisible(NULL))
   d$service <- factor(d$service, levels = services)
   d$group   <- factor(d$group, levels = rev(sort(unique(d$group))))
   refs_use <- dplyr::filter(refs, metric == !!metric)
   refs_use$service <- factor(refs_use$service, levels = services)
+
+  # Handle output directory with suffix
+  out_dir <- out_dir_base
+
   p <- ggplot(d, aes(x = mean_chg, y = group, fill = group)) +
     geom_col(show.legend = FALSE) +
     geom_vline(xintercept = 0, color = "#7f7f7f", linewidth = 0.6) +
@@ -392,13 +423,13 @@ for (g in unique(signed_keep0$grouping)) {
                     refs = glob_keep0,
                     variant_label = "keep0",
                     variant_desc  = "Zeros kept; dashed = global mean",
-                    out_dir = "outputs/plots/signed_alt_keep0")
+                    out_dir_base = file.path("outputs", "plots", paste0("signed_alt_keep0", params$output_suffix)))
     vmsg("Writing alt bars (drop zeros): ", g, " / ", m)
     plot_signed_alt(signed_drop0, g, m,
                     refs = glob_drop0,
                     variant_label = "drop0",
                     variant_desc  = "Zeros dropped; dashed = global mean",
-                    out_dir = "outputs/plots/signed_alt_drop0")
+                    out_dir_base = file.path("outputs", "plots", paste0("signed_alt_drop0", params$output_suffix)))
   }
 }
 ```
@@ -505,24 +536,37 @@ This object is suitable for external review, reproducibility checks, and further
 Hotspot export and KS still expect `plt_long`. To avoid the heavy pivot here, we load the cached table from the processed data directory. If it’s missing, this script can regenerate it.
 
 ```{r}
-#| eval: false
+#| label: pivot-plt-long
+#| eval: true
 #| echo: false
 #| message: false
 #| warning: false
 #| cache: false
 
-# Generate plt_long directly from sf_f to ensure freshness and consistency
-# This replaces the need to run scratch/pivot_long.R separately.
+# Generate or load plt_long
+rds_path <- file.path(cfg$paths$processed_data_dir, paste0("plt_long", params$output_suffix, ".rds"))
+
+if (file.exists(rds_path)) {
+  message("Loading cached plt_long from: ", rds_path)
+  plt_long <- readRDS(rds_path)
+} else {
+  # Generate plt_long directly from sf_f to ensure freshness and consistency
+  # This replaces the need to run scratch/pivot_long.R separately.
 
 # 1. Ensure source data (sf_f) is available
 if (!exists("sf_f")) {
-  gpkg <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+  gpkg <- file.path(data_dir(), "processed", params$input_gpkg)
   if (!file.exists(gpkg)) {
     stop("Canonical change file not found: ", gpkg)
   }
   message("Loading canonical change data for pivoting...")
   sf_f <- sf::st_read(gpkg, quiet = TRUE)
   sf_f <- sf::st_drop_geometry(sf_f)
+
+  # Handle grid_fid if present (renaming to fid for consistency)
+  if ("grid_fid" %in% names(sf_f) && !"fid" %in% names(sf_f)) {
+    sf_f <- dplyr::rename(sf_f, fid = grid_fid)
+  }
 
   if ("continent" %in% names(sf_f)) {
     sf_f <- dplyr::filter(sf_f, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
@@ -542,6 +586,11 @@ pivot_groupings <- intersect(pivot_groupings, names(sf_f))
 
 # 3. Identify change columns
 chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
+if (length(chg_cols) == 0) {
+  stop("CRITICAL: No change columns found matching '_(abs|pct)_chg$'. Check input GPKG columns.")
+}
+service_suffix_pattern <- "_(mean|sum)$"
+service_prefix_pattern <- "^(mean|sum|stdev|valid_count)_"
 
 # Optimization: Deduplicate columns mapping to the same service before pivoting
 matches <- stringr::str_match(chg_cols, "^(.*)_(abs|pct)_chg$")
@@ -550,7 +599,9 @@ col_map <- tibble::tibble(
   base = matches[,2],
   type = matches[,3]
 ) |>
+  dplyr::filter(!stringr::str_detect(base, "^(stdev|valid_count)_")) |>
   dplyr::mutate(service_norm = stringr::str_remove(base, service_suffix_pattern)) |>
+  dplyr::mutate(service_norm = stringr::str_remove(service_norm, service_prefix_pattern)) |>
   dplyr::group_by(service_norm, type) |>
   dplyr::slice(1) |>
   dplyr::ungroup()
@@ -569,16 +620,36 @@ plt_long <- sf_f |>
   ) |>
   # Normalize service names to canonical forms (matching HOTS_CFG)
   dplyr::mutate(service = stringr::str_remove(service, service_suffix_pattern)) |>
+  dplyr::mutate(service = stringr::str_remove(service, service_prefix_pattern)) |>
   dplyr::mutate(service = tolower(service)) |>
   dplyr::mutate(service = dplyr::recode(service, !!!canonical_lookup)) |>
   dplyr::rename(abs_chg = abs, pct_chg = pct) |>
   dplyr::mutate(service = as.factor(service))
 
+# Diagnostic: Check for NAs in pivoted data
+na_pct <- sum(is.na(plt_long$pct_chg))
+if (na_pct == nrow(plt_long)) {
+  stop("CRITICAL: All pct_chg values in plt_long are NA. Check input data (10k_change_calc_v2.gpkg).")
+}
+
+if (nrow(plt_long) == 0) {
+  stop("CRITICAL: plt_long is empty after pivot. Check service name mapping.")
+}
+
 # 5. Cache the result (optional but helpful for debugging)
-rds_path <- file.path(cfg$paths$processed_data_dir, "plt_long.rds")
+rds_path <- file.path(cfg$paths$processed_data_dir, paste0("plt_long", params$output_suffix, ".rds"))
 dir.create(dirname(rds_path), recursive = TRUE, showWarnings = FALSE)
 saveRDS(plt_long, rds_path)
 message("plt_long generated and cached to: ", rds_path)
+}
+
+# Apply filters to plt_long (whether cached or new)
+if ("continent" %in% names(plt_long)) {
+  plt_long <- dplyr::filter(plt_long, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+}
+if ("WWF_biome" %in% names(plt_long)) {
+  plt_long <- dplyr::filter(plt_long, !WWF_biome %in% c("Lakes", "Rock & Ice"))
+}
 ```
 
 ## Hotspot extraction workflow (global + subregional)
@@ -635,7 +706,7 @@ HOTS_CFG <- list(
   # IO
   write_layers = TRUE,
   write_index  = TRUE,
-  out_dir      = file.path(data_dir(), "processed", "hotspots")
+  out_dir      = file.path(data_dir(), "processed", paste0("hotspots", params$output_suffix))
 )
 ```
 
@@ -691,7 +762,7 @@ cat(paste0(
 #| label: ensure-plt-long-loaded
 #| echo: false
 if (!exists("plt_long")) {
-  rds_path <- file.path(data_dir(), "processed", "plt_long.rds")
+  rds_path <- file.path(data_dir(), "processed", paste0("plt_long", params$output_suffix, ".rds"))
   if (file.exists(rds_path)) {
     message("Loading cached plt_long from: ", rds_path)
     plt_long <- readRDS(rds_path)
@@ -712,7 +783,7 @@ if (!exists("plt_long")) {
 
 ```{r}
 #| label: hotspots_export
-#| eval: false
+#| eval: true
 #| message: true
 #| warning: false
 #| echo: false
@@ -731,14 +802,24 @@ cat("Services in data: ", paste(head(svc_in_data, 10), collapse=", "), "\n", fil
 cat("Services in CFG:  ", paste(head(svc_in_cfg, 10), collapse=", "), "\n", file = stderr())
 cat("Services missing from CFG: ", paste(setdiff(svc_in_data, svc_in_cfg), collapse=", "), "\n", file = stderr())
 
+# CRITICAL CHECK: If no services match, stop immediately to avoid silent failure
+if (length(intersect(svc_in_data, svc_in_cfg)) == 0) {
+  stop("CRITICAL ERROR: No overlap between services in data and services in HOTS_CFG. Check column names and canonical_lookup.")
+}
+
 # ---- Geometry: prefer an in-memory slim grid, else build it --------------
 if (exists("grid_sf") && inherits(grid_sf, "sf")) {
   geom_sf <- dplyr::select(grid_sf, dplyr::any_of(c("fid", "c_fid")))
 } else {
-  gpkg_grid <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+  gpkg_grid <- file.path(data_dir(), "processed", params$input_gpkg)
   stopifnot(file.exists(gpkg_grid))
   geom_sf <- sf::st_read(gpkg_grid, quiet = TRUE) |>
     dplyr::select(dplyr::any_of(c("fid", "c_fid", "continent")), dplyr::everything())
+
+  # Handle grid_fid if present (renaming to fid for consistency)
+  if ("grid_fid" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) {
+    geom_sf <- dplyr::rename(geom_sf, fid = grid_fid)
+  }
 }
 
 # Ensure we filter Antarctica to match the logic used for plt_long (sf_f)
@@ -831,7 +912,7 @@ run_one_hotset <- function(df, value_col, scope,
   )
 
   # Output layout
-  out_root <- file.path(data_dir(), "processed", "hotspots")
+  out_root <- cfg$out_dir
   metric_stub <- if (identical(value_col, "abs_chg")) "abs" else "pct"
   folder <- if (is.na(group_col)) file.path(out_root, metric_stub, "global")
             else                   file.path(out_root, metric_stub, tolower(group_col))
@@ -846,12 +927,23 @@ run_one_hotset <- function(df, value_col, scope,
 
   # Write only hotspot features
   if (!is.null(hs$hotspots_sf) && nrow(hs$hotspots_sf) > 0) {
-     cat("[DIAGNOSTIC] Writing ", nrow(hs$hotspots_sf), " hotspots to: ", out_gpkg, "\n", file = stderr())
-     # Force removal to ensure we aren't silently failing on overwrite
-     if (file.exists(out_gpkg)) unlink(out_gpkg)
-     sf::st_write(hs$hotspots_sf, out_gpkg, quiet = TRUE, delete_dsn = TRUE)
-     cat("[DIAGNOSTIC] Write complete. Timestamp: ", file.info(out_gpkg)$mtime, "\n", file = stderr())
      n_hot <- nrow(hs$hotspots_sf)
+
+     if (file.exists(out_gpkg)) {
+       cat("[DIAGNOSTIC] Skipping write (file exists): ", out_gpkg, "\n", file = stderr())
+     } else {
+       cat("[DIAGNOSTIC] Writing ", n_hot, " hotspots to: ", out_gpkg, "\n", file = stderr())
+       # Force removal to ensure we aren't silently failing on overwrite
+       if (file.exists(out_gpkg)) unlink(out_gpkg)
+
+       # Rename 'fid' to 'grid_fid' to avoid GPKG driver conflict (reserved primary key)
+       sf_to_write <- hs$hotspots_sf
+       if ("fid" %in% names(sf_to_write)) {
+         sf_to_write <- dplyr::rename(sf_to_write, grid_fid = fid)
+       }
+       sf::st_write(sf_to_write, out_gpkg, quiet = TRUE, delete_dsn = TRUE)
+       cat("[DIAGNOSTIC] Write complete. Timestamp: ", file.info(out_gpkg)$mtime, "\n", file = stderr())
+     }
   } else {
     cat("No hotspots found for ", metric_stub, " scope=", scope, " group=", group_val, "\n", file = stderr())
     out_gpkg <- NA_character_; n_hot <- 0L
@@ -905,9 +997,9 @@ for (gc in groupings) {
 hot_index <- dplyr::bind_rows(index_rows)
 
 # Ensure the output dir exists before writing the CSV index
-csv_dir <- file.path(data_dir(), "processed", "hotspots")
+csv_dir <- HOTS_CFG$out_dir
 dir.create(csv_dir, recursive = TRUE, showWarnings = FALSE)
-readr::write_csv(hot_index, file.path(csv_dir, "_hotspots_index.csv"))
+readr::write_csv(hot_index, file.path(csv_dir, paste0("_hotspots_index", params$output_suffix, ".csv")))
 
 # Small console summary
 dplyr::glimpse(hot_index, width = 120)
@@ -919,14 +1011,14 @@ dplyr::glimpse(hot_index, width = 120)
 
 ```{r}
 #| label: display-barplots
-#| eval: false
+#| eval: true
 #| echo: false
 #| results: 'asis'
 #| cache: false
 # Show barplots directly from signed_alt_keep0 and signed_alt_drop0
 bar_dirs <- c(
-  file.path("outputs","plots","signed_alt_keep0"),
-  file.path("outputs","plots","signed_alt_drop0")
+  file.path("outputs","plots", paste0("signed_alt_keep0", params$output_suffix)),
+  file.path("outputs","plots", paste0("signed_alt_drop0", params$output_suffix))
 )
 pngs <- unlist(lapply(bar_dirs, function(d) list.files(d, pattern = "^bars_signed_alt_.*\\.png$", full.names = TRUE)))
 
@@ -950,7 +1042,7 @@ if (length(pngs)) {
 #| message: true
 
 if (!exists("plt_long")) {
-  rds_path <- file.path(cfg$paths$processed_data_dir, "plt_long.rds")
+  rds_path <- file.path(cfg$paths$processed_data_dir, paste0("plt_long", params$output_suffix, ".rds"))
   if (file.exists(rds_path)) {
     message("Loading cached plt_long from: ", rds_path)
     plt_long <- readRDS(rds_path)
@@ -1029,7 +1121,7 @@ if (length(groupings) == 0) {
     })
   }
 }
-latest_dir_boxplots <- file.path("outputs","plots","latest","boxplots")
+latest_dir_boxplots <- file.path("outputs","plots","latest", paste0("boxplots", params$output_suffix))
 dir.create(latest_dir_boxplots, recursive = TRUE, showWarnings = FALSE)
 old_latest_boxplots <- list.files(latest_dir_boxplots, full.names = TRUE, all.files = FALSE)
 if (length(old_latest_boxplots)) invisible(file.remove(old_latest_boxplots))
@@ -1048,7 +1140,7 @@ if (length(good_boxplots)) {
 #| echo: false
 #| results: 'asis'
 #| cache: false
-box_dir   <- file.path("outputs","plots","latest","boxplots")
+box_dir   <- file.path("outputs","plots","latest", paste0("boxplots", params$output_suffix))
 box_files <- list.files(box_dir, pattern = "boxplots_.*\\.png$", full.names = FALSE)
 if (length(box_files)) {
   rel_paths <- file.path("..", box_dir, sort(box_files))
@@ -1089,26 +1181,43 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
   # We look for Forest Loss and Urban/Cropland Expansion
   # Explicitly targeting 1992-2020 transitions based on LCC_column_dictionary.md
   drivers <- list(
-    "Forest_Loss" = "ForestLoss_Loss_Forest_2020_1992",
-    "Urban_Exp"   = "Expansion_Gain_Urban_2020_1992",
-    "Crop_Exp"    = "Expansion_Gain_Cropland_2020_1992"
+    "Forest_Loss" = "ForestLoss_Loss_Forest_1992_2020",
+    "Urban_Exp"   = "Expansion_Gain_Urban_1992_2020",
+    "Crop_Exp"    = "Expansion_Gain_Cropland_1992_2020"
   )
 
   # Filter out columns that don't exist in the data
   drivers <- drivers[sapply(drivers, function(x) x %in% names(lc_df))]
 
+  # Fallback: If exact match failed, try pattern matching (ignoring year suffixes)
+  if (length(drivers) == 0) {
+    message("Exact match failed. Trying pattern matching...")
+    fl_col <- grep("ForestLoss_Loss_Forest", names(lc_df), value = TRUE)
+    if (length(fl_col) > 0) drivers[["Forest_Loss"]] <- fl_col[1]
+
+    ue_col <- grep("Expansion_Gain_Urban", names(lc_df), value = TRUE)
+    if (length(ue_col) > 0) drivers[["Urban_Exp"]] <- ue_col[1]
+
+    ce_col <- grep("Expansion_Gain_Cropland", names(lc_df), value = TRUE)
+    if (length(ce_col) > 0) drivers[["Crop_Exp"]] <- ce_col[1]
+  }
+
   # Identify Net Forest Change for correlation analysis
-  net_col <- "ForestLoss_dir_ch_Forest_2020_1992"
-  if (!net_col %in% names(lc_df)) net_col <- NULL
+  net_col <- "ForestLoss_dir_ch_Forest_1992_2020"
+  if (!net_col %in% names(lc_df)) {
+    net_col_candidates <- grep("ForestLoss_dir_ch_Forest", names(lc_df), value = TRUE)
+    if (length(net_col_candidates) > 0) net_col <- net_col_candidates[1] else net_col <- NULL
+  }
 
   if (length(drivers) > 0) {
     message("Found granular LC drivers: ", paste(names(drivers), collapse = ", "))
     lc_data_ready <- TRUE
   } else {
-    message("No granular driver columns found in LC data.")
+    warning("No granular driver columns found in LC data.")
+    message("Available columns in LC data: ", paste(head(names(lc_df), 20), collapse = ", "))
   }
 } else {
-  message("LC data or plt_long missing.")
+  warning(paste0("LC data or plt_long missing. Looking for: ", lc_gpkg))
 }
 ```
 
@@ -1135,20 +1244,26 @@ if (lc_data_ready) {
       pull(fid)
 
     # Export Driver Hotspots (Top 5%) to GPKG
-    driver_out_dir <- file.path(data_dir(), "processed", "hotspots", "drivers")
+    driver_out_dir <- file.path(data_dir(), "processed", paste0("hotspots", params$output_suffix), "drivers")
     if (!dir.exists(driver_out_dir)) dir.create(driver_out_dir, recursive = TRUE)
 
     driver_layer_name <- paste0("hotspots_", d_name, ".gpkg")
     out_path <- file.path(driver_out_dir, driver_layer_name)
 
-    lc_sf_full %>%
-      filter(fid %in% driver_hotspots) %>%
-      select(fid, value = all_of(d_col)) %>%
-      st_write(out_path, quiet = TRUE, delete_dsn = TRUE)
-    message("Exported driver hotspot layer: ", out_path)
+    if (file.exists(out_path)) {
+      message("Skipping driver hotspot export (file exists): ", out_path)
+    } else {
+      # Rename fid -> grid_fid to avoid GPKG primary key conflict
+      lc_sf_full %>%
+        filter(fid %in% driver_hotspots) %>%
+        select(grid_fid = fid, value = all_of(d_col)) %>%
+        st_write(out_path, quiet = TRUE, delete_dsn = TRUE)
+      message("Exported driver hotspot layer: ", out_path)
+    }
 
     # Calculate Overlap
     stats <- plt_long %>%
+      filter(service %in% c(HOTS_CFG$loss, HOTS_CFG$gain)) %>%
       group_by(service) %>%
       summarize(
         n_es_hotspots = sum(
@@ -1180,8 +1295,8 @@ if (lc_data_ready) {
 #| label: lc-hotspot-overlap-plot
 #| eval: true
 #| echo: false
-#| message: false
-#| warning: false
+#| message: true
+#| warning: true
 
 if (!is.null(overlap_stats)) {
   # Plot
@@ -1203,8 +1318,8 @@ if (!is.null(overlap_stats)) {
 #| label: lc-es-correlation
 #| eval: true
 #| echo: false
-#| message: false
-#| warning: false
+#| message: true
+#| warning: true
 
 if (lc_data_ready && !is.null(net_col)) {
   # Join ES change (plt_long) with Net LC Change
@@ -1243,4 +1358,175 @@ if (lc_data_ready && !is.null(net_col)) {
     print(p_cor)
   }
 }
+```
+
+```{r}
+#| label: lc-es-scatterplots
+#| eval: true
+#| echo: false
+#| message: true
+#| warning: true
+
+if (lc_data_ready) {
+  # Define interesting pairs for scatterplots
+  pairs <- list(
+    list(driver="Urban_Exp", es="C_Risk"),
+    list(driver="Urban_Exp", es="N_export"),
+    list(driver="Forest_Loss", es="Nature_Access"),
+    list(driver="Forest_Loss", es="Pollination"),
+    list(driver="Crop_Exp", es="Sed_export"),
+    list(driver="Crop_Exp", es="N_export")
+  )
+
+  for (p in pairs) {
+    d_name <- p$driver
+    es_name <- p$es
+
+    if (d_name %in% names(drivers)) {
+      d_col <- drivers[[d_name]]
+
+      # Filter data
+      plot_data <- plt_long %>%
+        filter(service == es_name) %>%
+        inner_join(lc_df %>% select(fid, driver_val = all_of(d_col)), by = "fid") %>%
+        filter(driver_val > 0) # Focus on areas where change occurred
+
+      if (nrow(plot_data) > 100) {
+        # Sample for plotting speed
+        plot_data_sample <- plot_data %>% sample_n(min(n(), 10000))
+
+        p_scatter <- ggplot(plot_data_sample, aes(x = driver_val, y = pct_chg)) +
+          geom_point(alpha = 0.1) +
+          geom_smooth(method = "lm", color = "blue") +
+          labs(title = paste(d_name, "vs", es_name, "Change"),
+               x = paste(d_name, "(% Area)"),
+               y = paste(es_name, "(% Change)")) +
+          theme_minimal()
+
+        print(p_scatter)
+      }
+    }
+  }
+}
+```
+
+```{r}
+#| label: lc-hotspots-export-by-group
+#| eval: true
+#| echo: false
+#| message: true
+#| warning: true
+
+if (lc_data_ready) {
+  message("Generating Land Cover Hotspots by Grouping...")
+
+  # 1. Prepare LC Long Data (Drivers as 'services')
+  # We need to join LC metrics with the grouping columns from plt_long (or sf_f)
+  group_cols <- HOTS_CFG$groupings
+
+  # Get attributes from plt_long (assuming it's loaded)
+  if (exists("plt_long")) {
+    attrs <- plt_long %>%
+      select(fid, c_fid, all_of(group_cols)) %>%
+      distinct(fid, .keep_all = TRUE)
+
+    # Select driver columns from lc_df
+    driver_cols <- unlist(drivers)
+
+    lc_subset <- lc_df %>%
+      select(fid, all_of(unname(driver_cols))) %>%
+      inner_join(attrs, by = "fid")
+
+    # Pivot to long format for the runner
+    lc_long <- lc_subset %>%
+      pivot_longer(cols = all_of(unname(driver_cols)), names_to = "driver_key", values_to = "pct_chg") %>%
+      mutate(
+        # Map full column name back to short driver name
+        service = names(drivers)[match(driver_key, drivers)],
+        abs_chg = NA_real_ # LC metrics are usually % or area, treating as pct here
+      ) %>%
+      filter(!is.na(pct_chg))
+
+    # 2. Define a temporary config for LC
+    # We treat all drivers as "Gain" (high value = hotspot)
+    LC_CFG <- HOTS_CFG
+    LC_CFG$loss <- character(0)
+    LC_CFG$gain <- names(drivers)
+    LC_CFG$out_dir <- file.path(data_dir(), "processed", paste0("hotspots", params$output_suffix), "drivers_by_group")
+
+    # 3. Run Extraction Loop (Global + Groups)
+    # Global
+    run_one_hotset(lc_long, value_col = "pct_chg", scope = "global", sf_obj = geom_sf, cfg = LC_CFG)
+
+    # By Group
+    for (gc in group_cols) {
+      vals <- unique(na.omit(lc_long[[gc]]))
+      # Filter out Antarctica/Seven Seas if present in vals (usually handled in run_one_hotset via df filter but good to be safe)
+      for (v in vals) {
+        run_one_hotset(lc_long, value_col = "pct_chg", scope = "by_group", group_col = gc, group_val = v, sf_obj = geom_sf, cfg = LC_CFG)
+      }
+    }
+    message("LC Hotspots by group exported to: ", LC_CFG$out_dir)
+  }
+}
+```
+```
+
+```{r}
+#| label: lc-socio-correlation
+#| eval: true
+#| echo: false
+#| message: true
+#| warning: true
+
+if (lc_data_ready) {
+  # Load Socioeconomic data from the input GPKG
+  gpkg_path <- file.path(data_dir(), "processed", params$input_gpkg)
+  sf_socio <- st_read(gpkg_path, quiet = TRUE) %>% st_drop_geometry()
+
+  # Ensure fid exists (consistent with other chunks)
+  if (!"fid" %in% names(sf_socio)) {
+    sf_socio$fid <- seq_len(nrow(sf_socio))
+  }
+
+  # Identify socio columns (heuristic)
+  socio_cols <- grep("GDP|HDI|Pop|Gini", names(sf_socio), value = TRUE, ignore.case = TRUE)
+  socio_cols <- socio_cols[!grepl("_chg", socio_cols)]
+
+  if (length(socio_cols) > 0) {
+    message("Found socio vars: ", paste(socio_cols, collapse=", "))
+
+    # Join with LC drivers
+    socio_lc <- sf_socio %>%
+      select(fid, all_of(socio_cols)) %>%
+      inner_join(lc_df, by = "fid")
+
+    # Calculate correlations
+    res_list <- list()
+    for (d_name in names(drivers)) {
+      d_col <- drivers[[d_name]]
+      for (s_col in socio_cols) {
+
+        valid_data <- socio_lc %>%
+          select(d = all_of(d_col), s = all_of(s_col)) %>%
+          filter(complete.cases(.))
+
+        if (nrow(valid_data) > 100) {
+           cor_val <- cor(valid_data$d, valid_data$s, method = "spearman")
+           res_list[[length(res_list) + 1]] <- data.frame(
+             Driver = d_name,
+             SocioVar = s_col,
+             SpearmanRho = cor_val
+           )
+        }
+      }
+    }
+
+    if (length(res_list) > 0) {
+      res_df <- bind_rows(res_list) %>% arrange(desc(abs(SpearmanRho)))
+      print(knitr::kable(res_df, digits = 3, caption = "Correlation: LC Drivers vs Socioeconomic Status"))
+    }
+  }
+}
+```
 ```

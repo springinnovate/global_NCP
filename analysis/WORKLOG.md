@@ -36,6 +36,38 @@
     *   **Execution:** Aborted initial render and restarted `analysis/LC_change_granular.qmd` inside a `screen` session to ensure stability for the long-running process (>24h expected).
     *   **Completion:** Granular LCC analysis finished (~48h runtime). Output: `processed/10k_lcc_granular_metrics.gpkg`.
 
+## 2026-02-27
+
+*   **V2 Pipeline Implementation (Symmetric Change):**
+    *   Created `analysis/process_zonal_stats_v2.qmd` to ingest new zonal stats and calculate **Symmetric Percentage Change** (handling division-by-zero artifacts).
+    *   Updated `analysis/hotspot_extraction.qmd` to be **version-aware** (accepts `input_gpkg` and `output_suffix` params).
+    *   Updated `analysis/KS_tests_hotspots.qmd` to accept V2 inputs/outputs.
+    *   **Execution:** Launched `process_zonal_stats_v2.qmd` to generate the V2 dataset.
+    *   **Debugging:** Fixed `fid` column not found error in `process_zonal_stats_v2.qmd` by adding a safety check to create the column if missing after `st_read`.
+
+## 2026-03-03
+
+*   **V2 Pipeline Debugging & Fixes:**
+    *   **Diagnosis:** Identified that `10k_change_calc_v2.gpkg` contained `NA` values in all change columns. Created `analysis/debug_v2_data.R` to confirm the issue, which stemmed from a `fid` mismatch (NULL `grid_fid` in the new zonal stats file).
+    *   **Fix:** Modified `analysis/process_zonal_stats_v2.qmd` to ignore the corrupt `grid_fid` and instead force `fid` creation based on sequential row numbers (`seq_len(nrow)`). This ensures correct alignment since row order is preserved.
+    *   **Verification:** Re-ran debug script; confirmed V2 data is now fully populated with valid change metrics.
+*   **V2 Execution:**
+    *   Launched full V2 hotspot extraction: `quarto render analysis/hotspot_extraction.qmd -P input_gpkg:10k_change_calc_v2.gpkg -P output_suffix:_v2`.
+*   **Comparison Framework:**
+    *   Created `analysis/compare_hotspots_v1_v2.qmd` to compute the Jaccard Index (spatial overlap) between V1 and V2 hotspots, allowing quantification of how the Symmetric Percentage Change method alters results.
+
+## 2026-03-04
+
+*   **V2 Pipeline Optimization & Fixes:**
+    *   **Hotspot Extraction:**
+        *   Implemented caching for `plt_long` to speed up iterative rendering.
+        *   Added robust fallback logic for Land Cover driver column names (handling variable year suffixes).
+        *   Optimized GPKG export: Added checks to skip `st_write` if output files already exist, reducing runtime.
+        *   Fixed `pivot_longer` errors in the "Drivers of Change" section by sanitizing named vectors.
+        *   Corrected the Land Cover driver export loop to ensure all drivers are included in the grouped GPKGs.
+    *   **KS Tests:**
+        *   Synchronized filters: Added Continent (Antarctica/Seven Seas) and Biome (Lakes/Rock & Ice) filters to match the extraction pipeline.
+
 ## Strategic Narrative / Pitch (2026-02-11)
 
 **Subject:** Status Update: Integrating Land Cover Drivers into Global NCP Hotspots
