@@ -196,7 +196,6 @@ What this chunk does:
 - A later chunk computes global reference means; plotting is in its own chunk so you can skip it when debugging.
 
 ```{r}
-
 #| label: make-signed-bars-data
 #| eval: true
 #| echo: false
@@ -223,6 +222,13 @@ if (!file.exists(gpkg)) {
 vmsg("Reading canonical grid + change: ", gpkg)
 sf_f <- sf::st_read(gpkg, quiet = TRUE)
 sf_f <- sf::st_drop_geometry(sf_f)
+sf_f <- dplyr::ungroup(sf_f)
+
+# Normalize names to lowercase match canonical (robustness against casing)
+for (target in c("income_grp", "region_wb", "continent", "region_un", "WWF_biome", "nev_name")) {
+  match_idx <- which(tolower(names(sf_f)) == tolower(target))
+  if (length(match_idx) == 1) names(sf_f)[match_idx] <- target
+}
 
 # Safety: Clamp any Infinite values (from 0 baseline) to +/- 200%
 # This ensures emerging/disappearing services are captured as max change, not dropped.
@@ -238,24 +244,37 @@ if ("grid_fid" %in% names(sf_f) && !"fid" %in% names(sf_f)) {
   sf_f <- dplyr::rename(sf_f, fid = grid_fid)
 }
 
+# Ensure required keys present; rebuild if missing (e.g. if dropped during IO)
+# TODO: Robustify grid alignment. Relying on row-order (seq_len) for fid generation is fragile
+# if the input GPKG has been filtered or sorted differently from the base attributes.
+if (!"fid" %in% names(sf_f)) {
+  sf_f$fid <- seq_len(nrow(sf_f))
+}
+
 # Diagnostic: Check loaded columns
 vmsg("Loaded columns: ", paste(head(names(sf_f), 10), collapse=", "), " ...")
 vmsg("Total columns: ", ncol(sf_f))
 
-# Filter out Antarctica and Seven Seas from the dataset as they contain no relevant data for this analysis
-if ("continent" %in% names(sf_f)) {
-  sf_f <- dplyr::filter(sf_f, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+# Diagnostic: Check NAs in grouping columns
+for (g in groupings) {
+  if (g %in% names(sf_f)) {
+    n_na <- sum(is.na(sf_f[[g]]))
+    # Force print to standard output so it's visible in error logs
+    cat("Grouping '", g, "': ", n_na, " NAs out of ", nrow(sf_f), " rows (",
+        round(n_na/nrow(sf_f)*100, 1), "%)\n", sep="")
+    # Print sample values to verify content
+    vals <- head(unique(na.omit(sf_f[[g]])), 5)
+    cat("  Sample values: ", paste(vals, collapse=", "), "\n")
+  } else {
+    cat("Grouping '", g, "' NOT FOUND in sf_f.\n")
+  }
 }
 
-# Filter out Lakes and Rock & Ice from WWF_biome
-if ("WWF_biome" %in% names(sf_f)) {
-  sf_f <- dplyr::filter(sf_f, !WWF_biome %in% c("Lakes", "Rock & Ice"))
-}
+available_groupings <- intersect(groupings, names(sf_f))
+if (length(available_groupings) == 0) warning("No requested groupings found in data!")
+vmsg("Groupings requested: ", paste(groupings, collapse=", "))
+vmsg("Groupings found in data: ", paste(available_groupings, collapse=", "))
 
-# Ensure required keys present; rebuild if missing (e.g. if dropped during IO)
-if (!"fid" %in% names(sf_f)) {
-  sf_f$fid <- seq_len(nrow(sf_f))
-}
 if (!"c_fid" %in% names(sf_f)) {
   sf_f$c_fid <- sf_f$fid
 }
@@ -327,15 +346,40 @@ agg_by_group <- function(df, services, groupings, cut_q = 0.999,
   dplyr::bind_rows(out)
 }
 
-signed_keep0 <- agg_by_group(sf_f, services, groupings, cut_q = cut_q,
+cat("Dimensions of sf_f before filtering: ", paste(dim(sf_f), collapse = " x "), "\n")
+original_rows <- nrow(sf_f)
+
+# Defer filtering to here (just before aggregation) to protect FID alignment upstream
+# Create a working subset so sf_f remains full (unfiltered) for downstream chunks (pivot-plt-long)
+sf_subset <- sf_f
+
+# Use explicit NA check to avoid dropping rows where attributes are missing
+if ("continent" %in% names(sf_subset)) {
+  sf_subset <- dplyr::filter(sf_subset, is.na(continent) | !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+}
+if ("WWF_biome" %in% names(sf_subset)) {
+  sf_subset <- dplyr::filter(sf_subset, is.na(WWF_biome) | !WWF_biome %in% c("Lakes", "Rock & Ice"))
+}
+
+cat("Dimensions of sf_subset after filtering: ", paste(dim(sf_subset), collapse = " x "), "\n")
+cat("Filtered out ", original_rows - nrow(sf_subset), " rows.\n")
+
+if (nrow(sf_subset) == 0) {
+  stop("CRITICAL: All rows were filtered out! Check if grouping columns are fully NA or filters are too aggressive.")
+}
+
+signed_keep0 <- agg_by_group(sf_subset, services, groupings, cut_q = cut_q,
                              handle_inf = handle_inf, drop_zero = FALSE)
-signed_drop0 <- agg_by_group(sf_f, services, groupings, cut_q = cut_q,
+signed_drop0 <- agg_by_group(sf_subset, services, groupings, cut_q = cut_q,
                              handle_inf = handle_inf, drop_zero = TRUE)
+
+if (nrow(signed_keep0) == 0) {
+  vmsg("Svc map entries: ", nrow(svc_map))
+  stop("CRITICAL: signed_keep0 is empty. No plots will be generated. Check if grouping columns are present in input or AOOGrid.")
+}
 
 if (nrow(signed_keep0) > 0) {
   print(dplyr::count(signed_keep0, grouping, metric, service))
-} else {
-  message("WARNING: signed_keep0 is empty. Check groupings or service mapping.")
 }
 if (nrow(signed_drop0) > 0) {
   print(dplyr::count(signed_drop0, grouping, metric, service))
@@ -391,6 +435,10 @@ glob_drop0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
 #| warning: false
 #| echo: false
 
+# Create latest directory upfront so it exists even if plotting fails/skips
+latest_dir <- file.path("outputs", "plots", "latest", "bars")
+dir.create(latest_dir, recursive = TRUE, showWarnings = FALSE)
+
 plot_signed_alt <- function(df, grouping, metric,
                             refs,
                             variant_label = "keep0",
@@ -420,8 +468,14 @@ plot_signed_alt <- function(df, grouping, metric,
     theme(strip.background = element_rect(fill = "#f3f4f6", color = NA),
           strip.text = element_text(face = "bold"))
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
   fp <- file.path(out_dir, paste0("bars_signed_alt_", variant_label, "_", tolower(grouping), "_", metric, ".png"))
   ggsave(fp, p, width = 12, height = 8, dpi = 300, bg = "white")
+
+  # Copy to latest
+  fp_latest <- file.path(latest_dir, paste0("bars_signed_alt_", variant_label, "_", tolower(grouping), "_", metric, ".png"))
+  file.copy(fp, fp_latest, overwrite = TRUE)
+
   message("Saved alt bars: ", fp)
 }
 
@@ -587,20 +641,23 @@ if (!exists("sf_f")) {
     sf_f <- dplyr::rename(sf_f, fid = grid_fid)
   }
 
-  if ("continent" %in% names(sf_f)) {
-    sf_f <- dplyr::filter(sf_f, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
-  }
-  if (!"fid" %in% names(sf_f)) {
-    sf_f$fid <- seq_len(nrow(sf_f))
-  }
+    # Ensure required keys present; rebuild if missing (e.g. if dropped during IO)
+    # Must happen BEFORE filtering to preserve 1:1 match with base grid fids
+    if (!"fid" %in% names(sf_f)) {
+      sf_f$fid <- seq_len(nrow(sf_f))
+    }
+
   if (!"c_fid" %in% names(sf_f)) {
     sf_f$c_fid <- sf_f$fid
   }
+
+  # Robustness: Ensure grouping columns exist before pivoting
+  # (Removed redundant AOOGrid join; input GPKG is authoritative)
 }
 
 # 2. Define grouping columns to keep
 #    (Must match what is used in make-signed-bars-data and hotspots_config)
-pivot_groupings <- c("income_grp","region_wb","continent","region_un","WWF_biome","nev_name")
+pivot_groupings <- c("income_grp","region_wb","WWF_biome")
 pivot_groupings <- intersect(pivot_groupings, names(sf_f))
 
 # 3. Identify change columns
@@ -667,14 +724,6 @@ rds_path <- file.path(cfg$paths$processed_data_dir, paste0("plt_long", params$ou
 dir.create(dirname(rds_path), recursive = TRUE, showWarnings = FALSE)
 saveRDS(plt_long, rds_path)
 message("plt_long generated and cached to: ", rds_path)
-}
-
-# Apply filters to plt_long (whether cached or new)
-if ("continent" %in% names(plt_long)) {
-  plt_long <- dplyr::filter(plt_long, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
-}
-if ("WWF_biome" %in% names(plt_long)) {
-  plt_long <- dplyr::filter(plt_long, !WWF_biome %in% c("Lakes", "Rock & Ice"))
 }
 ```
 
@@ -850,7 +899,10 @@ if (exists("grid_sf") && inherits(grid_sf, "sf")) {
 
 # Ensure we filter Antarctica to match the logic used for plt_long (sf_f)
 if ("continent" %in% names(geom_sf)) {
-  geom_sf <- dplyr::filter(geom_sf, continent != "Antarctica")
+  geom_sf <- dplyr::filter(geom_sf, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+}
+if ("WWF_biome" %in% names(geom_sf)) {
+  geom_sf <- dplyr::filter(geom_sf, !WWF_biome %in% c("Lakes", "Rock & Ice"))
 }
 
 if (!"fid" %in% names(geom_sf)) {
@@ -902,6 +954,14 @@ if (file.exists(lc_gpkg)) {
 # Diagnostic: check ID overlap
 n_overlap <- length(intersect(unique(plt_long$c_fid), unique(geom_sf$c_fid)))
 cat("Diagnostic: plt_long unique c_fids=", length(unique(plt_long$c_fid)), " geom_sf unique c_fids=", length(unique(geom_sf$c_fid)), " Overlap=", n_overlap, "\n", file = stderr())
+
+# Alignment: Ensure plt_long strictly matches the geometry domain
+# (e.g. if plt_long includes Antarctica but geom_sf filtered it out)
+valid_fids <- unique(geom_sf$fid)
+if (!all(plt_long$fid %in% valid_fids)) {
+  cat("Aligning plt_long to geometry domain. Filtering out mismatched FIDs...\n", file = stderr())
+  plt_long <- dplyr::filter(plt_long, fid %in% valid_fids)
+}
 
 # ---- Helper: safe slug for filenames -------------------------------------
 slug <- function(x) {
@@ -1064,11 +1124,8 @@ dplyr::glimpse(hot_index, width = 120)
 #| results: 'asis'
 #| cache: false
 # Show barplots directly from signed_alt_keep0 and signed_alt_drop0
-bar_dirs <- c(
-  file.path("outputs","plots", paste0("signed_alt_keep0", params$output_suffix)),
-  file.path("outputs","plots", paste0("signed_alt_drop0", params$output_suffix))
-)
-pngs <- unlist(lapply(bar_dirs, function(d) list.files(d, pattern = "^bars_signed_alt_.*\\.png$", full.names = TRUE)))
+bar_dir <- file.path("outputs", "plots", "latest", "bars")
+pngs <- list.files(bar_dir, pattern = "^bars_signed_alt_.*\\.png$", full.names = TRUE)
 
 if (length(pngs)) {
   # Show keep0 first, then drop0
@@ -1121,6 +1178,12 @@ groupings <- HOTS_CFG$groupings
 # Filter out Antarctica and Seven Seas for plotting
 if ("continent" %in% names(plt_long)) {
   plt_long <- dplyr::filter(plt_long, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+}
+if ("WWF_biome" %in% names(plt_long)) {
+  plt_long <- dplyr::filter(plt_long, !WWF_biome %in% c("Lakes", "Rock & Ice"))
+}
+if ("WWF_biome" %in% names(plt_long)) {
+  plt_long <- dplyr::filter(plt_long, !WWF_biome %in% c("Lakes", "Rock & Ice"))
 }
 
 # Define service lists for directing plotting logic

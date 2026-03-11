@@ -126,24 +126,10 @@ rm -f summary_pipeline_workspace/*.gpkg
 rm -f summary_pipeline_workspace/taskgraph_data.db
 ```
 
-## Coastal Protection Rasterization (points → rasters)
-
-Coastal protection outputs are provided as point features. Rasterize them to the
-ESA 300 m land cover template before running zonal summaries:
-
 ``` bash
 # requires GLOBAL_NCP_DATA to be set (e.g., /home/jeronimo/data/global_ncp)
 COASTAL_INCLUDE_CH=1 python Python_scripts/rasterize_coastal.py
 ```
-
-This produces rasters in:
-`$GLOBAL_NCP_DATA/interim/coastal_protection_rasters/`
-for `Rt_1992`, `Rt_2020`, and the ratios (plus `Rt_serv_ch` when enabled).
-
-After the run, the pipeline writes timestamped GPKGs to `summary_pipeline_workspace/`.
-Move/rename them into the interim folder and wrap dateline geometries for clean
-mapping (prevents the 180° wraparound polygon artifact). Use a timestamp to
-avoid overwriting prior outputs:
 
 ``` bash
 # identify outputs (services = older, beneficiaries = newer)

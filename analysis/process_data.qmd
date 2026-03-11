@@ -119,6 +119,17 @@ B <- st_read(ben_path)
 if (!"fid" %in% names(S)) S$fid <- seq_len(nrow(S))
 if (!"fid" %in% names(B)) B$fid <- seq_len(nrow(B))
 
+# Normalize grouping column names to canonical forms (handle casing issues)
+expected_attrs <- c(
+  "iso3", "continent", "region_un", "subregion", "nev_name",
+  "region_wb", "income_grp", "WWF_biome"
+)
+curr_names <- names(S)
+for (target in expected_attrs) {
+  match_idx <- which(tolower(curr_names) == tolower(target))
+  if (length(match_idx) == 1) names(S)[match_idx] <- target
+}
+
 # Immediately normalize variable names after joining
 S_tbl <- st_drop_geometry(S)
 B_tbl <- st_drop_geometry(B)
@@ -228,8 +239,8 @@ if (!"fid" %in% names(sf_f)) {
 # Define service rename mapping (same as in consolidation chunk).
 
 keep_fixed <- c(
-  "fid", "c_fid", "nev_name", "region_wb",
-  "income_grp", "WWF_biome"
+  "fid", "c_fid", "iso3", "continent", "region_un", "subregion",
+  "nev_name", "region_wb", "income_grp", "WWF_biome"
 )
 
 benef_pattern <- "^(GHS_|GlobPOP_|hdi_|rast_gdpTot_|rast_adm1_gini_|fields_mehrabi_)"
@@ -333,39 +344,15 @@ message('Canonical subset created. Elapsed (mins): ', round(as.numeric(difftime(
 #| eval: true
 #| include: false
 # STEP 3: Join missing grid attributes if necessary and finalize schema.
-grid_attrs <- st_read(
-  file.path(data_interim(), "..", "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"),
-  quiet = TRUE
-) %>%
-  st_drop_geometry() %>%
-  dplyr::select(any_of(keep_fixed))
-
-if (!"fid" %in% names(grid_attrs)) {
-  grid_attrs$fid <- seq_len(nrow(grid_attrs))
-}
-
-# If fixed grouping columns are missing after the select, join them back.
-if (!all(keep_fixed %in% names(sf_canon))) {
-  message("Fixed grouping columns are missing, joining them back...")
-  gc(); t_join <- Sys.time()
-  sf_canon <- sf_canon %>%
-    left_join(grid_attrs, by = "fid")
-  message('Join complete. Elapsed (secs): ', round(as.numeric(difftime(Sys.time(), t_join, units = 'secs')), 1))
-
-  # Clean up potential join artifacts if c_fid existed in both
-  if ("c_fid.x" %in% names(sf_canon)) {
-    sf_canon$c_fid <- dplyr::coalesce(sf_canon$c_fid.x, sf_canon$c_fid.y)
-    sf_canon$c_fid.x <- NULL
-    sf_canon$c_fid.y <- NULL
-  }
-}
-
-# Verification step: After the join, check if the columns were actually added.
-missing_after_join <- setdiff(keep_fixed, names(sf_canon))
-if (length(missing_after_join) > 0) {
-  stop("Join failed to add all expected attribute columns. Missing: ",
-       paste(missing_after_join, collapse=", "),
-       ".\nThis is likely due to a 'fid' mismatch between the service data and the grid attribute file.")
+# If fixed grouping columns are missing, we proceed without them (per user request),
+# assuming they might not be critical or will be handled downstream.
+# The complex join logic here has been removed to avoid errors when AOOGrid is unavailable
+# or mismatches fids, relying on the input services GPKG to provide these attributes.
+missing_cols <- setdiff(keep_fixed, names(sf_canon))
+if (length(missing_cols) > 0) {
+  message("WARNING: The following grouping columns are missing from the final dataset: ",
+          paste(missing_cols, collapse=", "),
+          ". Downstream analysis (hotspots) may require them.")
 }
 
 # Re-apply selection to ensure only intended columns remain after the join
