@@ -136,7 +136,8 @@ def zonal_stats(raster_path_band_dict, op_stats, vector_path):
 
     # keep/derive FID so joins align with the output vector
     if "fid" not in gdf.columns:
-        gdf["fid"] = gdf.index.astype("int32")
+        # Default to 1-based index to match R conventions if FID is missing
+        gdf["fid"] = gdf.index.astype("int32") + 1
     else:
         gdf["fid"] = gdf["fid"].astype("int32")
     gdf = gdf[["geometry", "fid"]].copy()
@@ -284,7 +285,8 @@ def main():
         # copy original vector and join to zonal stats via 'fid'
         gdf = gpd.read_file(vector_path)
         if "fid" not in gdf.columns:
-            gdf["fid"] = gdf.index.astype("int32")
+            # Default to 1-based index to match R conventions if FID is missing
+            gdf["fid"] = gdf.index.astype("int32") + 1
         else:
             gdf["fid"] = gdf["fid"].astype("int32")
         for raster_id, band_idx, stats_task in zonal_stats_task_list:

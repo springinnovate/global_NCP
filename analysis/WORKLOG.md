@@ -11,7 +11,8 @@
 - **Completed** Coastal Risk Reduction: Resolved calculation issue, incorporated into analysis, and updated charts.
 - **Completed** Execution: `analysis/LC_change.qmd` finished successfully (generated `processed/10k_lcc_metrics.gpkg`).
 - **Active** Interpretation: Analyzing "Drivers of Change" (LCC vs ES correlations) and rendering final reports.
-- **Active** Zonal Stats: Calculating summary statistics for base years (1992 & 2020) independently to enable precise Symmetric Percentage Change calculations alongside absolute change.
+- **Completed** Zonal Stats: Calculated summary statistics for base years (1992 & 2020) independently using per-hectare corrected rasters.
+- **Active** Difference Analysis: Running zonal statistics on pre-calculated difference rasters (Path C) to compare "Difference of Means" vs "Mean of Differences".
 - **Active** Granular LCC: Setting up and running `analysis/LC_change_granular.qmd` for Forest Loss and Urban/Cropland Expansion.
 
 ## 2026-02-20
@@ -68,6 +69,48 @@
     *   **KS Tests:**
         *   Synchronized filters: Added Continent (Antarctica/Seven Seas) and Biome (Lakes/Rock & Ice) filters to match the extraction pipeline.
 
+## 2026-03-09
+
+*   **Final Base Year Extraction (Per Hectare):**
+    *   Initiated a fresh, clean run of the summary statistics extraction for all base year services (1992 & 2020).
+    *   **Methodology Update:** Volumetric variables (e.g., Nitrogen Export, Sediment Export) have been corrected from a "per pixel" to a "per hectare" basis to ensure consistency across varying pixel sizes globally.
+    *   **Unchanged Variables:** Ratios (Retention Ratios) and Indices (Coastal Protection, Nature Access) remain unchanged as the per-hectare conversion is not applicable or neutral for these metrics.
+    *   **Goal:** Establish the definitive baseline dataset for the "Difference of Means" pathway.
+
+*   **Difference Raster Analysis (Path C):**
+    *   Configured `analysis_configs/services_diff_ha.yaml` to process the pre-calculated difference rasters (1992-2020) located in `2020_1992_ch_ha`.
+    *   **Correction:** Updated filenames in the YAML to match the actual output from the difference calculation script (e.g., `n_export_diff_1992_2020.tif` instead of `global_n_export...`).
+    *   **Execution:** Launched the summary pipeline for these difference rasters to generate the "Aggregate of Differences" dataset (`summary_pipeline_workspace_diff_ha`).
+
+## 2026-03-10
+
+*   **Difference Analysis (Path C) Complete:**
+    *   The `summary_pipeline_landgrid.py` run on the hectare-normalized difference rasters (`2020_1992_ch_ha`) has successfully completed.
+    *   This provides the "Mean of Differences" dataset, which is a critical component for methodological validation.
+
+*   **Initiate Consolidation & Validation Phase:**
+    *   Created `analysis/Consolidation.qmd` as the new central script for the final analysis push.
+    *   **Goal:** This script will load the outputs from both Path B ("Difference of Means") and Path C ("Mean of Differences"), compare them to quantify any divergence, and then integrate the chosen primary dataset with Coastal Protection and socioeconomic data.
+    *   The first step is to populate the paths in the script and run the validation comparison plots.
+
+*   **Data Consolidation (Path B):**
+    *   Finalized the primary base-year services dataset (`interim/10k_grid_services_base.gpkg`). This dataset is the result of the `summary_pipeline_landgrid.py` run on the **per-hectare corrected** base year rasters.
+    *   Manually joined the vector-based coastal protection data to this file in QGIS, creating the final input for the change calculation step.
+    *   Refactored and cleaned `analysis/process_data.qmd` to use this new consolidated file, removing legacy code and updating paths.
+    *   **Versioning:** Bumped the analysis version in `process_data.qmd` to **v1.2.1** to formally track the inclusion of per-hectare normalized data.
+    *   Updated `README_Methodology.md` and `README_pipeline.md` to clearly document the rationale for per-hectare unit standardization.
+
+## Upcoming Tasks (The Final Push)
+
+*   **Data Integration:**
+    *   Join Coastal Protection vector data (base years and differences) to the main 10km grid datasets.
+*   **Validation:**
+    *   Compare "Nature Access" statistics between the main pipeline and the alternative pipeline to ensure consistency.
+    *   Calculate absolute and relative change for the base year summaries (Path B).
+    *   Compare "Difference of Means" (Path B) vs "Mean of Differences" (Path C) to quantify methodological divergence.
+*   **Final Analysis:**
+    *   Run the full Hotspot Extraction and Statistical Analysis (KS tests, etc.) on the final, validated dataset.
+
 ## Strategic Narrative / Pitch (2026-02-11)
 
 **Subject:** Status Update: Integrating Land Cover Drivers into Global NCP Hotspots
@@ -94,7 +137,7 @@ A "Drivers of Change" visualization that ranks ecosystem services by their sensi
 - Personal MacBook may still retain Codex history and could be used later to recover past context.
 
 ## Active entry points
-- analysis/Consolidation.qmd
+- analysis/process_data.qmd
 - analysis/hotspot_extraction.qmd
 - analysis/KS_tests_hotspots.qmd
 

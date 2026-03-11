@@ -61,6 +61,17 @@ To explicitly quantify the difference between the two methodologies, a third ana
 
 This approach provides the spatial representation of the pixel-based method while remaining computationally manageable, providing a robust framework for comparing the core methodologies.
 
+## Unit Standardization (Per Hectare)
+
+To ensure that comparisons of ecosystem service provision are meaningful across the globe, all volumetric services (e.g., Nitrogen Export, Sediment Export) are standardized to a **per-hectare** basis. This crucial step corrects for the geometric distortion of raster pixels in unprojected coordinate systems, where pixel area decreases significantly with increasing latitude. Without this correction, high-latitude regions would be disproportionately represented in any analysis based on per-pixel values.
+
+*   **Volumetric Variables:** Converted to `Unit / ha` by dividing the raw pixel value by a corresponding pixel area raster (`esa_pixel_area_ha_...`). This calculation is performed *before* the zonal statistics aggregation.
+*   **Ratios & Indices:** Left in their native units (e.g., 0-1 ratios, unitless indices) as area normalization does not apply.
+
+This ensures that the zonal statistics (Mean/Sum) reflect physical densities comparable across regions.
+
+This per-hectare normalization is a key methodological improvement (v1.2.1) and is applied to the base year rasters that form the foundation of **Path B (Grid-Level Change)**.
+
 ## Key Analysis Parameters
 
 -   **Hotspot Threshold:** The threshold for identifying hotspots is defined in `analysis/hotspot_extraction.qmd`. It is configured in an R object named `HOTS_CFG` with the parameter `pct_cutoff = 0.05`, representing the top/bottom 5% of SPC values.
