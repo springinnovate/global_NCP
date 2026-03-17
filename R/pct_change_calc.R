@@ -1,8 +1,8 @@
 #' Compute Absolute and/or Percentage Change Between Two Time Points
 #'
 #' This function computes absolute and/or percentage change between two time points
-#' for variables that follow a specific naming convention: `"variable_YYYY_suffix"`, 
-#' where `variable` is the service name or indicator, `YYYY` is a 4-digit year, 
+#' for variables that follow a specific naming convention: `"variable_YYYY_suffix"`,
+#' where `variable` is the service name or indicator, `YYYY` is a 4-digit year,
 #' and `suffix` is a known ending such as `"_sum"` or `"_mean"`.
 #'
 #' The function detects variable-year pairs based on matching variable prefixes and suffixes.
@@ -10,7 +10,7 @@
 #' or both.
 #'
 #' @param df A `data.frame` or `sf` object with time-stamped variable columns.
-#' @param suffix A character vector of valid suffixes (e.g., `c("_sum", "_mean")`). 
+#' @param suffix A character vector of valid suffixes (e.g., `c("_sum", "_mean")`).
 #'        Used to detect columns to compare. Defaults to `c("_sum", "_mean")`.
 #' @param round_digits Integer. If specified, will round the computed values to this number of digits. Default is `NULL` (no rounding).
 #' @param drop_columns Logical. If `TRUE`, drops all original columns except for `"fid"`, computed change columns, and geometry. Default is `FALSE`.
@@ -37,49 +37,49 @@
 #' # Use custom suffix (e.g., "_total")
 #' compute_variable_change(df, suffix = "_total", change_type = "both")
 
-compute_change <- function(df, 
-                           suffix = c("_sum", "_mean"), 
-                           round_digits = NULL, 
+compute_change <- function(df,
+                           suffix = c("_sum", "_mean"),
+                           round_digits = NULL,
                            drop_columns = FALSE,
                            change_type = c("both", "pct", "abs"),
                            pct_mode = c("baseline", "symm"),
                            pct_eps = 0) {
-  
+
   change_type <- match.arg(change_type)
   pct_mode <- match.arg(pct_mode)
-  
+
   suffix_pattern <- paste0("(", paste(suffix, collapse = "|"), ")")
   pattern <- paste0("^(.*)_([0-9]{4})", suffix_pattern, "$")
-  
+
   detected <- stringr::str_match(names(df), pattern)
   valid_idx <- which(!is.na(detected[, 1]))
-  
+
   if (length(valid_idx) == 0) {
     warning("No valid columns detected for change calculation.")
     return(df)
   }
-  
+
   col_info <- tibble::tibble(
     full_col = detected[valid_idx, 1],
     prefix   = detected[valid_idx, 2],
     year     = detected[valid_idx, 3],
     suffix   = detected[valid_idx, 4]
   )
-  
+
   new_cols <- c()
   var_groups <- split(col_info, paste0(col_info$prefix, col_info$suffix))
-  
+
   for (group_name in names(var_groups)) {
     group <- var_groups[[group_name]]
     if (nrow(group) < 2) next
-    
+
     group <- dplyr::arrange(group, as.numeric(group$year))
     col1 <- group$full_col[1]
     col2 <- group$full_col[2]
-    
+
     # Keep both prefix and suffix in the base name
     var_base <- paste0(stringr::str_remove(group$prefix[1], "_$"), group$suffix[1])
-    
+
     # Absolute change
     if (change_type %in% c("abs", "both")) {
       new_col_abs <- paste0(var_base, "_abs_chg")
@@ -89,7 +89,7 @@ compute_change <- function(df,
       }
       new_cols <- c(new_cols, new_col_abs)
     }
-    
+
     # Percentage change
     if (change_type %in% c("pct", "both")) {
       new_col_pct <- paste0(var_base, "_pct_chg")
@@ -97,8 +97,9 @@ compute_change <- function(df,
         denom <- df[[col1]]
         pct <- ((df[[col2]] - df[[col1]]) / denom) * 100
       } else {
-        denom <- abs(df[[col2]]) + abs(df[[col1]])
-        pct <- 200 * (df[[col2]] - df[[col1]]) / denom
+        # Utilize the dedicated math helper from pct_change.R
+        pct <- calc_symmetric_pct_change(df[[col1]], df[[col2]])
+        denom <- 0.5 * (abs(df[[col1]]) + abs(df[[col2]]))
       }
       if (pct_eps > 0) {
         pct[abs(denom) < pct_eps] <- NA_real_
@@ -110,17 +111,17 @@ compute_change <- function(df,
       new_cols <- c(new_cols, new_col_pct)
     }
   }
-  
+
   # Remove duplicates before subsetting
   new_cols <- unique(new_cols)
-  
+
   if (drop_columns) {
     geom_col <- attr(df, "sf_column") %||% "geometry"
     keep_cols <- c("fid", new_cols, geom_col)
     keep_cols <- keep_cols[keep_cols %in% names(df)]
     df <- df[, keep_cols, drop = FALSE]
   }
-  
+
   return(df)
 }
 

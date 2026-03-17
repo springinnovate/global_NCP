@@ -24,7 +24,7 @@ params:
   analysis_version: "v1.2.1"
   input_gpkg: "10k_change_calc.gpkg"
   output_suffix: "" # e.g., "_v2"
-  force_export: true
+  force_export: false
 ---
 
 ## Overview
@@ -601,7 +601,7 @@ Hotspot export and KS still expect `plt_long`. To avoid the heavy pivot here, we
 
 ```{r}
 #| label: pivot-plt-long
-#| eval: true
+#| eval: false
 #| echo: false
 #| message: false
 #| warning: false
@@ -857,7 +857,7 @@ if (!exists("plt_long")) {
 :::
 
 ```{r}
-#| label: hotspots_export
+#| label: hotspots_setup
 #| eval: true
 #| message: true
 #| warning: false
@@ -1064,6 +1064,12 @@ run_one_hotset <- function(df, value_col, scope,
     gpkg       = out_gpkg
   )
 }
+```
+
+```{r}
+#| label: hotspots_execution
+#| eval: false
+#| include: false
 
 # ---- Execute: global + subregional runs -----------------------------------
 
@@ -1188,7 +1194,8 @@ if ("WWF_biome" %in% names(plt_long)) {
 
 # Define service lists for directing plotting logic
 volumetric_services <- c("Nature_Access", "Pollination", "Sed_export", "N_export")
-ratio_services <- c("C_Risk", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio")
+ratio_services <- c("N_Ret_Ratio", "Sed_Ret_Ratio")
+coastal_services <- c("C_Risk", "C_Risk_Red_Ratio")
 
 missing_groupings <- setdiff(groupings, names(plt_long))
 if (length(missing_groupings)) {
@@ -1230,6 +1237,70 @@ if (length(groupings) == 0) {
     }, error = function(e) {
       message("Error generating boxplots for ", gc, ": ", e$message)
     })
+
+    # ------------------------------------------------------------------
+    # Custom plotting for Coastal Protection (Free Scales)
+    # ------------------------------------------------------------------
+    # This addresses the issue where C_Risk (index) and C_Risk_Red_Ratio (ratio)
+    # appear as flat lines when faceted with other ratio services due to scale differences.
+
+    # Ensure we have coastal services in the data
+    curr_coastal <- intersect(coastal_services, unique(plt_long$service))
+
+    if (length(curr_coastal) > 0) {
+      message("Rendering dedicated coastal boxplots for: ", gc)
+
+      # We plot both Absolute and Percent change to match the standard outputs
+      for (metric in c("pct_chg", "abs_chg")) {
+        metric_label <- if (metric == "pct_chg") "Percent Change (%)" else "Absolute Change"
+        file_tag     <- if (metric == "pct_chg") "pct" else "abs"
+
+        plot_data_list <- list()
+
+        for (svc in curr_coastal) {
+          # Filter data for this service and group
+          d_svc <- plt_long %>%
+            dplyr::filter(service == svc, !is.na(.data[[metric]]), !is.na(.data[[gc]]))
+
+          if (nrow(d_svc) == 0) next
+
+          # Identify Hotspots (using PCT cutoff always, per HOTS_CFG)
+          # Note: We use the global percentile logic here for simplicity of visualization
+          is_loss <- svc %in% HOTS_CFG$loss
+
+          # Calculate threshold on PCT change (standard definition)
+          cutoff <- if (is_loss) quantile(d_svc$pct_chg, HOTS_CFG$pct_cutoff, na.rm = TRUE)
+                    else         quantile(d_svc$pct_chg, 1 - HOTS_CFG$pct_cutoff, na.rm = TRUE)
+
+          d_hot <- if (is_loss) d_svc %>% dplyr::filter(pct_chg <= cutoff)
+                   else         d_svc %>% dplyr::filter(pct_chg >= cutoff)
+
+          if (nrow(d_hot) > 0) {
+            d_hot$Service <- svc
+            plot_data_list[[svc]] <- d_hot
+          }
+        }
+
+        if (length(plot_data_list) > 0) {
+          coast_df <- dplyr::bind_rows(plot_data_list)
+
+          p <- ggplot(coast_df, aes(x = .data[[gc]], y = .data[[metric]], fill = .data[[gc]])) +
+            geom_boxplot(outlier.shape = 16, outlier.alpha = 0.3, show.legend = FALSE) +
+            facet_wrap(~Service, scales = "free_y", ncol = 1) +
+            labs(title = paste("Hotspot Change Distribution:", gc),
+                 subtitle = paste("Coastal Services (Free Scale) -", metric_label),
+                 y = metric_label, x = NULL) +
+            theme_minimal() +
+            theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+          # Save to standard output structure so downstream copy picks it up
+          out_sub <- file.path(out_plots(), "coastal", gc)
+          dir.create(out_sub, recursive = TRUE, showWarnings = FALSE)
+          fname <- file.path(out_sub, paste0("boxplots_", gc, "_", file_tag, "_coastal.png"))
+          ggsave(fname, p, width = 8, height = 8, bg = "white")
+        }
+      }
+    }
   }
 }
 latest_dir_boxplots <- file.path("outputs","plots","latest", paste0("boxplots", params$output_suffix))

@@ -1,6 +1,7 @@
 # Worklog — Global NCP Hotspots
 
 ## Current focus
+- **Completed** Cross-validation of bi-temporal change calculations (R vs Python pipelines).
 - **Completed** KS Analysis, Hotspot Intensity, and Multi-service workflows (v1.0.2).
 - **Completed** Re-calculating core ecosystem service ratios and difference rasters.
 - **Completed** LCC Pipeline Development: Finalized `analysis/LC_change.qmd` using `diffeR` for robust transition metrics (1992-2020).
@@ -14,6 +15,14 @@
 - **Completed** Zonal Stats: Calculated summary statistics for base years (1992 & 2020) independently using per-hectare corrected rasters.
 - **Active** Difference Analysis: Running zonal statistics on pre-calculated difference rasters (Path C) to compare "Difference of Means" vs "Mean of Differences".
 - **Active** Granular LCC: Setting up and running `analysis/LC_change_granular.qmd` for Forest Loss and Urban/Cropland Expansion.
+
+## 2026-03-16
+
+*   **Bi-temporal Change Validation (R vs Python):**
+    *   Successfully cross-validated the Symmetric Percentage Change (SPC) calculations between the R pipeline (`process_data.qmd`) and the Python SQLite pipeline (`calculate_bitemporal_change.py`).
+    *   Created `compare_bitemporal_outputs.R` to strictly compare all 20 resulting change columns.
+    *   **Result:** Both methods produced mathematically identical results (max difference exactly `0.000` across all services). Fixed edge cases like 0-to-0 baselines (evaluating correctly to 0% instead of `NaN`).
+    *   **Outcome:** The R pipeline is confirmed to be mathematically sound and will remain the primary workflow due to its superior in-memory processing speed, while the Python pipeline stands as a validated, low-memory alternative.
 
 ## 2026-02-20
 
