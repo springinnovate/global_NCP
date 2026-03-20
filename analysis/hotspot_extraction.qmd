@@ -186,14 +186,13 @@ if (!exists("canonical_lookup", inherits = TRUE)) {
 
 ## Produce signed change bars
 
-Bars are computed directly from `processed/change_calc.gpkg`. We output two variants—zeros kept vs zeros dropped—both with trimmed tails and a dashed global mean. Pivoted `plt_long` is only necessary for hotspots/KS. Trim/no-trim diagnostics and sign-flip tests live in `analysis/hotspot_sandbox.qmd`.
+Bars are computed directly from `processed/10k_change_calc.gpkg`. We focus specifically on "active areas" by dropping true zeros, ensuring that our regional summaries reflect areas where the ecosystem service is actually provided or changing. Both absolute and relative changes are plotted with trimmed tails and a dashed global mean. We no longer compute "zeros kept" variants, as discrepancies in sign direction (MAUP/Simpson's Paradox) are a known property of spatial aggregation rather than an artifact of zero-handling.
 
 What this chunk does:
 - Read the processed GPKG and normalize IDs (`fid`, `c_fid`), dropping any `c_fid.x/y` artifacts.
 - Build a service mapping (`svc_map`) so raw column bases (with/without `_mean`) map to the canonical services; construct `col_pct`/`col_abs` names.
-- `agg_by_group()`: intersect requested `groupings` with available columns; for each grouping × service, pick the pct/abs change column, handle `Inf` pct values (`handle_inf`), optionally drop zeros (`drop_zero`), trim extremes at `cut_q`, then compute mean change by group. Returns tidy rows with `grouping, group, service, metric, mean_chg`.
-- Run `agg_by_group()` two ways: trimmed keep0/drop0 → `signed_keep0`, `signed_drop0`.
-- A later chunk computes global reference means; plotting is in its own chunk so you can skip it when debugging.
+- `agg_by_group()`: intersect requested `groupings` with available columns; for each grouping × service, pick the pct/abs change column, drop zeros (`drop_zero = TRUE`), trim extremes at `cut_q`, then compute mean change by group. Returns tidy rows.
+- Run `agg_by_group()` to produce `signed_summary` and a later chunk computes global references `glob_refs`.
 
 ```{r}
 #| label: make-signed-bars-data
@@ -368,21 +367,16 @@ if (nrow(sf_subset) == 0) {
   stop("CRITICAL: All rows were filtered out! Check if grouping columns are fully NA or filters are too aggressive.")
 }
 
-signed_keep0 <- agg_by_group(sf_subset, services, groupings, cut_q = cut_q,
-                             handle_inf = handle_inf, drop_zero = FALSE)
-signed_drop0 <- agg_by_group(sf_subset, services, groupings, cut_q = cut_q,
-                             handle_inf = handle_inf, drop_zero = TRUE)
+signed_summary <- agg_by_group(sf_subset, services, groupings, cut_q = cut_q,
+                               handle_inf = handle_inf, drop_zero = TRUE)
 
-if (nrow(signed_keep0) == 0) {
+if (nrow(signed_summary) == 0) {
   vmsg("Svc map entries: ", nrow(svc_map))
-  stop("CRITICAL: signed_keep0 is empty. No plots will be generated. Check if grouping columns are present in input or AOOGrid.")
+  stop("CRITICAL: signed_summary is empty. No plots will be generated. Check if grouping columns are present in input or AOOGrid.")
 }
 
-if (nrow(signed_keep0) > 0) {
-  print(dplyr::count(signed_keep0, grouping, metric, service))
-}
-if (nrow(signed_drop0) > 0) {
-  print(dplyr::count(signed_drop0, grouping, metric, service))
+if (nrow(signed_summary) > 0) {
+  print(dplyr::count(signed_summary, grouping, metric, service))
 }
 ```
 
@@ -422,10 +416,8 @@ compute_global_refs <- function(df, services, cut_q = 0.999,
   dplyr::bind_rows(out)
 }
 
-glob_keep0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
-                                  handle_inf = handle_inf, drop_zero = FALSE)
-glob_drop0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
-                                  handle_inf = handle_inf, drop_zero = TRUE)
+glob_refs <- compute_global_refs(sf_f, services, cut_q = cut_q,
+                                 handle_inf = handle_inf, drop_zero = TRUE)
 ```
 
 ```{r}
@@ -439,11 +431,9 @@ glob_drop0 <- compute_global_refs(sf_f, services, cut_q = cut_q,
 latest_dir <- file.path("outputs", "plots", "latest", "bars")
 dir.create(latest_dir, recursive = TRUE, showWarnings = FALSE)
 
-plot_signed_alt <- function(df, grouping, metric,
-                            refs,
-                            variant_label = "keep0",
-                            variant_desc  = "Zeros kept",
-                            out_dir_base = "outputs/plots") {
+plot_signed_bars <- function(df, grouping, metric,
+                             refs,
+                             out_dir_base = "outputs/plots") {
   d <- dplyr::filter(df, grouping == !!grouping, metric == !!metric)
   if (!nrow(d)) return(invisible(NULL))
   d$service <- factor(d$service, levels = services)
@@ -460,8 +450,8 @@ plot_signed_alt <- function(df, grouping, metric,
     geom_vline(data = refs_use, aes(xintercept = ref),
                linetype = "dashed", color = "#4a4a4a", linewidth = 0.5) +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
-    labs(title = paste0("Signed mean change (alt) — ", grouping, " [", metric, "]"),
-         subtitle = variant_desc,
+    labs(title = paste0("Regional Mean Change — ", grouping, " [", metric, "]"),
+         subtitle = "Averaged over active areas only; dashed line = global mean",
          y = NULL,
          x = if (metric == "pct") "Mean % change (trimmed, signed)" else "Mean absolute change (trimmed, signed)") +
     theme_minimal(base_size = 12) +
@@ -469,104 +459,23 @@ plot_signed_alt <- function(df, grouping, metric,
           strip.text = element_text(face = "bold"))
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-  fp <- file.path(out_dir, paste0("bars_signed_alt_", variant_label, "_", tolower(grouping), "_", metric, ".png"))
+  fp <- file.path(out_dir, paste0("bars_signed_", tolower(grouping), "_", metric, ".png"))
   ggsave(fp, p, width = 12, height = 8, dpi = 300, bg = "white")
 
   # Copy to latest
-  fp_latest <- file.path(latest_dir, paste0("bars_signed_alt_", variant_label, "_", tolower(grouping), "_", metric, ".png"))
+  fp_latest <- file.path(latest_dir, paste0("bars_signed_", tolower(grouping), "_", metric, ".png"))
   file.copy(fp, fp_latest, overwrite = TRUE)
 
-  message("Saved alt bars: ", fp)
+  message("Saved regional bars: ", fp)
 }
 
-# Write both variants without touching current outputs
-for (g in unique(signed_keep0$grouping)) {
-  for (m in unique(signed_keep0$metric)) {
-    vmsg("Writing alt bars (keep zeros): ", g, " / ", m)
-    plot_signed_alt(signed_keep0, g, m,
-                    refs = glob_keep0,
-                    variant_label = "keep0",
-                    variant_desc  = "Zeros kept; dashed = global mean",
-                    out_dir_base = file.path("outputs", "plots", paste0("signed_alt_keep0", params$output_suffix)))
-    vmsg("Writing alt bars (drop zeros): ", g, " / ", m)
-    plot_signed_alt(signed_drop0, g, m,
-                    refs = glob_drop0,
-                    variant_label = "drop0",
-                    variant_desc  = "Zeros dropped; dashed = global mean",
-                    out_dir_base = file.path("outputs", "plots", paste0("signed_alt_drop0", params$output_suffix)))
-  }
-}
-```
-
-### QA: Check for sign flips in change metrics
-
-This section addresses potential sign flips where the sign of the percentage change (`_pct_chg`) might differ from the absolute change (`_abs_chg`).
-
-**Update:** A comprehensive diagnostic test was run using `analysis/diagnostic_sign_flip.R` on the full QA dataset. The test confirmed that:
-1. All `_abs_chg` values match `(Year_2020 - Year_Base)` exactly.
-2. No sign flips or calculation anomalies were found in the sample.
-3. Input service values are non-negative.
-
-The chunk below is kept for reference but set to `eval: false`.
-
-```{r}
-#| label: qa-sign-flips
-#| eval: true
-#| echo: false
-
-# Purpose: Detect and report sign flips between absolute and percentage change metrics.
-# This helps diagnose counter-intuitive results when baseline values are negative.
-
-qa_gpkg_path <- file.path(data_dir(), "processed", "10k_grid_ES_change_benef.gpkg")
-
-if (!file.exists(qa_gpkg_path)) {
-  warning("QA geopackage not found at: ", qa_gpkg_path, ". Skipping sign flip check.")
-} else {
-  message("Loading full QA data for sign flip check from: ", qa_gpkg_path)
-  qa_df <- sf::st_read(qa_gpkg_path, quiet = TRUE)
-  qa_df <- sf::st_drop_geometry(qa_df)
-
-  # Get all change columns
-  abs_chg_cols <- names(qa_df)[grepl("_abs_chg$", names(qa_df))]
-
-  sign_flip_found <- FALSE
-
-  for (abs_col in abs_chg_cols) {
-    pct_col <- sub("_abs_chg$", "_pct_chg", abs_col)
-
-    if (pct_col %in% names(qa_df)) {
-
-      sign_flips_df <- qa_df %>%
-        dplyr::filter(sign(.data[[abs_col]]) * sign(.data[[pct_col]]) == -1)
-
-      if (nrow(sign_flips_df) > 0) {
-        sign_flip_found <- TRUE
-        base_name <- sub("_abs_chg$", "", abs_col)
-        message(paste0("WARNING: Found ", nrow(sign_flips_df), " rows with sign flips for service: '", base_name, "'"))
-
-        # Recalculate baseline to demonstrate the cause
-        diagnostic_df <- sign_flips_df %>%
-          dplyr::mutate(
-            # Inverse of Symmetric Percentage Change: V1 = A * (100/P - 0.5)
-            # (Standard formula V1 = A / (P/100) is incorrect for symmetric change)
-            recalculated_t0 = .data[[abs_col]] * (100 / .data[[pct_col]] - 0.5),
-            recalculated_t1 = .data[[abs_col]] + recalculated_t0
-          ) %>%
-          dplyr::select(
-            fid,
-            recalculated_t0,
-            recalculated_t1,
-            dplyr::all_of(abs_col),
-            dplyr::all_of(pct_col)
-          )
-
-        print(head(diagnostic_df))
-      }
-    }
-  }
-
-  if (!sign_flip_found) {
-    message("No sign flips detected between absolute and percentage change metrics.")
+# Write plots
+for (g in unique(signed_summary$grouping)) {
+  for (m in unique(signed_summary$metric)) {
+    vmsg("Writing regional bars: ", g, " / ", m)
+    plot_signed_bars(signed_summary, g, m,
+                     refs = glob_refs,
+                     out_dir_base = file.path("outputs", "plots", paste0("signed_bars", params$output_suffix)))
   }
 }
 ```
@@ -601,7 +510,7 @@ Hotspot export and KS still expect `plt_long`. To avoid the heavy pivot here, we
 
 ```{r}
 #| label: pivot-plt-long
-#| eval: false
+#| eval: true
 #| echo: false
 #| message: false
 #| warning: false
@@ -1068,7 +977,7 @@ run_one_hotset <- function(df, value_col, scope,
 
 ```{r}
 #| label: hotspots_execution
-#| eval: false
+#| eval: true
 #| include: false
 
 # ---- Execute: global + subregional runs -----------------------------------
@@ -1129,16 +1038,14 @@ dplyr::glimpse(hot_index, width = 120)
 #| echo: false
 #| results: 'asis'
 #| cache: false
-# Show barplots directly from signed_alt_keep0 and signed_alt_drop0
+# Show barplots directly
 bar_dir <- file.path("outputs", "plots", "latest", "bars")
-pngs <- list.files(bar_dir, pattern = "^bars_signed_alt_.*\\.png$", full.names = TRUE)
+pngs <- list.files(bar_dir, pattern = "^bars_signed_.*\\.png$", full.names = TRUE)
 
 if (length(pngs)) {
-  # Show keep0 first, then drop0
-  pngs <- pngs[order(grepl("drop0", pngs))]
   rel_paths <- file.path("..", pngs)
   md <- c(
-    "### Signed means (alt variants: keep0 vs drop0; dashed = global mean)",
+    "### Regional Mean Change (dashed = global mean)",
     paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
   )
   knitr::asis_output(paste(md, collapse = "\n\n"))
@@ -1212,6 +1119,11 @@ boxplot_order <- as.character(boxplot_order)
 if (length(groupings) == 0) {
   warning("No grouping columns found in plt_long; skipping hotspot boxplots.")
 } else {
+
+  # Cleanup legacy absolute coastal plots to avoid confusion in outputs
+  legacy_abs_coastal <- list.files(out_plots(), pattern = ".*_abs_coastal\\.png$", recursive = TRUE, full.names = TRUE)
+  if (length(legacy_abs_coastal) > 0) invisible(file.remove(legacy_abs_coastal))
+
   for (gc in groupings) {
     # Check for valid data before attempting to plot
     n_valid <- sum(!is.na(plt_long[[gc]]))
@@ -1223,7 +1135,8 @@ if (length(groupings) == 0) {
     message("Rendering hotspot boxplots for: ", gc)
     tryCatch({
       run_hotspot_boxplots_by(
-        df_long             = plt_long,
+        # Exclude coastal services here because they are handled in their own dedicated plot below
+        df_long             = plt_long %>% dplyr::filter(!service %in% coastal_services),
         group_col           = gc,
         loss                = HOTS_CFG$loss,
         gain                = HOTS_CFG$gain,
@@ -1250,8 +1163,8 @@ if (length(groupings) == 0) {
     if (length(curr_coastal) > 0) {
       message("Rendering dedicated coastal boxplots for: ", gc)
 
-      # We plot both Absolute and Percent change to match the standard outputs
-      for (metric in c("pct_chg", "abs_chg")) {
+      # We plot only Percent change because absolute change doesn't make sense for these indices
+      for (metric in c("pct_chg")) {
         metric_label <- if (metric == "pct_chg") "Percent Change (%)" else "Absolute Change"
         file_tag     <- if (metric == "pct_chg") "pct" else "abs"
 
@@ -1596,7 +1509,7 @@ if (lc_data_ready) {
 
 ```{r}
 #| label: lc-hotspots-export-by-group
-#| eval: true
+#| eval: false
 #| echo: false
 #| message: true
 #| warning: false

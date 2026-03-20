@@ -84,7 +84,7 @@ Metrics are computed for each class and overall and then reshaped into wide form
 The `summary_pipeline_landgrid.py` script executes batch zonal summaries using
 `taskgraph` inside a Docker container. Inputs are defined in YAML files under
 `analysis_configs/` (e.g., `services_slim.yaml`, `beneficiaries_slim.yaml`,
-`c_protection_synth.yaml`) and point to the canonical IUCN AOO 10 km land grid
+`c_protection_synth.yaml`) and point to the canonical IUCN AOO 10 km vector grid
 (`AOOGrid_10x10km_land_4326_clean.gpkg`) plus the raw raster inputs.
 
 To execute:
@@ -193,11 +193,11 @@ The R analysis workflow is conducted through a series of Quarto notebooks locate
     -   **Outputs:** `processed/hotspot_multiservice_stats.csv`, Hotness distribution plots.
 
 ## Analytical Framework
-The analysis of Global NCP Hotspots (1992–2020) is conducted through two distinct but complementary lenses:
+The analysis of Global NCP Hotspots (1992–2020) leverages an `exactextract`-powered vector backbone to guarantee fractional geometry precision. It is conducted through two distinct but complementary lenses:
 
 A. Geographic Distribution (Where are they?)
 
-Objective: To quantify the spatial extent of hotspots across different jurisdictional and ecological boundaries.
+Objective: To quantify the spatial extent of hotspots across different jurisdictional and ecological boundaries, utilizing the master vector grid's authoritative attribute joins.
 
 Grouping Variables: World Bank Regions, Income Groups, and Biomes.
 

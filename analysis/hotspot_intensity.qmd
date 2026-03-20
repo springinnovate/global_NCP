@@ -9,6 +9,10 @@ format:
     number-sections: true
     theme: cosmo
 editor: source
+params:
+  input_gpkg: "10k_change_calc.gpkg"
+  input_plt_long: "plt_long.rds"
+  output_suffix: "" # e.g., "_v2"
 ---
 
 ## Overview
@@ -47,17 +51,17 @@ options(dplyr.summarise.inform = FALSE)
 ```{r}
 #| label: load-data
 
-rds_path <- file.path(data_dir(), "processed", "plt_long.rds")
+rds_path <- file.path(data_dir(), "processed", params$input_plt_long)
 
 if (file.exists(rds_path)) {
   message("Loading data from: ", rds_path)
   plt_long <- readRDS(rds_path)
 } else {
-  stop("plt_long.rds not found. Please run analysis/hotspot_extraction.qmd first to generate it.")
+  stop(params$input_plt_long, " not found. Please run analysis/hotspot_extraction.qmd first to generate it.")
 }
 
 # Load the canonical grid (all grid cells, including those with NA for services)
-gpkg_grid <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
+gpkg_grid <- file.path(data_dir(), "processed", params$input_gpkg)
 if (file.exists(gpkg_grid)) {
   message("Loading canonical grid from: ", gpkg_grid)
   grid_df <- sf::st_read(gpkg_grid, quiet = TRUE)
@@ -85,7 +89,7 @@ HOTS_CFG <- list(
   rule_mode       = "vectors",
   loss = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
   gain = c("Sed_export","N_export","C_Risk"),
-  groupings = c("income_grp","region_wb","continent","region_un","WWF_biome","nev_name"),
+  groupings = c("income_grp","region_wb","WWF_biome"),
   svc_order = c(
     "C_Risk","N_export","Sed_export",
     "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
@@ -252,7 +256,9 @@ plot_area_stats <- function(df, g_var, metric = "pct_area") {
   }
 
   # Save plot
-  out_file <- file.path(out_plots(), paste0("hotspot_", file_suffix, "_", tolower(g_var), ".png"))
+  out_dir <- file.path(out_plots(), paste0("intensity", params$output_suffix))
+  dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+  out_file <- file.path(out_dir, paste0("hotspot_", file_suffix, "_", tolower(g_var), ".png"))
   ggsave(out_file, p, width = 12, height = 8, bg = "white")
   message("Saved plot: ", out_file)
   return(p)

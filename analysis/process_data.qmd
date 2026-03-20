@@ -180,6 +180,9 @@ if (!exists("sf_f")) {
 # Division by zero yields Inf/NaN in standard pct change; symmetric change handles this by bounding at +/-200%.
 # However, if any Inf values persist (e.g. appearing from 0), we clamp them to the max symmetric range (+/- 200%).
 # Use pct_mode = "symm" to avoid counter-intuitive sign flips and handle zero baselines.
+t0_change <- Sys.time()
+gc_before <- gc()
+
 sf_f <- compute_change(
   sf_f,
   suffix = c("_sum", "_mean"),
@@ -187,6 +190,13 @@ sf_f <- compute_change(
   drop_columns = FALSE,
   pct_mode = "symm"
 )
+
+gc_after <- gc()
+t1_change <- Sys.time()
+message("\n--- R Diagnostics ---")
+message("Execution Time: ", round(as.numeric(difftime(t1_change, t0_change, units = "secs")), 2), " seconds")
+message("Memory allocation difference:")
+print(gc_after - gc_before)
 
 # Safety: Replace any accidental Inf with +/-200% (appearing/disappearing)
 sf_f <- sf_f %>%

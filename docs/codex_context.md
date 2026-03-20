@@ -67,6 +67,9 @@ Pollination, Nature_Access
   * **Path A (Pixel-Level)**: Direct difference of rasters. Used for raw change summaries.
   * **Path B (Grid-Level)**: Aggregation to 10km grid first, then difference. Used for **hotspot identification** and regional synthesis.
 * **Aggregation Logic**: Extensive variables (e.g. Nitrogen kg) are **summed**; Intensive variables (e.g. Risk Index) are **averaged**. On an equal-area grid, these are proportional and comparable for relative change.
+* **Extraction Strategy Rule**:
+  * **10km Grid (Simple Polygons)**: Uses `exactextract` (Exact Fractional). Excels at millions of simple square geometries.
+  * **Regional Groupings (Complex Multipolygons)**: Uses `zonal_stats_toolkit` (Rasterized). Bypasses C++ GEOS segfault bottlenecks and Python loop bottlenecks associated with exploding sprawling multipolygons (like WWF Biomes) into tens of thousands of fragments.
 
 * `fid` is unique and stable across all outputs.
 * `c_fid` references the country polygon key used elsewhere.

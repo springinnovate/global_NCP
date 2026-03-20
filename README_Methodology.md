@@ -61,6 +61,20 @@ To explicitly quantify the difference between the two methodologies, a third ana
 
 This approach provides the spatial representation of the pixel-based method while remaining computationally manageable, providing a robust framework for comparing the core methodologies.
 
+## Architectural Decision: Spatial Extraction Strategies
+
+Through extensive testing and methodological validation, a distinct performance and stability divergence was identified between different zonal statistics engines based on spatial scale and geometry complexity. The project now officially employs a hybrid extraction strategy:
+
+1.  **For Large Regional Groupings (Complex Multipolygons): `zonal_stats_toolkit` (Rasterized)**
+    *   **Use Case:** Aggregating global data by World Bank Regions, Income Groups, or WWF Biomes.
+    *   **Rationale:** These groupings form sprawling, highly complex multipolygons containing thousands of islands, jagged edges, and vertices. Using precise fractional extraction tools (`exactextract` / C++ GEOS) on these shapes causes memory leaks and segmentation faults, as the engine attempts to evaluate massive geometric intersections. While exploding these polygons into tens of thousands of simpler fragments (e.g., 85,000+ pieces) prevents crashes, the sheer volume of separate extraction loop operations destroys any speed advantage. By rasterizing the polygons first (the `zonal_stats_toolkit` approach), we completely bypass C++ geometry bottlenecks and reduce the problem to highly efficient matrix math.
+
+2.  **For High-Resolution Grids (Simple Polygons): `exactextract` (Exact Fractional)**
+    *   **Use Case:** Aggregating global data into the IUCN 10km equal-area grid (millions of cells).
+    *   **Rationale:** The 10km grid consists of completely uniform, simple square geometries. `exactextract` is the undisputed champion here, chewing through millions of simple shapes almost instantly without ever hitting geometry complexity limits.
+
+This "Best of Both Worlds" architecture ensures stability and speed regardless of the spatial target.
+
 ## Unit Standardization (Per Hectare)
 
 To ensure that comparisons of ecosystem service provision are meaningful across the globe, all volumetric services (e.g., Nitrogen Export, Sediment Export) are standardized to a **per-hectare** basis. This crucial step corrects for the geometric distortion of raster pixels in unprojected coordinate systems, where pixel area decreases significantly with increasing latitude. Without this correction, high-latitude regions would be disproportionately represented in any analysis based on per-pixel values.
@@ -81,6 +95,15 @@ This per-hectare normalization is a key methodological improvement (v1.2.1) and 
 To address mathematical artifacts where the sign of percentage change differs from absolute change (common when baselines are negative or near-zero), this analysis uses a **symmetric percentage change** calculation (`pct_mode="symm"`). This ensures that the direction of the percentage change always aligns with the absolute difference ($t_1 - t_0$).
 
 **Distribution Limits:** The Symmetric Percentage Change (SPC) metric is bounded between **-200%** (Total Loss) and **+200%** (New Emergence). Consequently, extreme values and clustering at these boundaries, as well as bi-modal distributions (e.g., in Sediment Export), are expected features of the metric rather than data artifacts.
+
+## Addressing Aggregation Divergence (Simpson's Paradox)
+
+During regional aggregation, it is possible to observe a "sign flip"—where regional bar plots display a negative *Absolute Change* but a positive *Symmetric Percentage Change* (SPC) for the same service. This is not a calculation error or a bug; it is a fundamental feature of aggregating spatial data, related to Simpson's Paradox and the Modifiable Areal Unit Problem (MAUP).
+
+*   **Mean Absolute Change** captures the **Systemic Shift**. Because it averages total physical units, it is heavily weighted by a few high-volume grid cells (e.g., massive, dense forests). If those highly productive cells lose a large volume of a service, the regional absolute average turns negative.
+*   **Mean Symmetric Percentage Change** captures the **Local Landscape Shift**. Because percentage change treats every 10km community (grid cell) equally regardless of its baseline volume, it highlights widespread but low-intensity dynamics.
+
+A sign flip reveals a specific geographic narrative: The *total volume* of the service in the region is decreasing (driven by heavy localized losses), but the *spatial footprint* of minor expansions or local service gains is spreading across a large number of low-baseline cells.
 
 ## Aggregation Logic: Sum vs. Mean
 
