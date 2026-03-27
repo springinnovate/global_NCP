@@ -90,11 +90,25 @@ This per-hectare normalization is a key methodological improvement (v1.2.1) and 
 
 -   **Hotspot Threshold:** The threshold for identifying hotspots is defined in `analysis/hotspot_extraction.qmd`. It is configured in an R object named `HOTS_CFG` with the parameter `pct_cutoff = 0.05`, representing the top/bottom 5% of SPC values.
 
+**What a "Hotspot" Means in This Context:**
+*   **Relative Extreme:** We call a cell a "hotspot" because its change sits in the most extreme 5% *within that specific service's own distribution*. It is a ranking label, not an absolute physical threshold. A cell can enter or leave the top 5% even if its raw change isn't huge in absolute terms, simply because it is relative to the rest of the globe.
+*   **Comparability:** Comparisons are strictly within-service. A top 5% decline in Service A isn't necessarily comparable in absolute magnitude to a top 5% decline in Service B.
+*   **Not Evidence of Cause:** Being a hotspot flags that "this cell's change is unusually large (relative to peers)," but it does not inherently prove *why* the value is extreme. Hotspots are starting points for explanation, not conclusions. To discuss drivers, we use additional robust analyses (like LCC attribution and KS socioeconomic profiling).
+*   **Quick Analogy:** Top 5% finishers in two different marathons are both "elite," but their finishing times (absolute performance) and the reasons they're fast (training, course, weather) can differ. Similarly, hotspots are elite by rank, not necessarily a proof of shared cause or identical absolute loss.
+
+
 ## Symmetric Percentage Change
 
 To address mathematical artifacts where the sign of percentage change differs from absolute change (common when baselines are negative or near-zero), this analysis uses a **symmetric percentage change** calculation (`pct_mode="symm"`). This ensures that the direction of the percentage change always aligns with the absolute difference ($t_1 - t_0$).
 
 **Distribution Limits:** The Symmetric Percentage Change (SPC) metric is bounded between **-200%** (Total Loss) and **+200%** (New Emergence). Consequently, extreme values and clustering at these boundaries, as well as bi-modal distributions (e.g., in Sediment Export), are expected features of the metric rather than data artifacts.
+
+### Why SPC over Absolute Change for Attribution?
+When assessing the relationship between Land Cover drivers and Ecosystem Service declines (e.g., scatterplots of Forest Loss vs. ES Change), **Symmetric Percentage Change (SPC)** is strictly preferred over Absolute Change.
+
+*   **Absolute Change** is inherently biased by the *baseline size* of the local ecosystem. A massive, dense forest that loses just 5% of its area might show a huge absolute drop in Carbon simply because of its initial size. Conversely, a small patch of forest that is 100% destroyed would show a tiny absolute drop. Analyzing Absolute Change creates highly skewed, heteroskedastic outputs that largely just map "where the largest baseline ecosystems are."
+*   **Symmetric Percentage Change** normalizes this scale effect. It isolates the *intensity of the ecological shock* relative to the local baseline. This ensures that a total ecosystem collapse in a small grid cell is properly recognized as a severe impact, making it mathematically appropriate for correlating against land cover conversion percentages.
+
 
 ## Addressing Aggregation Divergence (Simpson's Paradox)
 
@@ -115,6 +129,15 @@ A common question regarding Path B is the comparability of variables aggregated 
 2.  **Equal-Area Grid:** The analysis uses the IUCN equal-area grid. Since cell area is constant, $Sum$ and $Mean$ are perfectly proportional ($Sum = Mean \times Area$).
 3.  **Mathematical Identity:** For relative metrics used in this analysis (percent change, percentile rankings, KS test statistics), the results are identical regardless of whether sum or mean is used.
 4.  **Comparability:** Comparing relative magnitudes of change (e.g., percentage change) strips away the units, allowing valid comparisons between total loads and average indices.
+
+## Socioeconomic Profiling (KS Tests)
+
+To understand the socioeconomic context of ecosystem service hotspots (e.g., Population, GDP, HDI), we utilize two-sample Kolmogorov-Smirnov (KS) tests.
+
+**Balanced Sampling Methodology:**
+A direct comparison of hotspots (the top/bottom 5% of pixels) against the entire non-hotspot background (the remaining 95%) suffers from severe sample size imbalance and includes pixels undergoing extreme changes in the *opposite* direction. To ensure a fair and stable statistical comparison, the pipeline implements a "median background" sampling strategy:
+* Hotspots are compared strictly against the "business-as-usual" median 5% of the landscape (the 47.5th to 52.5th percentiles of change). This isolates the specific socioeconomic profile of extreme decline against typical, stable baseline conditions.
+
 
 ## Land Cover Change Attribution
 

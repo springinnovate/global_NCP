@@ -52,6 +52,35 @@ Uses the hotspot definition from the extraction report to compare hotspots vs no
 - **External validation:** The full KS results table (CSV) and plots can be shared for review, and the underlying data (plt_long) is available for reproducibility and further analysis in R, Python, or other tools.
 - **Limitations:** KS tests are sensitive to distribution shape, not just mean differences. Always consider the context and possible confounders.
 
+### Data Dictionary for KS Results
+
+| Column | Meaning |
+|------------------|------------------------------------------------------|
+| `service` | Ecosystem service for the comparison (row group). |
+| `var` | Socioeconomic variable being tested (e.g., GDP total, population). |
+| `D` | Kolmogorov–Smirnov statistic; maximum vertical gap between hotspot and non-hotspot ECDFs (unsigned). Larger ⇒ stronger distributional difference. |
+| `p_value` | Two-sided KS p-value (asymptotic). Small values indicate the two distributions differ. |
+| `p_perm` | Optional permutation p-value (label shuffle within a service). `NA` if permutations were not requested. |
+| `n_hot` | Sample size of the hotspot group used in the test. |
+| `n_non` | Sample size of the non-hotspot group used in the test. |
+| `mean_hot` | Mean of `var` in the hotspot group. |
+| `mean_non` | Mean of `var` in the non-hotspot group. |
+| `median_hot` | Median of `var` in the hotspot group. |
+| `median_non` | Median of `var` in the non-hotspot group. |
+| `q10_hot` | 10th percentile of `var` in the hotspot group. |
+| `q90_hot` | 90th percentile of `var` in the hotspot group. |
+| `q10_non` | 10th percentile of `var` in the non-hotspot group. |
+| `q90_non` | 90th percentile of `var` in the non-hotspot group. |
+| `median_delta` | `median_hot − median_non`. Positive ⇒ hotspots typically have larger values. |
+| `mean_delta` | `mean_hot − mean_non`. Positive ⇒ hotspots typically have larger values. |
+| `auc` | Probability of superiority (AUC; equivalent to normalized Mann–Whitney U): P(value_hotspot > value_nonhotspot). 0.5 ⇒ no tendency; >0.5 ⇒ hotspots tend higher; <0.5 ⇒ hotspots tend lower. |
+| `cliffs_delta` | Nonparametric effect size on [−1, 1], computed as `2*auc − 1`. Rule-of-thumb magnitude: ~0.15 negligible, ~0.33 small, ~0.47 medium, ≥0.47 large (use absolute value for magnitude). |
+| `p_hot_greater` | One-sided KS p-value testing whether hotspots are stochastically greater than non-hotspots. |
+| `p_hot_less` | One-sided KS p-value testing whether hotspots are stochastically smaller than non-hotspots. |
+| `p_adj` | Benjamini–Hochberg FDR-adjusted version of `p_value` (adjusted within each `var` across services). |
+| `p_hot_greater_adj` | BH-adjusted version of `p_hot_greater` (adjusted within `var`). |
+| `p_hot_less_adj` | BH-adjusted version of `p_hot_less` (adjusted within `var`). |
+
 ::: callout-note
 **Exporting KS results for review and further interpretation**
 
@@ -132,8 +161,6 @@ KS_CFG <- list(
   vars_to_test = c(
     "rast_gdpTot_1990_2020_30arcsec_2020_sum",
     "GHS_POP_E2020_GLOBE_sum",
-    "GlobPOP_Count_30arc_2020_sum",
-    "GHS_BUILT_S_E2020_mean",
     "fields_mehrabi_2017_mean",
     "hdi_raster_predictions_2020_mean",
     "rast_adm1_gini_disp_2020_mean"
@@ -150,8 +177,7 @@ KS_CFG <- list(
   transform_default = "auto",
   transform_by_var = c(
     "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "log1p",
-    "GHS_POP_E2020_GLOBE_sum"                 = "log1p",
-    "GlobPOP_Count_30arc_2020_sum"            = "log1p"
+    "GHS_POP_E2020_GLOBE_sum"                 = "log1p"
   ),
   ecdf_top_k              = 8,
   ecdf_service_selection  = "top_k",  # top_k | all | custom
@@ -161,7 +187,6 @@ KS_CFG <- list(
   # outputs
   out_table  = file.path(cfg$paths$processed_data_dir, paste0("ks_results_hot_vs_non", params$output_suffix, ".csv")),
   out_dir    = out_plots(paste0("ks", params$output_suffix)),
-  latest_dir = out_plots("latest", paste0("ks", params$output_suffix)),
   service_suffix_pattern = "_(mean|sum)$"
 )
 ```
@@ -401,9 +426,8 @@ dir.create(ks_plot_dir, recursive = TRUE, showWarnings = FALSE)
 # Heatmap
 heat_path <- file.path(ks_plot_dir, "ks_heatmap.png")
 svc_order <- c(
-  "C_Risk", "C_Risk_Red_Ratio",
-  "N_export", "N_Ret_Ratio",
-  "Sed_export", "Sed_Ret_Ratio",
+  "C_Risk", "N_export", "Sed_export",
+  "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
   "Pollination", "Nature_Access"
 )
 
@@ -473,9 +497,8 @@ ks_plot_dir <- KS_CFG$out_dir
 # Directionality plot (Cliff's Delta)
 dir_path <- file.path(ks_plot_dir, "directionality_cliffs_delta.png")
 svc_order <- c(
-  "C_Risk", "C_Risk_Red_Ratio",
-  "N_export", "N_Ret_Ratio",
-  "Sed_export", "Sed_Ret_Ratio",
+  "C_Risk", "N_export", "Sed_export",
+  "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
   "Pollination", "Nature_Access"
 )
 
@@ -537,17 +560,6 @@ mountain_file <- NULL
 #     message("Skipping mountain plot: ", e$message)
 #   })
 # }
-
-# Mirror to outputs/plots/latest/ks for embedding
-dir.create(KS_CFG$latest_dir, recursive = TRUE, showWarnings = FALSE)
-# Clean up latest dir
-unlink(list.files(KS_CFG$latest_dir, full.names = TRUE), recursive = TRUE)
-
-all_pngs <- list.files(ks_plot_dir, pattern = "\\.png$", recursive = TRUE, full.names = TRUE)
-all_pngs <- all_pngs[!grepl("/latest/", all_pngs)]
-if (length(all_pngs)) {
-  invisible(file.copy(all_pngs, KS_CFG$latest_dir, overwrite = TRUE))
-}
 ```
 
 ## Quick looks

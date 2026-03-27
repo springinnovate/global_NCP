@@ -24,7 +24,8 @@ run_hotspot_boxplots_by <- function(
     keep_only_ordered = TRUE,
     out_root = out_plots(),
     volumetric_services = NULL,
-    ratio_services = NULL) {
+    ratio_services = NULL,
+    top_bottom_n = NULL) {
 
   stopifnot(group_col %in% names(df_long))
 
@@ -61,7 +62,7 @@ run_hotspot_boxplots_by <- function(
   }
 
   calc_box_stats <- function(df, var) {
-    df %>%
+    stats_df <- df %>%
       dplyr::filter(!is.na(.data[[var]])) %>%
       dplyr::group_by(service, .data[[group_col]]) %>%
       dplyr::summarise(
@@ -71,8 +72,20 @@ run_hotspot_boxplots_by <- function(
         iqr    = stats::IQR(.data[[var]], na.rm = TRUE),
         ymin   = max(min(.data[[var]], na.rm = TRUE), lower - 1.5 * iqr),
         ymax   = min(max(.data[[var]], na.rm = TRUE), upper + 1.5 * iqr),
+        valid_count = dplyr::n(),
         .groups = "drop"
       )
+
+    if (!is.null(top_bottom_n)) {
+      stats_df <- stats_df %>%
+        dplyr::group_by(service) %>%
+        dplyr::filter(valid_count >= 10) %>% # Drop extreme artifacts from tiny polygons
+        dplyr::arrange(service, middle) %>%
+        dplyr::filter(dplyr::row_number() <= top_bottom_n | dplyr::row_number() >= dplyr::n() - (top_bottom_n - 1)) %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(plot_label = stats::reorder(paste(.data[[group_col]], service, sep = "__"), middle))
+    }
+    return(stats_df)
   }
 
   # Define which services get both abs and pct plots (volumetric), and which are ratios/indices
@@ -83,6 +96,10 @@ run_hotspot_boxplots_by <- function(
     ratio_services <- c("C_Risk", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio")
   }
 
+  # Setup plotting aesthetics for standard vs top N logic
+  x_var <- if (!is.null(top_bottom_n)) "plot_label" else group_col
+  facet_scales <- if (!is.null(top_bottom_n)) "free" else "free_y"
+  sub_txt <- if (!is.null(top_bottom_n)) paste0("Top & Bottom ", top_bottom_n, " (by median). Whiskers = 1.5*IQR. Outliers hidden.") else "Whiskers = 1.5*IQR. Outliers hidden."
 
   # --- PLOT: Volumetric Services ---
   volumetric_order <- canonical_order[canonical_order %in% volumetric_services]
@@ -91,22 +108,32 @@ run_hotspot_boxplots_by <- function(
   if (nrow(vals_vol) > 0) {
     # Absolute
     stats_abs_vol <- calc_box_stats(vals_vol, "abs_chg")
-    p_abs_box_vol <- ggplot2::ggplot(stats_abs_vol, ggplot2::aes(x = .data[[group_col]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
-      ggplot2::geom_boxplot(stat = "identity", fill = "gray90") +
-      ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 2) +
-      ggplot2::labs(title=paste0("Absolute Change (Volumetric Services) by ", group_col), subtitle="Whiskers = 1.5*IQR. Outliers hidden.", x=NULL, y="Absolute change") +
+    p_abs_box_vol <- ggplot2::ggplot(stats_abs_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
+      ggplot2::geom_boxplot(stat = "identity", fill = "gray95") +
+      ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 2) +
+      ggplot2::labs(title=paste0("Absolute Change (Volumetric Services) by ", group_col), subtitle=sub_txt, x=NULL, y="Absolute change") +
       ggplot2::theme_minimal(base_size = 11) + ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
+
+    if (!is.null(top_bottom_n)) {
+      p_abs_box_vol <- p_abs_box_vol + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
+    }
+
     dir_abs <- file.path(out_root, "abs", tolower(group_col))
     dir.create(dir_abs, recursive = TRUE, showWarnings = FALSE)
     ggplot2::ggsave(filename=file.path(dir_abs, paste0("boxplots_", tolower(group_col), "_abs_volumetric.png")), plot=p_abs_box_vol, width=12, height=8, dpi=300, bg="white")
 
     # Percent
     stats_pct_vol <- calc_box_stats(vals_vol, "pct_chg")
-    p_pct_box_vol <- ggplot2::ggplot(stats_pct_vol, ggplot2::aes(x = .data[[group_col]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
-      ggplot2::geom_boxplot(stat = "identity", fill = "gray90") +
-      ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 2) +
-      ggplot2::labs(title=paste0("Percentage Change (Volumetric Services) by ", group_col), subtitle="Whiskers = 1.5*IQR. Outliers hidden.", x=NULL, y="Percentage change (%)") +
+    p_pct_box_vol <- ggplot2::ggplot(stats_pct_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
+      ggplot2::geom_boxplot(stat = "identity", fill = "gray95") +
+      ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 2) +
+      ggplot2::labs(title=paste0("Percentage Change (Volumetric Services) by ", group_col), subtitle=sub_txt, x=NULL, y="Percentage change (%)") +
       ggplot2::theme_minimal(base_size = 11) + ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
+
+    if (!is.null(top_bottom_n)) {
+      p_pct_box_vol <- p_pct_box_vol + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
+    }
+
     dir_pct <- file.path(out_root, "pct", tolower(group_col))
     dir.create(dir_pct, recursive = TRUE, showWarnings = FALSE)
     ggplot2::ggsave(filename=file.path(dir_pct, paste0("boxplots_", tolower(group_col), "_pct_volumetric.png")), plot=p_pct_box_vol, width=12, height=8, dpi=300, bg="white")
@@ -120,11 +147,16 @@ run_hotspot_boxplots_by <- function(
     dplyr::mutate(service = factor(service, levels = ratio_present))
   if (nrow(vals_ratio) > 0) {
     stats_abs_ratio <- calc_box_stats(vals_ratio, "abs_chg")
-    p_abs_box_ratio <- ggplot2::ggplot(stats_abs_ratio, ggplot2::aes(x = .data[[group_col]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
-      ggplot2::geom_boxplot(stat = "identity", fill = "gray90") +
-      ggplot2::facet_wrap(~ service, scales = "free_y", ncol = 2) +
-      ggplot2::labs(title=paste0("Change in Ratio/Index Services by ", group_col), subtitle="Whiskers = 1.5*IQR. Outliers hidden.", x=NULL, y="Change (ratio/index units)") +
+    p_abs_box_ratio <- ggplot2::ggplot(stats_abs_ratio, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
+      ggplot2::geom_boxplot(stat = "identity", fill = "gray95") +
+      ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 1) +
+      ggplot2::labs(title=paste0("Change in Ratio/Index Services by ", group_col), subtitle=sub_txt, x=NULL, y="Change (ratio/index units)") +
       ggplot2::theme_minimal(base_size = 11) + ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
+
+    if (!is.null(top_bottom_n)) {
+      p_abs_box_ratio <- p_abs_box_ratio + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
+    }
+
     dir_ratio <- file.path(out_root, "ratios", tolower(group_col))
     dir.create(dir_ratio, recursive = TRUE, showWarnings = FALSE)
     ggplot2::ggsave(filename=file.path(dir_ratio, paste0("boxplots_", tolower(group_col), "_ratios.png")), plot=p_abs_box_ratio, width=12, height=8, dpi=300, bg="white")

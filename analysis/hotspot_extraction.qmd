@@ -196,7 +196,7 @@ What this chunk does:
 
 ```{r}
 #| label: make-signed-bars-data
-#| eval: true
+#| eval: false
 #| echo: false
 #| message: true
 #| warning: false
@@ -356,6 +356,9 @@ sf_subset <- sf_f
 if ("continent" %in% names(sf_subset)) {
   sf_subset <- dplyr::filter(sf_subset, is.na(continent) | !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
 }
+if ("region_wb" %in% names(sf_subset)) {
+  sf_subset <- dplyr::filter(sf_subset, is.na(region_wb) | !region_wb %in% c("Antarctica"))
+}
 if ("WWF_biome" %in% names(sf_subset)) {
   sf_subset <- dplyr::filter(sf_subset, is.na(WWF_biome) | !WWF_biome %in% c("Lakes", "Rock & Ice"))
 }
@@ -382,7 +385,7 @@ if (nrow(signed_summary) > 0) {
 
 ```{r}
 #| label: compute-global-refs
-#| eval: true
+#| eval: false
 #| message: false
 #| warning: false
 #| echo: false
@@ -422,18 +425,12 @@ glob_refs <- compute_global_refs(sf_f, services, cut_q = cut_q,
 
 ```{r}
 #| label: make-signed-bars-plot
-#| eval: true
+#| eval: false
 #| message: false
 #| warning: false
 #| echo: false
 
-# Create latest directory upfront so it exists even if plotting fails/skips
-latest_dir <- file.path("outputs", "plots", "latest", "bars")
-dir.create(latest_dir, recursive = TRUE, showWarnings = FALSE)
-
-plot_signed_bars <- function(df, grouping, metric,
-                             refs,
-                             out_dir_base = "outputs/plots") {
+plot_signed_bars <- function(df, grouping, metric, refs, out_dir_base = "outputs/plots") {
   d <- dplyr::filter(df, grouping == !!grouping, metric == !!metric)
   if (!nrow(d)) return(invisible(NULL))
   d$service <- factor(d$service, levels = services)
@@ -462,18 +459,13 @@ plot_signed_bars <- function(df, grouping, metric,
   fp <- file.path(out_dir, paste0("bars_signed_", tolower(grouping), "_", metric, ".png"))
   ggsave(fp, p, width = 12, height = 8, dpi = 300, bg = "white")
 
-  # Copy to latest
-  fp_latest <- file.path(latest_dir, paste0("bars_signed_", tolower(grouping), "_", metric, ".png"))
-  file.copy(fp, fp_latest, overwrite = TRUE)
-
   message("Saved regional bars: ", fp)
 }
 
 # Write plots
-for (g in unique(signed_summary$grouping)) {
-  for (m in unique(signed_summary$metric)) {
-    vmsg("Writing regional bars: ", g, " / ", m)
-    plot_signed_bars(signed_summary, g, m,
+for (g in groupings) {
+  for (m in c("abs", "pct")) {
+    plot_signed_bars(signed_summary, grouping = g, metric = m,
                      refs = glob_refs,
                      out_dir_base = file.path("outputs", "plots", paste0("signed_bars", params$output_suffix)))
   }
@@ -686,7 +678,7 @@ HOTS_CFG <- list(
     rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
   ),
 # centralize the grouping columns here
-  groupings = c("income_grp","region_wb","WWF_biome"),
+  groupings = c("income_grp","region_wb","WWF_biome","nev_name"),
   # IO
   write_layers = TRUE,
   write_index  = TRUE,
@@ -1034,16 +1026,16 @@ dplyr::glimpse(hot_index, width = 120)
 
 ```{r}
 #| label: display-barplots
-#| eval: true
+#| eval: false
 #| echo: false
 #| results: 'asis'
 #| cache: false
 # Show barplots directly
-bar_dir <- file.path("outputs", "plots", "latest", "bars")
-pngs <- list.files(bar_dir, pattern = "^bars_signed_.*\\.png$", full.names = TRUE)
+bar_dir <- file.path("outputs", "plots", paste0("signed_bars", params$output_suffix))
+pngs <- list.files(bar_dir, pattern = "^bars_signed_.*\\.png$", full.names = FALSE)
 
 if (length(pngs)) {
-  rel_paths <- file.path("..", pngs)
+  rel_paths <- file.path("..", bar_dir, pngs)
   md <- c(
     "### Regional Mean Change (dashed = global mean)",
     paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
@@ -1095,8 +1087,8 @@ if ("continent" %in% names(plt_long)) {
 if ("WWF_biome" %in% names(plt_long)) {
   plt_long <- dplyr::filter(plt_long, !WWF_biome %in% c("Lakes", "Rock & Ice"))
 }
-if ("WWF_biome" %in% names(plt_long)) {
-  plt_long <- dplyr::filter(plt_long, !WWF_biome %in% c("Lakes", "Rock & Ice"))
+if ("region_wb" %in% names(plt_long)) {
+  plt_long <- dplyr::filter(plt_long, !region_wb %in% c("Antarctica"))
 }
 
 # Define service lists for directing plotting logic
@@ -1145,7 +1137,8 @@ if (length(groupings) == 0) {
         svc_order           = boxplot_order,
         keep_only_ordered   = TRUE,
         volumetric_services = volumetric_services,
-        ratio_services      = ratio_services
+        ratio_services      = ratio_services,
+        top_bottom_n        = if (gc == "nev_name") 10 else NULL
       )
     }, error = function(e) {
       message("Error generating boxplots for ", gc, ": ", e$message)
@@ -1197,14 +1190,37 @@ if (length(groupings) == 0) {
         if (length(plot_data_list) > 0) {
           coast_df <- dplyr::bind_rows(plot_data_list)
 
-          p <- ggplot(coast_df, aes(x = .data[[gc]], y = .data[[metric]], fill = .data[[gc]])) +
-            geom_boxplot(outlier.shape = 16, outlier.alpha = 0.3, show.legend = FALSE) +
-            facet_wrap(~Service, scales = "free_y", ncol = 1) +
+          # Handle Top 10 logic for Coastal if grouping is country
+          x_var <- gc
+          facet_scales <- "free_y"
+          if (gc == "nev_name") {
+            coast_df <- coast_df %>%
+              dplyr::group_by(Service, .data[[gc]]) %>%
+              dplyr::mutate(med_val = median(pct_chg, na.rm = TRUE), v_count = n()) %>%
+              dplyr::ungroup() %>%
+              dplyr::filter(v_count >= 10) %>%
+              dplyr::arrange(Service, med_val) %>%
+              dplyr::group_by(Service) %>%
+              dplyr::filter(dplyr::dense_rank(med_val) <= 10 | dplyr::dense_rank(med_val) >= max(dplyr::dense_rank(med_val)) - 9) %>%
+              dplyr::ungroup() %>%
+              dplyr::mutate(plot_label = stats::reorder(paste(.data[[gc]], Service, sep="__"), med_val))
+
+            x_var <- "plot_label"
+            facet_scales <- "free"
+          }
+
+          p <- ggplot(coast_df, aes(x = .data[[x_var]], y = .data[[metric]])) +
+            geom_boxplot(fill = "gray95", outlier.shape = 16, outlier.alpha = 0.3) +
+            facet_wrap(~Service, scales = facet_scales, ncol = 1) +
             labs(title = paste("Hotspot Change Distribution:", gc),
                  subtitle = paste("Coastal Services (Free Scale) -", metric_label),
                  y = metric_label, x = NULL) +
             theme_minimal() +
             theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+          if (gc == "nev_name") {
+             p <- p + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
+          }
 
           # Save to standard output structure so downstream copy picks it up
           out_sub <- file.path(out_plots(), "coastal", gc)
@@ -1216,17 +1232,6 @@ if (length(groupings) == 0) {
     }
   }
 }
-latest_dir_boxplots <- file.path("outputs","plots","latest", paste0("boxplots", params$output_suffix))
-dir.create(latest_dir_boxplots, recursive = TRUE, showWarnings = FALSE)
-old_latest_boxplots <- list.files(latest_dir_boxplots, full.names = TRUE, all.files = FALSE)
-if (length(old_latest_boxplots)) invisible(file.remove(old_latest_boxplots))
-all_new_boxplots <- list.files(out_plots(), pattern = "boxplots_.*\\.png$",
-                              recursive = TRUE, full.names = TRUE)
-all_new_boxplots <- all_new_boxplots[!grepl("/latest/", all_new_boxplots)]
-good_boxplots <- all_new_boxplots[file.info(all_new_boxplots)$size > 0]
-if (length(good_boxplots)) {
-  invisible(file.copy(good_boxplots, latest_dir_boxplots, overwrite = TRUE))
-}
 
 ```
 
@@ -1235,19 +1240,22 @@ if (length(good_boxplots)) {
 #| echo: false
 #| results: 'asis'
 #| cache: false
-box_dir   <- file.path("outputs","plots","latest", paste0("boxplots", params$output_suffix))
-box_files <- list.files(box_dir, pattern = "boxplots_.*\\.png$", full.names = FALSE)
+box_dir <- "outputs/plots"
+box_files <- list.files(box_dir, pattern = "boxplots_.*\\.png$", recursive = TRUE, full.names = FALSE)
+box_files <- box_files[!grepl("^latest/", box_files)]
+
 if (length(box_files)) {
   rel_paths <- file.path("..", box_dir, sort(box_files))
   md <- paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
   knitr::asis_output(md)
 } else {
-  knitr::asis_output("> No boxplots were generated; check upstream chunks.")
+  knitr::asis_output("> No boxplots were generated.")
 }
 ```
 
-## Drivers of Change: Land Cover Overlap
-This section explores the relationship between Ecosystem Service hotspots and Land Cover change, specifically focusing on Land Conversion (Loss of Natural Land). We define Conversion Hotspots as the top 5% of grid cells with the highest gross loss of natural land (Loss_2). We then calculate the overlap: What percentage of ES hotspots are also Conversion Hotspots?
+## Attribution to Drivers of Change
+
+Here we integrate Land Cover change, specifically focusing on Land Conversion (Loss of Natural Land). We define Conversion Hotspots as the top 5% of grid cells with the highest gross loss of natural land (Loss_2). We then calculate the overlap: What percentage of ES hotspots are also Conversion Hotspots?
 ```{r}
 #| label: lc-hotspot-overlap-setup
 #| eval: true
@@ -1278,7 +1286,6 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
   # Explicitly targeting 1992-2020 transitions based on LCC_column_dictionary.md
   drivers <- list(
     "Forest_Loss" = "ForestLoss_Loss_Forest_1992_2020",
-    "Urban_Exp"   = "Expansion_Gain_Urban_1992_2020",
     "Crop_Exp"    = "Expansion_Gain_Cropland_1992_2020"
   )
 
@@ -1290,9 +1297,6 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
     message("Exact match failed. Trying pattern matching...")
     fl_col <- grep("ForestLoss_Loss_Forest", names(lc_df), value = TRUE)
     if (length(fl_col) > 0) drivers[["Forest_Loss"]] <- fl_col[1]
-
-    ue_col <- grep("Expansion_Gain_Urban", names(lc_df), value = TRUE)
-    if (length(ue_col) > 0) drivers[["Urban_Exp"]] <- ue_col[1]
 
     ce_col <- grep("Expansion_Gain_Cropland", names(lc_df), value = TRUE)
     if (length(ce_col) > 0) drivers[["Crop_Exp"]] <- ce_col[1]
@@ -1405,16 +1409,55 @@ if (lc_data_ready) {
 #| warning: false
 
 if (!is.null(overlap_stats)) {
+  # Make driver labels presentation-ready and enforce canonical ordering
+  canon_order <- rev(c("C_Risk", "N_export", "Sed_export",
+                       "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
+                       "Pollination", "Nature_Access"))
+
+  overlap_plot_data <- overlap_stats %>%
+    mutate(
+      driver_label = case_when(
+        driver == "Forest_Loss" ~ "Forest Loss",
+        driver == "Crop_Exp" ~ "Cropland Expansion",
+        driver == "Urban_Exp" ~ "Urban Expansion",
+        TRUE ~ driver
+      ),
+      service = factor(service, levels = canon_order)
+    ) %>%
+    filter(!is.na(service))
+
   # Plot
-  p <- ggplot(overlap_stats, aes(x = reorder(service, pct_overlap), y = pct_overlap, fill = driver)) +
+  p_bar <- ggplot(overlap_plot_data, aes(x = service, y = pct_overlap, fill = driver_label)) +
    geom_col(position = "dodge") +
    scale_fill_brewer(palette = "Set2") +
    coord_flip() +
    labs(title = "Attribution of ES Hotspots to Land Cover Drivers",
         subtitle = "% of ES Hotspots overlapping with Top 5% of Driver Change",
-        x = "Service", y = "% Overlap") +
+        x = "Service", y = "% Overlap", fill = "Driver") +
    theme_minimal()
-  print(p)
+  print(p_bar)
+
+  out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+  out_path_bar <- file.path(out_dir, "bar_driver_overlap.png")
+  ggsave(out_path_bar, p_bar, width = 10, height = 6, bg = "white", dpi = 300)
+
+  # Add a Heatmap for instant readability
+  p_heat <- ggplot(overlap_plot_data, aes(x = driver_label, y = service, fill = pct_overlap)) +
+    geom_tile(color = "white", linewidth = 0.5) +
+    geom_text(aes(label = sprintf("%.1f%%", pct_overlap)), color = "black", size = 4) +
+    scale_fill_distiller(palette = "Reds", direction = 1, name = "% Overlap") +
+    labs(title = "Attribution Gap: ES Hotspots vs. LCC Drivers",
+         subtitle = "Percentage of ES Hotspots that overlap with Top 5% of Land Conversion",
+         x = "Land Cover Driver", y = "Ecosystem Service") +
+    theme_minimal(base_size = 14) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          panel.grid = element_blank())
+
+  out_path_heat <- file.path(out_dir, "heatmap_driver_overlap.png")
+  ggsave(out_path_heat, p_heat, width = 8, height = 6, bg = "white", dpi = 300)
+
+  message("Saved overlap charts to: ", out_dir)
 } else {
   message("Skipping overlap analysis (data not ready).")
 }
@@ -1434,7 +1477,12 @@ if (lc_data_ready && !is.null(net_col)) {
 
   cor_data <- plt_long %>%
     dplyr::inner_join(lc_df %>% dplyr::select(fid, dplyr::all_of(net_col)), by = "fid") %>%
-    dplyr::filter(!is.na(pct_chg), !is.na(.data[[net_col]]))
+    dplyr::filter(!is.na(pct_chg), !is.na(.data[[net_col]])) %>%
+    dplyr::filter(!service %in% c("USLE", "N_retention"))
+
+  # Ensure canonical ordering for facets
+  canon_order <- c("C_Risk", "N_export", "Sed_export", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio", "Pollination", "Nature_Access")
+  cor_data$service <- factor(cor_data$service, levels = canon_order)
 
   # Calculate correlation per service
   cor_stats <- cor_data %>%
@@ -1448,21 +1496,30 @@ if (lc_data_ready && !is.null(net_col)) {
 
   print(knitr::kable(cor_stats, digits = 3, caption = "Correlation between ES % Change and Net Natural Land Change"))
 
-  # Plot for all services (subsampled for speed)
-  services_to_plot <- cor_stats$service
+  # Faceted plot for all services showing point density
+  p_cor <- ggplot(cor_data, aes(x = .data[[net_col]], y = pct_chg)) +
+    geom_bin2d(bins = 60) +
+    scale_fill_viridis_c(trans = "log10", option = "viridis", labels = scales::comma) +
+    geom_smooth(method = "lm", color = "tomato", linetype = "22", linewidth = 0.5) +
+    facet_wrap(~ service, scales = "free_y", ncol = 3) +
+    labs(title = "ES Change vs. Net Natural Change",
+         x = "Net Change in Natural Land (%)",
+         y = "ES Change (%)",
+         fill = "Count\n(log10)") +
+    theme_minimal() +
+    theme(axis.title = element_text(size = 10),
+          axis.text = element_text(size = 8))
+    theme(axis.title = element_text(size = 8),
+          axis.text = element_text(size = 8),
+          strip.text = element_text(size = 10),
+          legend.title = element_text(size = 9),
+          legend.text = element_text(size = 7))
 
-  for (svc in services_to_plot) {
-    p_cor <- ggplot(cor_data %>% dplyr::filter(service == svc) %>% dplyr::sample_n(min(n(), 10000)),
-                    aes(x = .data[[net_col]], y = pct_chg)) +
-      geom_point(alpha = 0.1) +
-      geom_smooth(method = "lm", color = "red") +
-      labs(title = paste("ES Change vs. Net Natural Change:", svc),
-           x = "Net Change in Natural Land (%)",
-           y = "ES Change (%)") +
-      theme_minimal()
+  print(p_cor)
 
-    print(p_cor)
-  }
+  out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+  ggsave(file.path(out_dir, "scatter_Net_Natural_Change.png"), p_cor, width = 12, height = 8, bg = "white", dpi = 300)
 }
 ```
 
@@ -1474,34 +1531,43 @@ if (lc_data_ready && !is.null(net_col)) {
 #| warning: false
 
 if (lc_data_ready) {
-  # Iterate through all drivers and all services
-  services_to_plot <- unique(as.character(plt_long$service))
-
   for (d_name in names(drivers)) {
     d_col <- drivers[[d_name]]
 
-    for (es_name in services_to_plot) {
+    # Filter data
+    plot_data <- plt_long %>%
+      dplyr::filter(!service %in% c("USLE", "N_retention")) %>%
+      dplyr::inner_join(lc_df %>% dplyr::select(fid, driver_val = dplyr::all_of(d_col)), by = "fid") %>%
+      dplyr::filter(driver_val > 0, !is.na(pct_chg)) # Focus on areas where change occurred
 
-      # Filter data
-      plot_data <- plt_long %>%
-        filter(service == es_name) %>%
-        inner_join(lc_df %>% select(fid, driver_val = all_of(d_col)), by = "fid") %>%
-        filter(driver_val > 0, !is.na(pct_chg)) # Focus on areas where change occurred
+    # Ensure canonical ordering for facets
+    canon_order <- c("C_Risk", "N_export", "Sed_export", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio", "Pollination", "Nature_Access")
+    plot_data$service <- factor(plot_data$service, levels = canon_order)
 
-      if (nrow(plot_data) > 100) {
-        # Sample for plotting speed
-        plot_data_sample <- plot_data %>% sample_n(min(n(), 10000))
+    if (nrow(plot_data) > 100) {
+      p_scatter <- ggplot(plot_data, aes(x = driver_val, y = pct_chg)) +
+        geom_bin2d(bins = 60) +
+        scale_fill_viridis_c(trans = "log10", option = "viridis", labels = scales::comma) +
+        geom_smooth(method = "lm", color = "tomato", linetype = "22", linewidth = 0.5) +
+        facet_wrap(~ service, scales = "free_y", ncol = 3) +
+        labs(title = paste("Driver vs ES Change:", d_name),
+             x = paste(d_name, "(% Area)"),
+             y = "ES Change (%)",
+             fill = "Count\n(log10)") +
+        theme_minimal() +
+        theme(axis.title = element_text(size = 10),
+              axis.text = element_text(size = 8))
+        theme(axis.title = element_text(size = 8),
+              axis.text = element_text(size = 8),
+          strip.text = element_text(size = 10),
+          legend.title = element_text(size = 9),
+          legend.text = element_text(size = 7))
 
-        p_scatter <- ggplot(plot_data_sample, aes(x = driver_val, y = pct_chg)) +
-          geom_point(alpha = 0.1) +
-          geom_smooth(method = "lm", color = "blue") +
-          labs(title = paste("Driver vs ES Change:", d_name, "vs", es_name),
-               x = paste(d_name, "(% Area)"),
-               y = paste(es_name, "(% Change)")) +
-          theme_minimal()
+      print(p_scatter)
 
-        print(p_scatter)
-      }
+      out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
+      dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+      ggsave(file.path(out_dir, paste0("scatter_", d_name, ".png")), p_scatter, width = 12, height = 8, bg = "white", dpi = 300)
     }
   }
 }
@@ -1509,7 +1575,7 @@ if (lc_data_ready) {
 
 ```{r}
 #| label: lc-hotspots-export-by-group
-#| eval: false
+#| eval: true
 #| echo: false
 #| message: true
 #| warning: false
