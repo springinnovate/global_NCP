@@ -149,7 +149,7 @@ Instead of simple "Net Change" (which masks simultaneous loss and gain), we use 
 *   **Gross Gain:** The area of natural land recovered.
 *   **Exchange:** Shifts that don't affect the net total but represent dynamic turnover.
 
-These metrics are aggregated to the 10km grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation).
+These metrics are aggregated to the 10km grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation). The analysis produces both a single, global attribution map showing the overall footprint of degradation, as well as a series of detailed maps breaking down the specific drivers for each of the 8 individual ecosystem service hotspots.
 
 **Granular Models:**
 To move beyond binary "Natural vs. Transformed" analysis, we implement two specific driver models:
