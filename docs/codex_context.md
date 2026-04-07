@@ -67,6 +67,9 @@ Pollination, Nature_Access
   * **Path A (Pixel-Level)**: Direct difference of rasters. Used for raw change summaries.
   * **Path B (Grid-Level)**: Aggregation to 10km grid first, then difference. Used for **hotspot identification** and regional synthesis.
 * **Aggregation Logic**: Extensive variables (e.g. Nitrogen kg) are **summed**; Intensive variables (e.g. Risk Index) are **averaged**. On an equal-area grid, these are proportional and comparable for relative change.
+* **Extraction Strategy Rule**:
+  * **10km Grid (Simple Polygons)**: Uses `exactextract` (Exact Fractional). Excels at millions of simple square geometries.
+  * **Regional Groupings (Complex Multipolygons)**: Uses `zonal_stats_toolkit` (Rasterized). Bypasses C++ GEOS segfault bottlenecks and Python loop bottlenecks associated with exploding sprawling multipolygons (like WWF Biomes) into tens of thousands of fragments.
 
 * `fid` is unique and stable across all outputs.
 * `c_fid` references the country polygon key used elsewhere.
@@ -212,15 +215,29 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 * **Enrichment**: Ratio of (Observed Share of Hotspots / Expected Share based on Area). Values > 1 indicate disproportionate concentration.
 * **Hotness**: Average number of overlapping service hotspots per pixel.
 
-### 4.9 Current run status / next steps
+### 4.9 Land Cover Change (LCC)
+
+* **Goal**: Attribute ES hotspots to specific land change drivers (e.g., deforestation, urbanization) versus degradation.
+* **Methodology**: Uses `diffeR` (Pontius et al.) to calculate **Gross Loss**, **Gross Gain**, and **Exchange** rather than simple net change.
+* **Pipeline**:
+  1. **Preparation** (`analysis/LC_change_preparation.qmd`): Extracts raw ESA CCI (1992) and C3S (2020) rasters, reclassifying them into 9 simplified classes to ensure consistent mapping.
+  2. **Granular Analysis** (`analysis/LC_change_granular.qmd`): Runs specific driver models:
+     * **Forest Loss**: Binary (Forest vs. Non-Forest). Tracks gross deforestation.
+     * **Expansion**: Multi-class (Urban, Cropland, Other). Tracks anthropogenic expansion.
+* **Outputs**: `processed/10k_lcc_granular_metrics.gpkg`.
+* **Integration**: LCC metrics are joined to hotspot geometries in `hotspot_extraction.qmd` to quantify the "Attribution Gap" (overlap between ES decline and Land Conversion).
+
+### 4.10 Current run status / next steps
 
 - **Completed**:
   - Core hotspot extraction (v1.0.2).
   - KS Analysis pipeline (robust to suffixes, improved visuals).
   - Intensity/Enrichment metrics.
   - Documentation of Sum vs Mean aggregation logic.
-- **Next**:
-  - Land Cover change analysis (new branch).
+  - Land Cover Change analysis (Granular models: Forest Loss, Expansion).
+  - Difference Analysis (Path C) on hectare-corrected rasters.
+- **Active**:
+  - Validation/Consolidation of Path B vs Path C.
   - Final report drafting.
 
 ---

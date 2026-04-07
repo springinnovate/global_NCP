@@ -1,3 +1,33 @@
+# Fri 27 Mar 2026
+
+**Milestone: Core Analysis Pipeline Complete (v1.3.0)**
+
+*   **Project Status:** The core analysis pipeline is functionally complete and validated against the outputs required for the primary presentation narrative. This marks a shift from foundational development to a phase of refinement, interpretation, and documentation.
+*   **ES-LCC Attribution Analysis:** [COMPLETED]
+    *   Successfully implemented the full attribution workflow, connecting Ecosystem Service (ES) hotspots to Land Cover Change (LCC) drivers.
+    *   Generated all key analytical outputs:
+        1.  **Overlap Percentage Table:** `outputs/tables/lcc_es_hotspot_overlap.csv` quantifies the exact overlap percentages.
+        2.  **Attribution Gap Heatmap:** `outputs/plots/drivers/heatmap_driver_overlap.png` provides a clear visual summary of which drivers impact which services.
+        3.  **Global Attribution Map:** The script `analysis/make_attribution_map.R` was initially created to produce a single map showing the overall "degradation" footprint.
+        4.  **Per-Service Attribution Maps:** The script was then enhanced to generate 8 individual maps, one for each ES hotspot type, detailing the specific LCC driver responsible (`outputs/plots/maps/attribution_by_service/`). This provides a highly granular view of the attribution story.
+*   **Codebase Stability:** The R scripts and Quarto notebooks (`hotspot_extraction.qmd`, `make_attribution_map.R`) are stable and produce the expected outputs.
+*   **Next Steps:**
+    *   Focus on interpreting the rich set of generated maps and tables.
+    *   Refine presentation narratives based on these detailed findings.
+    *   Begin the process of cleaning the repository: archiving old scripts, figures, and temporary files.
+    *   Update all documentation (`README.md`, context files) to reflect the final, stable methodology.
+
+# Tue 24 Mar 2026
+
+**Status Update: Visualization & Presentation Prep (Phase 1 & 2 Complete)**
+
+*   **LCC Attribution:** Refactored driver scatterplots into faceted 2D density heatmaps (`geom_bin2d`) with logarithmic scaling.
+*   **Hotspot Boxplots:** Standardized to grayscale (`gray95`). Implemented Top 10/Bottom 10 subsetting for country-level boxplots so they are legible.
+*   **KS Tests:** Verified balanced sampling methodology (comparing hotspots against the median 5% of landscape, not all 95%). Enforced canonical service ordering across Heatmaps and Cliff's Delta effect size charts.
+*   **Automated Mapping:** Successfully created `make_faceted_maps.R`. High-resolution, multi-scale maps generated for both absolute and percentage change across all 4 spatial groupings (Regions, Income, Biomes, Countries). Maps are correctly projected in Equal Earth (EPSG:8857) and stitched using canonical service ordering.
+*   **Next Steps:** Populate the final "Living PowerPoint" for tomorrow's meeting with Steve and Becky. We have successfully addressed the core action items (rescaling maps, canonical ordering, handling Antarctica projection distortion, summarizing regional insights).
+
+
 # Mon 03 Feb 2026
 
 **Status Update: Hotspot Intensity & Multi-service Analysis**

@@ -1,0 +1,302 @@
+---
+title: "Granular Land Cover Change Analysis"
+subtitle: "Forest Loss & Urban/Cropland Expansion Models"
+author: "Jeronimo Rodriguez-Escobar"
+date: last-modified
+format:
+  html:
+    toc: true
+    theme: cosmo
+editor: source
+---
+
+## Overview
+
+This document implements a more detailed Land Cover Change (LCC) analysis, moving beyond the simple "Natural vs. Transformed" binary model. It runs two separate, policy-relevant analyses based on the `diffeR` methodology (Pontius et al.), which calculates detailed transition metrics like Gain, Loss, Persistence, Quantity, Exchange, and Shift.
+
+1.  **Forest Loss Model:** Reclassifies land cover into a binary `Forest` vs. `Non-Forest` map to specifically track and quantify forest dynamics.
+2.  **Urban & Cropland Expansion Model:** Reclassifies land cover into a three-class map (`Cropland`, `Urban`, `Other`) to quantify the expansion of anthropogenic land uses.
+
+The metrics are extracted for the canonical 10km grid and saved to a new GeoPackage for integration with the main hotspot analysis.
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(devtools)
+
+# Initialize paths and load helper functions
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R", "paths.R"))
+devtools::load_all(quiet = TRUE)
+```
+
+## 1. Load Input Data
+
+This analysis relies on simplified 9-class land cover maps (`landcover_gl_[year].tif`) prepared by `analysis/LC_change_preparation.qmd`.
+
+```{r}
+#| label: load-data
+
+# Define years for analysis
+years_to_process <- c(1992, 2020)
+
+# Path to pre-processed 9-class rasters
+lc_dir_granular <- data_raw("LandCovers_Granular")
+if (!dir.exists(lc_dir_granular)) {
+  stop("Granular LC directory not found. Run analysis/LC_change_preparation.qmd first.")
+}
+
+# Find the files for the specified years
+landcover_files <- list.files(
+  lc_dir_granular,
+  pattern = paste0("landcover_gl_(", paste(years_to_process, collapse = "|"), ")\\.tif$"),
+  full.names = TRUE
+)
+
+# Check if files were found
+if (length(landcover_files) != length(years_to_process)) {
+  stop("Could not find all required 9-class land cover rasters for years: ", paste(years_to_process, collapse = ", "))
+}
+
+# Load rasters into a named list
+names(landcover_files) <- stringr::str_extract(basename(landcover_files), "\\d{4}")
+landcover_rasters_9class <- lapply(landcover_files, terra::rast)
+
+message("Loaded 9-class rasters for years: ", paste(names(landcover_rasters_9class), collapse = ", "))
+
+# Load canonical 10km grid
+grid_path <- data_vectors("AOOGrid_10x10km_land_4326_clean.gpkg")
+spatial_units <- st_read(grid_path, quiet = TRUE)
+
+if (!"fid" %in% names(spatial_units)) {
+  spatial_units$fid <- seq_len(nrow(spatial_units))
+}
+spatial_units <- spatial_units %>% dplyr::select(fid)
+id_col_name <- "fid"
+
+# --- TESTING MODE ---
+# Set to TRUE to run on a small subset for verification.
+TEST_MODE <- FALSE
+if (TEST_MODE) {
+  message("!!! RUNNING IN TEST MODE (subset of 1000 contiguous cells) !!!")
+  # Select a contiguous block of cells to optimize raster I/O during testing
+  set.seed(123)
+  start_idx <- sample(seq_len(nrow(spatial_units) - 1000), 1)
+  spatial_units <- spatial_units %>% dplyr::slice(start_idx:(start_idx + 999))
+}
+
+message("Loaded ", nrow(spatial_units), " spatial units from the 10km grid.")
+```
+
+## 2. Define and Run LCC Models
+
+We define a helper function to run the analysis for a given reclassification scheme. This avoids code duplication and makes the process modular. The function reclassifies the input rasters, runs the chunked `iterate_lcc_metrics` process, and returns the results in a tidy, long format.
+
+```{r}
+#| label: define-analysis-runner
+
+run_granular_lcc_analysis <- function(model_name, rasters_9class, reclass_matrix, class_labels, spatial_units, id_col) {
+  message(glue::glue("\n--- Starting Granular LCC Analysis: {model_name} ---"))
+
+  # 1. Reclassify rasters based on the model's matrix
+  message("Reclassifying rasters...")
+  reclassified_rasters <- list()
+  for (year in names(rasters_9class)) {
+    reclassified_rasters[[year]] <- terra::classify(rasters_9class[[year]], reclass_matrix)
+  }
+
+  # 2. Run LCC metric extraction in chunks
+  chunk_size <- 50000
+  n_total <- nrow(spatial_units)
+  n_chunks <- ceiling(n_total / chunk_size)
+  chunk_dir <- file.path(data_dir(), "processed", "lcc_chunks", model_name)
+  # Isolate test chunks to prevent them from blocking a full run later
+  if (exists("TEST_MODE") && TEST_MODE) {
+    chunk_dir <- paste0(chunk_dir, "_test")
+  }
+  if (!dir.exists(chunk_dir)) dir.create(chunk_dir, recursive = TRUE)
+
+  message(glue::glue("Processing {n_total} units in {n_chunks} chunks..."))
+
+  lcc_m_list <- list()
+  for (i in 1:n_chunks) {
+    chunk_file <- file.path(chunk_dir, paste0("lcc_chunk_", i, ".rds"))
+
+    if (file.exists(chunk_file)) {
+      message(glue::glue("Chunk {i}/{n_chunks} exists. Loading..."))
+      lcc_m_list[[i]] <- readRDS(chunk_file)
+    } else {
+      message(glue::glue("Processing chunk {i}/{n_chunks}..."))
+      idx_start <- (i - 1) * chunk_size + 1
+      idx_end <- min(i * chunk_size, n_total)
+      chunk_units <- spatial_units[idx_start:idx_end, ]
+
+      chunk_res <- iterate_lcc_metrics(
+        reclassified_rasters,
+        chunk_units,
+        id_col = id_col,
+        percent = TRUE,
+        mc = TRUE,
+        ncores = 8,
+        digits = 4
+      )
+      saveRDS(chunk_res, chunk_file)
+      lcc_m_list[[i]] <- chunk_res
+      rm(chunk_units, chunk_res); gc()
+    }
+  }
+
+  # 3. Assemble and label results
+  message("Assembling and labeling results...")
+  lcc_m <- dplyr::bind_rows(lcc_m_list) %>%
+    mutate(
+      Category = recode(Category, !!!class_labels),
+      model = model_name
+    )
+
+  message(glue::glue("--- Finished: {model_name} ---"))
+  return(lcc_m)
+}
+```
+
+### Model 1: Forest Loss
+
+This model uses a binary classification to isolate changes related to forest cover.
+
+```{r}
+#| label: run-forest-model
+
+# Reclassification: 9-class -> Forest (1) vs. Non-Forest (2)
+forest_reclass_matrix <- matrix(c(
+  1, 2, # Cropland -> Non-Forest
+  2, 1, # Forest -> Forest
+  3, 2, # Grassland -> Non-Forest
+  4, 2, # Sparse -> Non-Forest
+  5, 2, # Wetland -> Non-Forest
+  6, 2, # Urban -> Non-Forest
+  7, 2, # Bare -> Non-Forest
+  8, 2, # Water -> Non-Forest
+  9, 2  # Snow/Ice -> Non-Forest
+), ncol = 2, byrow = TRUE)
+
+forest_class_labels <- c("1" = "Forest", "2" = "NonForest")
+
+forest_results <- run_granular_lcc_analysis(
+  model_name = "ForestLoss",
+  rasters_9class = landcover_rasters_9class,
+  reclass_matrix = forest_reclass_matrix,
+  class_labels = forest_class_labels,
+  spatial_units = spatial_units,
+  id_col = id_col_name
+)
+```
+
+### Model 2: Urban & Cropland Expansion
+
+This model uses a three-way classification to track expansion of key anthropogenic land uses.
+
+```{r}
+#| label: run-expansion-model
+
+# Reclassification: 9-class -> Cropland (1), Urban (2), Other (3)
+expansion_reclass_matrix <- matrix(c(
+  1, 1, # Cropland -> Cropland
+  2, 3, # Forest -> Other
+  3, 3, # Grassland -> Other
+  4, 3, # Sparse -> Other
+  5, 3, # Wetland -> Other
+  6, 2, # Urban -> Urban
+  7, 3, # Bare -> Other
+  8, 3, # Water -> Other
+  9, 3  # Snow/Ice -> Other
+), ncol = 2, byrow = TRUE)
+
+expansion_class_labels <- c("1" = "Cropland", "2" = "Urban", "3" = "Other")
+
+expansion_results <- run_granular_lcc_analysis(
+  model_name = "Expansion",
+  rasters_9class = landcover_rasters_9class,
+  reclass_matrix = expansion_reclass_matrix,
+  class_labels = expansion_class_labels,
+  spatial_units = spatial_units,
+  id_col = id_col_name
+)
+```
+
+## 3. Consolidate and Export Results
+
+The results from both models are combined and pivoted into a wide format, creating one column for each metric, class, and model. This final dataset is then joined to the grid geometry and saved.
+
+```{r}
+#| label: consolidate-and-save
+
+message("Combining results from all models...")
+all_results_long <- bind_rows(forest_results, expansion_results)
+
+# Pivot to wide format
+message("Pivoting to wide format...")
+lcc_granular_wide <- all_results_long %>%
+  # Calculate net change for easier interpretation
+  mutate(dir_ch = round(as.numeric(Gain) - as.numeric(Loss), digits = 4)) %>%
+  tidyr::pivot_wider(
+    id_cols = all_of(id_col_name),
+    names_from = c(model, Category, year_step),
+    values_from = c(Gain, Persistence, Loss, Quantity, Exchange, Shift, dir_ch),
+    names_glue = "{model}_{.value}_{Category}_{year_step}"
+  ) %>%
+  mutate(
+    !!id_col_name := as.double(.data[[id_col_name]])
+  )
+
+# Join metrics to the spatial grid
+message("Joining metrics to spatial grid...")
+spatial_units_with_granular_lcc <- left_join(spatial_units, lcc_granular_wide, by = id_col_name)
+
+# Check for and repair invalid geometries
+if (any(!sf::st_is_valid(spatial_units_with_granular_lcc))) {
+  message("Warning: Found invalid geometries. Repairing with st_make_valid().")
+  spatial_units_with_granular_lcc <- sf::st_make_valid(spatial_units_with_granular_lcc)
+}
+
+# Save the final enriched GeoPackage
+out_gpkg <- file.path(data_dir(), "processed", "10k_lcc_granular_metrics.gpkg")
+if (exists("TEST_MODE") && TEST_MODE) {
+  out_gpkg <- file.path(data_dir(), "processed", "10k_lcc_granular_metrics_test.gpkg")
+}
+if (!dir.exists(dirname(out_gpkg))) dir.create(dirname(out_gpkg), recursive = TRUE)
+
+# Rename 'fid' to 'grid_fid' to avoid conflict with GeoPackage reserved primary key
+if ("fid" %in% names(spatial_units_with_granular_lcc)) {
+  message("Renaming 'fid' column to 'grid_fid' to avoid GPKG driver conflict.")
+  names(spatial_units_with_granular_lcc)[names(spatial_units_with_granular_lcc) == "fid"] <- "grid_fid"
+}
+
+message("Saving output to: ", out_gpkg)
+sf::st_write(spatial_units_with_granular_lcc, out_gpkg, append = FALSE, delete_dsn = TRUE)
+
+message("Granular LCC metric extraction complete.")
+
+# Optional: Save a summary CSV for quick inspection
+summary_by_class <- all_results_long %>%
+  group_by(model, year_step, Category) %>%
+  summarize(across(c(Gain, Persistence, Loss, Quantity, Exchange, Shift),
+                   mean, na.rm = TRUE), .groups = "drop")
+
+out_csv <- file.path(data_dir(), "processed", "lcc_granular_summary.csv")
+readr::write_csv(summary_by_class, out_csv)
+message("Saved summary table to: ", out_csv)
+
+print(head(summary_by_class))
+```

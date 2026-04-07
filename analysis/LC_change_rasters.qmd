@@ -1,0 +1,148 @@
+---
+title: "Land Cover Change Raster Generation"
+author: "Jeronimo Rodriguez-Escobar"
+date: last-modified
+format:
+  html:
+    toc: true
+    theme: cosmo
+editor: source
+---
+
+## Overview
+
+This notebook generates specific land cover change rasters for visualization and downstream analysis.
+Based on the 9-class simplified land cover maps (ESA CCI / C3S) defined in `LC_change.qmd`, we derive:
+
+1.  **Natural Land Change**: Single raster (1=Loss, 2=Gain).
+2.  **Forest Change**: Single raster (1=Loss, 2=Gain).
+3.  **Cropland Change**: Single raster (1=Expansion, 2=Abandonment).
+4.  **Urban Change**: Single raster (1=Expansion, 2=Decline).
+
+## Setup
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(terra)
+library(dplyr)
+library(here)
+library(stringr)
+library(devtools)
+
+# Initialize paths
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R", "paths.R"))
+devtools::load_all(quiet = TRUE)
+
+# Output directory for change rasters
+out_dir <- file.path(data_dir(), "processed", "lc_change_rasters")
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+```
+
+## Class Definitions
+
+We use the simplified 9-class schema derived from the original 37 ESA CCI classes (see `LC_change.qmd`).
+
+| ID | Class Name | Original ESA Classes |
+|----|------------|----------------------|
+| 1  | Agriculture| 10-40                |
+| 2  | Forest     | 50-100               |
+| 3  | Grassland  | 110-130              |
+| 4  | Sparse     | 140-150              |
+| 5  | Wetland    | 160-180              |
+| 6  | Urban      | 190                  |
+| 7  | Bare       | 200-202              |
+| 8  | Water      | 210                  |
+| 9  | Snow/Ice   | 220                  |
+
+**Binary Classification (Natural vs Transformed):**
+*   **Transformed**: Agriculture (1), Urban (6).
+*   **Natural**: Forest (2), Grassland (3), Sparse (4), Wetland (5), Bare (7), Water (8), Snow/Ice (9).
+
+## Load Data
+
+We load the simplified 9-class rasters for 1992 and 2020.
+
+```{r}
+#| label: load-data
+
+raw_lc_dir <- data_raw("LandCovers_Granular")
+lc_1992_path <- file.path(raw_lc_dir, "landcover_gl_1992.tif")
+lc_2020_path <- file.path(raw_lc_dir, "landcover_gl_2020.tif")
+
+if (!file.exists(lc_1992_path) || !file.exists(lc_2020_path)) {
+  stop("Simplified 9-class land cover rasters not found. Please run the reclassification step in 'analysis/LC_change.qmd' first.")
+}
+
+r92 <- terra::rast(lc_1992_path)
+r20 <- terra::rast(lc_2020_path)
+
+# Ensure alignment
+if (!terra::compareGeom(r92, r20, stopOnError = FALSE)) {
+  warning("Geometries differ. Resampling 2020 to 1992...")
+  r20 <- terra::resample(r20, r92, method = "near")
+}
+```
+
+## Generate Change Rasters
+
+We generate binary rasters where **1** indicates the specific transition occurred, and **NA** indicates no change or other transitions.
+
+```{r}
+#| label: generate-rasters
+
+# Define classes
+natural_classes <- c(2, 3, 4, 5, 7, 8, 9)
+transformed_classes <- c(1, 6)
+
+# Helper function to calculate change based on reclassification
+# Logic: Class 1 -> Class 2 = Change Type 1 (e.g., Loss/Expansion)
+#        Class 2 -> Class 1 = Change Type 2 (e.g., Gain/Abandonment)
+# We map Start Class to 10, End Class to 20.
+# r2 (20) - r1 (10) = 10 -> Type 1
+# r2 (10) - r1 (20) = -10 -> Type 2
+calc_change_raster <- function(r1, r2, rcl_matrix, out_path, others_val = NA) {
+  # Reclassify both years
+  r1_c <- terra::classify(r1, rcl_matrix, others = others_val)
+  r2_c <- terra::classify(r2, rcl_matrix, others = others_val)
+
+  # Calculate difference
+  diff <- r2_c - r1_c
+
+  # Remap to final values: 10 -> 1, -10 -> 2, others -> NA
+  rcl_final <- matrix(c(10, 1, -10, 2), ncol = 2, byrow = TRUE)
+  out <- terra::classify(diff, rcl_final, others = NA)
+
+  terra::writeRaster(out, out_path, overwrite = TRUE, gdal = c("COMPRESS=LZW", "TILED=YES"))
+  return(invisible(NULL))
+}
+
+# 1. Natural Land Change (Natural=10, Transformed=20)
+message("Generating Natural Land Change...")
+rcl_nat <- matrix(c(2, 10, 3, 10, 4, 10, 5, 10, 7, 10, 8, 10, 9, 10, 1, 20, 6, 20), ncol = 2, byrow = TRUE)
+calc_change_raster(r92, r20, rcl_nat, file.path(out_dir, "change_natural_land_1992_2020.tif"))
+
+# 2. Forest Change (Forest=10, Non-Forest=20)
+message("Generating Forest Change...")
+calc_change_raster(r92, r20, matrix(c(2, 10), ncol=2), file.path(out_dir, "change_forest_1992_2020.tif"), others_val = 20)
+
+# 3. Cropland Change (Non-Crop=10, Crop=20)
+message("Generating Cropland Change...")
+calc_change_raster(r92, r20, matrix(c(1, 20), ncol=2), file.path(out_dir, "change_cropland_1992_2020.tif"), others_val = 10)
+
+# 4. Urban Change (Non-Urban=10, Urban=20)
+message("Generating Urban Change...")
+calc_change_raster(r92, r20, matrix(c(6, 20), ncol=2), file.path(out_dir, "change_urban_1992_2020.tif"), others_val = 10)
+
+message("All rasters generated in: ", out_dir)
+```
+
+## Reference
+
+*   **Natural Land Change**: 1 = Loss (Natural -> Transformed), 2 = Gain (Transformed -> Natural).
+*   **Forest Change**: 1 = Loss (Forest -> Non-Forest), 2 = Gain (Non-Forest -> Forest).
+*   **Cropland Change**: 1 = Expansion (Non-Crop -> Crop), 2 = Abandonment (Crop -> Non-Crop).
+*   **Urban Change**: 1 = Expansion (Non-Urban -> Urban), 2 = Decline (Urban -> Non-Urban).

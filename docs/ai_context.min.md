@@ -5,10 +5,7 @@
 Global NCP time-series analysis (~1992–2020): quantify ecosystem-service change at ~10 km resolution, extract **hotspots** of concerning change, and summarize patterns globally and by subregions (WB region, income group, continent, UN region, WWF biome).
 
 ## Primary Entry Points (do not duplicate logic)
-- `analysis/Consolidation.qmd`
-- `analysis/hotspot_extraction.qmd`
-- `analysis/KS_tests_hotspots.qmd`
-
+- `analysis/
 All major logic should be **called from these QMDs**, not redefined inline.
 
 ## Data & Geometry Invariants

@@ -10,7 +10,7 @@ Use `doc/ai_context.min.md` for invariants and rules; this file explains **why**
 ## 1. Project Overview
 
 **Objective.**
-Quantify global change in multiple ecosystem services (~10 km grid, ~1995–2020), identify **hotspots** of concerning change, and describe how magnitudes and distributions vary across subregions.
+Quantify global change in multiple ecosystem services (~10 km grid, ~1992–2020), identify **hotspots** of concerning change, and describe how magnitudes and distributions vary across subregions.
 
 The emphasis is on:
 - clarity
@@ -29,8 +29,8 @@ The emphasis is on:
 
 These QMDs orchestrate the workflow:
 
-- `analysis/Consolidation.qmd`
-  - Builds and validates the consolidated long table
+- `analysis/process_data.qmd`
+  - Consolidates services/beneficiaries, calculates change, and builds canonical dataset
   - Handles joins, service recoding, and checkpointing
 
 - `analysis/hotspot_extraction.qmd`
@@ -40,6 +40,11 @@ These QMDs orchestrate the workflow:
 - `analysis/KS_tests_hotspots.qmd`
   - Compares hotspot distributions (subregion vs global)
   - Produces tidy KS tables and visual summaries
+
+- `analysis/LC_change_preparation.qmd` & `analysis/LC_change_granular.qmd`
+  - **Prep**: Extracts/reclassifies raw LC rasters to 9-class.
+  - **Granular**: Runs `diffeR` models (Forest Loss, Expansion) to produce driver metrics.
+  - **Integration**: Metrics joined in `hotspot_extraction.qmd`.
 
 Logic should be implemented in `R/` and **called** from these QMDs.
 
@@ -52,10 +57,15 @@ Logic should be implemented in `R/` and **called** from these QMDs.
 - Subregional attributes joined via point-on-surface:
   - WB regions, income groups, continents, UN regions
   - WWF biomes
+  - Inputs: `vectors/cartographic_ee_ee_r264_correspondence.gpkg`, `vectors/Biome.gpkg`
 - Output written to:
   `data/processed/10k_change_calc.gpkg`
+- **Aggregation Logic**:
+  - **Extensive** variables (e.g. Nitrogen kg) are **summed**.
+  - **Intensive** variables (e.g. Risk Index) are **averaged**.
+  - On an equal-area grid, these are proportional and comparable.
 
-Percent change columns may contain `NA` or `Inf` and are filtered during pivot.
+Percent change uses symmetric mode (bounded [-200, 200]); `Inf` (appearing from 0) is clamped to 200%. `NA` values are filtered during pivot.
 
 ---
 
@@ -124,7 +134,20 @@ Interpretation must clearly distinguish:
 
 ---
 
-## 8. Coding & Design Principles
+## 8. Land Cover Change (LCC)
+
+- **Goal**: Attribute ES hotspots to drivers (conversion vs. degradation).
+- **Methodology**: `diffeR` (Pontius et al.) for Gross Loss/Gain/Exchange.
+- **Models**:
+  - **Forest Loss**: Binary (Forest vs. Non-Forest).
+  - **Expansion**: Multi-class (Urban, Cropland, Other).
+- **Artifacts**:
+  - Input: `processed/10k_lcc_granular_metrics.gpkg`
+  - Joined in: `hotspot_extraction.qmd`
+
+---
+
+## 9. Coding & Design Principles
 
 - Paths resolved via `data_dir()` and `here::here()`
 - Rules centralized in config objects
@@ -134,7 +157,7 @@ Interpretation must clearly distinguish:
 
 ---
 
-## 9. Known Limitations & Next Steps
+## 10. Known Limitations & Next Steps
 
 - Externalize service metadata to `analysis_configs/service_meta.csv`
 - Finalize KS test runner + visualization
@@ -143,9 +166,42 @@ Interpretation must clearly distinguish:
 
 ---
 
-## 10. How the Assistant Should Help
+## 11. How the Assistant Should Help
 
 - Preserve scientific intent
 - Improve structure, readability, and reuse
 - Avoid duplicating logic across QMDs
 - Prefer explicit context files over implicit memory
+
+## 12. Project Status & History
+
+- See `analysis/WORKLOG.md` for the active task list, daily progress, and detailed session history.
+
+## 13. Developer Reference (Operational)
+
+### VS Code + Remote SSH Settings
+
+Recommended settings for maintaining persistent R sessions on the remote server:
+
+```json
+{
+  "r.rterm.linux": "/usr/bin/R",
+  "r.rpath.linux": "/usr/bin/R",
+  "r.rterm.option": ["--no-save","--no-restore","--quiet"],
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.profiles.linux": {
+    "bash":   { "path": "/bin/bash" },
+    "screen": { "path": "/usr/bin/screen", "args": ["-R","-S","rwork"] }
+  }
+}
+```
+
+### Quick Commands
+
+**Set stable repo root & sanity-check paths:**
+
+```bash
+cd ~/projects/global_NCP
+[ -f .here ] || touch .here
+Rscript -e 'if (!requireNamespace("here", quietly=TRUE)) install.packages("here"); cat("here() ->", here::here(), "\n"); source(here::here("R","paths.R")); cat("data_dir() ->", data_dir(), "\n")'
+```

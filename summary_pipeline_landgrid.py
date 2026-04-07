@@ -134,29 +134,39 @@ def zonal_stats(raster_path_band_dict, op_stats, vector_path):
     if gdf.crs != raster_crs:
         gdf = gdf.to_crs(raster_crs)
 
-    # keep/derive FID so joins align with the output vector
-    if "fid" not in gdf.columns:
-        gdf["fid"] = gdf.index.astype("int32")
+    if "frag_id" in gdf.columns:
+        include_cols = ["frag_id"]
+        gdf = gdf[["geometry", "frag_id"]].copy()
     else:
-        gdf["fid"] = gdf["fid"].astype("int32")
-    gdf = gdf[["geometry", "fid"]].copy()
+        # Fallback for older code
+        if "fid" not in gdf.columns:
+            gdf["fid"] = gdf.index.astype("int32") + 1
+        else:
+            gdf["fid"] = gdf["fid"].astype("int32")
+        include_cols = ["fid"]
+        gdf = gdf[["geometry", "fid"]].copy()
 
     stem = Path(raster_path_band_dict["path"]).stem
-    stats_df = exact_extract(
-        rast=GDALRasterSource(
+
+    extract_kwargs = {
+        "rast": GDALRasterSource(
             raster_path_band_dict["path"],
             band_idx=raster_path_band_dict["band"],
         ),
-        vec=gdf,
-        ops=op_stats,
-        include_cols=["fid"],
-        output="pandas",
-        strategy="raster-sequential",
-        # i found a *2 and *4 to make a nearly twofold improvment, but didn't
-        # see gains at *8
-        max_cells_in_memory=30000000 * 4,
-        progress=create_progress_logger(REPORTING_INTERVAL, stem),
-    )
+        "vec": gdf,
+        "ops": op_stats,
+        "include_cols": include_cols,
+        "output": "pandas",
+        "progress": create_progress_logger(REPORTING_INTERVAL, stem),
+    }
+
+    # Use raster-sequential for massive grids (e.g. 10km grid),
+    # but default to feature-sequential for complex regional multipolygons to avoid C++ segfaults.
+    if len(gdf) > 500000:
+        extract_kwargs["strategy"] = "raster-sequential"
+        extract_kwargs["max_cells_in_memory"] = 30000000 * 4
+
+    stats_df = exact_extract(**extract_kwargs)
     return stats_df
 
 
@@ -266,11 +276,44 @@ def main():
     vector_zones = pipeline_config["vector_zones"]
     output_vector_list = []
     for vector_id, vector_config in vector_zones.items():
+        zonal_stats_task_list = []
         vector_path = vector_config["path"]
+
+        # Pre-process the vector to make it valid and explode multipolygons
+        # This entirely prevents GEOS segfaults in exactextract
+        LOGGER.info(f"Pre-processing vector {vector_id} to fix geometries and explode multipolygons...")
+        gdf = gpd.read_file(vector_path)
+        if "fid" not in gdf.columns:
+            gdf["fid"] = gdf.index.astype("int32") + 1
+        else:
+            gdf["fid"] = gdf["fid"].astype("int32")
+
+        # Repair geometries: buffer(0) is a robust way to fix GEOS topological errors
+        gdf["geometry"] = gdf.geometry.buffer(0)
+        gdf["geometry"] = gdf.geometry.make_valid()
+        gdf = gdf.explode(ignore_index=True)
+
+        # Keep only valid, non-empty Polygons with a measurable area to prevent 'Never get here' crashes
+        gdf = gdf[~gdf.geometry.isna()]
+        gdf = gdf[gdf.geometry.geom_type.isin(['Polygon', 'MultiPolygon'])]
+        gdf = gdf[~gdf.geometry.is_empty]
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            gdf = gdf[gdf.geometry.area > 1e-10].reset_index(drop=True)
+
+        gdf["frag_id"] = gdf.index.astype("int32")
+
+        # Rename fid to orig_fid to prevent GPKG driver UNIQUE constraint failures on duplicated fids
+        gdf.rename(columns={"fid": "orig_fid"}, inplace=True)
+
+        exploded_vector_path = os.path.join(workspace_dir, f"_exploded_{vector_id}.gpkg")
+        gdf.to_file(exploded_vector_path, driver="GPKG")
+
         for raster_id, raster_path_band_dict in raster_layers.items():
             stats_task = task_graph.add_task(
                 func=zonal_stats,
-                args=(raster_path_band_dict, op_stats, vector_path),
+                args=(raster_path_band_dict, op_stats, exploded_vector_path),
                 store_result=True,
                 task_name=(
                     f"zonal stats for {raster_id}:"
@@ -281,12 +324,6 @@ def main():
                 (raster_id, raster_path_band_dict["band"], stats_task)
             )
 
-        # copy original vector and join to zonal stats via 'fid'
-        gdf = gpd.read_file(vector_path)
-        if "fid" not in gdf.columns:
-            gdf["fid"] = gdf.index.astype("int32")
-        else:
-            gdf["fid"] = gdf["fid"].astype("int32")
         for raster_id, band_idx, stats_task in zonal_stats_task_list:
             stats_df = stats_task.get()
             # renames the stat to be the raster id provided in the
@@ -294,13 +331,19 @@ def main():
             # differentiate the operation applied to that raster
             rename_map = {op: f"{raster_id}_{op}" for op in op_stats}
             stats_df.rename(columns=rename_map, inplace=True)
-            gdf = gdf.merge(stats_task.get(), on="fid")
+            gdf = gdf.merge(stats_df, on="frag_id")
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         out_vector_path = os.path.join(
             workspace_dir, f"{vector_id}_synth_zonal_{timestamp}.gpkg"
         )
         output_vector_list.append(out_vector_path)
         gdf.to_file(out_vector_path, driver="GPKG")
+
+        try:
+            os.remove(exploded_vector_path)
+        except OSError:
+            pass
+
     task_graph.join()
     task_graph.close()
     print(
