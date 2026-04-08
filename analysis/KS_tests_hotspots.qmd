@@ -267,7 +267,7 @@ if (need_reload) {
     ) |>
     dplyr::rename(abs_chg = abs, pct_chg = pct) |>
     dplyr::select(fid, c_fid, service, abs_chg, pct_chg, dplyr::any_of(socio_vars)) |>
-    dplyr::filter(!is.na(c_fid)) |>
+    dplyr::filter(!is.na(fid)) |>
     dplyr::filter(!(is.infinite(abs_chg) | is.infinite(pct_chg))) |>
     dplyr::filter(!is.na(abs_chg) | !is.na(pct_chg))
 
@@ -337,7 +337,7 @@ hs <- extract_hotspots(
   loss_services = KS_CFG$loss_services,
   gain_services = KS_CFG$gain_services,
   combos        = KS_CFG$combos,
-  id_cols       = c("c_fid")
+  id_cols       = c("fid")
 )
 
 hotspots_df <- hs$hotspots_df

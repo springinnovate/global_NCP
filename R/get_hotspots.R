@@ -68,7 +68,7 @@
 #'     deg_combo = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
 #'     rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
 #'   ),
-#'   id_cols = c("c_fid"),
+#'   id_cols = c("fid"),
 #'   sf_obj = sf_f,
 #'   write_sf_path = "output_charts/hotspots.gpkg",
 #'   write_driver  = "GPKG",
@@ -101,15 +101,15 @@ extract_hotspots <- function(
     write_sf_path = NULL,
     write_driver = "GPKG",
     clean_names = TRUE,
-    fid_alias = "fid_2",
-    drop_fid_on_write = TRUE
+    fid_alias = "grid_fid",
+    drop_fid_on_write = FALSE
 ) {
   threshold_mode <- match.arg(threshold_mode)
   rule_mode      <- match.arg(rule_mode)
   side           <- match.arg(side)
-  
+
   stopifnot(all(c("fid","service", value_col) %in% names(df)))
-  
+
   #--- helpers ------------------------------------------------------------
   `%||%` <- function(x, y) if (is.null(x)) y else x
   clean_nm <- function(x) {
@@ -119,7 +119,7 @@ extract_hotspots <- function(
     x <- sub("^([0-9])", "_\\1", x)
     x
   }
-  
+
   #--- 1) rank & flags per service ---------------------------------------
   df_hotspots <- df %>%
     dplyr::group_by(.data$service) %>%
@@ -129,13 +129,13 @@ extract_hotspots <- function(
         threshold_mode == "percent" ~ ceiling(n_total * pct_cutoff),
         threshold_mode == "count"   ~ ifelse(is.null(n_cut), 1L, as.integer(n_cut))
       ),
-      rank_high = rank(-.data[[value_col]], ties.method = "first"),
-      rank_low  = rank( .data[[value_col]], ties.method = "first"),
-      flag_high = .data$rank_high <= n_cut,
-      flag_low  = .data$rank_low  <= n_cut
+      rank_high = rank(-.data[[value_col]], ties.method = "max"),
+      rank_low  = rank( .data[[value_col]], ties.method = "max"),
+      flag_high = .data$rank_high <= n_cut & .data[[value_col]] != 0,
+      flag_low  = .data$rank_low  <= n_cut & .data[[value_col]] != 0
     ) %>%
     dplyr::ungroup()
-  
+
   #--- 2) choose directions ----------------------------------------------
   if (rule_mode == "vectors") {
     df_hotspots <- df_hotspots %>%
@@ -164,14 +164,15 @@ extract_hotspots <- function(
         )
       )
   }
-  
+
   hotspots_df     <- df_hotspots %>% dplyr::filter(.data$hotspot_binary)
   non_hotspots_df <- df_hotspots %>% dplyr::filter(!.data$hotspot_binary)
-  
+
   #--- 3) per-fid summary -------------------------------------------------
   group_cols <- c("fid")
   carry_cols <- intersect(id_cols %||% character(0), names(df_hotspots))
-  
+  carry_cols <- setdiff(carry_cols, group_cols)
+
   hotspot_summary <- hotspots_df %>%
     dplyr::group_by(dplyr::across(dplyr::all_of(group_cols))) %>%
     dplyr::summarise(
@@ -199,7 +200,7 @@ extract_hotspots <- function(
         FUN.VALUE = character(1)
       )
     )
-  
+
   #--- 4) optional combo counts ------------------------------------------
   if (!is.null(combos) && length(combos) > 0) {
     combo_counts <- lapply(names(combos), function(combo_name) {
@@ -213,7 +214,7 @@ extract_hotspots <- function(
     names(combo_counts) <- paste0("count_", names(combos))
     hotspot_summary <- dplyr::bind_cols(hotspot_summary, tibble::as_tibble(combo_counts))
   }
-  
+
   #--- 5) wide binary matrix (hotspots only) ------------------------------
   binary_matrix <- hotspot_summary %>%
     dplyr::select(dplyr::all_of(c("fid","hotspot_services"))) %>%
@@ -225,22 +226,22 @@ extract_hotspots <- function(
       values_from = is_hotspot,
       values_fill = 0
     )
-  
+
   if (clean_names) {
     new_names <- names(binary_matrix)
     new_names[-match("fid", new_names)] <- clean_nm(new_names[-match("fid", new_names)])
     names(binary_matrix) <- new_names
-    
+
     keep_to_clean <- setdiff(names(hotspot_summary), c("fid"))
     names(hotspot_summary)[match(keep_to_clean, names(hotspot_summary))] <-
       clean_nm(keep_to_clean)
   }
-  
+
   #--- 6) hotspot attributes for sf ---------------------------------------
   hotspot_attrs <- hotspot_summary %>%
     dplyr::select(-hotspot_services_list) %>%
     dplyr::left_join(binary_matrix, by = "fid")
-  
+
   #--- 7) optional join to sf (hotspot features only) ---------------------
   hotspots_sf <- NULL
   if (!is.null(sf_obj)) {
@@ -248,20 +249,20 @@ extract_hotspots <- function(
     if (any(duplicated(sf_obj$fid))) {
       stop("`sf_obj` must have unique `fid` per feature; found duplicates.")
     }
-    
+
     # Avoid duplicating ID columns already present in sf_obj (keep sf_obj's)
     drop_from_attrs <- intersect(names(hotspot_attrs), setdiff(names(sf_obj), "fid"))
     drop_from_attrs <- setdiff(drop_from_attrs, c("hotspot_count","hotspot_services","hotspot_types"))
     hotspot_attrs_slim <- hotspot_attrs %>%
       dplyr::select(-dplyr::all_of(drop_from_attrs))
-    
+
     hotspots_sf <- sf_obj %>%
       dplyr::inner_join(hotspot_attrs_slim, by = "fid")
-    
+
     # ---- write if requested, with fid aliasing to avoid GDAL conflicts
     if (!is.null(write_sf_path)) {
       to_write <- hotspots_sf
-      
+
       # Duplicate fid into alias (only for the file), and optionally drop fid
       alias_name <- fid_alias
       if (!is.null(alias_name) && "fid" %in% names(to_write)) {
@@ -281,17 +282,17 @@ extract_hotspots <- function(
         }
         to_write[[alias_name]] <- to_write$fid
       }
-      
-      if (isTRUE(drop_fid_on_write) && "fid" %in% names(to_write)) {
+
+      if (isTRUE(drop_fid_on_write) && "fid" %in% names(to_write) && write_driver != "GPKG") {
         to_write$fid <- NULL
       }
-      
+
       dir.create(dirname(write_sf_path), recursive = TRUE, showWarnings = FALSE)
       sf::st_write(to_write, write_sf_path, delete_dsn = TRUE,
                    driver = write_driver, quiet = TRUE)
     }
   }
-  
+
   #--- return -------------------------------------------------------------
   list(
     hotspots_df     = hotspots_df,
@@ -301,4 +302,3 @@ extract_hotspots <- function(
     hotspots_sf     = hotspots_sf
   )
 }
-

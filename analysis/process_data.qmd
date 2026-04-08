@@ -116,30 +116,87 @@ ben_path   <- latest_interim("^10k_grid_benef(.*)?\\.gpkg$")
 S <- st_read(serv_path)
 B <- st_read(ben_path)
 
-if (!"fid" %in% names(S)) S$fid <- seq_len(nrow(S))
-if (!"fid" %in% names(B)) B$fid <- seq_len(nrow(B))
+# We MUST resolve the fragment explosion caused by upstream Python (1.67M fragments vs 1.5M grid cells).
+# We use an R-tree spatial intersection to drop every fragment's centroid into the pristine master grid,
+# and then re-aggregate them mathematically to prevent duplicate hotspot counts and coordinate striping.
+master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land.gpkg")
+if (!file.exists(master_path)) stop("Master grid not found!")
+master_grid <- sf::st_read(master_path, quiet = TRUE)
+if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) {
+  master_grid <- dplyr::rename(master_grid, fid = id)
+}
+if (!"fid" %in% names(master_grid)) {
+  master_grid$fid <- seq_len(nrow(master_grid))
+}
+master_grid <- sf::st_make_valid(master_grid)
 
 # Normalize grouping column names to canonical forms (handle casing issues)
 expected_attrs <- c(
   "iso3", "continent", "region_un", "subregion", "nev_name",
   "region_wb", "income_grp", "WWF_biome"
 )
-curr_names <- names(S)
-for (target in expected_attrs) {
-  match_idx <- which(tolower(curr_names) == tolower(target))
-  if (length(match_idx) == 1) names(S)[match_idx] <- target
-}
 
-# Immediately normalize variable names after joining
-S_tbl <- st_drop_geometry(S)
-B_tbl <- st_drop_geometry(B)
+message("Aligning fragmented polygons via centroid-within-polygon spatial join...")
+S <- sf::st_make_valid(S)
+S_pts <- sf::st_point_on_surface(S)
+if (sf::st_crs(S_pts) != sf::st_crs(master_grid)) S_pts <- sf::st_transform(S_pts, sf::st_crs(master_grid))
+S_joined <- sf::st_join(S_pts, master_grid %>% dplyr::select(true_fid = fid, dplyr::any_of(expected_attrs)), join = sf::st_intersects)
 
-sf_f <- S %>%
-  left_join(B_tbl, by = "fid")
+B <- sf::st_make_valid(B)
+B_pts <- sf::st_point_on_surface(B)
+if (sf::st_crs(B_pts) != sf::st_crs(master_grid)) B_pts <- sf::st_transform(B_pts, sf::st_crs(master_grid))
+B_joined <- sf::st_join(B_pts, master_grid %>% dplyr::select(true_fid = fid), join = sf::st_intersects)
 
-# Canonical renaming: apply once, early, and only here
+message("Re-aggregating fragments into canonical 10km grid cells...")
+S_df <- sf::st_drop_geometry(S_joined) %>% dplyr::filter(!is.na(true_fid))
+B_df <- sf::st_drop_geometry(B_joined) %>% dplyr::filter(!is.na(true_fid))
+
+safe_sum <- function(x) { if(all(is.na(x))) NA_real_ else sum(x, na.rm = TRUE) }
+safe_mean <- function(x) { if(all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE) }
+
+sum_cols_S <- grep("_sum$", names(S_df), value = TRUE)
+mean_cols_S <- grep("_mean$", names(S_df), value = TRUE)
+group_cols_S <- intersect(names(S_df), c("true_fid", expected_attrs))
+
+S_agg <- S_df %>%
+  dplyr::group_by(dplyr::across(dplyr::all_of(group_cols_S))) %>%
+  dplyr::summarise(
+    dplyr::across(dplyr::all_of(sum_cols_S), safe_sum),
+    dplyr::across(dplyr::all_of(mean_cols_S), safe_mean),
+    .groups = "drop"
+  )
+
+sum_cols_B <- grep("_sum$", names(B_df), value = TRUE)
+mean_cols_B <- grep("_mean$", names(B_df), value = TRUE)
+
+B_agg <- B_df %>%
+  dplyr::group_by(true_fid) %>%
+  dplyr::summarise(
+    dplyr::across(dplyr::all_of(sum_cols_B), safe_sum),
+    dplyr::across(dplyr::all_of(mean_cols_B), safe_mean),
+    .groups = "drop"
+  )
+
+message("Joining Services, Beneficiaries, and restoring Master Geometry...")
+joined_tbl <- S_agg %>%
+  dplyr::left_join(B_agg, by = "true_fid") %>%
+  dplyr::rename(fid = true_fid)
+
+sf_f <- master_grid %>%
+  dplyr::select(fid) %>%
+  dplyr::inner_join(joined_tbl, by = "fid")
+
+# CLEAN UP: Remove duplicate .x / .y columns that crash GPKG export
+sf_f <- sf_f %>% dplyr::select(-dplyr::matches("\\.x$|\\.y$"))
+
+# Canonical renaming: safely apply only for existing columns
 rename_map <- c(rename_list[[1]], rename_list[[2]])
-sf_f <- dplyr::rename(sf_f, !!!rename_map)
+for (new_name in names(rename_map)) {
+  old_name <- rename_map[[new_name]]
+  if (old_name %in% names(sf_f)) {
+    names(sf_f)[names(sf_f) == old_name] <- new_name
+  }
+}
 
 
 # Ensure c_fid is present (critical for downstream hotspot extraction)
@@ -149,7 +206,17 @@ if (!"c_fid" %in% names(sf_f)) {
 
 # Optional: save the base synthesis (raw 1992/2020 + beneficiaries + coastal)
 if (isTRUE(write_base_synth)) {
-  st_write(sf_f, file.path(processed_dir, "10k_grid_synth_all.gpkg"), delete_dsn = TRUE)
+  sf_to_write <- sf_f
+  # Force rename of 'fid' to avoid GPKG conflict, dropping any existing 'grid_fid' first
+  if ("fid" %in% names(sf_to_write)) {
+    if ("grid_fid" %in% names(sf_to_write)) sf_to_write <- dplyr::select(sf_to_write, -grid_fid)
+    sf_to_write <- dplyr::rename(sf_to_write, grid_fid = fid)
+  }
+  tryCatch({
+    st_write(sf_to_write, file.path(processed_dir, "10k_grid_synth_all.gpkg"), delete_dsn = TRUE)
+  }, error = function(e) {
+    stop("\nCRITICAL: Failed to write GPKG. Ensure no other R processes have it locked. Details: ", e$message)
+  })
 }
 
  # Services-only synth lives in interim (10k_grid_services.gpkg) if needed for QA.
@@ -211,12 +278,19 @@ write_full_change <- TRUE
 
 # Expanded change synthesis (raw + change) for QA/validation
 if (isTRUE(write_full_change)) {
-  st_write(
-    sf_f,
-    file.path(processed_dir, "10k_grid_ES_change_benef.gpkg"),
-    layer = "10k_grid_ES_change_benef",
-    delete_dsn = TRUE
-  )
+  sf_to_write <- sf_f
+  if ("fid" %in% names(sf_to_write)) {
+    if ("grid_fid" %in% names(sf_to_write)) sf_to_write <- dplyr::select(sf_to_write, -grid_fid)
+    sf_to_write <- dplyr::rename(sf_to_write, grid_fid = fid)
+  }
+  tryCatch({
+    st_write(
+      sf_to_write,
+      file.path(processed_dir, "10k_grid_ES_change_benef.gpkg"),
+      layer = "10k_grid_ES_change_benef",
+      delete_dsn = TRUE
+    )
+  }, error = function(e) message("\nWarning: Could not write 10k_grid_ES_change_benef.gpkg. ", e$message))
 }
 
 
@@ -386,12 +460,19 @@ if (length(svc_change)) {
   sf_canon <- dplyr::rename_with(sf_canon, rename_change, .cols = all_of(svc_change))
 }
 
-st_write(
-  sf_canon,
-  file.path(processed_dir, "10k_change_calc.gpkg"),
-  layer = "10k_change_calc",
-  delete_dsn = TRUE
-)
+sf_to_write <- sf_canon
+if ("fid" %in% names(sf_to_write)) {
+  if ("grid_fid" %in% names(sf_to_write)) sf_to_write <- dplyr::select(sf_to_write, -grid_fid)
+  sf_to_write <- dplyr::rename(sf_to_write, grid_fid = fid)
+}
+tryCatch({
+  st_write(
+    sf_to_write,
+    file.path(processed_dir, "10k_change_calc.gpkg"),
+    layer = "10k_change_calc",
+    delete_dsn = TRUE
+  )
+}, error = function(e) stop("\nCRITICAL: Failed to write 10k_change_calc.gpkg. Details: ", e$message))
 ```
 
 Note: coastal protection is prepared upstream (join → ratios → rasterize → summary)

@@ -1,3 +1,16 @@
+# Wed 08 Apr 2026
+
+**Status Update: Hotspot Pipeline Spatial Join Fixes & V2 Technical Debt**
+
+*   **Pipeline Fixes (The Fragment Bug)**: Discovered that Python's `gdf.explode()` was fragmenting the 1.5M grid cells into 1.67M jagged pieces to bypass GEOS bottlenecks. This caused severe striping (dropped cells) and impossible hotspot counts (up to 180) due to duplicated data.
+*   **The Patch**: Implemented a robust `st_intersects` spatial join and re-aggregation (`group_by %>% summarise`) in `process_data.qmd`. This mathematically collapses all fragments back into their pristine 10km parent cells. Striping is eliminated, and max hotspot counts are strictly capped at 8.
+*   **V2 Simplification Plan (TODO)**:
+    1. `summary_pipeline_landgrid.py` has been updated to preserve the true `grid_id` as `orig_fid` *before* exploding geometries.
+    2. Run the full Python extraction pipeline to generate cached `.gpkg` files containing this `orig_fid`.
+    3. Completely remove the heavy `st_intersects` and spatial re-aggregation logic from the R pipeline.
+    4. Revert back to a lightning-fast standard tabular `left_join(by = "fid")`.
+    5. Target this cleanup for analysis version `v1.4.0`.
+
 # Fri 27 Mar 2026
 
 **Milestone: Core Analysis Pipeline Complete (v1.3.0)**
