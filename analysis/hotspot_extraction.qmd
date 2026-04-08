@@ -40,6 +40,7 @@ Here are some ideas and future tasks for this analysis:
 
 1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
 2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to quantify and visualize the share of total change (from bar plots) that occurs within hotspots versus outside of them, possibly using stacked bar plots.
+3.  **Simplify Spatial Joins (V2 Technical Debt):** Remove the on-the-fly spatial coordinate joins (X/Y) used to bypass upstream row-shifting. Once `summary_pipeline_landgrid.py` is updated to preserve true FIDs, revert to standard tabular `left_join(by = "fid")`.
 :::
 
 ## Setup and Libraries
@@ -274,12 +275,8 @@ if (length(available_groupings) == 0) warning("No requested groupings found in d
 vmsg("Groupings requested: ", paste(groupings, collapse=", "))
 vmsg("Groupings found in data: ", paste(available_groupings, collapse=", "))
 
-if (!"c_fid" %in% names(sf_f)) {
-  sf_f$c_fid <- sf_f$fid
-}
-
 # Ensure required keys present (Consolidation.qmd guarantees this)
-stopifnot("fid" %in% names(sf_f), "c_fid" %in% names(sf_f))
+stopifnot("fid" %in% names(sf_f))
 
 # build mapping; include both raw base and no-_mean base, with ready-to-use columns
 chg_cols <- grep("_(abs|pct)_chg$", names(sf_f), value = TRUE)
@@ -535,22 +532,11 @@ if (!exists("sf_f")) {
   }
   message("Loading canonical change data for pivoting...")
   sf_f <- sf::st_read(gpkg, quiet = TRUE)
+
   sf_f <- sf::st_drop_geometry(sf_f)
-
-  # Handle grid_fid if present (renaming to fid for consistency)
-  if ("grid_fid" %in% names(sf_f) && !"fid" %in% names(sf_f)) {
-    sf_f <- dplyr::rename(sf_f, fid = grid_fid)
-  }
-
-    # Ensure required keys present; rebuild if missing (e.g. if dropped during IO)
-    # Must happen BEFORE filtering to preserve 1:1 match with base grid fids
-    if (!"fid" %in% names(sf_f)) {
-      sf_f$fid <- seq_len(nrow(sf_f))
-    }
-
-  if (!"c_fid" %in% names(sf_f)) {
-    sf_f$c_fid <- sf_f$fid
-  }
+  if ("orig_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = orig_fid)
+  if ("grid_fid" %in% names(sf_f) && !"fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = grid_fid)
+  if (!"fid" %in% names(sf_f)) sf_f$fid <- seq_len(nrow(sf_f))
 
   # Robustness: Ensure grouping columns exist before pivoting
   # (Removed redundant AOOGrid join; input GPKG is authoritative)
@@ -558,7 +544,7 @@ if (!exists("sf_f")) {
 
 # 2. Define grouping columns to keep
 #    (Must match what is used in make-signed-bars-data and hotspots_config)
-pivot_groupings <- c("income_grp","region_wb","WWF_biome")
+pivot_groupings <- c("c_fid", "iso3", "continent", "region_un", "subregion", "nev_name", "region_wb", "income_grp", "WWF_biome")
 pivot_groupings <- intersect(pivot_groupings, names(sf_f))
 
 # 3. Identify change columns
@@ -589,7 +575,7 @@ message("Pivoting ", length(chg_cols), " change columns to long format...")
 # 4. Pivot to long format
 #    Structure: fid, c_fid, <groupings>, service, abs_chg, pct_chg
 plt_long <- sf_f |>
-  dplyr::select(dplyr::any_of(c("fid", "c_fid", pivot_groupings)), dplyr::all_of(chg_cols)) |>
+  dplyr::select(dplyr::any_of(c("fid", pivot_groupings)), dplyr::all_of(chg_cols)) |>
   tidyr::pivot_longer(
     cols = dplyr::all_of(chg_cols),
     names_to = c("service", ".value"),
@@ -608,16 +594,20 @@ plt_long <- sf_f |>
     is.infinite(pct_chg) & pct_chg > 0 ~ 200,
     is.infinite(pct_chg) & pct_chg < 0 ~ -200,
     TRUE ~ pct_chg
-  ))
+  )) |>
+  # Scrub floating point dust from Python raster overlap that creates fake 200% hotspots
+  dplyr::mutate(
+    pct_chg = ifelse(!is.na(abs_chg) & abs(abs_chg) < 1e-6, 0, pct_chg)
+  )
 
 # Diagnostic: Check for NAs in pivoted data
-na_pct <- sum(is.na(plt_long$pct_chg))
-if (na_pct == nrow(plt_long)) {
-  stop("CRITICAL: All pct_chg values in plt_long are NA. Check input data (10k_change_calc_v2.gpkg).")
+if (nrow(plt_long) == 0) {
+  stop("CRITICAL: plt_long is empty after pivot. The spatial coordinate join likely failed (0 matches) due to a CRS mismatch.")
 }
 
-if (nrow(plt_long) == 0) {
-  stop("CRITICAL: plt_long is empty after pivot. Check service name mapping.")
+na_pct <- sum(is.na(plt_long$pct_chg))
+if (na_pct == nrow(plt_long)) {
+  stop("CRITICAL: All pct_chg values in plt_long are NA. Check input data (10k_change_calc.gpkg).")
 }
 
 # 5. Cache the result (optional but helpful for debugging)
@@ -785,17 +775,21 @@ if (length(intersect(svc_in_data, svc_in_cfg)) == 0) {
 
 # ---- Geometry: prefer an in-memory slim grid, else build it --------------
 if (exists("grid_sf") && inherits(grid_sf, "sf")) {
-  geom_sf <- dplyr::select(grid_sf, dplyr::any_of(c("fid", "c_fid")))
+  geom_sf <- dplyr::select(grid_sf, dplyr::any_of(c("fid")))
 } else {
-  gpkg_grid <- file.path(data_dir(), "processed", params$input_gpkg)
-  stopifnot(file.exists(gpkg_grid))
-  geom_sf <- sf::st_read(gpkg_grid, quiet = TRUE) |>
-    dplyr::select(dplyr::any_of(c("fid", "c_fid", "continent")), dplyr::everything())
-
-  # Handle grid_fid if present (renaming to fid for consistency)
-  if ("grid_fid" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) {
-    geom_sf <- dplyr::rename(geom_sf, fid = grid_fid)
+  master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land.gpkg")
+  stopifnot(file.exists(master_path))
+  geom_sf <- sf::st_read(master_path, quiet = TRUE)
+  if ("id" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) {
+    geom_sf <- dplyr::rename(geom_sf, fid = id)
   }
+
+  # ASSIGN FID HERE BEFORE FILTERING
+  if (!"fid" %in% names(geom_sf)) {
+    geom_sf$fid <- seq_len(nrow(geom_sf))
+  }
+
+  geom_sf <- geom_sf |> dplyr::select(dplyr::any_of(c("fid", "iso3", "continent", "region_un", "subregion", "nev_name", "region_wb", "income_grp", "WWF_biome")))
 }
 
 # Ensure we filter Antarctica to match the logic used for plt_long (sf_f)
@@ -809,10 +803,6 @@ if ("WWF_biome" %in% names(geom_sf)) {
 if (!"fid" %in% names(geom_sf)) {
   geom_sf$fid <- seq_len(nrow(geom_sf))
 }
-if (!"c_fid" %in% names(geom_sf)) {
-  geom_sf$c_fid <- geom_sf$fid
-}
-geom_sf <- dplyr::select(geom_sf, fid, c_fid)  # keep it slim
 stopifnot("fid" %in% names(geom_sf), !any(duplicated(geom_sf$fid)))
 
 # Join Land Cover Transitions (diffeR output from LC_change.qmd)
@@ -853,8 +843,8 @@ if (file.exists(lc_gpkg)) {
 }
 
 # Diagnostic: check ID overlap
-n_overlap <- length(intersect(unique(plt_long$c_fid), unique(geom_sf$c_fid)))
-cat("Diagnostic: plt_long unique c_fids=", length(unique(plt_long$c_fid)), " geom_sf unique c_fids=", length(unique(geom_sf$c_fid)), " Overlap=", n_overlap, "\n", file = stderr())
+n_overlap <- length(intersect(unique(plt_long$fid), unique(geom_sf$fid)))
+cat("Diagnostic: plt_long unique fids=", length(unique(plt_long$fid)), " geom_sf unique fids=", length(unique(geom_sf$fid)), " Overlap=", n_overlap, "\n", file = stderr())
 
 # Alignment: Ensure plt_long strictly matches the geometry domain
 # (e.g. if plt_long includes Antarctica but geom_sf filtered it out)
@@ -908,7 +898,7 @@ run_one_hotset <- function(df, value_col, scope,
     loss_services  = cfg$loss,
     gain_services  = cfg$gain,
     combos         = cfg$combos,
-    id_cols        = c("c_fid"),
+    id_cols        = c("fid", intersect(names(df), c("c_fid", "iso3", "continent", "region_un", "subregion", "nev_name", "region_wb", "income_grp", "WWF_biome"))),
     sf_obj         = sf_obj,
     write_sf_path  = NULL,
     clean_names    = TRUE
@@ -1604,14 +1594,14 @@ if (lc_data_ready) {
       }
 
       attrs <- plt_long %>%
-        dplyr::select(fid, c_fid) %>%
+        dplyr::select(fid) %>%
         dplyr::distinct(fid, .keep_all = TRUE) %>%
         dplyr::left_join(grid_attrs_df, by = "fid")
 
     } else {
       attrs <- plt_long %>%
-        select(fid, c_fid, all_of(group_cols)) %>%
-        distinct(fid, .keep_all = TRUE)
+        dplyr::select(fid, dplyr::all_of(group_cols)) %>%
+        dplyr::distinct(fid, .keep_all = TRUE)
     }
 
     # Select driver columns from lc_df

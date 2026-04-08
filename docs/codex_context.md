@@ -71,6 +71,7 @@ Pollination, Nature_Access
   * **10km Grid (Simple Polygons)**: Uses `exactextract` (Exact Fractional). Excels at millions of simple square geometries.
   * **Regional Groupings (Complex Multipolygons)**: Uses `zonal_stats_toolkit` (Rasterized). Bypasses C++ GEOS segfault bottlenecks and Python loop bottlenecks associated with exploding sprawling multipolygons (like WWF Biomes) into tens of thousands of fragments.
 
+* **ID Integrity (V2 Refactor)**: R scripts currently use spatial X/Y coordinate joins to bypass upstream row-shifting. Once `summary_pipeline_landgrid.py` consistently exports `orig_fid`, R scripts will revert to strict, fast tabular joins (`left_join(by="fid")`).
 * `fid` is unique and stable across all outputs.
 * `c_fid` references the country polygon key used elsewhere.
 * Percent change columns may contain `NA/Inf`; these are filtered at pivot time.
@@ -301,6 +302,7 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 ## 8) Limitations & TODOs
 
 * **Service metadata externalization.** Replace hard‑coded recode vectors with `analysis_configs/service_meta.csv` (columns: `raw,label,direction,pref_metric`).
+* **V2 Pipeline Simplification (ID Integrity).** The current R pipeline uses heavy spatial coordinate joins (X/Y) to bypass missing IDs and row-shifting caused by Python dropping empty cells. Once all cached outputs contain `orig_fid`, remove `st_coordinates` from the `.qmd` files and return to fast `left_join(by = "fid")`.
 * **Aliasing cleanup.** Keep `agg_change` alias until all code uses `aggregate_change_simple` (or vice versa), then deprecate.
 * **KS module.** Implement KS calculations + multiple‑testing correction and a compact visualization.
 * **Caching.** Persist `plt_long` (e.g., `fst`/`arrow`) to speed resumes and reduce memory pressure.

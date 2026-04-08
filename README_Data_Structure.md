@@ -37,7 +37,6 @@ Contains the canonical geometries used for spatial extraction and aggregation.
 Contains the outputs of the Python `exactextract` and `zonal_stats_toolkit` geosharding pipeline. These files represent raw zonal statistics prior to time-series calculations.
 *   `10k_grid_synth_serv_<timestamp>.gpkg`: Extracted mean/sum statistics for Ecosystem Services.
 *   `10k_grid_synth_benef_<timestamp>.gpkg`: Extracted mean/sum statistics for Socioeconomic beneficiaries.
-*   `10k_grid_synth_coastal_<timestamp>.gpkg`: Extracted coastal protection reduction ratios.
 
 ## 4. `processed/` (Analysis-Ready Data)
 This directory contains the final datasets utilized by the R/Quarto analysis notebooks. **These are the core files recommended for public data sharing (e.g., Zenodo/Dryad).**

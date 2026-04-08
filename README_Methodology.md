@@ -75,6 +75,16 @@ Through extensive testing and methodological validation, a distinct performance 
 
 This "Best of Both Worlds" architecture ensures stability and speed regardless of the spatial target.
 
+## Spatial Alignment and ID Integrity (V2 Refactor)
+
+A major challenge in multi-stage spatial pipelines is maintaining row integrity when upstream processes (like Python zonal statistics) drop empty ocean or no-data cells to save space. If downstream R scripts rely on sequential row numbers (`seq_len`) to join data back to a master grid, dropping even a single cell causes catastrophic row-shifting (misaligning the data geographically).
+
+*   **Current State (Patch):** To robustly bypass this, the R pipeline temporarily uses a Spatial Coordinate Join. It extracts the exact X/Y center point of every cell and joins based on geographic location rather than ID. While bulletproof against row-shifting, this is computationally heavy.
+*   **V2 Simplification:** The Python extraction pipeline (`summary_pipeline_landgrid.py`) has been updated to explicitly preserve the true master grid ID under the column name `orig_fid`.
+
+By carrying `orig_fid` through the pipeline, even if millions of empty rows are dropped, the remaining data retains its absolute geographic identity. The R pipeline will soon be refactored to simply look for `orig_fid` and perform lightning-fast standard tabular joins (`left_join(by="fid")`), natively resolving any discrepancies in row counts without needing spatial geometry operations.
+
+
 ## Unit Standardization (Per Hectare)
 
 To ensure that comparisons of ecosystem service provision are meaningful across the globe, all volumetric services (e.g., Nitrogen Export, Sediment Export) are standardized to a **per-hectare** basis. This crucial step corrects for the geometric distortion of raster pixels in unprojected coordinate systems, where pixel area decreases significantly with increasing latitude. Without this correction, high-latitude regions would be disproportionately represented in any analysis based on per-pixel values.

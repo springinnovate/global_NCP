@@ -91,7 +91,7 @@ if (file.exists(gpkg_grid)) {
   message("Loading canonical grid from: ", gpkg_grid)
   grid_df <- sf::st_read(gpkg_grid, quiet = TRUE)
   grid_df <- sf::st_drop_geometry(grid_df)
-  if (!"c_fid" %in% names(grid_df)) grid_df$c_fid <- grid_df$fid
+  if (!"fid" %in% names(grid_df)) grid_df$fid <- seq_len(nrow(grid_df))
 } else {
   stop("Canonical grid file not found: ", gpkg_grid)
 }
@@ -140,7 +140,7 @@ hs_global_obj <- extract_hotspots(
   loss_services = HOTS_CFG$loss,
   gain_services = HOTS_CFG$gain,
   combos = NULL,
-  id_cols = c("c_fid")
+  id_cols = c("fid")
 )
 ```
 
@@ -150,7 +150,7 @@ hs_global_obj <- extract_hotspots(
 #| label: calc-intensity
 
 hs_flags <- hs_global_obj$hotspots_df %>%
-  dplyr::select(c_fid, service) %>%
+  dplyr::select(fid, service) %>%
   dplyr::mutate(is_hotspot = 1)
 
 global_totals <- hs_flags %>%
@@ -161,9 +161,9 @@ area_stats_list <- list()
 for (g in valid_groupings) {
   stats_all <- lapply(HOTS_CFG$svc_order, function(svc) {
     grid_svc <- grid_df %>%
-      dplyr::select(c_fid, !!g) %>%
+      dplyr::select(fid, !!g) %>%
       dplyr::mutate(service = svc) %>%
-      dplyr::left_join(hs_flags %>% dplyr::filter(service == svc), by = c("c_fid", "service")) %>%
+      dplyr::left_join(hs_flags %>% dplyr::filter(service == svc), by = c("fid", "service")) %>%
       dplyr::mutate(is_hotspot = tidyr::replace_na(is_hotspot, 0)) %>%
       # Apply master exclusions
       dplyr::filter(!service %in% exclude_services) %>%
@@ -261,13 +261,13 @@ plots_enrichment <- lapply(names(area_stats_list), function(g) plot_area_stats(h
 #| label: calc-overlap
 
 hotspot_counts <- hs_global_obj$hotspots_df %>%
-  dplyr::group_by(c_fid) %>%
+  dplyr::group_by(fid) %>%
   dplyr::summarise(hotspot_count = dplyr::n(), .groups = "drop")
 
 df_overlap <- grid_df %>%
-  dplyr::select(c_fid, dplyr::all_of(valid_groupings)) %>%
-  dplyr::distinct(c_fid, .keep_all = TRUE) %>%
-  dplyr::left_join(hotspot_counts, by = "c_fid") %>%
+  dplyr::select(fid, dplyr::all_of(valid_groupings)) %>%
+  dplyr::distinct(fid, .keep_all = TRUE) %>%
+  dplyr::left_join(hotspot_counts, by = "fid") %>%
   dplyr::mutate(hotspot_count = tidyr::replace_na(hotspot_count, 0))
 
 calc_hotness <- function(df, g_var) {
