@@ -1,4 +1,4 @@
-# Worklog — Global NCP Hotspots (v1.3.0)
+# Worklog — Global NCP Hotspots (v1.3.1)
 
 ## Project Overview & Goals
 

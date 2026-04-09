@@ -1,24 +1,3 @@
-# Analysis Runbook
-
-This repository still contains several historical Rmd/Qmd notebooks under `analysis/`, but only a few drive the current hotspot workflow. Run the following in order when regenerating results:
-
-1. **Optional checkpoint restore** – `analysis/restore_checkpoint.R`
-   Loads `HOTS_CFG`, `plt_long`, and `grid_sf` from the latest saved checkpoint under `data/processed/intermediate`. Use this to skip rebuilding `plt_long` when nothing upstream changed.
-
-2. **Hotspot extraction + plots** – `analysis/hotspot_extraction.qmd`
-   - Builds `plt_long` (if not restored), validates `HOTS_CFG`, and runs the hotspot export chunk (writes `processed/hotspots/...` and `_hotspots_index.csv`).
-   - Generates trimmed-change bar plots and hotspot violins via functions in `R/`.
-   - Writes figures to `outputs/plots/{abs|pct}/<group_col>/...`.
-
-3. **Checkpoint save** – `analysis/save_checkpoint.R` (optional)
-   Saves updated `plt_long`, `grid_sf`, `HOTS_CFG`, and `hot_index` back to `data/processed/intermediate` for future sessions.
-
-4. **KS tests / follow-up notebooks** – `analysis/KS_tests_hotspots.qmd` (and others as they come online).
-   These consume the hotspot outputs and produce statistical summaries or additional figures.
-
-5. **Land Cover Change Analysis** – `analysis/LC_change_preparation.qmd` & `analysis/LC_change_granular.qmd`
-   - **Preparation**: Run `LC_change_preparation.qmd` first to extract raw data and generate simplified 9-class rasters (ensuring correct class mapping).
-   - **Analysis**: Run `LC_change_granular.qmd` to calculate specific transition metrics (Forest Loss, Urban Expansion) and export `10k_lcc_granular_metrics.gpkg`.
-   - **Integration**: These metrics are then ingested by `hotspot_extraction.qmd` (Step 2) to attribute drivers to ES hotspots.
-
-> Historical notebooks such as `ch_analysis.Rmd`, `data_prep.Rmd`, etc., are kept for reference but are not part of the reproducible pipeline. Leave them untouched unless you intentionally need legacy code.
+> **Note:** This file has been deprecated and its contents consolidated into the master `README.md` at the root of the repository.
+>
+> Please see `/home/jeronimo/projects/global_NCP/README.md` for the current Analysis Runbook and workflow instructions.

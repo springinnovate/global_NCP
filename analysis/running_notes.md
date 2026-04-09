@@ -10,6 +10,8 @@
     3. Completely remove the heavy `st_intersects` and spatial re-aggregation logic from the R pipeline.
     4. Revert back to a lightning-fast standard tabular `left_join(by = "fid")`.
     5. Target this cleanup for analysis version `v1.4.0`.
+*   **Analytical Next Steps (TODO)**:
+    *   **Attribution Gap Mapping**: Spatially extract and highlight the specific pixels that are ES hotspots but *do not* overlap with top-tier Land Cover change. This will beautifully visualize areas suffering from degradation/climate impacts rather than direct land conversion. (Post-presentation priority).
 
 # Fri 27 Mar 2026
 
