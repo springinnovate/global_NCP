@@ -10,24 +10,38 @@
 3.  Integration of Land Cover Change (LCC) metrics to attribute ES decline to Land Conversion vs. Degradation.
 4.  Socioeconomic characterization of hotspots via Kolmogorov-Smirnov (KS) tests.
 
-## Current State: Version 1.3.0 (Synthesis & Interpretation Phase)
+## Current State: Version 1.3.1 (Final Synthesis & Report Generation)
 
-**Status:** The core pipeline architecture is mathematically validated and finalized. The project has shifted entirely from building the data infrastructure to generating final insights and interpreting results.
+**Status:** The core pipeline architecture is mathematically validated, cleaned, and finalized. The project has shifted entirely from building the data infrastructure to generating final insights, interpreting results, and drafting the manuscript.
 
 **Active Focus & The Final Wrap-Up Plan:**
-*   **Metric Justification & Consolidation:** We officially use **Relative (Symmetric Percentage) Change** to define hotspots and run socioeconomic KS tests. Absolute change remains in the regional bar plots for global volume accounting.
-*   **Land Cover Change (LCC) Interpretation:** Reviewing the outputs of the "Drivers of Change" chunks in `hotspot_extraction.qmd`. What percentage of ES hotspots directly overlap with the top 5% of "Forest Loss" or "Urban Expansion" cells? This defines our "Attribution Gap."
-*   **Socioeconomic Interpretation (KS Tests):** Reviewing KS Test heatmaps and Cliff's Delta plots. Are hotspots of decline systematically occurring in poorer areas? Or are they driven by rapid development in wealthier areas?
-*   **Presentation Assembly:** Moving final exported plots into the "Living PowerPoint" for presentation to co-authors. Drafting a 1-page "Key Takeaways" document summarizing attribution and KS findings.
+*   **Geographic Clustering:** Finalizing the geographic narrative of "Compound Risk" (Hotness) and "Disproportionate Burden" (Enrichment) using the consolidated `hotspot_synthesis.qmd` pipeline.
+*   **Land Cover Change (LCC) Interpretation:** Reviewing the outputs of the "Drivers of Change" chunks in `hotspot_extraction.qmd` to define our "Attribution Gap" (conversion vs. degradation).
+*   **Socioeconomic Interpretation (KS Tests):** Interpreting KS Test heatmaps and Cliff's Delta plots to profile the socioeconomic context of extreme ES decline.
+*   **Presentation & Handoff:** Sharing final exported plots and datasets with co-authors via OneDrive, and drafting the final Key Takeaways and methodology sections.
+
+## Key Challenges & Architectural Solutions (For Final Report)
+
+This section highlights the major technical and methodological hurdles overcome during the pipeline's development, serving as a direct outline for the Methods paper.
+
+*   **The Fragment Bug & Spatial Alignment:** *Challenge:* Bypassing C++ GEOS bottlenecks by exploding complex multipolygons into 1.67M fragments caused striping and duplicated data. *Solution:* Reverted to a mathematically safe `st_intersects` spatial joining and re-aggregation process (`group_by %>% summarise`), collapsing fragments back into pristine 10km parent cells to perfectly align data (v1.3.1).
+*   **Spatial Extraction Scaling:** *Challenge:* `exactextract` memory leaks and C++ segmentation faults when processing massive, jagged regional multipolygons (e.g., Biomes). *Solution:* Adopted a "Hybrid Extraction" architecture—using `exactextract` for simple grids (10km) and rasterized `zonal_stats_toolkit` for complex regional polygons.
+*   **Simpson's Paradox & MAUP:** *Challenge:* Observing "sign flips" where a region showed negative Absolute Change but positive Percentage Change. *Solution:* Documented the distinct spatial narratives. Mean Absolute Change captures systemic volume shifts (weighted by huge baselines), while Mean Symmetric Percentage Change captures widespread landscape footprint shifts.
+*   **Zero-Baselines & Scale Bias:** *Challenge:* Absolute change is heavily biased by the size of the baseline ecosystem, and standard percentage change fails on zero-baselines. *Solution:* Transitioned to **Symmetric Percentage Change (SPC)** to normalize the data, capturing the true *intensity* of ecological response for Land Cover Change attribution.
 
 ## Reference Information
 *   **Environment Notes:** Local machine: Lenovo (Windows 11) | Remote: lilling (VS Code Remote SSH) | AI assistant: Gemini Code Assist / Copilot
-*   **Active Entry Points:** `analysis/process_data.qmd`, `analysis/hotspot_extraction.qmd`, `analysis/KS_tests_hotspots.qmd`
+*   **Active Entry Points:** `analysis/process_data.qmd`, `analysis/hotspot_extraction.qmd`, `analysis/hotspot_synthesis.qmd`, `analysis/KS_tests_hotspots.qmd`
 *   **Known Issues / Gotchas:** Hotspot rules (loss vs gain services) must remain centralized in `HOTS_CFG`. Be careful not to mix interpretive direction (good/bad change) with magnitude summaries.
 
 ---
 
 ## Chronological Log (Newest to Oldest)
+
+### 2026-04-10
+*   **Final Synthesis & Key Takeaways:** Successfully consolidated Intensity, Share, Enrichment, and Multi-service "Hotness" (Compound Risk) into a single, bulletproof pipeline (`hotspot_synthesis.qmd`). 
+*   **Codebase Grooming:** Officially deprecated `hotspot_intensity.qmd` and `hotspot_multiservice.qmd`, removed dead code in Python utilities, and prepared the repository for co-author handoff via secure, read-only OneDrive sharing.
+*   **Visualization Polish:** Re-engineered compound risk and enrichment bar charts to automatically loop over all canonical groupings, generating presentation-ready outputs for the final report.
 
 ### 2026-04-08
 *   **Pipeline Fixes (The Fragment Bug):** Discovered that Python's `gdf.explode()` was fragmenting the 1.5M grid cells into 1.67M jagged pieces to bypass GEOS bottlenecks. This caused severe striping (dropped cells) and impossible hotspot counts (up to 180) due to duplicated data.

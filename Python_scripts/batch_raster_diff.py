@@ -69,26 +69,6 @@ def get_clean_variable_name(filename):
 
     return name
 
-def process_tile(args):
-    """Helper to process a single window."""
-    window, path_early, path_late, dst, write_lock = args
-
-    # Open datasets in thread-safe manner (or rely on rasterio's internal handling with separate reads)
-    # Ideally we pass open dataset handles if using threads, but for safety we can read from the shared handle
-    # provided we don't seek. Rasterio read with window is generally thread-safe if GDAL is built correctly.
-    # However, to be absolutely robust against race conditions in GDAL's internal state,
-    # we often use a lock for IO or open separate handles.
-    # Given the context of DEM_Mask.py, we will try using the shared handles for reading.
-
-    try:
-        # We need access to the source datasets.
-        # Since we can't easily pass open handles to a map function without global or closure,
-        # we'll assume src_early and src_late are available or passed.
-        # To make this clean with the executor, we'll define this inside calculate_difference or use a class.
-        pass
-    except Exception as e:
-        return f"Error in window {window}: {e}"
-
 def calculate_difference(path_early, path_late, output_path, num_threads=4):
     """Calculates late - early raster difference."""
 
@@ -118,7 +98,6 @@ def calculate_difference(path_early, path_late, output_path, num_threads=4):
             windows = [w for _, w in src_early.block_windows()] # Retry or manual slice
             # Fallback to manual slicing if block_windows returns full image
             if len(windows) <= 1:
-                from itertools import product
                 h, w = src_early.shape
                 windows = []
                 for row in range(0, h, block_shape[0]):

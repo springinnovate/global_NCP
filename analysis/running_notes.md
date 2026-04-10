@@ -1,47 +1,7 @@
-# Wed 08 Apr 2026
+# Wed 04 Feb 2026
 
-**Status Update: Hotspot Pipeline Spatial Join Fixes & V2 Technical Debt**
-
-*   **Pipeline Fixes (The Fragment Bug)**: Discovered that Python's `gdf.explode()` was fragmenting the 1.5M grid cells into 1.67M jagged pieces to bypass GEOS bottlenecks. This caused severe striping (dropped cells) and impossible hotspot counts (up to 180) due to duplicated data.
-*   **The Patch**: Implemented a robust `st_intersects` spatial join and re-aggregation (`group_by %>% summarise`) in `process_data.qmd`. This mathematically collapses all fragments back into their pristine 10km parent cells. Striping is eliminated, and max hotspot counts are strictly capped at 8.
-*   **V2 Simplification Plan (TODO)**:
-    1. `summary_pipeline_landgrid.py` has been updated to preserve the true `grid_id` as `orig_fid` *before* exploding geometries.
-    2. Run the full Python extraction pipeline to generate cached `.gpkg` files containing this `orig_fid`.
-    3. Completely remove the heavy `st_intersects` and spatial re-aggregation logic from the R pipeline.
-    4. Revert back to a lightning-fast standard tabular `left_join(by = "fid")`.
-    5. Target this cleanup for analysis version `v1.4.0`.
-*   **Analytical Next Steps (TODO)**:
-    *   **Attribution Gap Mapping**: Spatially extract and highlight the specific pixels that are ES hotspots but *do not* overlap with top-tier Land Cover change. This will beautifully visualize areas suffering from degradation/climate impacts rather than direct land conversion. (Post-presentation priority).
-
-# Fri 27 Mar 2026
-
-**Milestone: Core Analysis Pipeline Complete (v1.3.0)**
-
-*   **Project Status:** The core analysis pipeline is functionally complete and validated against the outputs required for the primary presentation narrative. This marks a shift from foundational development to a phase of refinement, interpretation, and documentation.
-*   **ES-LCC Attribution Analysis:** [COMPLETED]
-    *   Successfully implemented the full attribution workflow, connecting Ecosystem Service (ES) hotspots to Land Cover Change (LCC) drivers.
-    *   Generated all key analytical outputs:
-        1.  **Overlap Percentage Table:** `outputs/tables/lcc_es_hotspot_overlap.csv` quantifies the exact overlap percentages.
-        2.  **Attribution Gap Heatmap:** `outputs/plots/drivers/heatmap_driver_overlap.png` provides a clear visual summary of which drivers impact which services.
-        3.  **Global Attribution Map:** The script `analysis/make_attribution_map.R` was initially created to produce a single map showing the overall "degradation" footprint.
-        4.  **Per-Service Attribution Maps:** The script was then enhanced to generate 8 individual maps, one for each ES hotspot type, detailing the specific LCC driver responsible (`outputs/plots/maps/attribution_by_service/`). This provides a highly granular view of the attribution story.
-*   **Codebase Stability:** The R scripts and Quarto notebooks (`hotspot_extraction.qmd`, `make_attribution_map.R`) are stable and produce the expected outputs.
-*   **Next Steps:**
-    *   Focus on interpreting the rich set of generated maps and tables.
-    *   Refine presentation narratives based on these detailed findings.
-    *   Begin the process of cleaning the repository: archiving old scripts, figures, and temporary files.
-    *   Update all documentation (`README.md`, context files) to reflect the final, stable methodology.
-
-# Tue 24 Mar 2026
-
-**Status Update: Visualization & Presentation Prep (Phase 1 & 2 Complete)**
-
-*   **LCC Attribution:** Refactored driver scatterplots into faceted 2D density heatmaps (`geom_bin2d`) with logarithmic scaling.
-*   **Hotspot Boxplots:** Standardized to grayscale (`gray95`). Implemented Top 10/Bottom 10 subsetting for country-level boxplots so they are legible.
-*   **KS Tests:** Verified balanced sampling methodology (comparing hotspots against the median 5% of landscape, not all 95%). Enforced canonical service ordering across Heatmaps and Cliff's Delta effect size charts.
-*   **Automated Mapping:** Successfully created `make_faceted_maps.R`. High-resolution, multi-scale maps generated for both absolute and percentage change across all 4 spatial groupings (Regions, Income, Biomes, Countries). Maps are correctly projected in Equal Earth (EPSG:8857) and stitched using canonical service ordering.
-*   **Next Steps:** Populate the final "Living PowerPoint" for tomorrow's meeting with Steve and Becky. We have successfully addressed the core action items (rescaling maps, canonical ordering, handling Antarctica projection distortion, summarizing regional insights).
-
+**Status Update: Code Cleanup & Consolidation**
+*   **Hotspot Synthesis**: Verified that `analysis/hotspot_synthesis.qmd` successfully integrates all geographic clustering metrics. It replaces and officially deprecates `hotspot_intensity.qmd` and `hotspot_multiservice.qmd`. 
 
 # Mon 03 Feb 2026
 

@@ -1,15 +1,14 @@
 # Global NCP – Hotspots Time‑Series Workflow (Long Context)
 
-*Last updated: 2026-04-09*
-*Version: v1.3.1*
+*Last updated: 2026-02-04*
 
-This document captures the full project context for AI assistants and collaborators. Use it alongside the slimmer spec in `docs/codex_context.min.md`. When coding or refactoring, prefer the **minimal** file as your primary context and consult this long version for rationale and narrative background.
+This document captures the full project context for assistants (e.g., Codex in VS Code) and collaborators. Use it alongside the slimmer spec in `doc/codex_context.min.md`. When coding or refactoring, prefer the **minimal** file as your primary context and consult this long version for rationale and narrative background.
 
 ---
 
 ## 1) Project Overview
 
-**Goal.** Quantify global change in multiple ecosystem services at ~10‑km resolution over 1992–2020, identify **hotspots** of concerning change, attribute those changes to Land Cover Conversion (LCC), and describe socioeconomic profiles via Kolmogorov-Smirnov (KS) tests.
+**Goal.** Quantify global change in multiple ecosystem services at ~10‑km resolution over ~1995–2020, identify **hotspots** of concerning change, and describe patterns across **subregions** (World Bank regions, income groups, continents, UN regions, WWF biomes). Produce clear, reproducible figures (bars/violins/maps) and simple statistics (e.g., KS tests) to communicate patterns **before** deep modeling.
 
 **Core questions.**
 
@@ -59,8 +58,8 @@ Pollination, Nature_Access
 
 **Directionality.**
 
-* **Loss services** (bad when they go **down**): `Nature_Access`, `Pollination`, `N_Ret_Ratio`, `Sed_Ret_Ratio`, `C_Risk_Red_Ratio` → keep **lowest** tail (steepest decline).
-* **Gain services** (bad when they go **up**): `Sed_export`, `N_export`, `C_Risk` → keep **highest** tail (steepest increase).
+* **Loss services** (bad when they go **down**): `Nature_Access`, `Pollination`, `N_Ret_Ratio`, `Sed_Ret_Ratio`, `C_Risk_Red_Ratio` → keep **lowest** tail.
+* **Gain services** (bad when they go **up**): `Sed_export`, `N_export`, `C_Risk` → keep **highest** tail.
 
 **Assumptions.**
 
@@ -68,11 +67,7 @@ Pollination, Nature_Access
   * **Path A (Pixel-Level)**: Direct difference of rasters. Used for raw change summaries.
   * **Path B (Grid-Level)**: Aggregation to 10km grid first, then difference. Used for **hotspot identification** and regional synthesis.
 * **Aggregation Logic**: Extensive variables (e.g. Nitrogen kg) are **summed**; Intensive variables (e.g. Risk Index) are **averaged**. On an equal-area grid, these are proportional and comparable for relative change.
-* **Extraction Strategy Rule**:
-  * **10km Grid (Simple Polygons)**: Uses `exactextract` (Exact Fractional). Excels at millions of simple square geometries.
-  * **Regional Groupings (Complex Multipolygons)**: Uses `zonal_stats_toolkit` (Rasterized). Bypasses C++ GEOS segfault bottlenecks and Python loop bottlenecks associated with exploding sprawling multipolygons (like WWF Biomes) into tens of thousands of fragments.
-* **The Fragment Bug Patch (v1.3.1)**: Python's `gdf.explode()` fractured the 1.5M grid cells into 1.67M jagged polygons. The R pipeline (`process_data.qmd`) currently uses a robust `st_intersects` spatial join and `group_by %>% summarise` to mathematically aggregate these fragments back into the pristine 1.5M master cells.
-* **ID Integrity (V2 Refactor Plan)**: Python now preserves `orig_fid` prior to geometry explosion. Future versions (`v1.4.0`) will completely remove the R spatial intersection patch and revert to a lightning-fast tabular `left_join(by="orig_fid")`.
+
 * `fid` is unique and stable across all outputs.
 * `c_fid` references the country polygon key used elsewhere.
 * Percent change columns may contain `NA/Inf`; these are filtered at pivot time.
@@ -87,8 +82,7 @@ project root
 │   ├── prepare_data.qmd              # preprocessing & consolidation
 │   ├── process_data.qmd              # change calculation & metric derivation
 │   ├── hotspot_extraction.qmd        # main narrative & orchestration
-│   ├── hotspot_intensity.qmd         # area intensity & enrichment analysis
-│   ├── hotspot_multiservice.qmd      # overlap & "hotness" analysis
+│   ├── hotspot_synthesis.qmd         # intensity, enrichment, and multi-service overlap analysis
 │   ├── KS_tests_hotspots.qmd         # statistical comparisons (KS tests)
 │   └── restore_checkpoint.R          # restores big tidy tables (plt_long, grid_sf)
 ├── R/
@@ -106,7 +100,10 @@ project root
 │   │   └── hotspots/                 # all hotspot GPKGs + index CSV
 │   └── raw/                          # (if needed)
 ├── outputs/
-│   └── plots/                        # Maps, bars, violins, KS heatmaps
+│   └── plots/
+│       ├── abs/<group_col>/bars_*.png
+│       ├── pct/<group_col>/bars_*.png
+│       └── violins/<group_col>/*_violins.png
 └── doc/
     ├── codex_context.md              # this file
     └── codex_context.min.md          # slim spec for assistants
@@ -133,9 +130,10 @@ project root
 * Set `service` factor order to the canonical eight, then append extras in sorted order.
 * Create a slim geometry `grid_sf <- sf_f[, c("fid","c_fid")]` and `rm(sf_f)` to save memory.
 
-**Exporting `plt_long`.**
+**Checkpointing (recommended).**
 
-* Exported to `processed/plt_long.rds`. This is the canonical, pivoted long-table that is heavily used by downstream plotting, subsetting, and KS tests.
+* Save heavy tables for fast resumes: `saveRDS(plt_long, "analysis/_checkpoints/plt_long.rds")`; same for `grid_sf` if desired.
+* Restore with `analysis/restore_checkpoint.R` (already prepared to print sizes and confirm columns).
 
 ### 4.3 Hotspot configuration (single source of truth)
 
@@ -192,17 +190,17 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 ### 4.6 Violins (hotspots only)
 
 * Purpose: compare the **distribution** of hotspot magnitudes across subregions.
-* Inputs: hotspot rows only, utilizing `plt_long`.
-* Trimming: Outliers are managed purely via visual limits (1st/99th percentile), rather than strict row-dropping, to avoid artificial "fat tail" cliffs.
+* Inputs: hotspot rows only (from the wrapper or by filtering `hotspots_df`), keeping only canonical services.
+* Trimming: remove `NA/0`, then per‑service trim to [0.1%, 99.9%] (configurable via `cut_q`).
 * Sampling: optionally sample up to `plot_n` rows for speed.
-* Styling: Standardized to grayscale (`gray95`) with top/bottom 10 rank logic for busy groupings (e.g., Countries).
+* Scales: `facet_wrap(~service, ncol = 3, scales = "free_y")`.
 * Output: `outputs/plots/violins/<group_col>/*_{abs|pct}_change_violins.png`.
 * Make background **white** (e.g., device `ragg_png()` and `theme_minimal()`; avoid transparent PNGs in dark UIs).
 
-### 4.7 KS tests
+### 4.7 KS tests (Implemented)
 
-* Purpose: Determine if hotspots disproportionately overlap with specific socioeconomic conditions (GDP, Population, HDI).
-* **Balanced Sampling**: Compares the socioeconomic profile of Hotspots (extreme 5%) strictly against the Median 5% of the landscape (47.5th-52.5th percentile), preventing class-imbalance skew.
+* Compare the **ECDFs** of hotspot magnitudes between a subregion and the **global** distribution, or between pairs of subregions.
+* Provide both the **statistic** and **adjusted p‑values** (e.g., BH FDR) across services and metrics.
 * **Visuals**: Heatmaps of KS statistics, ECDF overlays, and **Cliff's Delta** (directionality) bar plots.
 * **Transformations**: Signed power transformations used to visualize small but significant effects.
 * Clarify in text that bars (magnitude plots) are **direction‑agnostic** (absolute size of change), while violins + KS can be run on **absolute** or **percent** changes depending on the question.
@@ -213,27 +211,16 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 * **Enrichment**: Ratio of (Observed Share of Hotspots / Expected Share based on Area). Values > 1 indicate disproportionate concentration.
 * **Hotness**: Average number of overlapping service hotspots per pixel.
 
-### 4.9 Land Cover Change (LCC)
+### 4.9 Current run status / next steps
 
-* **Goal**: Attribute ES hotspots to specific land change drivers (e.g., deforestation, urbanization) versus degradation.
-* **Methodology**: Uses `diffeR` (Pontius et al.) to calculate **Gross Loss**, **Gross Gain**, and **Exchange** rather than simple net change.
-* **Pipeline**:
-  1. **Preparation** (`analysis/LC_change_preparation.qmd`): Extracts raw ESA CCI (1992) and C3S (2020) rasters, reclassifying them into 9 simplified classes to ensure consistent mapping.
-  2. **Granular Analysis** (`analysis/LC_change_granular.qmd`): Runs specific driver models:
-     * **Forest Loss**: Binary (Forest vs. Non-Forest). Tracks gross deforestation.
-     * **Expansion**: Multi-class (Urban, Cropland, Other). Tracks anthropogenic expansion.
-* **Outputs**: `processed/10k_lcc_granular_metrics.gpkg`.
-* **Integration**: LCC metrics are joined to hotspot geometries in `hotspot_extraction.qmd` to quantify the "Attribution Gap" (overlap between ES decline and Land Conversion).
-
-### 4.10 Current run status / next steps
-
-- **Completed (v1.3.1)**:
-  - Overcame "Fragment Bug" via `st_intersects` re-aggregation. Data mathematically perfect.
-  - Land Cover Attribution matrices and KS Socioeconomic Heatmaps generated.
-  - Automated canonical faceted mapping (`make_faceted_maps.R`) using Equal Earth projection.
-- **Active**:
-  - Presentation slide deck assembly.
-  - Drafting Key Takeaways regarding the "Attribution Gap" (ES decline vs LCC).
+- **Completed**:
+  - Core hotspot extraction (v1.0.2).
+  - KS Analysis pipeline (robust to suffixes, improved visuals).
+  - Intensity/Enrichment metrics.
+  - Documentation of Sum vs Mean aggregation logic.
+- **Next**:
+  - Land Cover change analysis (new branch).
+  - Final report drafting.
 
 ---
 
@@ -296,8 +283,6 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 ## 8) Limitations & TODOs
 
 * **Service metadata externalization.** Replace hard‑coded recode vectors with `analysis_configs/service_meta.csv` (columns: `raw,label,direction,pref_metric`).
-* **V2 Pipeline Simplification (ID Integrity).** The current R pipeline uses `st_intersects` to mathematically bypass upstream Python geometry fragmentation (`gdf.explode()`). Python now exports the true pre-explosion `orig_fid`. In v1.4.0, strip the spatial intersections out of `process_data.qmd` and return to `left_join(by = "orig_fid")`.
-* **Attribution Gap Mapping.** Extract and explicitly map the pixels where ES hotspots occur *without* corresponding top-tier Land Cover change. This will help geographically isolate degradation and climate impacts from direct land conversion.
 * **Aliasing cleanup.** Keep `agg_change` alias until all code uses `aggregate_change_simple` (or vice versa), then deprecate.
 * **KS module.** Implement KS calculations + multiple‑testing correction and a compact visualization.
 * **Caching.** Persist `plt_long` (e.g., `fst`/`arrow`) to speed resumes and reduce memory pressure.
