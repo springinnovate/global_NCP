@@ -289,6 +289,7 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 * **Tests.** Add small snapshot tests for the hotspot runner and plot builders.
 * **Quarto render.** Optionally add CLI render once Quarto is installed server‑side.
 * **Plot polish.** Finalize color palette, legend placement, and annotation text (especially explaining **direction‑agnostic magnitude** in barplots).
+* **Data Directory Cleanup.** Move loose root-level raster directories (`base_years_ha`, `2020_1992_ch_ha`) into `raw/` and update YAMLs in `analysis_configs/` to match.
 
 ---
 

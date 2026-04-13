@@ -119,6 +119,10 @@ B <- st_read(ben_path)
 # We MUST resolve the fragment explosion caused by upstream Python (1.67M fragments vs 1.5M grid cells).
 # We use an R-tree spatial intersection to drop every fragment's centroid into the pristine master grid,
 # and then re-aggregate them mathematically to prevent duplicate hotspot counts and coordinate striping.
+#
+# TODO (v1.4.0 Refactor): Python now preserves the pre-explosion grid ID as `orig_fid`.
+# This entire spatial join and group_by block should be ripped out and replaced with a simple
+# tabular `left_join(by = "orig_fid")` once the new python extractions are fully cached.
 master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land.gpkg")
 if (!file.exists(master_path)) stop("Master grid not found!")
 master_grid <- sf::st_read(master_path, quiet = TRUE)
