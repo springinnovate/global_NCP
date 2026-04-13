@@ -1273,24 +1273,13 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
 
   # Identify specific driver columns (Granular Analysis)
   # We look for Forest Loss and Urban/Cropland Expansion
-  # Explicitly targeting 1992-2020 transitions based on LCC_column_dictionary.md
-  drivers <- list(
-    "Forest_Loss" = "ForestLoss_Loss_Forest_1992_2020",
-    "Crop_Exp"    = "Expansion_Gain_Cropland_1992_2020"
-  )
+  # Using pattern matching to ensure robustness against year suffix changes
+  drivers <- list()
+  fl_col <- grep("ForestLoss_Loss_Forest", names(lc_df), value = TRUE)
+  if (length(fl_col) > 0) drivers[["Forest_Loss"]] <- fl_col[1]
 
-  # Filter out columns that don't exist in the data
-  drivers <- drivers[sapply(drivers, function(x) x %in% names(lc_df))]
-
-  # Fallback: If exact match failed, try pattern matching (ignoring year suffixes)
-  if (length(drivers) == 0) {
-    message("Exact match failed. Trying pattern matching...")
-    fl_col <- grep("ForestLoss_Loss_Forest", names(lc_df), value = TRUE)
-    if (length(fl_col) > 0) drivers[["Forest_Loss"]] <- fl_col[1]
-
-    ce_col <- grep("Expansion_Gain_Cropland", names(lc_df), value = TRUE)
-    if (length(ce_col) > 0) drivers[["Crop_Exp"]] <- ce_col[1]
-  }
+  ce_col <- grep("Expansion_Gain_Cropland", names(lc_df), value = TRUE)
+  if (length(ce_col) > 0) drivers[["Crop_Exp"]] <- ce_col[1]
 
   # Identify Net Forest Change for correlation analysis
   net_col <- "ForestLoss_dir_ch_Forest_1992_2020"
@@ -1388,6 +1377,14 @@ if (lc_data_ready) {
 
   overlap_stats <- bind_rows(overlap_list) %>%
     arrange(desc(pct_overlap))
+
+  # Export to CSV
+  out_csv <- file.path(data_dir(), "processed", "tables", paste0("lcc_es_hotspot_overlap", params$output_suffix, ".csv"))
+  dir.create(dirname(out_csv), recursive = TRUE, showWarnings = FALSE)
+  readr::write_csv(overlap_stats, out_csv)
+
+  # Print to rendered document
+  print(knitr::kable(head(overlap_stats, 20), digits = 1, caption = "LCC Attribution Gap (% Overlap)"))
 }
 ```
 

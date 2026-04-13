@@ -563,6 +563,41 @@ mountain_file <- NULL
 ```
 
 ## Quick looks
+### Top Socioeconomic Associations
+
+This section extracts the exact statistical values for the strongest associations, providing the hard numbers behind the "Wealth Paradox" and "Urbanization of Risk" narratives.
+
+```{r}
+#| label: ks-top-associations
+#| echo: false
+#| results: 'asis'
+
+if (exists("ks_res")) {
+  # Clean up variable names for readability
+  ks_clean <- ks_res %>%
+    mutate(
+      Variable = case_when(
+        grepl("gdpTot", var) ~ "GDP",
+        grepl("POP", var) ~ "Population",
+        grepl("hdi", var) ~ "HDI",
+        grepl("gini", var) ~ "Gini Index",
+        grepl("mehrabi", var) ~ "Field Size",
+        grepl("BUILT", var) ~ "Built Area",
+        TRUE ~ var
+      )
+    ) %>%
+    select(Service = service, Variable, KS_Stat_D = D, Cliffs_Delta = cliffs_delta, p_adj) %>%
+    arrange(desc(abs(Cliffs_Delta)))
+
+  cat("\n\n#### Top 10 Strongest Socioeconomic Associations (Overall)\n\n")
+  print(knitr::kable(head(ks_clean, 10), digits = 3))
+
+  cat("\n\n#### Top GDP Associations\n\n")
+  print(knitr::kable(ks_clean %>% filter(Variable == "GDP") %>% arrange(desc(abs(Cliffs_Delta))) %>% head(5), digits = 3))
+
+  cat("\n\n#### Top Population Associations\n\n")
+  print(knitr::kable(ks_clean %>% filter(Variable == "Population") %>% arrange(desc(abs(Cliffs_Delta))) %>% head(5), digits = 3))
+}
 
 ```{r}
 #| label: ks-preview

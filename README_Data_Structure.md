@@ -13,10 +13,13 @@ global_ncp/
 ├── raw/                    # Original, unmodified source data (rasters)
 ├── vector_basedata/        # Canonical grids and administrative boundaries
 ├── interim/                # Intermediate spatial extractions (Python outputs)
-└── processed/              # Final analysis-ready datasets (R outputs)
-    ├── hotspots/           # Extracted ES hotspot geometries and indices
-    ├── tables/             # Summary statistics and KS test results
-    └── ...                 # Canonical change calculation GPKGs
+├── processed/              # Final analysis-ready datasets (R outputs)
+│   ├── hotspots/           # Extracted ES hotspot geometries and indices
+│   ├── tables/             # Summary statistics and KS test results
+│   └── ...                 # Canonical change calculation GPKGs
+└── outputs/                # Visualizations, maps, and analytical figures
+    ├── plots/              # Analytical plots (bars, violins, KS heatmaps, clustering)
+    └── maps/               # Spatial distributions and LCC attribution maps
 ```
 
 ---
