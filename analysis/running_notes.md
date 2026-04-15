@@ -1,7 +1,7 @@
 # Wed 04 Feb 2026
 
 **Status Update: Code Cleanup & Consolidation**
-*   **Hotspot Synthesis**: Verified that `analysis/hotspot_synthesis.qmd` successfully integrates all geographic clustering metrics. It replaces and officially deprecates `hotspot_intensity.qmd` and `hotspot_multiservice.qmd`. 
+*   **Hotspot Synthesis**: Verified that `analysis/hotspot_synthesis.qmd` successfully integrates all geographic clustering metrics. It replaces and officially deprecates `hotspot_intensity.qmd` and `hotspot_multiservice.qmd`.
 
 # Mon 03 Feb 2026
 
@@ -9,7 +9,7 @@
 
 *   **Hotspot Intensity (Area Correction)**: [COMPLETED]
     *   Refactored `analysis/hotspot_intensity.qmd` to calculate hotspot coverage against the **total spatial unit area** (canonical grid), ensuring regions with sparse data (e.g., Tundra) are accurately represented.
-    *   Implemented **Enrichment** metric (Observed Share / Expected Share) to highlight regions with disproportionate hotspot concentrations.
+    *   Implemented **Relative Intensity** metric (Observed Share / Expected Share) to highlight regions with disproportionate hotspot concentrations.
 *   **Multi-service Analysis**: [COMPLETED]
     *   Finalized `analysis/hotspot_multiservice.qmd` (fixed setup/paths).
     *   Standardized visualization: Plots are now ordered alphabetically for consistent comparison across metrics.
@@ -21,7 +21,7 @@
 Per hectare instead of per-pixel results for all but ratio metrics (they're already standardized and will lose meaning if divided by area)/ extracting the per area summaries,
 Calculate coastal risk reduction ratio in new spatially joined gpkg and rerun pipeline on vector not raster for coastal metrics. It is still not working. As is, the pipeline only accepts the input data as raster. I already asked Rich for help, raised the issue in github, waiting for him to reach back to me.
 GDP comparison analysis (hotspot vs non-hotspot average values)
-Recalculated hotspot percentages using total zone areas, not just valid data extent [corrected, added  enrichment calculation]
+Recalculated hotspot percentages using total zone areas, not just valid data extent [corrected, added relative intensity calculation]
 Revised KS test results !
 
 # Thu, 22 Jan 2026

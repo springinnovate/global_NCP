@@ -777,7 +777,7 @@ if (length(intersect(svc_in_data, svc_in_cfg)) == 0) {
 if (exists("grid_sf") && inherits(grid_sf, "sf")) {
   geom_sf <- dplyr::select(grid_sf, dplyr::any_of(c("fid")))
 } else {
-  master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land.gpkg")
+  master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
   stopifnot(file.exists(master_path))
   geom_sf <- sf::st_read(master_path, quiet = TRUE)
   if ("id" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) {

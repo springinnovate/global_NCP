@@ -1,6 +1,6 @@
 ---
 title: "Hotspot Spatial Synthesis"
-subtitle: "Intensity, Enrichment, and Multi-service Overlap"
+subtitle: "Intensity, Relative Intensity, and Multi-service Overlap"
 author: "Jerónimo Rodríguez Escobar"
 date: last-modified
 format:
@@ -21,7 +21,7 @@ This notebook consolidates all spatial summary statistics for global hotspots in
 
 1.  **Hotspot Intensity (Coverage)**: The percentage of land area within a spatial unit that is classified as a hotspot.
 2.  **Global Share (Distribution)**: The proportion of all global hotspot gridcells that are located within a specific spatial unit.
-3.  **Enrichment**: A ratio comparing the observed share of hotspots to the expected share based on land area (Observed / Expected).
+3.  **Relative Intensity**: A ratio comparing the observed share of hotspots to the expected share based on land area (Observed / Expected).
 4.  **Multi-service Hotspots & Hotness**: How many services is a single gridcell a hotspot for, and which regions have the highest average number of overlapping hotspots?
 
 ## Setup
@@ -99,7 +99,7 @@ if (file.exists(gpkg_grid)) {
   missing_groupings <- setdiff(c("income_grp", "region_wb", "WWF_biome"), names(grid_df))
   if (length(missing_groupings) > 0) {
     message("Joining missing attributes from master grid: ", paste(missing_groupings, collapse = ", "))
-    master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land.gpkg"), quiet = TRUE)
+    master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"), quiet = TRUE)
     master_grid <- sf::st_drop_geometry(master_grid)
     if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) {
       master_grid <- dplyr::rename(master_grid, fid = id)
@@ -167,7 +167,7 @@ hs_global_obj <- extract_hotspots(
 )
 ```
 
-## Part 1: Intensity, Share, and Enrichment
+## Part 1: Intensity, Share, and Relative Intensity
 
 ```{r}
 #| label: calc-intensity
@@ -210,7 +210,7 @@ for (g in valid_groupings) {
       pct_share = (n_hot / global_n_hot) * 100,
       grouping_var = g,
       expected_share = (n_total / sum(n_total)) * 100,
-      enrichment = ifelse(expected_share > 0, pct_share / expected_share, NA)
+      relative_intensity = ifelse(expected_share > 0, pct_share / expected_share, NA)
     ) %>%
     dplyr::ungroup() %>%
     dplyr::arrange(desc(pct_area))
@@ -245,7 +245,7 @@ for (g_var in valid_groupings) {
   plot_data <- plot_data %>%
     dplyr::mutate(
       pct_share = tidyr::replace_na(pct_share, 0),
-      enrichment = tidyr::replace_na(enrichment, 0)
+      relative_intensity = tidyr::replace_na(relative_intensity, 0)
     )
   if(nrow(plot_data) == 0) next
 
@@ -261,13 +261,13 @@ for (g_var in valid_groupings) {
     labs(title = paste("Global Hotspot Share by", g_var), x = "% of Global Hotspots", y = NULL) + theme_minimal()
   ggsave(file.path(out_intensity_dir, paste0("hotspot_share_", tolower(g_var), ".png")), p_share, width=14, height=10, bg="white")
 
-  # 3. Enrichment Plot
-  p_enrich <- ggplot(plot_data, aes(x = enrichment, y = tidytext::reorder_within(group, enrichment, service), fill = enrichment > 1)) +
+  # 3. Relative Intensity Plot
+  p_enrich <- ggplot(plot_data, aes(x = relative_intensity, y = tidytext::reorder_within(group, relative_intensity, service), fill = relative_intensity > 1)) +
     geom_col() + geom_vline(xintercept = 1, linetype = "dashed", color = "black") + facet_wrap(~ service, scales = "free_y", ncol = 3) +
     tidytext::scale_y_reordered() + scale_fill_manual(values = c("TRUE" = "#E74C3C", "FALSE" = "#95A5A6")) +
-    labs(title = paste("Hotspot Enrichment by", g_var), x = "Enrichment Score (>1 indicates disproportionate burden)", y = NULL) +
+    labs(title = paste("Relative Hotspot Intensity by", g_var), x = "Intensity Score (Regional Hotspot % ÷ Global Average [~5%])", y = NULL) +
     theme_minimal() + theme(legend.position = "none")
-  ggsave(file.path(out_intensity_dir, paste0("hotspot_enrichment_", tolower(g_var), ".png")), p_enrich, width=14, height=10, bg="white")
+  ggsave(file.path(out_intensity_dir, paste0("hotspot_relative_intensity_", tolower(g_var), ".png")), p_enrich, width=14, height=10, bg="white")
 }
 ```
 
@@ -359,7 +359,7 @@ plot_stacked_overlap <- function(df, g_var) {
 
   p <- ggplot2::ggplot(d_summ, ggplot2::aes(x = group, y = pct, fill = cat)) +
     ggplot2::geom_col(position = "fill") +
-    ggplot2::scale_fill_viridis_d(option = "magma", direction = -1, name = "Services") +
+    ggplot2::scale_fill_viridis_d(option = "magma", direction = 1, name = "Services") +
     ggplot2::coord_flip() +
     ggplot2::labs(
       title = paste0("Multi-service Hotspot Distribution by ", g_var),

@@ -9,6 +9,7 @@ library(ggplot2)
 library(dplyr)
 library(purrr)
 library(tidyr)
+library(here)
 library(patchwork) # Essential for different color scales in a "faceted" layout
 
 # ------------------------------------------------------------------------------
@@ -173,8 +174,7 @@ generate_faceted_map <- function(gpkg_path, grouping_name, value_col = "pct_chg"
 # 3. Execution
 # ------------------------------------------------------------------------------
 
-library(here)
-source(here("R", "paths.R"))
+source(here::here("R", "paths.R"))
 
 # Define your groupings and their corresponding GPKG file paths
 groupings_files <- list(
