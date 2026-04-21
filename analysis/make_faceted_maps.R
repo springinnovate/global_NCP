@@ -102,6 +102,17 @@ generate_faceted_map <- function(gpkg_path, grouping_name, value_col = "pct_chg"
   sf_data <- st_read(gpkg_path, quiet = TRUE)
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
+  # ---------------------------------------------------------------------------
+  # Identify Antarctica to prevent attribute grouping artifacts
+  # (e.g., Antarctica being mistakenly classified as "High income: nonOECD").
+  # We break multi-part geometries into single polygons and flag any landmass
+  # whose centroid is below -60 latitude so it can be colored gray (NA).
+  # ---------------------------------------------------------------------------
+  sf_data <- suppressWarnings(st_cast(sf_data, "POLYGON"))
+  cents <- suppressWarnings(st_centroid(st_geometry(sf_data)))
+  cents_4326 <- st_transform(cents, 4326)
+  sf_data$is_antarctica <- st_coordinates(cents_4326)[, "Y"] <= -60
+
   # Transform to Equal Earth projection (EPSG:8857) to correct polar distortion
   sf_data <- st_transform(sf_data, crs = "EPSG:8857")
 
@@ -119,6 +130,26 @@ generate_faceted_map <- function(gpkg_path, grouping_name, value_col = "pct_chg"
     } else {
       message("  -> WARNING: Could not find any columns ending in '_", value_col, "'.")
     }
+  }
+
+  # Mask out Antarctica and unclassified regions so they render as neutral gray (NA)
+  if ("income_grp" %in% names(sf_data)) {
+    sf_data[[value_col]][is.na(sf_data$income_grp) | sf_data$income_grp %in% c("NA", "Not classified", "Unclassified")] <- NA
+  }
+  if ("region_wb" %in% names(sf_data)) {
+    sf_data[[value_col]][is.na(sf_data$region_wb) | sf_data$region_wb %in% c("NA", "Antarctica")] <- NA
+  }
+  if ("WWF_biome" %in% names(sf_data)) {
+    sf_data[[value_col]][is.na(sf_data$WWF_biome) | sf_data$WWF_biome %in% c("NA", "Lakes", "Rock & Ice")] <- NA
+  }
+  if ("iso3" %in% names(sf_data)) {
+    sf_data[[value_col]][is.na(sf_data$iso3) | sf_data$iso3 == "ATA"] <- NA
+  }
+  if ("nev_name" %in% names(sf_data)) {
+    sf_data[[value_col]][is.na(sf_data$nev_name) | sf_data$nev_name == "Antarctica"] <- NA
+  }
+  if ("is_antarctica" %in% names(sf_data)) {
+    sf_data[[value_col]][sf_data$is_antarctica] <- NA
   }
 
   services <- unique(sf_data$service)
