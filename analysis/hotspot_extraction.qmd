@@ -749,7 +749,7 @@ if (!exists("plt_long")) {
 
 ```{r}
 #| label: hotspots_setup
-#| eval: true
+#| eval: false
 #| message: true
 #| warning: false
 #| echo: false
@@ -959,7 +959,7 @@ run_one_hotset <- function(df, value_col, scope,
 
 ```{r}
 #| label: hotspots_execution
-#| eval: true
+#| eval: false
 #| include: false
 
 # ---- Execute: global + subregional runs -----------------------------------
@@ -1200,7 +1200,7 @@ if (length(groupings) == 0) {
           }
 
           p <- ggplot(coast_df, aes(x = .data[[x_var]], y = .data[[metric]])) +
-            geom_boxplot(fill = "gray95", outlier.shape = 16, outlier.alpha = 0.3) +
+            geom_boxplot(fill = "gray95", outlier.shape = NA) +
             facet_wrap(~Service, scales = facet_scales, ncol = 1) +
             labs(title = paste("Hotspot Change Distribution:", gc),
                  subtitle = paste("Coastal Services (Free Scale) -", metric_label),

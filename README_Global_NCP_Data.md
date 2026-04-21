@@ -13,7 +13,7 @@ This is the most important folder for QGIS exploration.
 ### 2. `outputs/` (Visualizations)
 Contains all the generated PNG figures ready for presentations or manuscript insertion.
 *   `plots/signed_bars/`: Directional bar charts showing regional mean change.
-*   `plots/intensity/` & `plots/hotness/`: Bar charts highlighting Compound Risk and Disproportionate Burden (Enrichment).
+*   `plots/intensity/` & `plots/hotness/`: Bar charts highlighting Compound Risk and Disproportionate Burden (Relative Intensity).
 *   `plots/drivers/`: Overlap charts showing the Attribution Gap (ES Hotspots vs. Land Cover drivers).
 
 ### 3. `vector_basedata/`

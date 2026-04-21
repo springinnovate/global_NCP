@@ -22,8 +22,8 @@ This document captures the full project context for assistants (e.g., Codex in V
 1. Processed 10‑km grid with subregional tags (`processed/10k_change_calc.gpkg`).
 2. Hotspot feature layers (global and per‑group) as compact GPKGs under `processed/hotspots/` plus an index CSV.
 3. Reusable tidy table `plt_long` (cell × service with `abs_chg`/`pct_chg`).
-4. **Intensity & Enrichment**: Metrics quantifying hotspot coverage and disproportionate concentration per region (`hotspot_area_stats.csv`).
-4. Figures: trimmed **barplots** of magnitudes (all cells), **violins** of hotspot distributions, and (later) **KS** tables/plots.
+4. **Intensity & Relative Intensity**: Metrics quantifying hotspot coverage and disproportionate concentration per region (`hotspot_area_stats.csv`).
+5. Figures: trimmed **barplots** of magnitudes (all cells), **violins** of hotspot distributions, **faceted maps**, and **KS** tables/plots.
 
 ---
 
@@ -208,15 +208,22 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 ### 4.8 Hotspot Intensity & Multi-service
 
 * **Intensity**: % of land area classified as hotspot per region.
-* **Enrichment**: Ratio of (Observed Share of Hotspots / Expected Share based on Area). Values > 1 indicate disproportionate concentration.
+* **Relative Intensity**: Ratio of (Observed Share of Hotspots / Expected Share based on Area). Values > 1 indicate disproportionate concentration.
 * **Hotness**: Average number of overlapping service hotspots per pixel.
 
-### 4.9 Current run status / next steps
+### 4.9 Faceted Maps (`make_faceted_maps.R`)
+* **Purpose**: Show spatial distribution of absolute and percentage change across subregions.
+* **Color Rule Engine**: A strict semantic diverging scale (`scale_fill_gradient2`) anchored at `midpoint = 0` is used universally.
+  * **Goods**: Increase is Green, Decrease is Red.
+  * **Damages**: Increase is Red, Decrease is Green.
+  * This rule applies even if a specific dataset does not cross zero (e.g., all values are positive or all negative), ensuring the visual language (Red = Bad, Green = Good) remains perfectly consistent across all presentation slides.
+
+### 4.10 Current run status / next steps
 
 - **Completed**:
   - Core hotspot extraction (v1.0.2).
   - KS Analysis pipeline (robust to suffixes, improved visuals).
-  - Intensity/Enrichment metrics.
+  - Intensity/Relative Intensity metrics.
   - Documentation of Sum vs Mean aggregation logic.
 - **Next**:
   - Land Cover change analysis (new branch).
@@ -376,6 +383,7 @@ for (gc in groupings) {
 
   * Bars: `outputs/plots/{abs|pct}/<group_col>/bars_<group_col>_{abs|pct}.png`
   * Violins: `outputs/plots/violins/<group_col>/*_{abs|pct}_change_violins.png`
+    * Maps: `outputs/plots/maps/map_<group_col>_{abs|pct}.png`
 
 ---
 

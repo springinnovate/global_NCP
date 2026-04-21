@@ -36,34 +36,16 @@ get_color_scale <- function(data_vec, service) {
     return(scale_fill_viridis_c(na.value = "gray90", name = "Change"))
   }
 
-  min_val <- min(data_vec, na.rm = TRUE)
-  max_val <- max(data_vec, na.rm = TRUE)
   dir <- get_direction(service)
 
-  crosses_zero <- (min_val < 0) && (max_val > 0)
-
-  if (crosses_zero) {
-    # Diverging scale
-    if (dir == "good") {
-      # Good: high is Blue/Green, low is Red
-      scale_fill_gradient2(low = "red", mid = "white", high = "forestgreen",
-                           midpoint = 0, name = "Change", na.value = "gray90")
-    } else {
-      # Damage: high is Red, low is Blue/Green
-      scale_fill_gradient2(low = "forestgreen", mid = "white", high = "red",
-                           midpoint = 0, name = "Change", na.value = "gray90")
-    }
+  if (dir == "good") {
+    # Good: high is Green, low is Red
+    scale_fill_gradient2(low = "red", mid = "white", high = "forestgreen",
+                         midpoint = 0, name = "Change", na.value = "gray90")
   } else {
-    # Sequential scale (viridis)
-    if (dir == "good") {
-      # Good: Bad is low values. So we want low values to be dark.
-      # direction = 1 makes low values dark.
-      scale_fill_viridis_c(direction = 1, option = "viridis", name = "Change", na.value = "gray90")
-    } else {
-      # Damage: Bad is high values. So we want high values to be dark.
-      # direction = -1 makes high values dark.
-      scale_fill_viridis_c(direction = -1, option = "viridis", name = "Change", na.value = "gray90")
-    }
+    # Damage: high is Red, low is Green
+    scale_fill_gradient2(low = "forestgreen", mid = "white", high = "red",
+                         midpoint = 0, name = "Change", na.value = "gray90")
   }
 }
 

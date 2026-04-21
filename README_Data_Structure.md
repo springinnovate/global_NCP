@@ -58,7 +58,7 @@ Contains the geometries and indices of Ecosystem Service decline hotspots (the w
 
 ### `processed/tables/`
 Contains tabular summary statistics extracted for the manuscript and presentations.
-*   `hotspot_area_stats.csv`: Quantifies the **Intensity** (percentage of a region's landmass flagged as a hotspot) and **Enrichment** (Observed share vs. Expected share).
+*   `hotspot_area_stats.csv`: Quantifies the **Intensity** (percentage of a region's landmass flagged as a hotspot) and **Relative Intensity** (Observed share vs. Expected share).
 *   `hotspot_multiservice_stats.csv`: Quantifies **Hotness**, showing the overlap of multiple service declines within single grid cells.
 *   `ks_results_hot_vs_non.csv`: Results of the Kolmogorov-Smirnov statistical tests, comparing the socioeconomic profiles of hotspots vs. non-hotspot "business-as-usual" median baselines.
 *   `lcc_es_hotspot_overlap.csv`: The **"Attribution Gap"** metrics. Details the exact percentage of ES hotspots that spatially overlap with Land Cover Conversion hotspots.

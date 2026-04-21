@@ -32,7 +32,7 @@ This is the primary pathway for the main analysis, including hotspot identificat
 2.  **Grid-Level Differencing:** The Quarto notebook `analysis/process_data.qmd` ingests the aggregated table from the previous step. It then calculates the absolute and Symmetric Percentage Change (SPC) between the 1992 and 2020 columns for each grid cell.
 3.  **Hotspot Identification:** The notebook `analysis/hotspot_extraction.qmd` takes the final grid-level change data and identifies hotspots.
 
-**Use Case:** This path underpins all hotspot maps, regional summaries, and enrichment analyses.
+**Use Case:** This path underpins all hotspot maps, regional summaries, and relative intensity analyses.
 
 ---
 
@@ -137,6 +137,14 @@ A common question regarding Path B is the comparability of variables aggregated 
 2.  **Equal-Area Grid:** The analysis uses the IUCN equal-area grid. Since cell area is constant, $Sum$ and $Mean$ are perfectly proportional ($Sum = Mean \times Area$).
 3.  **Mathematical Identity:** For relative metrics used in this analysis (percent change, percentile rankings, KS test statistics), the results are identical regardless of whether sum or mean is used.
 4.  **Comparability:** Comparing relative magnitudes of change (e.g., percentage change) strips away the units, allowing valid comparisons between total loads and average indices.
+
+## Visualization Semantic Rules (Maps)
+
+To maintain a consistent narrative across all presentations and figures, spatial maps of Ecosystem Service change adhere to a strict semantic color rule:
+
+*   **Universal Diverging Scale:** All maps use a diverging color ramp anchored at zero (`midpoint = 0`).
+*   **Semantic Meaning:** Red always indicates ecological or social damage (loss of a good service, or increase in a detrimental risk). Green always indicates improvement or healthy service provision.
+*   **Sequential vs. Diverging Data:** Even if a regional dataset does not cross zero (e.g., all regions experience a decline), the diverging scale is maintained to preserve the semantic meaning of the colors. For example, an entirely negative map for a 'good' service will simply use the Red-to-White half of the scale, avoiding the confusion of introducing sequential palettes (like viridis) that break the "Red=Bad" cognitive mapping.
 
 ## Socioeconomic Profiling (KS Tests)
 
