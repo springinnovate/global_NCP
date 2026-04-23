@@ -26,6 +26,17 @@ params:
 
 ## Overview
 
+This notebook performs two-sample Kolmogorov-Smirnov (KS) tests to determine if the socioeconomic profiles of ecosystem service "hotspots" are statistically different from the background landscape.
+
+### Balanced Sampling Methodology
+
+A direct comparison of hotspots (the top/bottom 5% of pixels) against the entire non-hotspot background (the remaining 95%) suffers from severe sample size imbalance and includes pixels undergoing extreme changes in the *opposite* direction. To ensure a fair and stable statistical comparison, this pipeline implements a **"median background"** sampling strategy (`comparison_mode = "median"`):
+
+*   Hotspots are compared strictly against the "business-as-usual" median 5% of the landscape (the 47.5th to 52.5th percentiles of change).
+*   This isolates the specific socioeconomic profile of extreme decline against typical, stable baseline conditions, providing a much cleaner signal for interpretation.
+
+### Workflow
+
 Uses the hotspot definition from the extraction report to compare hotspots vs non-hotspots across socio-environmental covariates. Workflow: load helpers and cached `plt_long`, derive hotspot/complement subsets with the same thresholds, run KS tests per service × variable, and export heatmaps/bars/ECDFs to `outputs/plots/ks/` (mirrored in `outputs/plots/latest/ks/`). The goal is a quick, reproducible readout of which covariates most strongly distinguish hotspot cells.
 
 ## Interpreting the KS Results

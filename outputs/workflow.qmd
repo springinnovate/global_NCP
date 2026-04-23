@@ -1,0 +1,40 @@
+```{mermaid}
+graph TD
+    %% Input Layer
+    RawES[Raw ES Raster Inputs <br> <i>300m InVEST Models</i>] --> Norm[Unit Standardization <br> <i>Per-Hectare Normalization</i>]
+    RawLC[ESA CCI / C3S Land Cover <br> <i>Transitions & Gross Loss</i>] --> P3
+    RawSoc[Socioeconomic Data <br> <i>GDP, Pop, HDI</i>] --> P4
+
+    %% Aggregation & Math Layer
+    Norm --> Agg[10km IUCN Grid Aggregation <br> <i>Path B: Zonal Stats & Re-aggregation</i>]
+    Agg --> Math[Bi-Temporal Differencing <br> <i>Symmetric Percentage Change & Absolute</i>]
+
+    %% Pillar 1
+    Math --> P1{Pillar 1: The 'What' <br> Aggregate Trajectories}
+    P1 --> P1a[Signed Change Barplots <br> <i>Mean regional shifts</i>]
+
+    %% Pillar 2
+    Math --> P2{Pillar 2: The 'Where' <br> Hotspot Detection}
+    P2 --> P2a[Top/Bottom 5% Extraction <br> <i>Faceted Maps & Violin Distributions</i>]
+
+    %% Pillar 3
+    P2 --> P3{Pillar 3: The 'Why' <br> Land Cover Attribution}
+    P3 --> P3a[Driver Overlap Maps <br> <i>LCC Hotspot Intersection & Heatmaps</i>]
+    P3 --> P3b[Driver Scatterplots <br> <i>Net Natural Change vs ES Change</i>]
+
+    %% Pillar 4
+    P2 --> P4{Pillar 4: The 'Who' <br> Exposure & Vulnerability}
+    P4 --> P4a[Socioeconomic Profiling <br> <i>KS Tests: Median Background vs Hotspots</i>]
+    P4 --> P4b[Socioeconomic Scatterplots <br> <i>Log10 Density Heatmaps</i>]
+
+    %% Styling
+    classDef inputs fill:#e2e8f0,stroke:#94a3b8,stroke-width:2px,color:#0f172a;
+    classDef processing fill:#bfdbfe,stroke:#3b82f6,stroke-width:2px,color:#0f172a;
+    classDef pillar fill:#fef08a,stroke:#2563eb,stroke-width:3px,color:#1e3a8a,font-weight:bold;
+    classDef outputs fill:#dcfce7,stroke:#ca8a04,stroke-width:2px,color:#422006;
+
+    class RawES,RawLC,RawSoc inputs;
+    class Norm,Agg,Math processing;
+    class P1,P2,P3,P4 pillar;
+    class P1a,P2a,P3a,P3b,P4a,P4b outputs;
+```

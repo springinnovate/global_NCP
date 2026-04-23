@@ -1,8 +1,24 @@
 # ==============================================================================
 # Automate Faceted Global Maps for Ecosystem Services Change
 # ==============================================================================
-# This script reads spatial groupings, applies a dynamic Cartography Rule Engine,
-# and generates faceted global maps with appropriate color ramps per service.
+#
+# Author: Jerónimo Rodríguez Escobar
+#
+# Description:
+# This script generates a series of faceted global maps visualizing the change
+# in multiple ecosystem services across different geographic groupings (e.g.,
+# World Bank Regions, Income Groups). It enforces a strict set of cartographic
+# rules to ensure consistency and clear communication for presentations.
+#
+# Key Methodological Rules:
+# 1.  **Semantic Color Scale**: A universal Red/Green diverging scale is used,
+#     anchored at zero. Red always signifies a negative outcome (loss of a
+#     good, increase of a damage), and Green a positive one. This is enforced
+#     even for datasets that do not cross zero to maintain visual consistency.
+# 2.  **Antarctica Masking**: The script includes a spatial filtering step to
+#     identify and neutralize the continent of Antarctica, which often causes
+#     visual artifacts by being mis-classified into unrelated economic groups
+#     (e.g., "High income: nonOECD"). It is rendered in a neutral gray.
 
 library(sf)
 library(ggplot2)
@@ -48,6 +64,28 @@ get_color_scale <- function(data_vec, service) {
                          midpoint = 0, name = "Change", na.value = "gray90")
   }
 }
+
+# RULE 3: Universal Palettes for Context Maps
+group_palettes <- list(
+  biome = c(
+    'Tropical & Subtropical Moist Broadleaf Forests' = '#319D00',
+    'Tropical & Subtropical Dry Broadleaf Forests' = '#7ABD1B',
+    'Tropical & Subtropical Coniferous Forests' = '#556E19',
+    'Temperate Broadleaf & Mixed Forests' = '#207433',
+    'Temperate Coniferous Forests' = '#3E8D62',
+    'Boreal Forests/Taiga' = '#496FF3',
+    'Tropical & Subtropical Grasslands, Savannas & Shrublands' = '#D6F392',
+    'Temperate Grasslands, Savannas & Shrublands' = '#D1E614',
+    'Flooded Grasslands & Savannas' = '#75D0D5',
+    'Montane Grasslands & Shrublands' = '#98E600',
+    'Tundra' = '#C7DEFF',
+    'Mediterranean Forests, Woodlands & Scrub' = '#AF963C',
+    'Deserts & Xeric Shrublands' = '#C55C5C',
+    'Mangroves' = '#FE04BC'
+  ),
+  income_grp = c('1. High income: OECD' = '#004D33', '2. High income: nonOECD' = '#1d7355', '3. Upper middle income' = '#4b9e80', '4. Lower middle income' = '#8bc5af', '5. Low income' = '#cde9df'),
+  region_wb = c('East Asia & Pacific' = '#2E5A88', 'Europe & Central Asia' = '#D86018', 'Latin America & Caribbean' = '#7A3F91', 'Middle East & North Africa' = '#B38F00', 'North America' = '#1D8A99', 'South Asia' = '#6B8E23', 'Sub-Saharan Africa' = '#8B0000')
+)
 
 # ------------------------------------------------------------------------------
 # 2. Map Generation Function
@@ -183,6 +221,75 @@ generate_faceted_map <- function(gpkg_path, grouping_name, value_col = "pct_chg"
   message("Saved map to: ", out_path)
 }
 
+# Function to generate a 4-facet context map showing the geographic groupings
+generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/plots/maps") {
+  message("Generating Context Groupings map...")
+  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+  # Helper to load and clean geometries (masking Antarctica)
+  load_and_clean <- function(gpkg_path) {
+    d <- st_read(gpkg_path, quiet = TRUE)
+    d <- suppressWarnings(st_cast(d, "POLYGON"))
+    cents <- suppressWarnings(st_centroid(st_geometry(d)))
+    cents_4326 <- st_transform(cents, 4326)
+    d <- d[st_coordinates(cents_4326)[, "Y"] > -60, ]
+    d <- st_transform(d, crs = "EPSG:8857")
+    return(d)
+  }
+
+  # 1. World Bank Region
+  sf_wb <- load_and_clean(groupings_files$World_Bank_Region)
+  sf_wb$region_wb[is.na(sf_wb$region_wb) | sf_wb$region_wb == "Antarctica"] <- NA
+  p_wb <- ggplot(sf_wb) +
+    geom_sf(aes(fill = region_wb), color = "gray50", linewidth = 0.1) +
+    scale_fill_manual(values = group_palettes$region_wb, na.value = "gray90", name = NULL) +
+    labs(title = "World Bank Regions") +
+    theme_void() +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+          legend.position = "bottom", legend.text = element_text(size = 9)) +
+    guides(fill = guide_legend(ncol = 3))
+
+  # 2. Income Group
+  sf_inc <- load_and_clean(groupings_files$Income_Group)
+  sf_inc$income_grp[is.na(sf_inc$income_grp) | sf_inc$income_grp %in% c("Not classified", "Unclassified")] <- NA
+  p_inc <- ggplot(sf_inc) +
+    geom_sf(aes(fill = income_grp), color = "gray50", linewidth = 0.1) +
+    scale_fill_manual(values = group_palettes$income_grp, na.value = "gray90", name = NULL) +
+    labs(title = "Income Groups") +
+    theme_void() +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+          legend.position = "bottom", legend.text = element_text(size = 9)) +
+    guides(fill = guide_legend(ncol = 2))
+
+  # 3. Biome
+  sf_bio <- load_and_clean(groupings_files$Biome)
+  sf_bio$WWF_biome[is.na(sf_bio$WWF_biome) | sf_bio$WWF_biome %in% c("Lakes", "Rock & Ice")] <- NA
+  p_bio <- ggplot(sf_bio) +
+    geom_sf(aes(fill = WWF_biome), color = "gray50", linewidth = 0.1) +
+    scale_fill_manual(values = group_palettes$biome, na.value = "gray90", name = NULL) +
+    labs(title = "WWF Biomes") +
+    theme_void() +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+          legend.position = "bottom", legend.text = element_text(size = 9)) +
+    guides(fill = guide_legend(ncol = 2))
+
+  # 4. Country
+  sf_ctry <- load_and_clean(groupings_files$Country)
+  p_ctry <- ggplot(sf_ctry) +
+    geom_sf(fill = "#E0E0E0", color = "gray40", linewidth = 0.15) +
+    labs(title = "National Boundaries") +
+    theme_void() +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16))
+
+  combined_plot <- (p_wb + p_inc) / (p_bio + p_ctry) +
+    plot_annotation(title = "Global NCP Analytical Context: Geographic Groupings",
+                    theme = theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5)))
+
+  out_path <- file.path(out_dir, "context_groupings_map.png")
+  ggsave(out_path, combined_plot, width = 18, height = 14, bg = "white", dpi = 300)
+  message("Saved context map to: ", out_path)
+}
+
 # ------------------------------------------------------------------------------
 # 3. Execution
 # ------------------------------------------------------------------------------
@@ -202,3 +309,6 @@ iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y,
 
 # Run the loop for absolute change maps
 iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "abs"))
+
+# Generate the contextual groupings map
+generate_context_groupings_map(groupings_files)

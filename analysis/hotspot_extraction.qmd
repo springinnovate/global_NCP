@@ -427,6 +427,29 @@ glob_refs <- compute_global_refs(sf_f, services, cut_q = cut_q,
 #| warning: false
 #| echo: false
 
+# Universal Palettes for Regional Groupings
+group_palettes <- list(
+  biome = c(
+    'Tropical & Subtropical Moist Broadleaf Forests' = '#319D00',
+    'Tropical & Subtropical Dry Broadleaf Forests' = '#7ABD1B',
+    'Tropical & Subtropical Coniferous Forests' = '#556E19',
+    'Temperate Broadleaf & Mixed Forests' = '#207433',
+    'Temperate Coniferous Forests' = '#3E8D62',
+    'Boreal Forests/Taiga' = '#496FF3',
+    'Tropical & Subtropical Grasslands, Savannas & Shrublands' = '#D6F392',
+    'Temperate Grasslands, Savannas & Shrublands' = '#D1E614',
+    'Flooded Grasslands & Savannas' = '#75D0D5',
+    'Montane Grasslands & Shrublands' = '#98E600',
+    'Tundra' = '#C7DEFF',
+    'Mediterranean Forests, Woodlands & Scrub' = '#AF963C',
+    'Deserts & Xeric Shrublands' = '#C55C5C',
+    'Mangroves' = '#FE04BC'
+  ),
+  income_grp = c('1. High income: OECD' = '#004D33', '2. High income: nonOECD' = '#1d7355', '3. Upper middle income' = '#4b9e80', '4. Lower middle income' = '#8bc5af', '5. Low income' = '#cde9df'),
+  region_wb = c('East Asia & Pacific' = '#2E5A88', 'Europe & Central Asia' = '#D86018', 'Latin America & Caribbean' = '#7A3F91', 'Middle East & North Africa' = '#B38F00', 'North America' = '#1D8A99', 'South Asia' = '#6B8E23', 'Sub-Saharan Africa' = '#8B0000')
+)
+group_palettes$WWF_biome <- group_palettes$biome
+
 plot_signed_bars <- function(df, grouping, metric, refs, out_dir_base = "outputs/plots") {
   d <- dplyr::filter(df, grouping == !!grouping, metric == !!metric)
   if (!nrow(d)) return(invisible(NULL))
@@ -435,11 +458,12 @@ plot_signed_bars <- function(df, grouping, metric, refs, out_dir_base = "outputs
   refs_use <- dplyr::filter(refs, metric == !!metric)
   refs_use$service <- factor(refs_use$service, levels = services)
 
+  custom_palette <- group_palettes[[grouping]]
   # Handle output directory with suffix
   out_dir <- out_dir_base
 
   p <- ggplot(d, aes(x = mean_chg, y = group, fill = group)) +
-    geom_col(show.legend = FALSE) +
+    geom_col(show.legend = TRUE) +
     geom_vline(xintercept = 0, color = "#7f7f7f", linewidth = 0.6) +
     geom_vline(data = refs_use, aes(xintercept = ref),
                linetype = "dashed", color = "#4a4a4a", linewidth = 0.5) +
@@ -450,7 +474,17 @@ plot_signed_bars <- function(df, grouping, metric, refs, out_dir_base = "outputs
          x = if (metric == "pct") "Mean % change (trimmed, signed)" else "Mean absolute change (trimmed, signed)") +
     theme_minimal(base_size = 12) +
     theme(strip.background = element_rect(fill = "#f3f4f6", color = NA),
-          strip.text = element_text(face = "bold"))
+          strip.text = element_text(face = "bold"),
+          axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          legend.position = "bottom",
+          legend.title = element_blank(),
+          legend.text = element_text(size = 8)) +
+    guides(fill = guide_legend(ncol = 4))
+
+  if (!is.null(custom_palette)) {
+    p <- p + scale_fill_manual(values = custom_palette, na.value = "gray50")
+  }
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
   fp <- file.path(out_dir, paste0("bars_signed_", tolower(grouping), "_", metric, ".png"))

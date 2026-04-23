@@ -75,6 +75,8 @@ Through extensive testing and methodological validation, a distinct performance 
 
 This "Best of Both Worlds" architecture ensures stability and speed regardless of the spatial target.
 
+*Note: The `zonal_stats_toolkit` is currently managed alongside the main pipeline in a multi-root VS Code workspace. Future updates will fully integrate this toolkit's codebase into the `global_NCP` repository to unify version control.*
+
 ## Spatial Alignment and The Fragment Bug
 
 A major challenge in multi-stage spatial pipelines is maintaining exact 1:1 row integrity between extracted statistics and the canonical master grid.

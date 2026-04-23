@@ -1,8 +1,3 @@
-# Wed 04 Feb 2026
-
-**Status Update: Code Cleanup & Consolidation**
-*   **Hotspot Synthesis**: Verified that `analysis/hotspot_synthesis.qmd` successfully integrates all geographic clustering metrics. It replaces and officially deprecates `hotspot_intensity.qmd` and `hotspot_multiservice.qmd`.
-
 # Mon 03 Feb 2026
 
 **Status Update: Hotspot Intensity & Multi-service Analysis**

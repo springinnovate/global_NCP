@@ -17,12 +17,24 @@ params:
 
 ## Overview
 
-This notebook consolidates all spatial summary statistics for global hotspots into a single pipeline. It calculates:
+This notebook consolidates all spatial summary statistics for global hotspots into a single, reproducible pipeline. It calculates and visualizes three key metrics of geographic concentration:
 
-1.  **Hotspot Intensity (Coverage)**: The percentage of land area within a spatial unit that is classified as a hotspot.
-2.  **Global Share (Distribution)**: The proportion of all global hotspot gridcells that are located within a specific spatial unit.
-3.  **Relative Intensity**: A ratio comparing the observed share of hotspots to the expected share based on land area (Observed / Expected).
-4.  **Multi-service Hotspots & Hotness**: How many services is a single gridcell a hotspot for, and which regions have the highest average number of overlapping hotspots?
+1.  **Hotspot Intensity (Coverage)**
+    -   **Question**: What percentage of a region's own land area is experiencing a crisis for a given service?
+    -   **Formula**: `(Hotspot Area in Region / Total Area of Region) * 100`
+
+2.  **Global Share (Distribution)**
+    -   **Question**: What percentage of all global hotspots for a service are located within this specific region?
+    -   **Formula**: `(Hotspot Area in Region / Total Global Hotspot Area) * 100`
+
+3.  **Relative Intensity (Enrichment Score)**
+    -   **Question**: Is a region bearing a disproportionate burden of hotspots compared to its size?
+    -   **Formula**: `Global Share / Expected Share`, where `Expected Share` is the region's percentage of the total global land area.
+    -   **Interpretation**: A score > 1 indicates the region is a "hotspot of hotspots"—it contains more of the crisis than would be expected based on its size alone.
+
+4.  **Multi-service Hotspots ("Hotness")**
+    -   **Question**: How many overlapping crises are occurring in the same place?
+    -   **Metrics**: We calculate the average number of overlapping hotspots per gridcell within a region, and the distribution of cells with 1, 2, or 3+ hotspots.
 
 ## Setup
 
@@ -230,6 +242,29 @@ message("Hotspot area statistics saved to: ", out_csv_path)
 #| label: plot-intensity
 #| message: false
 
+# Universal Palettes for Regional Groupings
+group_palettes <- list(
+  biome = c(
+    'Tropical & Subtropical Moist Broadleaf Forests' = '#319D00',
+    'Tropical & Subtropical Dry Broadleaf Forests' = '#7ABD1B',
+    'Tropical & Subtropical Coniferous Forests' = '#556E19',
+    'Temperate Broadleaf & Mixed Forests' = '#207433',
+    'Temperate Coniferous Forests' = '#3E8D62',
+    'Boreal Forests/Taiga' = '#496FF3',
+    'Tropical & Subtropical Grasslands, Savannas & Shrublands' = '#D6F392',
+    'Temperate Grasslands, Savannas & Shrublands' = '#D1E614',
+    'Flooded Grasslands & Savannas' = '#75D0D5',
+    'Montane Grasslands & Shrublands' = '#98E600',
+    'Tundra' = '#C7DEFF',
+    'Mediterranean Forests, Woodlands & Scrub' = '#AF963C',
+    'Deserts & Xeric Shrublands' = '#C55C5C',
+    'Mangroves' = '#FE04BC'
+  ),
+  income_grp = c('1. High income: OECD' = '#004D33', '2. High income: nonOECD' = '#1d7355', '3. Upper middle income' = '#4b9e80', '4. Lower middle income' = '#8bc5af', '5. Low income' = '#cde9df'),
+  region_wb = c('East Asia & Pacific' = '#2E5A88', 'Europe & Central Asia' = '#D86018', 'Latin America & Caribbean' = '#7A3F91', 'Middle East & North Africa' = '#B38F00', 'North America' = '#1D8A99', 'South Asia' = '#6B8E23', 'Sub-Saharan Africa' = '#8B0000')
+)
+group_palettes$WWF_biome <- group_palettes$biome
+
 library(tidytext)
 
 out_intensity_dir <- file.path(out_plots(), paste0("intensity", params$output_suffix))
@@ -239,7 +274,8 @@ for (g_var in valid_groupings) {
   plot_data <- hotspot_area_stats %>%
     dplyr::filter(grouping_var == g_var) %>%
     dplyr::mutate(service = factor(service, levels = HOTS_CFG$svc_order)) %>%
-    dplyr::filter(!is.na(service))
+    dplyr::filter(!is.na(service)) %>%
+    dplyr::mutate(group = factor(group, levels = rev(sort(unique(as.character(group))))))
 
   # Prevent Quarto crash if left_join generated NaNs
   plot_data <- plot_data %>%
@@ -249,24 +285,34 @@ for (g_var in valid_groupings) {
     )
   if(nrow(plot_data) == 0) next
 
+  custom_palette <- group_palettes[[g_var]]
+
   # 1. Coverage Plot
-  p_cov <- ggplot(plot_data, aes(x = pct_area, y = tidytext::reorder_within(group, pct_area, service), fill = service)) +
-    geom_col(show.legend = FALSE) + facet_wrap(~ service, scales = "free_y", ncol = 3) + tidytext::scale_y_reordered() +
-    labs(title = paste("Hotspot Coverage by", g_var), x = "% of Area that is a Hotspot", y = NULL) + theme_minimal()
+  p_cov <- ggplot(plot_data, aes(x = pct_area, y = group, fill = group)) +
+    geom_col() + facet_wrap(~ service, scales = "free_x", ncol = 3) +
+    labs(title = paste("Hotspot Coverage by", g_var), x = "% of Area that is a Hotspot", y = NULL) + theme_minimal() +
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8)) +
+    guides(fill = guide_legend(ncol = 4))
+  if (!is.null(custom_palette)) p_cov <- p_cov + scale_fill_manual(values = custom_palette, na.value = "gray50")
   ggsave(file.path(out_intensity_dir, paste0("hotspot_coverage_", tolower(g_var), ".png")), p_cov, width=14, height=10, bg="white")
 
   # 2. Share Plot
-  p_share <- ggplot(plot_data, aes(x = pct_share, y = tidytext::reorder_within(group, pct_share, service), fill = service)) +
-    geom_col(show.legend = FALSE) + facet_wrap(~ service, scales = "free_y", ncol = 3) + tidytext::scale_y_reordered() +
-    labs(title = paste("Global Hotspot Share by", g_var), x = "% of Global Hotspots", y = NULL) + theme_minimal()
+  p_share <- ggplot(plot_data, aes(x = pct_share, y = group, fill = group)) +
+    geom_col() + facet_wrap(~ service, scales = "free_x", ncol = 3) +
+    labs(title = paste("Global Hotspot Share by", g_var), x = "% of Global Hotspots", y = NULL) + theme_minimal() +
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8)) +
+    guides(fill = guide_legend(ncol = 4))
+  if (!is.null(custom_palette)) p_share <- p_share + scale_fill_manual(values = custom_palette, na.value = "gray50")
   ggsave(file.path(out_intensity_dir, paste0("hotspot_share_", tolower(g_var), ".png")), p_share, width=14, height=10, bg="white")
 
   # 3. Relative Intensity Plot
-  p_enrich <- ggplot(plot_data, aes(x = relative_intensity, y = tidytext::reorder_within(group, relative_intensity, service), fill = relative_intensity > 1)) +
-    geom_col() + geom_vline(xintercept = 1, linetype = "dashed", color = "black") + facet_wrap(~ service, scales = "free_y", ncol = 3) +
-    tidytext::scale_y_reordered() + scale_fill_manual(values = c("TRUE" = "#E74C3C", "FALSE" = "#95A5A6")) +
+  p_enrich <- ggplot(plot_data, aes(x = relative_intensity, y = group, fill = group)) +
+    geom_col(aes(alpha = relative_intensity > 1)) + geom_vline(xintercept = 1, linetype = "dashed", color = "black") + facet_wrap(~ service, scales = "free_x", ncol = 3) +
+    scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.4), guide = "none") +
     labs(title = paste("Relative Hotspot Intensity by", g_var), x = "Intensity Score (Regional Hotspot % ÷ Global Average [~5%])", y = NULL) +
-    theme_minimal() + theme(legend.position = "none")
+    theme_minimal() + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8)) +
+    guides(fill = guide_legend(ncol = 4))
+  if (!is.null(custom_palette)) p_enrich <- p_enrich + scale_fill_manual(values = custom_palette, na.value = "gray50")
   ggsave(file.path(out_intensity_dir, paste0("hotspot_relative_intensity_", tolower(g_var), ".png")), p_enrich, width=14, height=10, bg="white")
 }
 ```
@@ -314,11 +360,14 @@ plot_hotness <- function(df, g_var) {
   d_plot <- df %>% dplyr::filter(grouping == g_var) %>% dplyr::slice_head(n = 15) %>%
     dplyr::mutate(group = factor(group, levels = rev(sort(unique(as.character(group))))))
 
-  p <- ggplot2::ggplot(d_plot, ggplot2::aes(x = group, y = mean_hotspots)) +
-    ggplot2::geom_col(fill = "#e74c3c") +
+  custom_palette <- group_palettes[[g_var]]
+
+  p <- ggplot2::ggplot(d_plot, ggplot2::aes(x = group, y = mean_hotspots, fill = group)) +
+    ggplot2::geom_col(show.legend = FALSE) +
     ggplot2::coord_flip() +
     ggplot2::labs(title = paste0("Average Hotspot Overlap by ", g_var), subtitle = "Hotspot Density (including zero-hotspot areas)", x = NULL, y = "Avg. Hotspot Count") +
     ggplot2::theme_minimal()
+  if (!is.null(custom_palette)) p <- p + ggplot2::scale_fill_manual(values = custom_palette, na.value = "#e74c3c")
 
   ggsave(file.path(out_plots(), paste0("hotness_", tolower(g_var), ".png")), p, width = 10, height = 6, bg = "white")
   return(p)
@@ -334,18 +383,21 @@ plot_stacked_overlap <- function(df, g_var) {
       cat = dplyr::case_when(
         hotspot_count == 1 ~ "1",
         hotspot_count == 2 ~ "2",
-        hotspot_count >= 3 ~ "3+",
+        hotspot_count == 3 ~ "3",
+        hotspot_count == 4 ~ "4",
+        hotspot_count == 5 ~ "5",
+        hotspot_count >= 6 ~ "6+",
         TRUE ~ as.character(hotspot_count)
       ),
-      cat = factor(cat, levels = c("1", "2", "3+"))
+      cat = factor(cat, levels = c("1", "2", "3", "4", "5", "6+"))
     ) %>%
     dplyr::count(group = .data[[g_var]], cat) %>%
     dplyr::group_by(group) %>%
     dplyr::mutate(pct = n / sum(n)) %>%
     dplyr::ungroup()
 
-  # Filter top 15 groups by "3+" share
-  top_groups <- d_summ %>% dplyr::filter(cat == "3+") %>% dplyr::arrange(desc(pct)) %>% dplyr::slice_head(n = 15) %>% dplyr::pull(group)
+  # Filter top 15 groups by severe multi-service share (3 or more combined)
+  top_groups <- d_summ %>% dplyr::filter(cat %in% c("3", "4", "5", "6+")) %>% dplyr::group_by(group) %>% dplyr::summarise(pct = sum(pct)) %>% dplyr::arrange(desc(pct)) %>% dplyr::slice_head(n = 15) %>% dplyr::pull(group)
   if (length(unique(d_summ$group)) > 20) {
     if (length(top_groups) < 15) {
       extra_groups <- setdiff(unique(d_summ$group), top_groups)
