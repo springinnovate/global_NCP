@@ -1,40 +1,76 @@
+---
+title: "Global NCP Workflow"
+format: html
+---
+
 ```{mermaid}
-graph TD
+flowchart LR
+    %% Subgraph Styling
+    style INPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+    style PROCESSING fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+    style OUTPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+
     %% Input Layer
-    RawES[Raw ES Raster Inputs <br> <i>300m InVEST Models</i>] --> Norm[Unit Standardization <br> <i>Per-Hectare Normalization</i>]
-    RawLC[ESA CCI / C3S Land Cover <br> <i>Transitions & Gross Loss</i>] --> P3
-    RawSoc[Socioeconomic Data <br> <i>GDP, Pop, HDI</i>] --> P4
+    subgraph INPUTS ["<span style='font-size: 30px; font-weight: bold; color: #222222;'>Inputs</span><br/>"]
+        direction TB
+        RawES["<b>Global ES Models</b> <br/> 300m Rasters <i>(1992 & 2020)</i>"]
+        RawLC["<b>ESA CCI Land Cover</b> <br/> 300m Rasters <i>(1992 & 2020)</i>"]
+        RawSoc["<b>Socioeconomic Data</b> <br/> Rasters <i>(Pop, GDP, HDI)</i>"]
+        RawGrid["<b>IUCN AOO 10km Master Grid</b> <br/> <i>Vector with Subregional Attributes</i>"]
+    end
 
-    %% Aggregation & Math Layer
-    Norm --> Agg[10km IUCN Grid Aggregation <br> <i>Path B: Zonal Stats & Re-aggregation</i>]
-    Agg --> Math[Bi-Temporal Differencing <br> <i>Symmetric Percentage Change & Absolute</i>]
+    %% Processing Layer
+    subgraph PROCESSING ["<span style='font-size: 30px; font-weight: bold; color: #222222;'>Processing</span><br/>"]
+        direction TB
+        IntA["<b>Path A: Global Trajectories</b> <br/> Zonal Summaries <i>(1992 & 2020)</i>"]
+        IntB["<b>Path B: Grid Analysis</b> <br/> 10km Zonal Summaries <i>(1992 & 2020)</i>"]
+        Math["<b>Metrics Calculation</b> <br/> Symmetric % Change (SPC) <br/> & Absolute Difference"]
 
-    %% Pillar 1
-    Math --> P1{Pillar 1: The 'What' <br> Aggregate Trajectories}
-    P1 --> P1a[Signed Change Barplots <br> <i>Mean regional shifts</i>]
+        MathLC["<b>Land Cover Transitions</b> <br/> Reclassified LC Contingency <br/> Matrices per 10km Gridcell"]
+        MathSoc["<b>Socioeconomic Stats & KS Tests</b> <br/> 10km Grid Aggregation <br/> & Statistical Profiling"]
+    end
 
-    %% Pillar 2
-    Math --> P2{Pillar 2: The 'Where' <br> Hotspot Detection}
-    P2 --> P2a[Top/Bottom 5% Extraction <br> <i>Faceted Maps & Violin Distributions</i>]
+    %% Outputs Layer
+    subgraph OUTPUTS ["<span style='font-size: 30px; font-weight: bold; color: #222222;'>Outputs</span><br/>"]
+        direction TB
+        P1["<b>Global Trajectories</b> <br/> <i style='font-size: 25px; font-weight: normal;'>Bar Charts, Summary Tables, <br/> & Cartographies (GPKGs)</i>"]
+        P2["<b>Hotspot Detection (Top/Bottom 5%)</b> <br/> <i style='font-size: 25px; font-weight: normal;'>Abs & SPC GPKGs, Synthesis Maps, <br/> & Distribution Plots</i>"]
+        P3["<b>Attribution Gap</b> <br/> <i style='font-size: 25px; font-weight: normal;'>LCC Overlap CSVs, Heatmaps, <br/> Scatterplots, & Driver Maps</i>"]
+        P4["<b>Equity & Exposure</b> <br/> <i style='font-size: 25px; font-weight: normal;'>KS Test Plots & <br/> Population Exposure CSVs</i>"]
+    end
 
-    %% Pillar 3
-    P2 --> P3{Pillar 3: The 'Why' <br> Land Cover Attribution}
-    P3 --> P3a[Driver Overlap Maps <br> <i>LCC Hotspot Intersection & Heatmaps</i>]
-    P3 --> P3b[Driver Scatterplots <br> <i>Net Natural Change vs ES Change</i>]
+    %% Logical Connections
+    RawGrid ==> IntB
 
-    %% Pillar 4
-    P2 --> P4{Pillar 4: The 'Who' <br> Exposure & Vulnerability}
-    P4 --> P4a[Socioeconomic Profiling <br> <i>KS Tests: Median Background vs Hotspots</i>]
-    P4 --> P4b[Socioeconomic Scatterplots <br> <i>Log10 Density Heatmaps</i>]
+    RawES ==> IntA
+    RawES ==> IntB
 
-    %% Styling
-    classDef inputs fill:#e2e8f0,stroke:#94a3b8,stroke-width:2px,color:#0f172a;
-    classDef processing fill:#bfdbfe,stroke:#3b82f6,stroke-width:2px,color:#0f172a;
-    classDef pillar fill:#fef08a,stroke:#2563eb,stroke-width:3px,color:#1e3a8a,font-weight:bold;
-    classDef outputs fill:#dcfce7,stroke:#ca8a04,stroke-width:2px,color:#422006;
+    IntA ==> Math
+    IntB ==> Math
 
-    class RawES,RawLC,RawSoc inputs;
-    class Norm,Agg,Math processing;
+    Math ==> P1
+    Math ==> P2
+
+    %% Downstream Analysis from Hotspots (P2)
+    P2 ==> P3
+    RawLC ==> MathLC
+    MathLC ==> P3
+
+    P2 ==> P4
+    RawSoc ==> MathSoc
+    MathSoc ==> P4
+
+    %% Layout Guides (Forces boxes to match heights and center-align)
+    RawGrid ~~~ MathSoc
+    IntA ~~~ P1
+
+    %% Visual Styling - WWF Palette
+    classDef inputs fill:#F2F2F2,stroke:#D9D9D9,stroke-width:2px,color:#333,font-size:23px;
+    classDef processing fill:#E1F5FE,stroke:#01579B,stroke-width:2px,color:#01579B,font-size:23px;
+    classDef pillar fill:#006743,stroke:#004D33,stroke-width:3px,color:#FFF,font-weight:bold,font-size:27px;
+
+    %% Explicit Class Assignments
+    class RawES,RawLC,RawSoc,RawGrid inputs;
+    class IntA,IntB,Math,MathLC,MathSoc processing;
     class P1,P2,P3,P4 pillar;
-    class P1a,P2a,P3a,P3b,P4a,P4b outputs;
 ```
