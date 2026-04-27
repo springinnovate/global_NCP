@@ -4,10 +4,15 @@ subtitle: "Intensity, Relative Intensity, and Multi-service Overlap"
 author: "Jerónimo Rodríguez Escobar"
 date: last-modified
 format:
-  html:
+#  html:
+#    toc: true
+#    number-sections: true
+#    theme: cosmo
+  pdf:
     toc: true
     number-sections: true
-    theme: cosmo
+    geometry: margin=1in
+    df-print: kable
 editor: source
 params:
   input_gpkg: "10k_change_calc.gpkg"
@@ -35,6 +40,10 @@ This notebook consolidates all spatial summary statistics for global hotspots in
 4.  **Multi-service Hotspots ("Hotness")**
     -   **Question**: How many overlapping crises are occurring in the same place?
     -   **Metrics**: We calculate the average number of overlapping hotspots per gridcell within a region, and the distribution of cells with 1, 2, or 3+ hotspots.
+
+5.  **Absolute Population Exposure (Impact Tier)**
+    -   **Question**: How many people are directly living within these top 5% areas of ES decline?
+    -   **Metrics**: Total population count within hotspots, segmented by Human Development Index (HDI) vulnerability bins and World Bank Income Group.
 
 ## Setup
 
@@ -426,4 +435,114 @@ plot_stacked_overlap <- function(df, g_var) {
 plots_hotness <- lapply(valid_groupings, function(g) plot_hotness(hotness_stats, g))
 plots_dist    <- lapply(valid_groupings, function(g) plot_stacked_overlap(df_overlap, g))
 if (length(plots_hotness) > 0) plots_hotness[]
+```
+
+## Part 3: Absolute Population Exposure
+
+```{r}
+#| label: calc-pop-exposure
+#| message: false
+
+# Define the canonical socioeconomic variables to use for exposure
+pop_var <- "GHS_POP_E2020_GLOBE_sum"
+hdi_var <- "hdi_raster_predictions_2020_mean"
+req_vars <- c(pop_var, hdi_var, "income_grp")
+
+missing_vars <- setdiff(req_vars, names(grid_df))
+
+if (length(missing_vars) == 0) {
+  pop_exposure <- hs_flags %>%
+    dplyr::left_join(grid_df %>% dplyr::select(fid, dplyr::all_of(req_vars)), by = "fid") %>%
+    dplyr::filter(!is.na(.data[[pop_var]]), !is.na(.data[[hdi_var]])) %>%
+    dplyr::mutate(
+      hdi_bin = dplyr::case_when(
+        .data[[hdi_var]] < 0.550 ~ "Low (<0.550)",
+        .data[[hdi_var]] >= 0.550 & .data[[hdi_var]] < 0.700 ~ "Medium (0.550-0.700)",
+        .data[[hdi_var]] >= 0.700 & .data[[hdi_var]] <= 0.800 ~ "High (0.700-0.800)",
+        .data[[hdi_var]] > 0.800 ~ "Very High (>0.800)",
+        TRUE ~ "Unknown"
+      ),
+      hdi_bin = factor(hdi_bin, levels = c("Low (<0.550)", "Medium (0.550-0.700)", "High (0.700-0.800)", "Very High (>0.800)", "Unknown"))
+    ) %>%
+    dplyr::group_by(service, income_grp, hdi_bin) %>%
+    dplyr::summarise(
+      exposed_population = sum(.data[[pop_var]], na.rm = TRUE),
+      hotspot_cells = dplyr::n(),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(service, income_grp, hdi_bin)
+
+  out_pop_csv <- file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv")
+  dir.create(dirname(out_pop_csv), recursive = TRUE, showWarnings = FALSE)
+  readr::write_csv(pop_exposure, out_pop_csv)
+  message("Absolute Population Exposure statistics saved to: ", out_pop_csv)
+
+} else {
+  warning("Missing required variables for population exposure calculation: ", paste(missing_vars, collapse = ", "))
+}
+```
+
+
+```{r}
+#| label: plot-pop-exposure
+#| message: false
+#| echo: false
+
+pop_exposure_csv <- file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv")
+if (file.exists(pop_exposure_csv)) {
+  pop_df <- readr::read_csv(pop_exposure_csv, show_col_types = FALSE)
+
+  facet_names <- c(
+    "C_Risk" = "Coastal Risk",
+    "N_export" = "Nitrogen Export",
+    "Sed_export" = "Sediment Export",
+    "C_Risk_Red_Ratio" = "Coastal Risk Red. Ratio",
+    "N_Ret_Ratio" = "N Retention Ratio",
+    "Sed_Ret_Ratio" = "Sed Retention Ratio",
+    "Pollination" = "Pollination",
+    "Nature_Access" = "Nature Access"
+  )
+
+  # 1. Plot by Income Group
+  p_pop_inc <- ggplot(pop_df, aes(x = exposed_population, y = income_grp, fill = income_grp)) +
+    geom_col() +
+    facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
+    scale_x_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    scale_y_discrete(labels = function(x) stringr::str_remove(x, "^\\d\\.\\s*")) +
+    labs(title = "Absolute Population Exposure in Hotspots",
+         subtitle = "By World Bank Income Group",
+         x = "Exposed Population", y = NULL) +
+    theme_minimal() +
+    theme(legend.position = "none",
+          axis.text.y = element_text(size = 10))
+
+  if (exists("group_palettes") && !is.null(group_palettes[["income_grp"]])) {
+    p_pop_inc <- p_pop_inc + scale_fill_manual(values = group_palettes[["income_grp"]], na.value = "gray50")
+  }
+  ggsave(file.path(out_plots(), paste0("pop_exposure_income", params$output_suffix, ".png")), p_pop_inc, width = 14, height = 10, bg = "white")
+
+  # 2. Plot by HDI Bin
+  hdi_pal <- c("Low (<0.550)" = "#d7191c", "Medium (0.550-0.700)" = "#fdae61", "High (0.700-0.800)" = "#abdda4", "Very High (>0.800)" = "#2b83ba", "Unknown" = "gray50")
+
+  pop_df_hdi <- pop_df %>%
+    dplyr::group_by(service, hdi_bin) %>%
+    dplyr::summarise(exposed_population = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::mutate(hdi_bin = factor(hdi_bin, levels = rev(names(hdi_pal))))
+
+  p_pop_hdi <- ggplot(pop_df_hdi, aes(x = exposed_population, y = hdi_bin, fill = hdi_bin)) +
+    geom_col() +
+    facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
+    scale_x_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    scale_fill_manual(values = hdi_pal) +
+    labs(title = "Absolute Population Exposure in Hotspots",
+         subtitle = "By UN Human Development Index (HDI)",
+         x = "Exposed Population", y = NULL) +
+    theme_minimal() +
+    theme(legend.position = "none",
+          axis.text.y = element_text(size = 10))
+  ggsave(file.path(out_plots(), paste0("pop_exposure_hdi", params$output_suffix, ".png")), p_pop_hdi, width = 14, height = 10, bg = "white")
+
+  plots_pop <- list(p_pop_inc, p_pop_hdi)
+  if (length(plots_pop) > 0) plots_pop[]
+}
 ```

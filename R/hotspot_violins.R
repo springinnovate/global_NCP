@@ -40,6 +40,29 @@ run_hotspot_boxplots_by <- function(
   }
   svc_order <- as.character(svc_order)
 
+  # Universal Palettes for Regional Groupings
+  group_palettes <- list(
+    biome = c(
+      'Tropical & Subtropical Moist Broadleaf Forests' = '#319D00',
+      'Tropical & Subtropical Dry Broadleaf Forests' = '#7ABD1B',
+      'Tropical & Subtropical Coniferous Forests' = '#556E19',
+      'Temperate Broadleaf & Mixed Forests' = '#207433',
+      'Temperate Coniferous Forests' = '#3E8D62',
+      'Boreal Forests/Taiga' = '#496FF3',
+      'Tropical & Subtropical Grasslands, Savannas & Shrublands' = '#D6F392',
+      'Temperate Grasslands, Savannas & Shrublands' = '#D1E614',
+      'Flooded Grasslands & Savannas' = '#75D0D5',
+      'Montane Grasslands & Shrublands' = '#98E600',
+      'Tundra' = '#C7DEFF',
+      'Mediterranean Forests, Woodlands & Scrub' = '#AF963C',
+      'Deserts & Xeric Shrublands' = '#C55C5C',
+      'Mangroves' = '#FE04BC'
+    ),
+    income_grp = c('1. High income: OECD' = '#004D33', '2. High income: nonOECD' = '#1d7355', '3. Upper middle income' = '#4b9e80', '4. Lower middle income' = '#8bc5af', '5. Low income' = '#cde9df'),
+    region_wb = c('East Asia & Pacific' = '#2E5A88', 'Europe & Central Asia' = '#D86018', 'Latin America & Caribbean' = '#7A3F91', 'Middle East & North Africa' = '#B38F00', 'North America' = '#1D8A99', 'South Asia' = '#6B8E23', 'Sub-Saharan Africa' = '#8B0000')
+  )
+  group_palettes$WWF_biome <- group_palettes$biome
+
   message("==> Boxplots by: ", group_col)
 
   # Original data extraction remains the same
@@ -57,14 +80,16 @@ run_hotspot_boxplots_by <- function(
     dplyr::mutate(!!group_col := as.factor(.data[[group_col]]))
 
   if (nrow(vals) == 0) {
-    message("No hotspot data found for grouping: ", group_col)
+    cat("[DIAGNOSTIC] No hotspot data found for grouping: ", group_col, " after extraction.\n", file=stderr())
     return(invisible(NULL))
   }
+
+  cat("[DIAGNOSTIC] Data prepared for ", group_col, " | Hotspot rows: ", nrow(vals), "\n", file=stderr())
 
   calc_box_stats <- function(df, var) {
     stats_df <- df %>%
       dplyr::filter(!is.na(.data[[var]])) %>%
-      dplyr::group_by(service, .data[[group_col]]) %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(c("service", group_col)))) %>%
       dplyr::summarise(
         middle = stats::median(.data[[var]], na.rm = TRUE),
         lower  = stats::quantile(.data[[var]], 0.25, na.rm = TRUE),
@@ -108,11 +133,16 @@ run_hotspot_boxplots_by <- function(
   if (nrow(vals_vol) > 0) {
     # Absolute
     stats_abs_vol <- calc_box_stats(vals_vol, "abs_chg")
-    p_abs_box_vol <- ggplot2::ggplot(stats_abs_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
-      ggplot2::geom_boxplot(stat = "identity", fill = "gray95") +
+    p_abs_box_vol <- ggplot2::ggplot(stats_abs_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = .data[[group_col]])) +
+      ggplot2::geom_boxplot(stat = "identity") +
       ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 2) +
       ggplot2::labs(title=paste0("Absolute Change (Volumetric Services) by ", group_col), subtitle=sub_txt, x=NULL, y="Absolute change") +
-      ggplot2::theme_minimal(base_size = 11) + ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
+      ggplot2::theme_minimal(base_size = 11) +
+      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1), legend.position = "none")
+
+    if (!is.null(group_palettes[[group_col]])) {
+      p_abs_box_vol <- p_abs_box_vol + ggplot2::scale_fill_manual(values = group_palettes[[group_col]], na.value = "gray50")
+    }
 
     if (!is.null(top_bottom_n)) {
       p_abs_box_vol <- p_abs_box_vol + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
@@ -120,15 +150,22 @@ run_hotspot_boxplots_by <- function(
 
     dir_abs <- file.path(out_root, "abs", tolower(group_col))
     dir.create(dir_abs, recursive = TRUE, showWarnings = FALSE)
-    ggplot2::ggsave(filename=file.path(dir_abs, paste0("boxplots_", tolower(group_col), "_abs_volumetric.png")), plot=p_abs_box_vol, width=12, height=8, dpi=300, bg="white")
+    file_abs <- file.path(dir_abs, paste0("boxplots_", tolower(group_col), "_abs_volumetric.png"))
+    cat("[DIAGNOSTIC] Saving abs volumetric boxplot to: ", file_abs, "\n", file=stderr())
+    ggplot2::ggsave(filename=file_abs, plot=p_abs_box_vol, width=12, height=8, dpi=300, bg="white")
 
     # Percent
     stats_pct_vol <- calc_box_stats(vals_vol, "pct_chg")
-    p_pct_box_vol <- ggplot2::ggplot(stats_pct_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
-      ggplot2::geom_boxplot(stat = "identity", fill = "gray95") +
+    p_pct_box_vol <- ggplot2::ggplot(stats_pct_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = .data[[group_col]])) +
+      ggplot2::geom_boxplot(stat = "identity") +
       ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 2) +
       ggplot2::labs(title=paste0("Percentage Change (Volumetric Services) by ", group_col), subtitle=sub_txt, x=NULL, y="Percentage change (%)") +
-      ggplot2::theme_minimal(base_size = 11) + ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
+      ggplot2::theme_minimal(base_size = 11) +
+      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1), legend.position = "none")
+
+    if (!is.null(group_palettes[[group_col]])) {
+      p_pct_box_vol <- p_pct_box_vol + ggplot2::scale_fill_manual(values = group_palettes[[group_col]], na.value = "gray50")
+    }
 
     if (!is.null(top_bottom_n)) {
       p_pct_box_vol <- p_pct_box_vol + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
@@ -136,7 +173,9 @@ run_hotspot_boxplots_by <- function(
 
     dir_pct <- file.path(out_root, "pct", tolower(group_col))
     dir.create(dir_pct, recursive = TRUE, showWarnings = FALSE)
-    ggplot2::ggsave(filename=file.path(dir_pct, paste0("boxplots_", tolower(group_col), "_pct_volumetric.png")), plot=p_pct_box_vol, width=12, height=8, dpi=300, bg="white")
+    file_pct <- file.path(dir_pct, paste0("boxplots_", tolower(group_col), "_pct_volumetric.png"))
+    cat("[DIAGNOSTIC] Saving pct volumetric boxplot to: ", file_pct, "\n", file=stderr())
+    ggplot2::ggsave(filename=file_pct, plot=p_pct_box_vol, width=12, height=8, dpi=300, bg="white")
   }
 
   # --- PLOT: Ratio/Index Services (only one plot needed) ---
@@ -147,11 +186,16 @@ run_hotspot_boxplots_by <- function(
     dplyr::mutate(service = factor(service, levels = ratio_present))
   if (nrow(vals_ratio) > 0) {
     stats_abs_ratio <- calc_box_stats(vals_ratio, "abs_chg")
-    p_abs_box_ratio <- ggplot2::ggplot(stats_abs_ratio, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
-      ggplot2::geom_boxplot(stat = "identity", fill = "gray95") +
+    p_abs_box_ratio <- ggplot2::ggplot(stats_abs_ratio, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = .data[[group_col]])) +
+      ggplot2::geom_boxplot(stat = "identity") +
       ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 1) +
       ggplot2::labs(title=paste0("Change in Ratio/Index Services by ", group_col), subtitle=sub_txt, x=NULL, y="Change (ratio/index units)") +
-      ggplot2::theme_minimal(base_size = 11) + ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1))
+      ggplot2::theme_minimal(base_size = 11) +
+      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1), legend.position = "none")
+
+    if (!is.null(group_palettes[[group_col]])) {
+      p_abs_box_ratio <- p_abs_box_ratio + ggplot2::scale_fill_manual(values = group_palettes[[group_col]], na.value = "gray50")
+    }
 
     if (!is.null(top_bottom_n)) {
       p_abs_box_ratio <- p_abs_box_ratio + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
@@ -159,7 +203,9 @@ run_hotspot_boxplots_by <- function(
 
     dir_ratio <- file.path(out_root, "ratios", tolower(group_col))
     dir.create(dir_ratio, recursive = TRUE, showWarnings = FALSE)
-    ggplot2::ggsave(filename=file.path(dir_ratio, paste0("boxplots_", tolower(group_col), "_ratios.png")), plot=p_abs_box_ratio, width=12, height=8, dpi=300, bg="white")
+    file_ratio <- file.path(dir_ratio, paste0("boxplots_", tolower(group_col), "_ratios.png"))
+    cat("[DIAGNOSTIC] Saving ratio boxplot to: ", file_ratio, "\n", file=stderr())
+    ggplot2::ggsave(filename=file_ratio, plot=p_abs_box_ratio, width=12, height=8, dpi=300, bg="white")
   }
 
   # Return a list of plots invisibly

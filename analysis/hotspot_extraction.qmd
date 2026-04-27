@@ -24,7 +24,7 @@ params:
   analysis_version: "v1.3.1"
   input_gpkg: "10k_change_calc.gpkg"
   output_suffix: "" # e.g., "_v2"
-  force_export: false
+  force_export: true
 ---
 
 ## Overview
@@ -95,6 +95,8 @@ set.seed(1)
 # ---- Project wiring ------------------------------------------------------
 # Load package-style functions from R/ (if this is a package-ish repo)
 devtools::load_all(quiet = TRUE)
+# Explicitly source files to guarantee recent changes are loaded
+invisible(lapply(list.files(here::here("R"), pattern = "\\.R$", full.names = TRUE), source))
 
 # ---- Python (enable when needed) ----------------------------------------
 library(reticulate)
@@ -535,12 +537,12 @@ Hotspot export and KS still expect `plt_long`. To avoid the heavy pivot here, we
 #| label: pivot-plt-long
 #| eval: true
 #| echo: false
-#| message: false
+#| message: true
 #| warning: false
 #| cache: false
 
 # Generate or load plt_long
-rds_path <- file.path(cfg$paths$processed_data_dir, paste0("plt_long", params$output_suffix, ".rds"))
+rds_path <- file.path(data_dir(), "processed", paste0("plt_long", params$output_suffix, ".rds"))
 
 need_build <- TRUE
 if (file.exists(rds_path) && !isTRUE(params$force_export)) {
@@ -645,7 +647,7 @@ if (na_pct == nrow(plt_long)) {
 }
 
 # 5. Cache the result (optional but helpful for debugging)
-rds_path <- file.path(cfg$paths$processed_data_dir, paste0("plt_long", params$output_suffix, ".rds"))
+rds_path <- file.path(data_dir(), "processed", paste0("plt_long", params$output_suffix, ".rds"))
 dir.create(dirname(rds_path), recursive = TRUE, showWarnings = FALSE)
 saveRDS(plt_long, rds_path)
 message("plt_long generated and cached to: ", rds_path)
@@ -783,7 +785,7 @@ if (!exists("plt_long")) {
 
 ```{r}
 #| label: hotspots_setup
-#| eval: false
+#| eval: true
 #| message: true
 #| warning: false
 #| echo: false
@@ -993,7 +995,7 @@ run_one_hotset <- function(df, value_col, scope,
 
 ```{r}
 #| label: hotspots_execution
-#| eval: false
+#| eval: true
 #| include: false
 
 # ---- Execute: global + subregional runs -----------------------------------
@@ -1076,7 +1078,7 @@ if (length(pngs)) {
 #| message: true
 
 if (!exists("plt_long")) {
-  rds_path <- file.path(cfg$paths$processed_data_dir, paste0("plt_long", params$output_suffix, ".rds"))
+  rds_path <- file.path(data_dir(), "processed", paste0("plt_long", params$output_suffix, ".rds"))
   if (file.exists(rds_path)) {
     message("Loading cached plt_long from: ", rds_path)
     plt_long <- readRDS(rds_path)
@@ -1094,8 +1096,8 @@ Outputs: PNGs are written to `outputs/plots/{abs|pct}/<group_col>/boxplots_*.png
 
 ```{r}
 #| label: make-hotspot-boxplots
-#| message: false
-#| warning: false
+#| message: true
+#| warning: true
 #| echo: false
 #| cache: false
 #| results: "hold"
@@ -1122,33 +1124,69 @@ coastal_services <- c("C_Risk", "C_Risk_Red_Ratio")
 
 missing_groupings <- setdiff(groupings, names(plt_long))
 if (length(missing_groupings)) {
-  warning("Grouping column(s) not found in plt_long and will be skipped: ",
-          paste(missing_groupings, collapse = ", "))
+  cat("[DIAGNOSTIC] Grouping column(s) missing from plt_long:", paste(missing_groupings, collapse = ", "), "\n", file=stderr())
+  cat("[DIAGNOSTIC] Joining missing attributes from master grid...\n", file=stderr())
+  master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"), quiet = TRUE)
+  master_grid <- sf::st_drop_geometry(master_grid)
+  if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) {
+    master_grid <- dplyr::rename(master_grid, fid = id)
+  }
+  if (!"fid" %in% names(master_grid)) {
+    master_grid$fid <- seq_len(nrow(master_grid))
+  }
+  grid_attrs <- master_grid %>% dplyr::select(dplyr::any_of(c("fid", missing_groupings)))
+  plt_long <- plt_long %>% dplyr::left_join(grid_attrs, by = "fid")
 }
 groupings <- intersect(groupings, names(plt_long))
-message("make-hotspot-boxplots groupings: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none")
+cat("[DIAGNOSTIC] make-hotspot-boxplots groupings to process: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none", "\n", file=stderr())
 boxplot_order <- levels(plt_long$service)
 if (is.null(boxplot_order)) {
   boxplot_order <- unique(plt_long$service)
 }
 boxplot_order <- as.character(boxplot_order)
+
+# Universal Palettes for Regional Groupings
+group_palettes <- list(
+  biome = c(
+    'Tropical & Subtropical Moist Broadleaf Forests' = '#319D00',
+    'Tropical & Subtropical Dry Broadleaf Forests' = '#7ABD1B',
+    'Tropical & Subtropical Coniferous Forests' = '#556E19',
+    'Temperate Broadleaf & Mixed Forests' = '#207433',
+    'Temperate Coniferous Forests' = '#3E8D62',
+    'Boreal Forests/Taiga' = '#496FF3',
+    'Tropical & Subtropical Grasslands, Savannas & Shrublands' = '#D6F392',
+    'Temperate Grasslands, Savannas & Shrublands' = '#D1E614',
+    'Flooded Grasslands & Savannas' = '#75D0D5',
+    'Montane Grasslands & Shrublands' = '#98E600',
+    'Tundra' = '#C7DEFF',
+    'Mediterranean Forests, Woodlands & Scrub' = '#AF963C',
+    'Deserts & Xeric Shrublands' = '#C55C5C',
+    'Mangroves' = '#FE04BC'
+  ),
+  income_grp = c('1. High income: OECD' = '#004D33', '2. High income: nonOECD' = '#1d7355', '3. Upper middle income' = '#4b9e80', '4. Lower middle income' = '#8bc5af', '5. Low income' = '#cde9df'),
+  region_wb = c('East Asia & Pacific' = '#2E5A88', 'Europe & Central Asia' = '#D86018', 'Latin America & Caribbean' = '#7A3F91', 'Middle East & North Africa' = '#B38F00', 'North America' = '#1D8A99', 'South Asia' = '#6B8E23', 'Sub-Saharan Africa' = '#8B0000')
+)
+group_palettes$WWF_biome <- group_palettes$biome
+
 if (length(groupings) == 0) {
   warning("No grouping columns found in plt_long; skipping hotspot boxplots.")
 } else {
 
   # Cleanup legacy absolute coastal plots to avoid confusion in outputs
-  legacy_abs_coastal <- list.files(out_plots(), pattern = ".*_abs_coastal\\.png$", recursive = TRUE, full.names = TRUE)
+  legacy_abs_coastal <- list.files(here::here("outputs", "plots"), pattern = ".*_abs_coastal\\.png$", recursive = TRUE, full.names = TRUE)
   if (length(legacy_abs_coastal) > 0) invisible(file.remove(legacy_abs_coastal))
 
   for (gc in groupings) {
     # Check for valid data before attempting to plot
     n_valid <- sum(!is.na(plt_long[[gc]]))
+    cat("[DIAGNOSTIC] Grouping: ", gc, " | Valid rows in plt_long: ", n_valid, "\n", file=stderr())
     if (n_valid == 0) {
-      message("Skipping boxplots for ", gc, ": all values are NA.")
+      cat("[DIAGNOSTIC] Skipping boxplots for ", gc, ": all values are NA.\n", file=stderr())
       next
     }
 
-    message("Rendering hotspot boxplots for: ", gc)
+    cat("[DIAGNOSTIC] Rendering hotspot boxplots for: ", gc, "\n", file=stderr())
+    cat("[DIAGNOSTIC] Target out_root: ", here::here("outputs", "plots"), "\n", file=stderr())
     tryCatch({
       run_hotspot_boxplots_by(
         # Exclude coastal services here because they are handled in their own dedicated plot below
@@ -1162,10 +1200,12 @@ if (length(groupings) == 0) {
         keep_only_ordered   = TRUE,
         volumetric_services = volumetric_services,
         ratio_services      = ratio_services,
-        top_bottom_n        = if (gc == "nev_name") 10 else NULL
+        top_bottom_n        = if (gc == "nev_name") 10 else NULL,
+        out_root            = here::here("outputs", "plots")
       )
     }, error = function(e) {
-      message("Error generating boxplots for ", gc, ": ", e$message)
+      cat("[DIAGNOSTIC] ERROR generating boxplots for ", gc, ": ", e$message, "\n", file=stderr())
+      stop(e)
     })
 
     # ------------------------------------------------------------------
@@ -1178,7 +1218,7 @@ if (length(groupings) == 0) {
     curr_coastal <- intersect(coastal_services, unique(plt_long$service))
 
     if (length(curr_coastal) > 0) {
-      message("Rendering dedicated coastal boxplots for: ", gc)
+      cat("[DIAGNOSTIC] Rendering dedicated coastal boxplots for: ", gc, "\n", file=stderr())
 
       # We plot only Percent change because absolute change doesn't make sense for these indices
       for (metric in c("pct_chg")) {
@@ -1214,42 +1254,58 @@ if (length(groupings) == 0) {
         if (length(plot_data_list) > 0) {
           coast_df <- dplyr::bind_rows(plot_data_list)
 
-          # Handle Top 10 logic for Coastal if grouping is country
+          coast_stats <- coast_df %>%
+            dplyr::filter(!is.na(.data[[metric]])) %>%
+            dplyr::group_by(dplyr::across(dplyr::all_of(c("Service", gc)))) %>%
+            dplyr::summarise(
+              middle = stats::median(.data[[metric]], na.rm = TRUE),
+              lower  = stats::quantile(.data[[metric]], 0.25, na.rm = TRUE),
+              upper  = stats::quantile(.data[[metric]], 0.75, na.rm = TRUE),
+              iqr    = stats::IQR(.data[[metric]], na.rm = TRUE),
+              ymin   = max(min(.data[[metric]], na.rm = TRUE), lower - 1.5 * iqr),
+              ymax   = min(max(.data[[metric]], na.rm = TRUE), upper + 1.5 * iqr),
+              v_count = dplyr::n(),
+              .groups = "drop"
+            )
+
           x_var <- gc
           facet_scales <- "free_y"
           if (gc == "nev_name") {
-            coast_df <- coast_df %>%
-              dplyr::group_by(Service, .data[[gc]]) %>%
-              dplyr::mutate(med_val = median(pct_chg, na.rm = TRUE), v_count = n()) %>%
-              dplyr::ungroup() %>%
+            coast_stats <- coast_stats %>%
               dplyr::filter(v_count >= 10) %>%
-              dplyr::arrange(Service, med_val) %>%
+              dplyr::arrange(Service, middle) %>%
               dplyr::group_by(Service) %>%
-              dplyr::filter(dplyr::dense_rank(med_val) <= 10 | dplyr::dense_rank(med_val) >= max(dplyr::dense_rank(med_val)) - 9) %>%
+              dplyr::filter(dplyr::dense_rank(middle) <= 10 | dplyr::dense_rank(middle) >= max(dplyr::dense_rank(middle)) - 9) %>%
               dplyr::ungroup() %>%
-              dplyr::mutate(plot_label = stats::reorder(paste(.data[[gc]], Service, sep="__"), med_val))
+              dplyr::mutate(plot_label = stats::reorder(paste(.data[[gc]], Service, sep="__"), middle))
 
             x_var <- "plot_label"
             facet_scales <- "free"
           }
 
-          p <- ggplot(coast_df, aes(x = .data[[x_var]], y = .data[[metric]])) +
-            geom_boxplot(fill = "gray95", outlier.shape = NA) +
+        p <- ggplot(coast_stats, aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = .data[[gc]])) +
+          geom_boxplot(stat = "identity") +
             facet_wrap(~Service, scales = facet_scales, ncol = 1) +
             labs(title = paste("Hotspot Change Distribution:", gc),
                  subtitle = paste("Coastal Services (Free Scale) -", metric_label),
                  y = metric_label, x = NULL) +
             theme_minimal() +
-            theme(axis.text.x = element_text(angle = 45, hjust = 1))
+          theme(axis.text.x = element_text(angle = 45, hjust = 1),
+                legend.position = "none")
+
+        if (!is.null(group_palettes[[gc]])) {
+          p <- p + scale_fill_manual(values = group_palettes[[gc]], na.value = "gray50")
+        }
 
           if (gc == "nev_name") {
              p <- p + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
           }
 
-          # Save to standard output structure so downstream copy picks it up
-          out_sub <- file.path(out_plots(), "coastal", gc)
+          # Use deterministic outputs/plots path
+          out_sub <- here::here("outputs", "plots", "coastal", gc)
           dir.create(out_sub, recursive = TRUE, showWarnings = FALSE)
           fname <- file.path(out_sub, paste0("boxplots_", gc, "_", file_tag, "_coastal.png"))
+          cat("[DIAGNOSTIC] Saving coastal boxplot to: ", fname, "\n", file=stderr())
           ggsave(fname, p, width = 8, height = 8, bg = "white")
         }
       }
@@ -1264,12 +1320,15 @@ if (length(groupings) == 0) {
 #| echo: false
 #| results: 'asis'
 #| cache: false
-box_dir <- "outputs/plots"
+box_dir <- here::here("outputs", "plots")
 box_files <- list.files(box_dir, pattern = "boxplots_.*\\.png$", recursive = TRUE, full.names = FALSE)
 box_files <- box_files[!grepl("^latest/", box_files)]
 
+cat("[DIAGNOSTIC] display-boxplots looking in: ", box_dir, "\n", file=stderr())
+cat("[DIAGNOSTIC] Found ", length(box_files), " boxplot images to display.\n", file=stderr())
+
 if (length(box_files)) {
-  rel_paths <- file.path("..", box_dir, sort(box_files))
+  rel_paths <- file.path("..", "outputs", "plots", sort(box_files))
   md <- paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
   knitr::asis_output(md)
 } else {
@@ -1528,8 +1587,6 @@ if (lc_data_ready && !is.null(net_col)) {
          y = "ES Change (%)",
          fill = "Count\n(log10)") +
     theme_minimal() +
-    theme(axis.title = element_text(size = 10),
-          axis.text = element_text(size = 8))
     theme(axis.title = element_text(size = 8),
           axis.text = element_text(size = 8),
           strip.text = element_text(size = 10),
@@ -1576,8 +1633,6 @@ if (lc_data_ready) {
              y = "ES Change (%)",
              fill = "Count\n(log10)") +
         theme_minimal() +
-        theme(axis.title = element_text(size = 10),
-              axis.text = element_text(size = 8))
         theme(axis.title = element_text(size = 8),
               axis.text = element_text(size = 8),
           strip.text = element_text(size = 10),

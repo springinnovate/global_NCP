@@ -1,5 +1,5 @@
 ---
-title: "KS tests: hotspots vs non-hotspots"
+title: "Relative Socioeconomic Shift"
 subtitle: "v1.3.1"
 author: "Jerónimo Rodríguez Escobar"
 analysis_version: "v1.3.1"
@@ -99,15 +99,14 @@ The full KS results are saved as a CSV in the processed data directory (typicall
 
 - **For R users:**
   ```r
-  source("R/config.R") # to load cfg object
-  ks_res <- read.csv(file.path(cfg$paths$processed_data_dir, "ks_results_hot_vs_non.csv"))
+  ks_res <- read.csv(file.path("data", "processed", "tables", "ks_results_hot_vs_non.csv"))
   ```
 - **For Python users:**
   ```python
   import pandas as pd
   # Note: You may need to define the path manually if not running in an R-integrated environment
   processed_data_dir = "/home/jeronimo/data/global_ncp/processed"
-  ks_res = pd.read_csv(f'{processed_data_dir}/ks_results_hot_vs_non.csv')
+  ks_res = pd.read_csv(f'{processed_data_dir}/tables/ks_results_hot_vs_non.csv')
   ```
 :::
 ## Setup
@@ -174,7 +173,8 @@ KS_CFG <- list(
     "GHS_POP_E2020_GLOBE_sum",
     "fields_mehrabi_2017_mean",
     "hdi_raster_predictions_2020_mean",
-    "rast_adm1_gini_disp_2020_mean"
+    "rast_adm1_gini_disp_2020_mean",
+    "GHS_BUILT_S_E2020_mean"
   ),
   sampling          = "match_hot",  # none | match_hot | cap_nonhot
   comparison_mode   = "median",     # "random" (all non-hotspots) | "median" (middle 5% of change)
@@ -188,7 +188,8 @@ KS_CFG <- list(
   transform_default = "auto",
   transform_by_var = c(
     "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "log1p",
-    "GHS_POP_E2020_GLOBE_sum"                 = "log1p"
+    "GHS_POP_E2020_GLOBE_sum"                 = "log1p",
+    "GHS_BUILT_S_E2020_mean"                  = "log1p"
   ),
   ecdf_top_k              = 8,
   ecdf_service_selection  = "top_k",  # top_k | all | custom
@@ -196,7 +197,7 @@ KS_CFG <- list(
   mountain_var            = "rast_gdpTot_1990_2020_30arcsec_2020_sum",
   mountain_transform      = "log1p",
   # outputs
-  out_table  = file.path(cfg$paths$processed_data_dir, paste0("ks_results_hot_vs_non", params$output_suffix, ".csv")),
+  out_table  = file.path(data_dir(), "processed", "tables", paste0("ks_results_hot_vs_non", params$output_suffix, ".csv")),
   out_dir    = out_plots(paste0("ks", params$output_suffix)),
   service_suffix_pattern = "_(mean|sum)$"
 )
@@ -214,7 +215,7 @@ Build `plt_long` from the processed grid, harmonizing service labels and keeping
 #| results: hide
 #| cache: false
 
-rds_path <- file.path(cfg$paths$processed_data_dir, params$input_plt_long)
+rds_path <- file.path(data_dir(), "processed", params$input_plt_long)
 need_reload <- TRUE
 if (file.exists(rds_path)) {
   plt_long <- readRDS(rds_path)
@@ -609,6 +610,8 @@ if (exists("ks_res")) {
   cat("\n\n#### Top Population Associations\n\n")
   print(knitr::kable(ks_clean %>% filter(Variable == "Population") %>% arrange(desc(abs(Cliffs_Delta))) %>% head(5), digits = 3))
 }
+```
+```
 
 ```{r}
 #| label: ks-preview
