@@ -469,23 +469,85 @@ group_palettes <- list(
 )
 group_palettes$WWF_biome <- group_palettes$biome
 
+biome_labels <- c(
+  'Tropical & Subtropical Moist Broadleaf Forests' = 'Trop/Subtrop Moist Broadleaf',
+  'Tropical & Subtropical Dry Broadleaf Forests' = 'Trop/Subtrop Dry Broadleaf',
+  'Tropical & Subtropical Coniferous Forests' = 'Trop/Subtrop Coniferous',
+  'Temperate Broadleaf & Mixed Forests' = 'Temp Broadleaf/Mixed',
+  'Temperate Coniferous Forests' = 'Temp Coniferous',
+  'Boreal Forests/Taiga' = 'Boreal/Taiga',
+  'Tropical & Subtropical Grasslands, Savannas & Shrublands' = 'Trop/Subtrop Grass/Sav/Shrub',
+  'Temperate Grasslands, Savannas & Shrublands' = 'Temp Grass/Sav/Shrub',
+  'Flooded Grasslands & Savannas' = 'Flooded Grass/Savannas',
+  'Montane Grasslands & Shrublands' = 'Montane Grass/Shrub',
+  'Tundra' = 'Tundra',
+  'Mediterranean Forests, Woodlands & Scrub' = 'Mediterranean',
+  'Deserts & Xeric Shrublands' = 'Deserts & Xeric Shrub',
+  'Mangroves' = 'Mangroves'
+)
+
+get_short_name <- function(g, grp_name) {
+  g <- as.character(g)
+  if (grp_name == "WWF_biome" || grp_name == "biome") {
+    res <- biome_labels[g]
+    unname(ifelse(is.na(res), g, res))
+  } else {
+    g
+  }
+}
+
 plot_signed_bars <- function(df, grouping, metric, refs, out_dir_base = "outputs/plots") {
   d <- dplyr::filter(df, grouping == !!grouping, metric == !!metric)
   if (!nrow(d)) return(invisible(NULL))
   d$service <- factor(d$service, levels = services)
-  d$group   <- factor(d$group, levels = rev(sort(unique(d$group))))
+
+  d <- d %>%
+    dplyr::mutate(
+      status = dplyr::case_when(
+        service %in% c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio") & mean_chg > 0 ~ "Good",
+        service %in% c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio") & mean_chg < 0 ~ "Bad",
+        service %in% c("Sed_export","N_export","C_Risk") & mean_chg < 0 ~ "Good",
+        service %in% c("Sed_export","N_export","C_Risk") & mean_chg > 0 ~ "Bad",
+        TRUE ~ "Neutral"
+      )
+    )
+
+  unique_groups <- sort(unique(as.character(d$group)))
+  group_id_map <- setNames(seq_along(unique_groups), unique_groups)
+  unique_groups_desc <- sort(unique_groups, decreasing = TRUE)
+  legend_levels <- paste0("[", group_id_map[unique_groups_desc], "] ", get_short_name(unique_groups_desc, grouping))
+
+  d <- d %>%
+    dplyr::mutate(
+      group = factor(group, levels = unique_groups_desc),
+      grp_num_id = as.character(group_id_map[as.character(group)]),
+      grp_legend_label = factor(paste0("[", grp_num_id, "] ", get_short_name(as.character(group), grouping)), levels = legend_levels)
+    )
+
   refs_use <- dplyr::filter(refs, metric == !!metric)
   refs_use$service <- factor(refs_use$service, levels = services)
 
   custom_palette <- group_palettes[[grouping]]
-  # Handle output directory with suffix
+  if (!is.null(custom_palette)) {
+    valid_keys <- intersect(names(custom_palette), unique_groups)
+    new_palette <- custom_palette[valid_keys]
+    names(new_palette) <- paste0("[", group_id_map[valid_keys], "] ", get_short_name(valid_keys, grouping))
+    custom_palette <- new_palette
+  }
+  legend_cols <- if (grouping == "WWF_biome") 5 else 4
+  status_colors <- c("Good" = "#007930", "Bad" = "#E83737", "Neutral" = "gray70")
+
   out_dir <- out_dir_base
 
-  p <- ggplot(d, aes(x = mean_chg, y = group, fill = group)) +
-    geom_col(show.legend = TRUE) +
+  p <- ggplot(d, aes(x = mean_chg, y = group)) +
+    geom_col(aes(fill = status), show.legend = FALSE) +
+    scale_fill_manual(values = status_colors) +
     geom_vline(xintercept = 0, color = "#7f7f7f", linewidth = 0.6) +
     geom_vline(data = refs_use, aes(xintercept = ref),
                linetype = "dashed", color = "#4a4a4a", linewidth = 0.5) +
+    geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
+    geom_text(aes(label = grp_num_id), color = "black", x = -Inf, hjust = 1.5, size = 3, fontface = "bold", show.legend = FALSE) +
+    coord_cartesian(clip = "off") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
     labs(title = paste0("Regional Mean Change — ", grouping, " [", metric, "]"),
          subtitle = "Averaged over active areas only; dashed line = global mean",
@@ -498,11 +560,12 @@ plot_signed_bars <- function(df, grouping, metric, refs, out_dir_base = "outputs
           axis.ticks.y = element_blank(),
           legend.position = "bottom",
           legend.title = element_blank(),
-          legend.text = element_text(size = 8)) +
-    guides(fill = guide_legend(ncol = 4))
+          legend.text = element_text(size = 8),
+          plot.margin = margin(l = 30)) +
+    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
 
   if (!is.null(custom_palette)) {
-    p <- p + scale_fill_manual(values = custom_palette, na.value = "gray50")
+    p <- p + scale_color_manual(values = custom_palette, na.value = "gray50")
   }
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -1692,7 +1755,7 @@ if (lc_data_ready) {
     if ("orig_fid" %in% names(grid_attrs_df) && !"fid" %in% names(grid_attrs_df)) grid_attrs_df <- dplyr::rename(grid_attrs_df, fid = orig_fid)
     if ("grid_fid" %in% names(grid_attrs_df) && !"fid" %in% names(grid_attrs_df)) grid_attrs_df <- dplyr::rename(grid_attrs_df, fid = grid_fid)
     if ("id" %in% names(grid_attrs_df) && !"fid" %in% names(grid_attrs_df)) grid_attrs_df <- dplyr::rename(grid_attrs_df, fid = id)
-    if (!"fid" %in% names(grid_attrs_df)) stop("Fatal Error: grid_attrs_df is missing a stable identifier.")
+    if (!"fid" %in% names(grid_attrs_df)) grid_attrs_df$fid <- seq_len(nrow(grid_attrs_df))
 
     grid_attrs_df <- grid_attrs_df %>% dplyr::select(any_of(c("fid", group_cols)))
 
