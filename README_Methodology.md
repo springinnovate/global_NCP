@@ -32,7 +32,7 @@ This is the primary pathway for the main analysis, including hotspot identificat
 2.  **Grid-Level Differencing:** The Quarto notebook `analysis/process_data.qmd` ingests the aggregated table from the previous step. It then calculates the absolute and Symmetric Percentage Change (SPC) between the 1992 and 2020 columns for each grid cell.
 3.  **Hotspot Identification:** The notebook `analysis/hotspot_extraction.qmd` takes the final grid-level change data and identifies hotspots.
 
-**Use Case:** This path underpins all hotspot maps, regional summaries, and enrichment analyses.
+**Use Case:** This path underpins all hotspot maps, regional summaries, and relative intensity analyses.
 
 ---
 
@@ -75,14 +75,14 @@ Through extensive testing and methodological validation, a distinct performance 
 
 This "Best of Both Worlds" architecture ensures stability and speed regardless of the spatial target.
 
-## Spatial Alignment and ID Integrity (V2 Refactor)
+*Note: The `zonal_stats_toolkit` is currently managed alongside the main pipeline in a multi-root VS Code workspace. Future updates will fully integrate this toolkit's codebase into the `global_NCP` repository to unify version control.*
 
-A major challenge in multi-stage spatial pipelines is maintaining row integrity when upstream processes (like Python zonal statistics) drop empty ocean or no-data cells to save space. If downstream R scripts rely on sequential row numbers (`seq_len`) to join data back to a master grid, dropping even a single cell causes catastrophic row-shifting (misaligning the data geographically).
+## Spatial Alignment and The Fragment Bug
 
-*   **Current State (Patch):** To robustly bypass this, the R pipeline temporarily uses a Spatial Coordinate Join. It extracts the exact X/Y center point of every cell and joins based on geographic location rather than ID. While bulletproof against row-shifting, this is computationally heavy.
-*   **V2 Simplification:** The Python extraction pipeline (`summary_pipeline_landgrid.py`) has been updated to explicitly preserve the true master grid ID under the column name `orig_fid`.
+A major challenge in multi-stage spatial pipelines is maintaining exact 1:1 row integrity between extracted statistics and the canonical master grid.
 
-By carrying `orig_fid` through the pipeline, even if millions of empty rows are dropped, the remaining data retains its absolute geographic identity. The R pipeline will soon be refactored to simply look for `orig_fid` and perform lightning-fast standard tabular joins (`left_join(by="fid")`), natively resolving any discrepancies in row counts without needing spatial geometry operations.
+*   **The Fragment Bug:** To bypass C++ GEOS bottlenecks during Python zonal statistics extraction, complex master grid cells were exploded into simpler fragments (e.g., `gdf.explode()` resulting in ~1.67M fragments for a 1.5M cell grid). If joined directly to downstream datasets, this causes severe data duplication (e.g., impossible overlapping hotspot counts per cell) and geographic striping.
+*   **The Re-aggregation Solution (v1.3.1):** The R pipeline (`process_data.qmd`) implements a mathematically rigorous recovery step. It uses an `st_intersects` spatial join (mapping fragment centroids to the master grid) to trace every fragment back to its pristine 10km parent cell. It then performs a re-aggregation (`group_by %>% summarise`), collapsing the fragments back together. This ensures perfect geometric alignment with the canonical grid and strictly bounds the data.
 
 
 ## Unit Standardization (Per Hectare)
@@ -139,6 +139,14 @@ A common question regarding Path B is the comparability of variables aggregated 
 2.  **Equal-Area Grid:** The analysis uses the IUCN equal-area grid. Since cell area is constant, $Sum$ and $Mean$ are perfectly proportional ($Sum = Mean \times Area$).
 3.  **Mathematical Identity:** For relative metrics used in this analysis (percent change, percentile rankings, KS test statistics), the results are identical regardless of whether sum or mean is used.
 4.  **Comparability:** Comparing relative magnitudes of change (e.g., percentage change) strips away the units, allowing valid comparisons between total loads and average indices.
+
+## Visualization Semantic Rules (Maps)
+
+To maintain a consistent narrative across all presentations and figures, spatial maps of Ecosystem Service change adhere to a strict semantic color rule:
+
+*   **Universal Diverging Scale:** All maps use a diverging color ramp anchored at zero (`midpoint = 0`).
+*   **Semantic Meaning:** Red always indicates ecological or social damage (loss of a good service, or increase in a detrimental risk). Green always indicates improvement or healthy service provision.
+*   **Sequential vs. Diverging Data:** Even if a regional dataset does not cross zero (e.g., all regions experience a decline), the diverging scale is maintained to preserve the semantic meaning of the colors. For example, an entirely negative map for a 'good' service will simply use the Red-to-White half of the scale, avoiding the confusion of introducing sequential palettes (like viridis) that break the "Red=Bad" cognitive mapping.
 
 ## Socioeconomic Profiling (KS Tests)
 

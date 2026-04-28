@@ -1,13 +1,18 @@
 ---
 title: "Hotspot Spatial Synthesis"
-subtitle: "Intensity, Enrichment, and Multi-service Overlap"
+subtitle: "Intensity, Relative Intensity, and Multi-service Overlap"
 author: "Jerónimo Rodríguez Escobar"
 date: last-modified
 format:
-  html:
+#  html:
+#    toc: true
+#    number-sections: true
+#    theme: cosmo
+  pdf:
     toc: true
     number-sections: true
-    theme: cosmo
+    geometry: margin=1in
+    df-print: kable
 editor: source
 params:
   input_gpkg: "10k_change_calc.gpkg"
@@ -17,12 +22,28 @@ params:
 
 ## Overview
 
-This notebook consolidates all spatial summary statistics for global hotspots into a single pipeline. It calculates:
+This notebook consolidates all spatial summary statistics for global hotspots into a single, reproducible pipeline. It calculates and visualizes three key metrics of geographic concentration:
 
-1.  **Hotspot Intensity (Coverage)**: The percentage of land area within a spatial unit that is classified as a hotspot.
-2.  **Global Share (Distribution)**: The proportion of all global hotspot gridcells that are located within a specific spatial unit.
-3.  **Enrichment**: A ratio comparing the observed share of hotspots to the expected share based on land area (Observed / Expected).
-4.  **Multi-service Hotspots & Hotness**: How many services is a single gridcell a hotspot for, and which regions have the highest average number of overlapping hotspots?
+1.  **Hotspot Intensity (Coverage)**
+    -   **Question**: What percentage of a region's own land area is experiencing a crisis for a given service?
+    -   **Formula**: `(Hotspot Area in Region / Total Area of Region) * 100`
+
+2.  **Global Share (Distribution)**
+    -   **Question**: What percentage of all global hotspots for a service are located within this specific region?
+    -   **Formula**: `(Hotspot Area in Region / Total Global Hotspot Area) * 100`
+
+3.  **Relative Intensity (Enrichment Score)**
+    -   **Question**: Is a region bearing a disproportionate burden of hotspots compared to its size?
+    -   **Formula**: `Global Share / Expected Share`, where `Expected Share` is the region's percentage of the total global land area.
+    -   **Interpretation**: A score > 1 indicates the region is a "hotspot of hotspots"—it contains more of the crisis than would be expected based on its size alone.
+
+4.  **Multi-service Hotspots ("Hotness")**
+    -   **Question**: How many overlapping crises are occurring in the same place?
+    -   **Metrics**: We calculate the average number of overlapping hotspots per gridcell within a region, and the distribution of cells with 1, 2, or 3+ hotspots.
+
+5.  **Absolute Population Exposure (Impact Tier)**
+    -   **Question**: How many people are directly living within these top 5% areas of ES decline?
+    -   **Metrics**: Total population count within hotspots, segmented by Human Development Index (HDI) vulnerability bins and World Bank Income Group.
 
 ## Setup
 
@@ -91,7 +112,26 @@ if (file.exists(gpkg_grid)) {
   message("Loading canonical grid from: ", gpkg_grid)
   grid_df <- sf::st_read(gpkg_grid, quiet = TRUE)
   grid_df <- sf::st_drop_geometry(grid_df)
+  if ("orig_fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = orig_fid)
+  if ("grid_fid" %in% names(grid_df) && !"fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = grid_fid)
   if (!"fid" %in% names(grid_df)) grid_df$fid <- seq_len(nrow(grid_df))
+
+  # FIX: Ensure missing grouping attributes are rejoined from the master grid
+  missing_groupings <- setdiff(c("income_grp", "region_wb", "WWF_biome"), names(grid_df))
+  if (length(missing_groupings) > 0) {
+    message("Joining missing attributes from master grid: ", paste(missing_groupings, collapse = ", "))
+    master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"), quiet = TRUE)
+    master_grid <- sf::st_drop_geometry(master_grid)
+    if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) {
+      master_grid <- dplyr::rename(master_grid, fid = id)
+    }
+    # This is the critical missing piece: ensure master_grid has a 'fid'
+    if (!"fid" %in% names(master_grid)) {
+      master_grid$fid <- seq_len(nrow(master_grid))
+    }
+    grid_attrs <- master_grid %>% dplyr::select(dplyr::any_of(c("fid", missing_groupings)))
+    grid_df <- grid_df %>% dplyr::left_join(grid_attrs, by = "fid")
+  }
 } else {
   stop("Canonical grid file not found: ", gpkg_grid)
 }
@@ -109,6 +149,10 @@ HOTS_CFG <- list(
   loss = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
   gain = c("Sed_export","N_export","C_Risk"),
   groupings = c("income_grp","region_wb","WWF_biome"),
+  combos = list(
+    deg_combo = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
+    rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+  ),
   svc_order = c(
     "C_Risk","N_export","Sed_export",
     "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
@@ -139,12 +183,12 @@ hs_global_obj <- extract_hotspots(
   rule_mode = HOTS_CFG$rule_mode,
   loss_services = HOTS_CFG$loss,
   gain_services = HOTS_CFG$gain,
-  combos = NULL,
+  combos = HOTS_CFG$combos,
   id_cols = c("fid")
 )
 ```
 
-## Part 1: Intensity, Share, and Enrichment
+## Part 1: Intensity, Share, and Relative Intensity
 
 ```{r}
 #| label: calc-intensity
@@ -161,9 +205,9 @@ area_stats_list <- list()
 for (g in valid_groupings) {
   stats_all <- lapply(HOTS_CFG$svc_order, function(svc) {
     grid_svc <- grid_df %>%
-      dplyr::select(fid, !!g) %>%
-      dplyr::mutate(service = svc) %>%
-      dplyr::left_join(hs_flags %>% dplyr::filter(service == svc), by = c("fid", "service")) %>%
+      dplyr::select(fid, dplyr::all_of(g)) %>%
+      dplyr::mutate(service = as.character(svc)) %>%
+      dplyr::left_join(hs_flags %>% dplyr::filter(service == svc) %>% dplyr::mutate(service = as.character(service)), by = c("fid", "service")) %>%
       dplyr::mutate(is_hotspot = tidyr::replace_na(is_hotspot, 0)) %>%
       # Apply master exclusions
       dplyr::filter(!service %in% exclude_services) %>%
@@ -187,7 +231,7 @@ for (g in valid_groupings) {
       pct_share = (n_hot / global_n_hot) * 100,
       grouping_var = g,
       expected_share = (n_total / sum(n_total)) * 100,
-      enrichment = ifelse(expected_share > 0, pct_share / expected_share, NA)
+      relative_intensity = ifelse(expected_share > 0, pct_share / expected_share, NA)
     ) %>%
     dplyr::ungroup() %>%
     dplyr::arrange(desc(pct_area))
@@ -197,7 +241,8 @@ for (g in valid_groupings) {
 
 hotspot_area_stats <- dplyr::bind_rows(area_stats_list)
 
-out_csv_path <- file.path(data_dir(), "processed", "hotspot_area_stats.csv")
+out_csv_path <- file.path(data_dir(), "processed", "tables", "hotspot_area_stats.csv")
+dir.create(dirname(out_csv_path), recursive = TRUE, showWarnings = FALSE)
 readr::write_csv(hotspot_area_stats, out_csv_path)
 message("Hotspot area statistics saved to: ", out_csv_path)
 ```
@@ -206,53 +251,79 @@ message("Hotspot area statistics saved to: ", out_csv_path)
 #| label: plot-intensity
 #| message: false
 
-plot_area_stats <- function(df, g_var, metric = "pct_area") {
-  metric_label <- switch(metric,
-    "pct_area" = "% of Area that is a Hotspot (Intensity)",
-    "pct_share" = "% Share of Global Hotspot Gridcells (Distribution)",
-    "enrichment" = "Hotspot Enrichment (Observed/Expected)"
-  )
-  file_suffix <- switch(metric, "pct_area" = "coverage", "pct_share" = "share", "enrichment" = "enrichment")
+# Universal Palettes for Regional Groupings
+group_palettes <- list(
+  biome = c(
+    'Tropical & Subtropical Moist Broadleaf Forests' = '#319D00',
+    'Tropical & Subtropical Dry Broadleaf Forests' = '#7ABD1B',
+    'Tropical & Subtropical Coniferous Forests' = '#556E19',
+    'Temperate Broadleaf & Mixed Forests' = '#207433',
+    'Temperate Coniferous Forests' = '#3E8D62',
+    'Boreal Forests/Taiga' = '#496FF3',
+    'Tropical & Subtropical Grasslands, Savannas & Shrublands' = '#D6F392',
+    'Temperate Grasslands, Savannas & Shrublands' = '#D1E614',
+    'Flooded Grasslands & Savannas' = '#75D0D5',
+    'Montane Grasslands & Shrublands' = '#98E600',
+    'Tundra' = '#C7DEFF',
+    'Mediterranean Forests, Woodlands & Scrub' = '#AF963C',
+    'Deserts & Xeric Shrublands' = '#C55C5C',
+    'Mangroves' = '#FE04BC'
+  ),
+  income_grp = c('1. High income: OECD' = '#004D33', '2. High income: nonOECD' = '#1d7355', '3. Upper middle income' = '#4b9e80', '4. Lower middle income' = '#8bc5af', '5. Low income' = '#cde9df'),
+  region_wb = c('East Asia & Pacific' = '#2E5A88', 'Europe & Central Asia' = '#D86018', 'Latin America & Caribbean' = '#7A3F91', 'Middle East & North Africa' = '#B38F00', 'North America' = '#1D8A99', 'South Asia' = '#6B8E23', 'Sub-Saharan Africa' = '#8B0000')
+)
+group_palettes$WWF_biome <- group_palettes$biome
 
-  d_plot <- df %>%
+library(tidytext)
+
+out_intensity_dir <- file.path(out_plots(), paste0("intensity", params$output_suffix))
+dir.create(out_intensity_dir, recursive = TRUE, showWarnings = FALSE)
+
+for (g_var in valid_groupings) {
+  plot_data <- hotspot_area_stats %>%
     dplyr::filter(grouping_var == g_var) %>%
     dplyr::mutate(service = factor(service, levels = HOTS_CFG$svc_order)) %>%
-    dplyr::filter(!is.na(service))
+    dplyr::filter(!is.na(service)) %>%
+    dplyr::mutate(group = factor(group, levels = rev(sort(unique(as.character(group))))))
 
-  if (nrow(d_plot) == 0) return(NULL)
+  # Prevent Quarto crash if left_join generated NaNs
+  plot_data <- plot_data %>%
+    dplyr::mutate(
+      pct_share = tidyr::replace_na(pct_share, 0),
+      relative_intensity = tidyr::replace_na(relative_intensity, 0)
+    )
+  if(nrow(plot_data) == 0) next
 
-  is_large_group <- dplyr::n_distinct(d_plot$group) > 20
-  scales_val <- if (is_large_group) "free_y" else "free_x"
+  custom_palette <- group_palettes[[g_var]]
 
-  if (!is_large_group) {
-    d_plot <- d_plot %>%
-      dplyr::arrange(dplyr::desc(group)) %>%
-      dplyr::mutate(group_ordered = factor(group, levels = unique(group)))
-  } else {
-    d_plot <- d_plot %>% dplyr::mutate(group_ordered = group)
-  }
+  # 1. Coverage Plot
+  p_cov <- ggplot(plot_data, aes(x = pct_area, y = group, fill = group)) +
+    geom_col() + facet_wrap(~ service, scales = "free_x", ncol = 3) +
+    labs(title = paste("Hotspot Coverage by", g_var), x = "% of Area that is a Hotspot", y = NULL) + theme_minimal() +
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8)) +
+    guides(fill = guide_legend(ncol = 4))
+  if (!is.null(custom_palette)) p_cov <- p_cov + scale_fill_manual(values = custom_palette, na.value = "gray50")
+  ggsave(file.path(out_intensity_dir, paste0("hotspot_coverage_", tolower(g_var), ".png")), p_cov, width=14, height=10, bg="white")
 
-  p <- ggplot2::ggplot(d_plot, ggplot2::aes(x = .data[[metric]], y = group_ordered, fill = service)) +
-    ggplot2::geom_col(show.legend = FALSE) +
-    ggplot2::facet_wrap(~ service, scales = scales_val, ncol = 3) +
-    ggplot2::labs(
-      title = paste0("Hotspot ", if (metric == "pct_area") "Intensity" else if (metric == "enrichment") "Enrichment" else "Distribution", " by ", g_var),
-      subtitle = metric_label, x = metric_label, y = NULL
-    ) +
-    ggplot2::theme_minimal()
+  # 2. Share Plot
+  p_share <- ggplot(plot_data, aes(x = pct_share, y = group, fill = group)) +
+    geom_col() + facet_wrap(~ service, scales = "free_x", ncol = 3) +
+    labs(title = paste("Global Hotspot Share by", g_var), x = "% of Global Hotspots", y = NULL) + theme_minimal() +
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8)) +
+    guides(fill = guide_legend(ncol = 4))
+  if (!is.null(custom_palette)) p_share <- p_share + scale_fill_manual(values = custom_palette, na.value = "gray50")
+  ggsave(file.path(out_intensity_dir, paste0("hotspot_share_", tolower(g_var), ".png")), p_share, width=14, height=10, bg="white")
 
-  if (metric == "enrichment") p <- p + ggplot2::geom_vline(xintercept = 1, linetype = "dashed", color = "black")
-  if (is_large_group) p <- p + ggplot2::scale_y_discrete(labels = function(x) sub("___.*", "", x))
-
-  out_dir <- file.path(out_plots(), paste0("intensity", params$output_suffix))
-  dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
-  ggsave(file.path(out_dir, paste0("hotspot_", file_suffix, "_", tolower(g_var), ".png")), p, width = 12, height = 8, bg = "white")
-  return(p)
+  # 3. Relative Intensity Plot
+  p_enrich <- ggplot(plot_data, aes(x = relative_intensity, y = group, fill = group)) +
+    geom_col(aes(alpha = relative_intensity > 1)) + geom_vline(xintercept = 1, linetype = "dashed", color = "black") + facet_wrap(~ service, scales = "free_x", ncol = 3) +
+    scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.4), guide = "none") +
+    labs(title = paste("Relative Hotspot Intensity by", g_var), x = "Intensity Score (Regional Hotspot % ÷ Global Average [~5%])", y = NULL) +
+    theme_minimal() + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8)) +
+    guides(fill = guide_legend(ncol = 4))
+  if (!is.null(custom_palette)) p_enrich <- p_enrich + scale_fill_manual(values = custom_palette, na.value = "gray50")
+  ggsave(file.path(out_intensity_dir, paste0("hotspot_relative_intensity_", tolower(g_var), ".png")), p_enrich, width=14, height=10, bg="white")
 }
-
-plots_intensity <- lapply(names(area_stats_list), function(g) plot_area_stats(hotspot_area_stats, g, "pct_area"))
-plots_share     <- lapply(names(area_stats_list), function(g) plot_area_stats(hotspot_area_stats, g, "pct_share"))
-plots_enrichment <- lapply(names(area_stats_list), function(g) plot_area_stats(hotspot_area_stats, g, "enrichment"))
 ```
 
 ## Part 2: Multi-service Overlap (Hotness)
@@ -286,7 +357,8 @@ calc_hotness <- function(df, g_var) {
 }
 
 hotness_stats <- dplyr::bind_rows(lapply(valid_groupings, function(g) calc_hotness(df_overlap, g)))
-out_csv <- file.path(data_dir(), "processed", "hotspot_multiservice_stats.csv")
+out_csv <- file.path(data_dir(), "processed", "tables", "hotspot_multiservice_stats.csv")
+dir.create(dirname(out_csv), recursive = TRUE, showWarnings = FALSE)
 readr::write_csv(hotness_stats, out_csv)
 ```
 
@@ -297,11 +369,14 @@ plot_hotness <- function(df, g_var) {
   d_plot <- df %>% dplyr::filter(grouping == g_var) %>% dplyr::slice_head(n = 15) %>%
     dplyr::mutate(group = factor(group, levels = rev(sort(unique(as.character(group))))))
 
-  p <- ggplot2::ggplot(d_plot, ggplot2::aes(x = group, y = mean_hotspots)) +
-    ggplot2::geom_col(fill = "#e74c3c") +
+  custom_palette <- group_palettes[[g_var]]
+
+  p <- ggplot2::ggplot(d_plot, ggplot2::aes(x = group, y = mean_hotspots, fill = group)) +
+    ggplot2::geom_col(show.legend = FALSE) +
     ggplot2::coord_flip() +
     ggplot2::labs(title = paste0("Average Hotspot Overlap by ", g_var), subtitle = "Hotspot Density (including zero-hotspot areas)", x = NULL, y = "Avg. Hotspot Count") +
     ggplot2::theme_minimal()
+  if (!is.null(custom_palette)) p <- p + ggplot2::scale_fill_manual(values = custom_palette, na.value = "#e74c3c")
 
   ggsave(file.path(out_plots(), paste0("hotness_", tolower(g_var), ".png")), p, width = 10, height = 6, bg = "white")
   return(p)
@@ -317,26 +392,35 @@ plot_stacked_overlap <- function(df, g_var) {
       cat = dplyr::case_when(
         hotspot_count == 1 ~ "1",
         hotspot_count == 2 ~ "2",
-        hotspot_count >= 3 ~ "3+",
+        hotspot_count == 3 ~ "3",
+        hotspot_count == 4 ~ "4",
+        hotspot_count == 5 ~ "5",
+        hotspot_count >= 6 ~ "6+",
         TRUE ~ as.character(hotspot_count)
       ),
-      cat = factor(cat, levels = c("1", "2", "3+"))
+      cat = factor(cat, levels = c("1", "2", "3", "4", "5", "6+"))
     ) %>%
     dplyr::count(group = .data[[g_var]], cat) %>%
     dplyr::group_by(group) %>%
     dplyr::mutate(pct = n / sum(n)) %>%
     dplyr::ungroup()
 
-  # Filter top 15 groups by "3+" share
-  top_groups <- d_summ %>% dplyr::filter(cat == "3+") %>% dplyr::arrange(desc(pct)) %>% dplyr::slice_head(n = 15) %>% dplyr::pull(group)
-  if (length(unique(d_summ$group)) > 20) d_summ <- d_summ %>% dplyr::filter(group %in% top_groups)
+  # Filter top 15 groups by severe multi-service share (3 or more combined)
+  top_groups <- d_summ %>% dplyr::filter(cat %in% c("3", "4", "5", "6+")) %>% dplyr::group_by(group) %>% dplyr::summarise(pct = sum(pct)) %>% dplyr::arrange(desc(pct)) %>% dplyr::slice_head(n = 15) %>% dplyr::pull(group)
+  if (length(unique(d_summ$group)) > 20) {
+    if (length(top_groups) < 15) {
+      extra_groups <- setdiff(unique(d_summ$group), top_groups)
+      top_groups <- c(top_groups, head(extra_groups, 15 - length(top_groups)))
+    }
+    d_summ <- d_summ %>% dplyr::filter(group %in% top_groups)
+  }
 
   # Order alphabetically (reversed for coord_flip to show A at top)
   d_summ <- d_summ %>% dplyr::mutate(group = factor(group, levels = rev(sort(unique(as.character(group))))))
 
   p <- ggplot2::ggplot(d_summ, ggplot2::aes(x = group, y = pct, fill = cat)) +
     ggplot2::geom_col(position = "fill") +
-    ggplot2::scale_fill_viridis_d(option = "magma", direction = -1, name = "Services") +
+    ggplot2::scale_fill_viridis_d(option = "magma", direction = 1, name = "Services") +
     ggplot2::coord_flip() +
     ggplot2::labs(
       title = paste0("Multi-service Hotspot Distribution by ", g_var),
@@ -351,4 +435,114 @@ plot_stacked_overlap <- function(df, g_var) {
 plots_hotness <- lapply(valid_groupings, function(g) plot_hotness(hotness_stats, g))
 plots_dist    <- lapply(valid_groupings, function(g) plot_stacked_overlap(df_overlap, g))
 if (length(plots_hotness) > 0) plots_hotness[]
+```
+
+## Part 3: Absolute Population Exposure
+
+```{r}
+#| label: calc-pop-exposure
+#| message: false
+
+# Define the canonical socioeconomic variables to use for exposure
+pop_var <- "GHS_POP_E2020_GLOBE_sum"
+hdi_var <- "hdi_raster_predictions_2020_mean"
+req_vars <- c(pop_var, hdi_var, "income_grp")
+
+missing_vars <- setdiff(req_vars, names(grid_df))
+
+if (length(missing_vars) == 0) {
+  pop_exposure <- hs_flags %>%
+    dplyr::left_join(grid_df %>% dplyr::select(fid, dplyr::all_of(req_vars)), by = "fid") %>%
+    dplyr::filter(!is.na(.data[[pop_var]]), !is.na(.data[[hdi_var]])) %>%
+    dplyr::mutate(
+      hdi_bin = dplyr::case_when(
+        .data[[hdi_var]] < 0.550 ~ "Low (<0.550)",
+        .data[[hdi_var]] >= 0.550 & .data[[hdi_var]] < 0.700 ~ "Medium (0.550-0.700)",
+        .data[[hdi_var]] >= 0.700 & .data[[hdi_var]] <= 0.800 ~ "High (0.700-0.800)",
+        .data[[hdi_var]] > 0.800 ~ "Very High (>0.800)",
+        TRUE ~ "Unknown"
+      ),
+      hdi_bin = factor(hdi_bin, levels = c("Low (<0.550)", "Medium (0.550-0.700)", "High (0.700-0.800)", "Very High (>0.800)", "Unknown"))
+    ) %>%
+    dplyr::group_by(service, income_grp, hdi_bin) %>%
+    dplyr::summarise(
+      exposed_population = sum(.data[[pop_var]], na.rm = TRUE),
+      hotspot_cells = dplyr::n(),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(service, income_grp, hdi_bin)
+
+  out_pop_csv <- file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv")
+  dir.create(dirname(out_pop_csv), recursive = TRUE, showWarnings = FALSE)
+  readr::write_csv(pop_exposure, out_pop_csv)
+  message("Absolute Population Exposure statistics saved to: ", out_pop_csv)
+
+} else {
+  warning("Missing required variables for population exposure calculation: ", paste(missing_vars, collapse = ", "))
+}
+```
+
+
+```{r}
+#| label: plot-pop-exposure
+#| message: false
+#| echo: false
+
+pop_exposure_csv <- file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv")
+if (file.exists(pop_exposure_csv)) {
+  pop_df <- readr::read_csv(pop_exposure_csv, show_col_types = FALSE)
+
+  facet_names <- c(
+    "C_Risk" = "Coastal Risk",
+    "N_export" = "Nitrogen Export",
+    "Sed_export" = "Sediment Export",
+    "C_Risk_Red_Ratio" = "Coastal Risk Red. Ratio",
+    "N_Ret_Ratio" = "N Retention Ratio",
+    "Sed_Ret_Ratio" = "Sed Retention Ratio",
+    "Pollination" = "Pollination",
+    "Nature_Access" = "Nature Access"
+  )
+
+  # 1. Plot by Income Group
+  p_pop_inc <- ggplot(pop_df, aes(x = exposed_population, y = income_grp, fill = income_grp)) +
+    geom_col() +
+    facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
+    scale_x_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    scale_y_discrete(labels = function(x) stringr::str_remove(x, "^\\d\\.\\s*")) +
+    labs(title = "Absolute Population Exposure in Hotspots",
+         subtitle = "By World Bank Income Group",
+         x = "Exposed Population", y = NULL) +
+    theme_minimal() +
+    theme(legend.position = "none",
+          axis.text.y = element_text(size = 10))
+
+  if (exists("group_palettes") && !is.null(group_palettes[["income_grp"]])) {
+    p_pop_inc <- p_pop_inc + scale_fill_manual(values = group_palettes[["income_grp"]], na.value = "gray50")
+  }
+  ggsave(file.path(out_plots(), paste0("pop_exposure_income", params$output_suffix, ".png")), p_pop_inc, width = 14, height = 10, bg = "white")
+
+  # 2. Plot by HDI Bin
+  hdi_pal <- c("Low (<0.550)" = "#d7191c", "Medium (0.550-0.700)" = "#fdae61", "High (0.700-0.800)" = "#abdda4", "Very High (>0.800)" = "#2b83ba", "Unknown" = "gray50")
+
+  pop_df_hdi <- pop_df %>%
+    dplyr::group_by(service, hdi_bin) %>%
+    dplyr::summarise(exposed_population = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::mutate(hdi_bin = factor(hdi_bin, levels = rev(names(hdi_pal))))
+
+  p_pop_hdi <- ggplot(pop_df_hdi, aes(x = exposed_population, y = hdi_bin, fill = hdi_bin)) +
+    geom_col() +
+    facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
+    scale_x_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    scale_fill_manual(values = hdi_pal) +
+    labs(title = "Absolute Population Exposure in Hotspots",
+         subtitle = "By UN Human Development Index (HDI)",
+         x = "Exposed Population", y = NULL) +
+    theme_minimal() +
+    theme(legend.position = "none",
+          axis.text.y = element_text(size = 10))
+  ggsave(file.path(out_plots(), paste0("pop_exposure_hdi", params$output_suffix, ".png")), p_pop_hdi, width = 14, height = 10, bg = "white")
+
+  plots_pop <- list(p_pop_inc, p_pop_hdi)
+  if (length(plots_pop) > 0) plots_pop[]
+}
 ```

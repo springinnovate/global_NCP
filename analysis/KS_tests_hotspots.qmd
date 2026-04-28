@@ -1,8 +1,8 @@
 ---
-title: "KS tests: hotspots vs non-hotspots"
-subtitle: "v1.2.0"
+title: "Relative Socioeconomic Shift"
+subtitle: "v1.3.1"
 author: "Jerónimo Rodríguez Escobar"
-analysis_version: "v1.2.0"
+analysis_version: "v1.3.1"
 date: now
 date-format: "YYYY-MM-DD HH:mm zzz"
 format:
@@ -25,6 +25,17 @@ params:
 ---
 
 ## Overview
+
+This notebook performs two-sample Kolmogorov-Smirnov (KS) tests to determine if the socioeconomic profiles of ecosystem service "hotspots" are statistically different from the background landscape.
+
+### Balanced Sampling Methodology
+
+A direct comparison of hotspots (the top/bottom 5% of pixels) against the entire non-hotspot background (the remaining 95%) suffers from severe sample size imbalance and includes pixels undergoing extreme changes in the *opposite* direction. To ensure a fair and stable statistical comparison, this pipeline implements a **"median background"** sampling strategy (`comparison_mode = "median"`):
+
+*   Hotspots are compared strictly against the "business-as-usual" median 5% of the landscape (the 47.5th to 52.5th percentiles of change).
+*   This isolates the specific socioeconomic profile of extreme decline against typical, stable baseline conditions, providing a much cleaner signal for interpretation.
+
+### Workflow
 
 Uses the hotspot definition from the extraction report to compare hotspots vs non-hotspots across socio-environmental covariates. Workflow: load helpers and cached `plt_long`, derive hotspot/complement subsets with the same thresholds, run KS tests per service × variable, and export heatmaps/bars/ECDFs to `outputs/plots/ks/` (mirrored in `outputs/plots/latest/ks/`). The goal is a quick, reproducible readout of which covariates most strongly distinguish hotspot cells.
 
@@ -88,15 +99,14 @@ The full KS results are saved as a CSV in the processed data directory (typicall
 
 - **For R users:**
   ```r
-  source("R/config.R") # to load cfg object
-  ks_res <- read.csv(file.path(cfg$paths$processed_data_dir, "ks_results_hot_vs_non.csv"))
+  ks_res <- read.csv(file.path("data", "processed", "tables", "ks_results_hot_vs_non.csv"))
   ```
 - **For Python users:**
   ```python
   import pandas as pd
   # Note: You may need to define the path manually if not running in an R-integrated environment
   processed_data_dir = "/home/jeronimo/data/global_ncp/processed"
-  ks_res = pd.read_csv(f'{processed_data_dir}/ks_results_hot_vs_non.csv')
+  ks_res = pd.read_csv(f'{processed_data_dir}/tables/ks_results_hot_vs_non.csv')
   ```
 :::
 ## Setup
@@ -163,7 +173,8 @@ KS_CFG <- list(
     "GHS_POP_E2020_GLOBE_sum",
     "fields_mehrabi_2017_mean",
     "hdi_raster_predictions_2020_mean",
-    "rast_adm1_gini_disp_2020_mean"
+    "rast_adm1_gini_disp_2020_mean",
+    "GHS_BUILT_S_E2020_mean"
   ),
   sampling          = "match_hot",  # none | match_hot | cap_nonhot
   comparison_mode   = "median",     # "random" (all non-hotspots) | "median" (middle 5% of change)
@@ -177,7 +188,8 @@ KS_CFG <- list(
   transform_default = "auto",
   transform_by_var = c(
     "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "log1p",
-    "GHS_POP_E2020_GLOBE_sum"                 = "log1p"
+    "GHS_POP_E2020_GLOBE_sum"                 = "log1p",
+    "GHS_BUILT_S_E2020_mean"                  = "log1p"
   ),
   ecdf_top_k              = 8,
   ecdf_service_selection  = "top_k",  # top_k | all | custom
@@ -185,7 +197,7 @@ KS_CFG <- list(
   mountain_var            = "rast_gdpTot_1990_2020_30arcsec_2020_sum",
   mountain_transform      = "log1p",
   # outputs
-  out_table  = file.path(cfg$paths$processed_data_dir, paste0("ks_results_hot_vs_non", params$output_suffix, ".csv")),
+  out_table  = file.path(data_dir(), "processed", "tables", paste0("ks_results_hot_vs_non", params$output_suffix, ".csv")),
   out_dir    = out_plots(paste0("ks", params$output_suffix)),
   service_suffix_pattern = "_(mean|sum)$"
 )
@@ -203,7 +215,7 @@ Build `plt_long` from the processed grid, harmonizing service labels and keeping
 #| results: hide
 #| cache: false
 
-rds_path <- file.path(cfg$paths$processed_data_dir, params$input_plt_long)
+rds_path <- file.path(data_dir(), "processed", params$input_plt_long)
 need_reload <- TRUE
 if (file.exists(rds_path)) {
   plt_long <- readRDS(rds_path)
@@ -563,6 +575,43 @@ mountain_file <- NULL
 ```
 
 ## Quick looks
+### Top Socioeconomic Associations
+
+This section extracts the exact statistical values for the strongest associations, providing the hard numbers behind the "Wealth Paradox" and "Urbanization of Risk" narratives.
+
+```{r}
+#| label: ks-top-associations
+#| echo: false
+#| results: 'asis'
+
+if (exists("ks_res")) {
+  # Clean up variable names for readability
+  ks_clean <- ks_res %>%
+    mutate(
+      Variable = case_when(
+        grepl("gdpTot", var) ~ "GDP",
+        grepl("POP", var) ~ "Population",
+        grepl("hdi", var) ~ "HDI",
+        grepl("gini", var) ~ "Gini Index",
+        grepl("mehrabi", var) ~ "Field Size",
+        grepl("BUILT", var) ~ "Built Area",
+        TRUE ~ var
+      )
+    ) %>%
+    select(Service = service, Variable, KS_Stat_D = D, Cliffs_Delta = cliffs_delta, p_adj) %>%
+    arrange(desc(abs(Cliffs_Delta)))
+
+  cat("\n\n#### Top 10 Strongest Socioeconomic Associations (Overall)\n\n")
+  print(knitr::kable(head(ks_clean, 10), digits = 3))
+
+  cat("\n\n#### Top GDP Associations\n\n")
+  print(knitr::kable(ks_clean %>% filter(Variable == "GDP") %>% arrange(desc(abs(Cliffs_Delta))) %>% head(5), digits = 3))
+
+  cat("\n\n#### Top Population Associations\n\n")
+  print(knitr::kable(ks_clean %>% filter(Variable == "Population") %>% arrange(desc(abs(Cliffs_Delta))) %>% head(5), digits = 3))
+}
+```
+```
 
 ```{r}
 #| label: ks-preview

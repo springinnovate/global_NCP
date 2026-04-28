@@ -3,8 +3,22 @@
 Jeronimo Rodriguez Escobar
 Affiliation: Global Science, WWF
 Supervisor: Becky Chaplin-Kramer
-Version: v1.1.0
-Last updated: 2026-02-13
+Version: v1.3.2
+Last updated: 2026-04-28
+
+# Executive Summary
+
+This workflow brings together global data on ecosystem services, land cover, and people to help us understand where nature is changing, who is affected, and where action is most needed. It combines data processing, change detection, and hotspot mapping in a way that is transparent and reproducible.
+
+**Why does it matter?**
+By identifying areas of rapid change or high importance, this pipeline supports better decision-making for conservation, policy, and sustainable development.
+
+## Glossary
+- **AOO**: Area of Occupancy. A standard 10 km equal-area grid used for spatial analysis.
+- **ES**: Ecosystem Services. Benefits people obtain from nature (e.g., pollination, coastal protection).
+- **Hotspot**: A grid cell showing unusually high or low relative change in ecosystem services (the extreme 5% tail of the distribution).
+- **KS Analysis**: Kolmogorov-Smirnov test, a statistical method used here to compare the socioeconomic profiles of hotspots vs. non-hotspots.
+- **Zonal Statistics**: Calculations that summarize high-resolution raster data within the boundaries of polygons (grid cells or regions).
 
 # Overview
 
@@ -13,6 +27,87 @@ Working version of a structured workflow for extracting, analyzing, and visualiz
 The core extraction workflow uses Python (`taskgraph` + `exactextract`) for zonal summaries; R/Quarto is used for consolidation, change calculations, hotspot extraction, and KS tests.
 
 For a detailed technical description of the pipeline steps, see analysis/README_pipeline.md.
+
+### Pipeline Architecture
+
+```mermaid
+%%{init: {'flowchart': {'rankSpacing': 300, 'nodeSpacing': 30}}}%%
+flowchart LR
+    %% Subgraph Styling
+    style INPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+    style PROCESSING fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+    style OUTPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+
+    %% Input Layer
+    subgraph INPUTS [" "]
+        direction TB
+        RawES["<span style='font-size: 38px;'><b>Global InVEST ES Models</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 & 2020)</i></span>"]
+        RawGrid["<span style='font-size: 38px;'><b>IUCN AOO 10km Master Grid</b></span> <br/> <span style='font-size: 32px;'><i>Vector with Subregional Attributes</i></span>"]
+        RawLC["<span style='font-size: 38px;'><b>ESA CCI Land Cover</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 & 2020)</i></span>"]
+        RawSoc["<span style='font-size: 38px;'><b>Socioeconomic Data</b></span> <br/> <span style='font-size: 32px;'>Rasters <i>(Pop, GDP, HDI)</i></span>"]
+    end
+
+    %% Processing Layer
+    subgraph PROCESSING [" "]
+        direction TB
+        IntA["<span style='font-size: 38px;'><b>Path A: Global Trajectories</b></span> <br/> <span style='font-size: 32px;'>Zonal Summaries <i>(1992 & 2020)</i></span>"]
+        MathA["<span style='font-size: 38px;'><b>Path A Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC & Absolute Difference</span>"]
+
+        IntB["<span style='font-size: 38px;'><b>Path B: Grid Analysis</b></span> <br/> <span style='font-size: 32px;'>10km Zonal Summaries <i>(1992 & 2020)</i></span>"]
+        MathB["<span style='font-size: 38px;'><b>Path B Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC & Absolute Difference</span>"]
+
+        MathLC["<span style='font-size: 38px;'><b>Land Cover Transitions</b></span> <br/> <span style='font-size: 32px;'>Reclassified LC Contingency <br/> Matrices per 10km Gridcell</span>"]
+        MathSoc["<span style='font-size: 38px;'><b>Socioeconomic Stats & KS Tests</b></span> <br/> <span style='font-size: 32px;'>10km Grid Aggregation <br/> & Statistical Profiling</span>"]
+    end
+
+    %% Outputs Layer
+    subgraph OUTPUTS [" "]
+        direction TB
+        P1["<span style='font-size: 38px;'><b>WHAT: Global Trajectories</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Bar Charts, Summary Tables, <br/> & Cartographies (GPKGs)</i>"]
+        P2["<span style='font-size: 38px;'><b>WHERE: Hotspot Detection (Top/Bottom 5%)</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Abs & SPC GPKGs, Synthesis Maps, <br/> & Distribution Plots</i>"]
+        P3["<span style='font-size: 38px;'><b>WHY: Attribution Gap</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>LCC Overlap CSVs, Heatmaps, <br/> Scatterplots, & Driver Maps</i>"]
+        P4["<span style='font-size: 38px;'><b>WHO: Equity & Exposure</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>KS Test Plots & <br/> Population Exposure CSVs</i>"]
+    end
+
+    %% Logical Connections
+    RawGrid ==> IntB
+    RawGrid ==> MathLC
+    RawGrid ==> MathSoc
+
+    RawES ==> IntA
+    RawES ==> IntB
+
+    IntA ==> MathA
+    IntB ==> MathB
+
+    MathA ==> P1
+    MathB ==> P2
+
+    %% Downstream Analysis from Hotspots (P2)
+    P2 ==> P3
+    RawLC ==> MathLC
+    MathLC ==> P3
+
+    P2 ==> P4
+    RawSoc ==> MathSoc
+    MathSoc ==> P4
+
+    %% Layout Guides
+    RawSoc ~~~ MathSoc
+    IntA ~~~ P1
+
+    %% CANONICAL COLOR CLASSES (Matching Circular Diagram)
+    classDef c_what fill:#007930,stroke:#004D1E,stroke-width:3px,color:#FFF;
+    classDef c_where fill:#7B8327,stroke:#515619,stroke-width:3px,color:#FFF;
+    classDef c_why fill:#F07D00,stroke:#A85700,stroke-width:3px,color:#FFF;
+    classDef c_who fill:#F5D200,stroke:#B39900,stroke-width:3px,color:#333;
+
+    %% Pillar Assignments
+    class RawES,IntA,MathA,P1 c_what;
+    class RawGrid,IntB,MathB,P2 c_where;
+    class RawLC,MathLC,P3 c_why;
+    class RawSoc,MathSoc,P4 c_who;
+```
 
 ## Documentation Structure
 
@@ -158,39 +253,25 @@ ogr2ogr -wrapdateline -datelineoffset 180 \
 
 The R analysis workflow is conducted through a series of Quarto notebooks located in the `analysis/` directory. These notebooks should be executed in the following order after the Python pre-processing is complete.
 
-*(Note: The `notebooks/` directory is considered legacy and the most current work resides in `analysis/`.)*
+## 1. Data Consolidation (`analysis/process_data.qmd`)
+- **Purpose:** Synthesizes the raw `10k_grid_synth_*.gpkg` interim files. Re-aggregates fragmented polygons via `st_intersects` spatial join to the canonical 10km grid, and calculates absolute/percentage change.
+- **Outputs:** Generates the canonical `10k_change_calc.gpkg`.
 
-## 1. Data Consolidation and Change Analysis
+## 2. Land Cover Change Analysis (`analysis/LC_change_preparation.qmd` & `LC_change_granular.qmd`)
+- **Purpose:** Extracts raw ESA/C3S land cover data, simplifies it into 9 canonical classes, and calculates specific transition metrics (Gross Forest Loss, Urban/Cropland Expansion).
+- **Outputs:** Exports `10k_lcc_granular_metrics.gpkg`.
 
--   **File:** `analysis/Consolidation.qmd`
--   **Purpose:** This notebook synthesizes the summary data generated by the Python pipeline into a single, unified database. It then calculates the bi-temporal change between the two time periods and generates initial characterization plots (e.g., bar plots) of these changes, grouped by various administrative and geographical units.
-    -   **Outputs:** `processed/10k_change_calc.gpkg` (canonical subset for downstream work) and `processed/10k_grid_ES_change_benef.gpkg` (full QA dataset with additional mean/sum fields if you need to expand later).
+## 3. Hotspot Extraction + Plots (`analysis/hotspot_extraction.qmd`)
+- **Purpose:** Identifies hotspots using the centralized `HOTS_CFG` (5% threshold). Integrates Land Cover metrics to attribute specific LCC drivers to ES hotspots. Generates regional bar plots and hotspot distribution boxplots.
+- **Outputs:** Exports hotspot feature layers to `processed/hotspots/` and plots to `outputs/plots/`.
 
-## 2. Land Cover Change Analysis
+## 4. Statistical Analysis (`analysis/KS_tests_hotspots.qmd`)
+- **Purpose:** Runs Kolmogorov-Smirnov (KS) tests comparing the socioeconomic profile (GDP, Population, HDI) of hotspots against the median 5% of the background landscape.
+- **Outputs:** Generates heatmaps, ECDF distribution plots, and Cliff's Delta effect size charts.
 
--   **File:** `analysis/LC_change.qmd`
--   **Purpose:** Calculates pixel-to-grid transition metrics (Gross Loss, Gross Gain, Persistence) using the `diffeR` package. This provides the "Driver" layer for attributing ES change.
--   **Outputs:** `processed/10k_lcc_metrics.gpkg` (spatial) and `processed/lcc_summary_by_group.csv` (tabular summaries).
-
-## 3. Hotspot Extraction and Beneficiary Data Integration
-
--   **File:** `analysis/hotspot_extraction.qmd`
--   **Purpose:** Using the consolidated database, this notebook identifies and extracts "hotspots"—areas of significant change or high/low ecosystem service values. It then merges key beneficiary (socioeconomic) data onto these hotspot geometries, preparing the dataset for the subsequent statistical analysis.
-
-## 4. Kolmogorov-Smirnov (KS) Analysis
-
--   **File:** `analysis/KS_tests_hotspots.qmd`
--   **Purpose:** This final notebook performs a Kolmogorov-Smirnov (KS) statistical analysis. It compares the distributions of the beneficiary variables within the identified hotspots versus non-hotspot areas to identify significant differences.
-
-## 5. Hotspot Intensity & Multi-service Analysis
-
--   **File:** `analysis/hotspot_intensity.qmd`
--   **Purpose:** Quantifies the spatial extent of hotspots. Calculates the percentage of land area classified as a hotspot ("Intensity") and the share of global hotspots located within each region/biome.
-    -   **Outputs:** `processed/hotspot_area_stats.csv`, Intensity bar plots.
-
--   **File:** `analysis/hotspot_multiservice.qmd`
--   **Purpose:** Analyzes the overlap of hotspots across different services ("Hotness"). Identifies regions with high coincidence of multiple service declines.
-    -   **Outputs:** `processed/hotspot_multiservice_stats.csv`, Hotness distribution plots.
+## 5. Supplemental Analysis
+- **`analysis/hotspot_intensity.qmd`:** Quantifies the spatial extent of hotspots (percentage of land area) and regional enrichment.
+- **`analysis/hotspot_multiservice.qmd`:** Analyzes overlap of hotspots across different services ("Hotness").
 
 ## Analytical Framework
 The analysis of Global NCP Hotspots (1992–2020) leverages an `exactextract`-powered vector backbone to guarantee fractional geometry precision. It is conducted through two distinct but complementary lenses:

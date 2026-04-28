@@ -22,8 +22,8 @@ This document captures the full project context for assistants (e.g., Codex in V
 1. Processed 10‑km grid with subregional tags (`processed/10k_change_calc.gpkg`).
 2. Hotspot feature layers (global and per‑group) as compact GPKGs under `processed/hotspots/` plus an index CSV.
 3. Reusable tidy table `plt_long` (cell × service with `abs_chg`/`pct_chg`).
-4. **Intensity & Enrichment**: Metrics quantifying hotspot coverage and disproportionate concentration per region (`hotspot_area_stats.csv`).
-4. Figures: trimmed **barplots** of magnitudes (all cells), **violins** of hotspot distributions, and (later) **KS** tables/plots.
+4. **Intensity & Relative Intensity**: Metrics quantifying hotspot coverage and disproportionate concentration per region (`hotspot_area_stats.csv`).
+5. Figures: trimmed **barplots** of magnitudes (all cells), **violins** of hotspot distributions, **faceted maps**, and **KS** tables/plots.
 
 ---
 
@@ -67,11 +67,7 @@ Pollination, Nature_Access
   * **Path A (Pixel-Level)**: Direct difference of rasters. Used for raw change summaries.
   * **Path B (Grid-Level)**: Aggregation to 10km grid first, then difference. Used for **hotspot identification** and regional synthesis.
 * **Aggregation Logic**: Extensive variables (e.g. Nitrogen kg) are **summed**; Intensive variables (e.g. Risk Index) are **averaged**. On an equal-area grid, these are proportional and comparable for relative change.
-* **Extraction Strategy Rule**:
-  * **10km Grid (Simple Polygons)**: Uses `exactextract` (Exact Fractional). Excels at millions of simple square geometries.
-  * **Regional Groupings (Complex Multipolygons)**: Uses `zonal_stats_toolkit` (Rasterized). Bypasses C++ GEOS segfault bottlenecks and Python loop bottlenecks associated with exploding sprawling multipolygons (like WWF Biomes) into tens of thousands of fragments.
 
-* **ID Integrity (V2 Refactor)**: R scripts currently use spatial X/Y coordinate joins to bypass upstream row-shifting. Once `summary_pipeline_landgrid.py` consistently exports `orig_fid`, R scripts will revert to strict, fast tabular joins (`left_join(by="fid")`).
 * `fid` is unique and stable across all outputs.
 * `c_fid` references the country polygon key used elsewhere.
 * Percent change columns may contain `NA/Inf`; these are filtered at pivot time.
@@ -86,8 +82,7 @@ project root
 │   ├── prepare_data.qmd              # preprocessing & consolidation
 │   ├── process_data.qmd              # change calculation & metric derivation
 │   ├── hotspot_extraction.qmd        # main narrative & orchestration
-│   ├── hotspot_intensity.qmd         # area intensity & enrichment analysis
-│   ├── hotspot_multiservice.qmd      # overlap & "hotness" analysis
+│   ├── hotspot_synthesis.qmd         # intensity, enrichment, and multi-service overlap analysis
 │   ├── KS_tests_hotspots.qmd         # statistical comparisons (KS tests)
 │   └── restore_checkpoint.R          # restores big tidy tables (plt_long, grid_sf)
 ├── R/
@@ -213,32 +208,25 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 ### 4.8 Hotspot Intensity & Multi-service
 
 * **Intensity**: % of land area classified as hotspot per region.
-* **Enrichment**: Ratio of (Observed Share of Hotspots / Expected Share based on Area). Values > 1 indicate disproportionate concentration.
+* **Relative Intensity**: Ratio of (Observed Share of Hotspots / Expected Share based on Area). Values > 1 indicate disproportionate concentration.
 * **Hotness**: Average number of overlapping service hotspots per pixel.
 
-### 4.9 Land Cover Change (LCC)
-
-* **Goal**: Attribute ES hotspots to specific land change drivers (e.g., deforestation, urbanization) versus degradation.
-* **Methodology**: Uses `diffeR` (Pontius et al.) to calculate **Gross Loss**, **Gross Gain**, and **Exchange** rather than simple net change.
-* **Pipeline**:
-  1. **Preparation** (`analysis/LC_change_preparation.qmd`): Extracts raw ESA CCI (1992) and C3S (2020) rasters, reclassifying them into 9 simplified classes to ensure consistent mapping.
-  2. **Granular Analysis** (`analysis/LC_change_granular.qmd`): Runs specific driver models:
-     * **Forest Loss**: Binary (Forest vs. Non-Forest). Tracks gross deforestation.
-     * **Expansion**: Multi-class (Urban, Cropland, Other). Tracks anthropogenic expansion.
-* **Outputs**: `processed/10k_lcc_granular_metrics.gpkg`.
-* **Integration**: LCC metrics are joined to hotspot geometries in `hotspot_extraction.qmd` to quantify the "Attribution Gap" (overlap between ES decline and Land Conversion).
+### 4.9 Faceted Maps (`make_faceted_maps.R`)
+* **Purpose**: Show spatial distribution of absolute and percentage change across subregions.
+* **Color Rule Engine**: A strict semantic diverging scale (`scale_fill_gradient2`) anchored at `midpoint = 0` is used universally.
+  * **Goods**: Increase is Green, Decrease is Red.
+  * **Damages**: Increase is Red, Decrease is Green.
+  * This rule applies even if a specific dataset does not cross zero (e.g., all values are positive or all negative), ensuring the visual language (Red = Bad, Green = Good) remains perfectly consistent across all presentation slides.
 
 ### 4.10 Current run status / next steps
 
 - **Completed**:
   - Core hotspot extraction (v1.0.2).
   - KS Analysis pipeline (robust to suffixes, improved visuals).
-  - Intensity/Enrichment metrics.
+  - Intensity/Relative Intensity metrics.
   - Documentation of Sum vs Mean aggregation logic.
-  - Land Cover Change analysis (Granular models: Forest Loss, Expansion).
-  - Difference Analysis (Path C) on hectare-corrected rasters.
-- **Active**:
-  - Validation/Consolidation of Path B vs Path C.
+- **Next**:
+  - Land Cover change analysis (new branch).
   - Final report drafting.
 
 ---
@@ -302,13 +290,13 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 ## 8) Limitations & TODOs
 
 * **Service metadata externalization.** Replace hard‑coded recode vectors with `analysis_configs/service_meta.csv` (columns: `raw,label,direction,pref_metric`).
-* **V2 Pipeline Simplification (ID Integrity).** The current R pipeline uses heavy spatial coordinate joins (X/Y) to bypass missing IDs and row-shifting caused by Python dropping empty cells. Once all cached outputs contain `orig_fid`, remove `st_coordinates` from the `.qmd` files and return to fast `left_join(by = "fid")`.
 * **Aliasing cleanup.** Keep `agg_change` alias until all code uses `aggregate_change_simple` (or vice versa), then deprecate.
 * **KS module.** Implement KS calculations + multiple‑testing correction and a compact visualization.
 * **Caching.** Persist `plt_long` (e.g., `fst`/`arrow`) to speed resumes and reduce memory pressure.
 * **Tests.** Add small snapshot tests for the hotspot runner and plot builders.
 * **Quarto render.** Optionally add CLI render once Quarto is installed server‑side.
 * **Plot polish.** Finalize color palette, legend placement, and annotation text (especially explaining **direction‑agnostic magnitude** in barplots).
+* **Data Directory Cleanup.** Move loose root-level raster directories (`base_years_ha`, `2020_1992_ch_ha`) into `raw/` and update YAMLs in `analysis_configs/` to match.
 
 ---
 
@@ -395,6 +383,7 @@ for (gc in groupings) {
 
   * Bars: `outputs/plots/{abs|pct}/<group_col>/bars_<group_col>_{abs|pct}.png`
   * Violins: `outputs/plots/violins/<group_col>/*_{abs|pct}_change_violins.png`
+    * Maps: `outputs/plots/maps/map_<group_col>_{abs|pct}.png`
 
 ---
 

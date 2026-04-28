@@ -1,8 +1,8 @@
 cfg <- local({
-  sv <- yaml::read_yaml("inst/config/services.yml")
-  vr <- yaml::read_yaml("inst/config/variables.yml")
-  th <- yaml::read_yaml("inst/config/thresholds.yml")
-  pa <- yaml::read_yaml("inst/config/paths.yml")
+  sv <- yaml::read_yaml(here::here("inst/config/services.yml"))
+  vr <- yaml::read_yaml(here::here("inst/config/variables.yml"))
+  th <- yaml::read_yaml(here::here("inst/config/thresholds.yml"))
+  pa <- yaml::read_yaml(here::here("inst/config/paths.yml"))
   list(services = sv, vars = vr, thresh = th, paths = pa)
 })
 

@@ -19,9 +19,8 @@ if (!file.exists(gpkg_path)) {
 }
 sf_data <- st_read(gpkg_path, quiet = TRUE)
 
-message("Fixing dateline wraparound artifacts and overwriting input file...")
+message("Fixing dateline wraparound artifacts in memory...")
 sf_data <- st_wrap_dateline(sf_data, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
-st_write(sf_data, gpkg_path, append = FALSE, delete_dsn = TRUE, quiet = TRUE)
 
 message("Transforming to Equal Earth projection (EPSG:8857)...")
 sf_data <- st_transform(sf_data, crs = "EPSG:8857")
