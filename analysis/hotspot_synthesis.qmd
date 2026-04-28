@@ -295,7 +295,7 @@ biome_labels <- c(
 
 get_short_name <- function(g, grp_name) {
   g <- as.character(g)
-  if (grp_name == "WWF_biome" || grp_name == "biome") {
+  if (any(grp_name %in% c("WWF_biome", "biome"))) {
     res <- biome_labels[g]
     unname(ifelse(is.na(res), g, res))
   } else {

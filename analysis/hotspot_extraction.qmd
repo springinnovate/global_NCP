@@ -488,7 +488,7 @@ biome_labels <- c(
 
 get_short_name <- function(g, grp_name) {
   g <- as.character(g)
-  if (grp_name == "WWF_biome" || grp_name == "biome") {
+  if (any(grp_name %in% c("WWF_biome", "biome"))) {
     res <- biome_labels[g]
     unname(ifelse(is.na(res), g, res))
   } else {
@@ -1700,28 +1700,31 @@ if (lc_data_ready) {
     canon_order <- c("C_Risk", "N_export", "Sed_export", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio", "Pollination", "Nature_Access")
     plot_data$service <- factor(plot_data$service, levels = canon_order)
 
-    if (nrow(plot_data) > 100) {
-      p_scatter <- ggplot(plot_data, aes(x = driver_val, y = pct_chg)) +
-        geom_bin2d(bins = 60) +
-        scale_fill_viridis_c(trans = "log10", option = "viridis", labels = scales::comma) +
-        geom_smooth(method = "lm", color = "tomato", linetype = "22", linewidth = 0.5) +
-        facet_wrap(~ service, scales = "free_y", ncol = 3) +
-        labs(title = paste("Driver vs ES Change:", d_name),
-             x = paste(d_name, "(% Area)"),
-             y = "ES Change (%)",
-             fill = "Count\n(log10)") +
-        theme_minimal() +
-        theme(axis.title = element_text(size = 8),
-              axis.text = element_text(size = 8),
-          strip.text = element_text(size = 10),
-          legend.title = element_text(size = 9),
-          legend.text = element_text(size = 7))
+    for (m_col in c("pct_chg", "abs_chg")) {
+      m_label <- if (m_col == "pct_chg") "Percentage" else "Absolute"
+      m_short <- if (m_col == "pct_chg") "pct" else "abs"
 
-      print(p_scatter)
+      plot_subset <- plot_data %>% filter(!is.na(.data[[m_col]]))
 
-      out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
-      dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-      ggsave(file.path(out_dir, paste0("scatter_", d_name, ".png")), p_scatter, width = 12, height = 8, bg = "white", dpi = 300)
+      if (nrow(plot_subset) > 100) {
+        p_scatter <- ggplot(plot_subset, aes(x = driver_val, y = .data[[m_col]])) +
+          geom_bin2d(bins = 60) +
+          scale_fill_viridis_c(trans = "log10", option = "viridis", labels = scales::comma) +
+          geom_smooth(method = "lm", color = "tomato", linetype = "22", linewidth = 0.5) +
+          facet_wrap(~ service, scales = "free_y", ncol = 3) +
+          labs(title = paste("Driver vs ES Change:", d_name, "(", m_label, ")"),
+               x = paste(d_name, "(% Area)"),
+               y = paste("ES Change (", m_label, ")"),
+               fill = "Count\n(log10)") +
+          theme_minimal() +
+          theme(axis.title = element_text(size = 8), axis.text = element_text(size = 8),
+                strip.text = element_text(size = 10), legend.title = element_text(size = 9), legend.text = element_text(size = 7))
+
+        print(p_scatter)
+        out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
+        dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+        ggsave(file.path(out_dir, paste0("scatter_", d_name, "_", m_short, ".png")), p_scatter, width = 12, height = 8, bg = "white", dpi = 300)
+      }
     }
   }
 }
