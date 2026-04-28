@@ -199,7 +199,7 @@ What this chunk does:
 
 ```{r}
 #| label: make-signed-bars-data
-#| eval: false
+#| eval: true
 #| echo: false
 #| message: true
 #| warning: false
@@ -250,7 +250,24 @@ if ("grid_fid" %in% names(sf_f) && !"fid" %in% names(sf_f)) {
 # TODO: Robustify grid alignment. Relying on row-order (seq_len) for fid generation is fragile
 # if the input GPKG has been filtered or sorted differently from the base attributes.
 if (!"fid" %in% names(sf_f)) {
-  sf_f$fid <- seq_len(nrow(sf_f))
+  if ("orig_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = orig_fid)
+  else if ("grid_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = grid_fid)
+  else if ("id" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = id)
+  else stop("Fatal Error: sf_f is missing a stable identifier (fid/orig_fid/grid_fid).")
+}
+
+# Join missing attributes from master grid
+missing_groupings <- setdiff(groupings, names(sf_f))
+if (length(missing_groupings) > 0) {
+  message("Joining missing attributes from master grid: ", paste(missing_groupings, collapse = ", "))
+  master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"), quiet = TRUE)
+  master_grid <- sf::st_drop_geometry(master_grid)
+  if ("orig_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = orig_fid)
+  if ("grid_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = grid_fid)
+  if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = id)
+  if (!"fid" %in% names(master_grid)) master_grid$fid <- seq_len(nrow(master_grid))
+  grid_attrs <- master_grid %>% dplyr::select(dplyr::any_of(c("fid", missing_groupings)))
+  sf_f <- sf_f %>% dplyr::left_join(grid_attrs, by = "fid")
 }
 
 # Diagnostic: Check loaded columns
@@ -384,7 +401,7 @@ if (nrow(signed_summary) > 0) {
 
 ```{r}
 #| label: compute-global-refs
-#| eval: false
+#| eval: true
 #| message: false
 #| warning: false
 #| echo: false
@@ -424,7 +441,7 @@ glob_refs <- compute_global_refs(sf_f, services, cut_q = cut_q,
 
 ```{r}
 #| label: make-signed-bars-plot
-#| eval: false
+#| eval: true
 #| message: false
 #| warning: false
 #| echo: false
@@ -572,7 +589,7 @@ if (!exists("sf_f")) {
   sf_f <- sf::st_drop_geometry(sf_f)
   if ("orig_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = orig_fid)
   if ("grid_fid" %in% names(sf_f) && !"fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = grid_fid)
-  if (!"fid" %in% names(sf_f)) sf_f$fid <- seq_len(nrow(sf_f))
+  if (!"fid" %in% names(sf_f)) stop("Fatal Error: sf_f is missing a stable identifier (fid/orig_fid/grid_fid).")
 
   # Robustness: Ensure grouping columns exist before pivoting
   # (Removed redundant AOOGrid join; input GPKG is authoritative)
@@ -816,14 +833,12 @@ if (exists("grid_sf") && inherits(grid_sf, "sf")) {
   master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
   stopifnot(file.exists(master_path))
   geom_sf <- sf::st_read(master_path, quiet = TRUE)
-  if ("id" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) {
-    geom_sf <- dplyr::rename(geom_sf, fid = id)
-  }
 
-  # ASSIGN FID HERE BEFORE FILTERING
-  if (!"fid" %in% names(geom_sf)) {
-    geom_sf$fid <- seq_len(nrow(geom_sf))
-  }
+  # Safely resolve canonical ID, avoiding seq_len() which causes spatial shifts
+  if ("orig_fid" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) geom_sf <- dplyr::rename(geom_sf, fid = orig_fid)
+  if ("grid_fid" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) geom_sf <- dplyr::rename(geom_sf, fid = grid_fid)
+  if ("id" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) geom_sf <- dplyr::rename(geom_sf, fid = id)
+  if (!"fid" %in% names(geom_sf)) geom_sf$fid <- seq_len(nrow(geom_sf))
 
   geom_sf <- geom_sf |> dplyr::select(dplyr::any_of(c("fid", "iso3", "continent", "region_un", "subregion", "nev_name", "region_wb", "income_grp", "WWF_biome")))
 }
@@ -1052,7 +1067,7 @@ dplyr::glimpse(hot_index, width = 120)
 
 ```{r}
 #| label: display-barplots
-#| eval: false
+#| eval: true
 #| echo: false
 #| results: 'asis'
 #| cache: false
@@ -1671,13 +1686,15 @@ if (lc_data_ready) {
       grid_attrs_path <- file.path(data_dir(), "interim", "..", "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
       if (!file.exists(grid_attrs_path)) stop("Base grid attribute file not found.")
 
-      grid_attrs_df <- sf::st_read(grid_attrs_path, quiet = TRUE) %>%
-        sf::st_drop_geometry() %>%
-        dplyr::select(any_of(c("fid", group_cols)))
+    grid_attrs_df <- sf::st_read(grid_attrs_path, quiet = TRUE) %>% sf::st_drop_geometry()
 
-      if (!"fid" %in% names(grid_attrs_df)) {
-        grid_attrs_df$fid <- seq_len(nrow(grid_attrs_df))
-      }
+    # Safely resolve canonical ID, avoiding seq_len() which causes spatial shifts
+    if ("orig_fid" %in% names(grid_attrs_df) && !"fid" %in% names(grid_attrs_df)) grid_attrs_df <- dplyr::rename(grid_attrs_df, fid = orig_fid)
+    if ("grid_fid" %in% names(grid_attrs_df) && !"fid" %in% names(grid_attrs_df)) grid_attrs_df <- dplyr::rename(grid_attrs_df, fid = grid_fid)
+    if ("id" %in% names(grid_attrs_df) && !"fid" %in% names(grid_attrs_df)) grid_attrs_df <- dplyr::rename(grid_attrs_df, fid = id)
+    if (!"fid" %in% names(grid_attrs_df)) stop("Fatal Error: grid_attrs_df is missing a stable identifier.")
+
+    grid_attrs_df <- grid_attrs_df %>% dplyr::select(any_of(c("fid", group_cols)))
 
       attrs <- plt_long %>%
         dplyr::select(fid) %>%

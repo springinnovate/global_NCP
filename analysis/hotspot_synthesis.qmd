@@ -114,7 +114,9 @@ if (file.exists(gpkg_grid)) {
   grid_df <- sf::st_drop_geometry(grid_df)
   if ("orig_fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = orig_fid)
   if ("grid_fid" %in% names(grid_df) && !"fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = grid_fid)
-  if (!"fid" %in% names(grid_df)) grid_df$fid <- seq_len(nrow(grid_df))
+  if ("id" %in% names(grid_df) && !"fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = id)
+
+  if (!"fid" %in% names(grid_df)) stop("Fatal Error: grid_df is missing a stable identifier (fid/orig_fid/grid_fid).")
 
   # FIX: Ensure missing grouping attributes are rejoined from the master grid
   missing_groupings <- setdiff(c("income_grp", "region_wb", "WWF_biome"), names(grid_df))

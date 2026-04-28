@@ -109,3 +109,46 @@ out_path_3plus <- file.path(out_dir, "global_hotspot_count_heatmap_3plus.png")
 
 message("Saving map to: ", out_path_3plus)
 ggsave(out_path_3plus, p_3plus, width = 16, height = 9, bg = "white", dpi = 300)
+
+# ==============================================================================
+# Map 3: Hotspot Frequency (Capped at 3+)
+# ==============================================================================
+
+message("Generating heatmap capped at 3+ hotspots...")
+
+sf_data_cap3 <- sf_data %>%
+  mutate(
+    hotspots_capped_3 = pmin(as.numeric(hotspot_count), 3),
+    hotspot_label_3 = factor(hotspots_capped_3, levels = 1:3, labels = c("1", "2", "3+"))
+  )
+
+p_cap3 <- ggplot() +
+  # Base map underneath
+  geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) +
+  geom_sf(data = sf_data_cap3, aes(fill = hotspot_label_3), color = NA) +
+  scale_fill_manual(
+    name = "Overlapping\nHotspots",
+    values = c(
+      "1" = "#FFD54F",   # Yellow
+      "2" = "#FB8C00",   # Orange
+      "3+" = "#E53935"   # Red
+    ),
+    na.value = "gray90",
+    drop = FALSE
+  ) +
+  labs(
+    title = "Global Ecosystem Service Hotspot Frequency",
+    subtitle = "Number of overlapping hotspots of decline/damage per 10km grid cell (Capped at 3+)"
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5, margin = margin(b = 15)),
+    legend.position = "bottom",
+    legend.key.width = unit(2.5, "cm")
+  )
+
+out_path_cap3 <- file.path(out_dir, "global_hotspot_count_heatmap_cap3.png")
+
+message("Saving map to: ", out_path_cap3)
+ggsave(out_path_cap3, p_cap3, width = 16, height = 9, bg = "white", dpi = 300)
