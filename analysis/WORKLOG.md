@@ -1,4 +1,4 @@
-# Worklog — Global NCP Hotspots (v1.3.1)
+# Worklog — Global NCP Hotspots (v1.3.2)
 
 ## Project Overview & Goals
 
@@ -10,9 +10,9 @@
 3.  Integration of Land Cover Change (LCC) metrics to attribute ES decline to Land Conversion vs. Degradation.
 4.  Socioeconomic characterization of hotspots via Kolmogorov-Smirnov (KS) tests.
 
-## Current State: Version 1.3.1 (Final Synthesis & Report Generation)
+## Current State: Version 1.3.2 (Visual Unification & Presentation Polish)
 
-**Status:** The core pipeline architecture is mathematically validated, cleaned, and finalized. The project has shifted entirely from building the data infrastructure to generating final insights, interpreting results, and drafting the manuscript.
+**Status:** The core pipeline architecture is mathematically validated, cleaned, and finalized. We have successfully unified the visual styling using canonical WWF colors across all flowcharts and plots, preparing everything for the final presentation.
 
 **Active Focus & The Final Wrap-Up Plan:**
 *   **Geographic Clustering:** Finalizing the geographic narrative of "Compound Risk" (Hotness) and "Disproportionate Burden" (Relative Intensity) using the consolidated `hotspot_synthesis.qmd` pipeline.
@@ -59,11 +59,15 @@ This section highlights the major technical and methodological hurdles overcome 
 
 ## Chronological Log (Newest to Oldest)
 
+### 2026-04-28
+*   **Version 1.3.2 Release**: Unified pipeline visual styling (Mermaid flowcharts, spatial maps, and plots) to strictly use canonical WWF colors. Cleaned up redundant documentation and finalized the narrative methodology structure for the presentation slide deck.
+
 ### 2026-04-27
 *   **Hotspot Boxplot Pipeline Overhaul**: Resolved critical "silent failures" in `hotspot_extraction.qmd` where Quarto intercepted error messages and skipped plot generation due to missing `plt_long` attributes. Implemented a robust on-the-fly attribute join from the master grid (`AOOGrid_10x10km_land_4326_clean.gpkg`), fixed `dplyr` dynamic scoping issues (`across(all_of())`), and added aggressive `stderr()` diagnostic logging.
 *   **Coastal Visualization Fix**: Refactored coastal service boxplots to use pre-calculated 1.5*IQR whiskers (`stat="identity"`) instead of `outlier.shape=NA`. This permanently solves the issue of invisible outliers stretching the y-axis and causing scattered point artifacts.
 *   **PDF Image Resolution**: Fixed LaTeX pathing during document rendering to ensure the freshly rendered, canonical-colored plots are correctly embedded into the final PDF.
 *   **KS Test Enhancements**: Deprecated legacy `cfg$paths` in favor of `data_dir()` across the pipeline, and successfully integrated **Built Area** (`GHS_BUILT_S_E2020_mean`) into the socioeconomic covariate analysis.
+*   **Methodology Flowchart (`workflow.qmd`)**: Developed a presentation-ready, high-resolution Mermaid.js flowchart documenting the end-to-end analytical pipeline. Mapped the dual-path extraction architecture (Regional Zonal Summaries vs. 10km Grid Analysis) and perfectly aligned the final deliverables with the slide deck's narrative structure (WHAT, WHERE, WHY, WHO). Bypassed strict parsing bugs in Mermaid v11.6.0 to implement custom WWF color palettes, transparent overlays, and thick routing arrows.
 
 ### 2026-04-23
 *   **Workspace Integration**: Configured a VS Code Multi-root Workspace bringing `global_NCP` and `zonal_stats_toolkit` side-by-side for unified development.

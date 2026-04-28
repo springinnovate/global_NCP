@@ -1,9 +1,11 @@
 ---
-title: "Global NCP Workflow"
-format: html
+format:
+  html:
+    page-layout: full
 ---
 
 ```{mermaid}
+%%{init: {'flowchart': {'rankSpacing': 300, 'nodeSpacing': 30}}}%%
 flowchart LR
     %% Subgraph Styling
     style INPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
@@ -11,45 +13,49 @@ flowchart LR
     style OUTPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
 
     %% Input Layer
-    subgraph INPUTS ["<span style='font-size: 30px; font-weight: bold; color: #222222;'>Inputs</span><br/>"]
+    subgraph INPUTS [" "]
         direction TB
-        RawES["<b>Global ES Models</b> <br/> 300m Rasters <i>(1992 & 2020)</i>"]
-        RawLC["<b>ESA CCI Land Cover</b> <br/> 300m Rasters <i>(1992 & 2020)</i>"]
-        RawSoc["<b>Socioeconomic Data</b> <br/> Rasters <i>(Pop, GDP, HDI)</i>"]
-        RawGrid["<b>IUCN AOO 10km Master Grid</b> <br/> <i>Vector with Subregional Attributes</i>"]
+        RawES["<span style='font-size: 38px;'><b>Global InVEST ES Models</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 & 2020)</i></span>"]
+        RawGrid["<span style='font-size: 38px;'><b>IUCN AOO 10km Master Grid</b></span> <br/> <span style='font-size: 32px;'><i>Vector with Subregional Attributes</i></span>"]
+        RawLC["<span style='font-size: 38px;'><b>ESA CCI Land Cover</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 & 2020)</i></span>"]
+        RawSoc["<span style='font-size: 38px;'><b>Socioeconomic Data</b></span> <br/> <span style='font-size: 32px;'>Rasters <i>(Pop, GDP, HDI)</i></span>"]
     end
 
     %% Processing Layer
-    subgraph PROCESSING ["<span style='font-size: 30px; font-weight: bold; color: #222222;'>Processing</span><br/>"]
+    subgraph PROCESSING [" "]
         direction TB
-        IntA["<b>Path A: Global Trajectories</b> <br/> Zonal Summaries <i>(1992 & 2020)</i>"]
-        IntB["<b>Path B: Grid Analysis</b> <br/> 10km Zonal Summaries <i>(1992 & 2020)</i>"]
-        Math["<b>Metrics Calculation</b> <br/> Symmetric % Change (SPC) <br/> & Absolute Difference"]
+        IntA["<span style='font-size: 38px;'><b>Path A: Global Trajectories</b></span> <br/> <span style='font-size: 32px;'>Zonal Summaries <i>(1992 & 2020)</i></span>"]
+        MathA["<span style='font-size: 38px;'><b>Path A Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC & Absolute Difference</span>"]
 
-        MathLC["<b>Land Cover Transitions</b> <br/> Reclassified LC Contingency <br/> Matrices per 10km Gridcell"]
-        MathSoc["<b>Socioeconomic Stats & KS Tests</b> <br/> 10km Grid Aggregation <br/> & Statistical Profiling"]
+        IntB["<span style='font-size: 38px;'><b>Path B: Grid Analysis</b></span> <br/> <span style='font-size: 32px;'>10km Zonal Summaries <i>(1992 & 2020)</i></span>"]
+        MathB["<span style='font-size: 38px;'><b>Path B Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC & Absolute Difference</span>"]
+
+        MathLC["<span style='font-size: 38px;'><b>Land Cover Transitions</b></span> <br/> <span style='font-size: 32px;'>Reclassified LC Contingency <br/> Matrices per 10km Gridcell</span>"]
+        MathSoc["<span style='font-size: 38px;'><b>Socioeconomic Stats & KS Tests</b></span> <br/> <span style='font-size: 32px;'>10km Grid Aggregation <br/> & Statistical Profiling</span>"]
     end
 
     %% Outputs Layer
-    subgraph OUTPUTS ["<span style='font-size: 30px; font-weight: bold; color: #222222;'>Outputs</span><br/>"]
+    subgraph OUTPUTS [" "]
         direction TB
-        P1["<b>Global Trajectories</b> <br/> <i style='font-size: 25px; font-weight: normal;'>Bar Charts, Summary Tables, <br/> & Cartographies (GPKGs)</i>"]
-        P2["<b>Hotspot Detection (Top/Bottom 5%)</b> <br/> <i style='font-size: 25px; font-weight: normal;'>Abs & SPC GPKGs, Synthesis Maps, <br/> & Distribution Plots</i>"]
-        P3["<b>Attribution Gap</b> <br/> <i style='font-size: 25px; font-weight: normal;'>LCC Overlap CSVs, Heatmaps, <br/> Scatterplots, & Driver Maps</i>"]
-        P4["<b>Equity & Exposure</b> <br/> <i style='font-size: 25px; font-weight: normal;'>KS Test Plots & <br/> Population Exposure CSVs</i>"]
+        P1["<span style='font-size: 38px;'><b>WHAT: Global Trajectories</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Bar Charts, Summary Tables, <br/> & Cartographies (GPKGs)</i>"]
+        P2["<span style='font-size: 38px;'><b>WHERE: Hotspot Detection (Top/Bottom 5%)</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Abs & SPC GPKGs, Synthesis Maps, <br/> & Distribution Plots</i>"]
+        P3["<span style='font-size: 38px;'><b>WHY: Attribution Gap</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>LCC Overlap CSVs, Heatmaps, <br/> Scatterplots, & Driver Maps</i>"]
+        P4["<span style='font-size: 38px;'><b>WHO: Equity & Exposure</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>KS Test Plots & <br/> Population Exposure CSVs</i>"]
     end
 
     %% Logical Connections
     RawGrid ==> IntB
+    RawGrid ==> MathLC
+    RawGrid ==> MathSoc
 
     RawES ==> IntA
     RawES ==> IntB
 
-    IntA ==> Math
-    IntB ==> Math
+    IntA ==> MathA
+    IntB ==> MathB
 
-    Math ==> P1
-    Math ==> P2
+    MathA ==> P1
+    MathB ==> P2
 
     %% Downstream Analysis from Hotspots (P2)
     P2 ==> P3
@@ -60,17 +66,19 @@ flowchart LR
     RawSoc ==> MathSoc
     MathSoc ==> P4
 
-    %% Layout Guides (Forces boxes to match heights and center-align)
-    RawGrid ~~~ MathSoc
+    %% Layout Guides
+    RawSoc ~~~ MathSoc
     IntA ~~~ P1
 
-    %% Visual Styling - WWF Palette
-    classDef inputs fill:#F2F2F2,stroke:#D9D9D9,stroke-width:2px,color:#333,font-size:23px;
-    classDef processing fill:#E1F5FE,stroke:#01579B,stroke-width:2px,color:#01579B,font-size:23px;
-    classDef pillar fill:#006743,stroke:#004D33,stroke-width:3px,color:#FFF,font-weight:bold,font-size:27px;
+    %% CANONICAL COLOR CLASSES (Matching Circular Diagram)
+    classDef c_what fill:#007930,stroke:#004D1E,stroke-width:3px,color:#FFF;
+    classDef c_where fill:#7B8327,stroke:#515619,stroke-width:3px,color:#FFF;
+    classDef c_why fill:#F07D00,stroke:#A85700,stroke-width:3px,color:#FFF;
+    classDef c_who fill:#F5D200,stroke:#B39900,stroke-width:3px,color:#333;
 
-    %% Explicit Class Assignments
-    class RawES,RawLC,RawSoc,RawGrid inputs;
-    class IntA,IntB,Math,MathLC,MathSoc processing;
-    class P1,P2,P3,P4 pillar;
-```
+    %% Pillar Assignments
+    class RawES,IntA,MathA,P1 c_what;
+    class RawGrid,IntB,MathB,P2 c_where;
+    class RawLC,MathLC,P3 c_why;
+    class RawSoc,MathSoc,P4 c_who;
+ ```

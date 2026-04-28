@@ -42,9 +42,7 @@ For a technical deep dive, see the main README.md and the Quarto notebooks in th
 
 ## TODO: Recommended Visuals and Flowcharts
 
-- Conceptual diagram of the pipeline (from data to decision)
 - Example map of hotspots
-- Flowchart of data processing steps
 - Before/after change maps for a key service
 - Infographic showing how beneficiaries are linked to ES change
 

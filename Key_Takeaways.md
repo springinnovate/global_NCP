@@ -40,6 +40,6 @@ To move beyond correlation, we assessed the direct overlap between ES hotspots a
 ---
 
 ## 5. Next Steps & Future Directions
-Now that the core V1.3.1 data pipeline is robust, mathematically validated, and fully automated, future analytical phases can easily explore:
+Now that the core V1.3.2 data pipeline is robust, mathematically validated, and fully automated, future analytical phases can easily explore:
 * **Bright Spots:** Flipping the threshold to identify and analyze the top 5% of areas experiencing *gains* and improvements in ecosystem services (e.g., successful reforestation or restoration impacts).
 * **Country-Level Deep Dives:** Utilizing the built-in subregional tags to extract specific national risk profiles.

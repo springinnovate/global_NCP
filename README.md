@@ -3,8 +3,8 @@
 Jeronimo Rodriguez Escobar
 Affiliation: Global Science, WWF
 Supervisor: Becky Chaplin-Kramer
-Version: v1.3.1
-Last updated: 2026-04-09
+Version: v1.3.2
+Last updated: 2026-04-28
 
 # Executive Summary
 
@@ -27,6 +27,87 @@ Working version of a structured workflow for extracting, analyzing, and visualiz
 The core extraction workflow uses Python (`taskgraph` + `exactextract`) for zonal summaries; R/Quarto is used for consolidation, change calculations, hotspot extraction, and KS tests.
 
 For a detailed technical description of the pipeline steps, see analysis/README_pipeline.md.
+
+### Pipeline Architecture
+
+```mermaid
+%%{init: {'flowchart': {'rankSpacing': 300, 'nodeSpacing': 30}}}%%
+flowchart LR
+    %% Subgraph Styling
+    style INPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+    style PROCESSING fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+    style OUTPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+
+    %% Input Layer
+    subgraph INPUTS [" "]
+        direction TB
+        RawES["<span style='font-size: 38px;'><b>Global InVEST ES Models</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 & 2020)</i></span>"]
+        RawGrid["<span style='font-size: 38px;'><b>IUCN AOO 10km Master Grid</b></span> <br/> <span style='font-size: 32px;'><i>Vector with Subregional Attributes</i></span>"]
+        RawLC["<span style='font-size: 38px;'><b>ESA CCI Land Cover</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 & 2020)</i></span>"]
+        RawSoc["<span style='font-size: 38px;'><b>Socioeconomic Data</b></span> <br/> <span style='font-size: 32px;'>Rasters <i>(Pop, GDP, HDI)</i></span>"]
+    end
+
+    %% Processing Layer
+    subgraph PROCESSING [" "]
+        direction TB
+        IntA["<span style='font-size: 38px;'><b>Path A: Global Trajectories</b></span> <br/> <span style='font-size: 32px;'>Zonal Summaries <i>(1992 & 2020)</i></span>"]
+        MathA["<span style='font-size: 38px;'><b>Path A Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC & Absolute Difference</span>"]
+
+        IntB["<span style='font-size: 38px;'><b>Path B: Grid Analysis</b></span> <br/> <span style='font-size: 32px;'>10km Zonal Summaries <i>(1992 & 2020)</i></span>"]
+        MathB["<span style='font-size: 38px;'><b>Path B Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC & Absolute Difference</span>"]
+
+        MathLC["<span style='font-size: 38px;'><b>Land Cover Transitions</b></span> <br/> <span style='font-size: 32px;'>Reclassified LC Contingency <br/> Matrices per 10km Gridcell</span>"]
+        MathSoc["<span style='font-size: 38px;'><b>Socioeconomic Stats & KS Tests</b></span> <br/> <span style='font-size: 32px;'>10km Grid Aggregation <br/> & Statistical Profiling</span>"]
+    end
+
+    %% Outputs Layer
+    subgraph OUTPUTS [" "]
+        direction TB
+        P1["<span style='font-size: 38px;'><b>WHAT: Global Trajectories</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Bar Charts, Summary Tables, <br/> & Cartographies (GPKGs)</i>"]
+        P2["<span style='font-size: 38px;'><b>WHERE: Hotspot Detection (Top/Bottom 5%)</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Abs & SPC GPKGs, Synthesis Maps, <br/> & Distribution Plots</i>"]
+        P3["<span style='font-size: 38px;'><b>WHY: Attribution Gap</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>LCC Overlap CSVs, Heatmaps, <br/> Scatterplots, & Driver Maps</i>"]
+        P4["<span style='font-size: 38px;'><b>WHO: Equity & Exposure</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>KS Test Plots & <br/> Population Exposure CSVs</i>"]
+    end
+
+    %% Logical Connections
+    RawGrid ==> IntB
+    RawGrid ==> MathLC
+    RawGrid ==> MathSoc
+
+    RawES ==> IntA
+    RawES ==> IntB
+
+    IntA ==> MathA
+    IntB ==> MathB
+
+    MathA ==> P1
+    MathB ==> P2
+
+    %% Downstream Analysis from Hotspots (P2)
+    P2 ==> P3
+    RawLC ==> MathLC
+    MathLC ==> P3
+
+    P2 ==> P4
+    RawSoc ==> MathSoc
+    MathSoc ==> P4
+
+    %% Layout Guides
+    RawSoc ~~~ MathSoc
+    IntA ~~~ P1
+
+    %% CANONICAL COLOR CLASSES (Matching Circular Diagram)
+    classDef c_what fill:#007930,stroke:#004D1E,stroke-width:3px,color:#FFF;
+    classDef c_where fill:#7B8327,stroke:#515619,stroke-width:3px,color:#FFF;
+    classDef c_why fill:#F07D00,stroke:#A85700,stroke-width:3px,color:#FFF;
+    classDef c_who fill:#F5D200,stroke:#B39900,stroke-width:3px,color:#333;
+
+    %% Pillar Assignments
+    class RawES,IntA,MathA,P1 c_what;
+    class RawGrid,IntB,MathB,P2 c_where;
+    class RawLC,MathLC,P3 c_why;
+    class RawSoc,MathSoc,P4 c_who;
+```
 
 ## Documentation Structure
 
