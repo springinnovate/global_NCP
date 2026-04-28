@@ -23,9 +23,12 @@ base_map_path <- "/home/jeronimo/data/global_ncp/vector_basedata/cartographic_ee
 base_sf <- st_read(base_map_path, quiet = TRUE)
 base_sf <- st_transform(base_sf, crs = "EPSG:8857")
 
-# Ensure hotspot_count is numeric so the color ramp behaves as a continuous gradient
-sf_data$hotspot_count <- as.numeric(sf_data$hotspot_count)
-max_count <- max(sf_data$hotspot_count, na.rm = TRUE)
+# Cap hotspot_count at 4 and convert to a discrete factor
+sf_data <- sf_data %>%
+  mutate(
+    hotspots_capped = pmin(as.numeric(hotspot_count), 4),
+    hotspot_label = factor(hotspots_capped, levels = 1:4, labels = c("1", "2", "3", "4+"))
+  )
 
 message("Generating heatmap...")
 
@@ -33,13 +36,17 @@ p <- ggplot() +
   # Base map underneath
   geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) +
   # color = NA ensures the 10km grid cell borders do not render, preventing visual clutter
-  geom_sf(data = sf_data, aes(fill = hotspot_count), color = NA) +
-  scale_fill_viridis_c(
-    option = "inferno",
-    direction = 1,
-    limits = c(1, max_count),   # Lock the scale so colors mean the same thing across maps
-    breaks = seq(1, max_count), # Clean integer breaks in the legend
-    name = "Overlapping\nHotspots"
+  geom_sf(data = sf_data, aes(fill = hotspot_label), color = NA) +
+  scale_fill_manual(
+    name = "Overlapping\nHotspots",
+    values = c(
+      "1" = "#FFD54F",   # Yellow (Warning)
+      "2" = "#FB8C00",   # Orange (Elevated)
+      "3" = "#E53935",   # Red (High)
+      "4+" = "#800026"   # Dark Red (Extreme / Compound Risk)
+    ),
+    na.value = "gray90",
+    drop = FALSE
   ) +
   labs(
     title = "Global Ecosystem Service Hotspot Frequency",
@@ -66,19 +73,23 @@ ggsave(out_path, p, width = 16, height = 9, bg = "white", dpi = 300)
 
 message("Generating high-frequency heatmap (3+ hotspots)...")
 
-sf_data_3plus <- sf_data %>% filter(hotspot_count >= 3)
+sf_data_3plus <- sf_data %>% filter(as.numeric(hotspot_count) >= 3)
 
 p_3plus <- ggplot() +
   # Base map underneath
   geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) +
   # color = NA ensures the 10km grid cell borders do not render, preventing visual clutter
-  geom_sf(data = sf_data_3plus, aes(fill = hotspot_count), color = NA) +
-  scale_fill_viridis_c(
-    option = "inferno",
-    direction = 1,
-    limits = c(1, max_count),    # Lock the scale so colors match Map 1 exactly
-    breaks = seq(3, max_count), # Clean integer breaks in the legend, starting from 3
-    name = "Overlapping\nHotspots"
+  geom_sf(data = sf_data_3plus, aes(fill = hotspot_label), color = NA) +
+  scale_fill_manual(
+    name = "Overlapping\nHotspots",
+    values = c(
+      "1" = "#FFD54F",
+      "2" = "#FB8C00",
+      "3" = "#E53935",
+      "4+" = "#800026"
+    ),
+    na.value = "gray90",
+    drop = FALSE
   ) +
   labs(
     title = "High-Frequency Hotspot Concentrations",
