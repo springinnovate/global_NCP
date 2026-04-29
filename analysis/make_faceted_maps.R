@@ -226,6 +226,23 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
   message("Generating Context Groupings map...")
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
+  biome_labels <- c(
+    'Tropical & Subtropical Moist Broadleaf Forests' = 'Trop/Subtrop Moist Broadleaf',
+    'Tropical & Subtropical Dry Broadleaf Forests' = 'Trop/Subtrop Dry Broadleaf',
+    'Tropical & Subtropical Coniferous Forests' = 'Trop/Subtrop Coniferous',
+    'Temperate Broadleaf & Mixed Forests' = 'Temp Broadleaf/Mixed',
+    'Temperate Coniferous Forests' = 'Temp Coniferous',
+    'Boreal Forests/Taiga' = 'Boreal/Taiga',
+    'Tropical & Subtropical Grasslands, Savannas & Shrublands' = 'Trop/Subtrop Grass/Sav/Shrub',
+    'Temperate Grasslands, Savannas & Shrublands' = 'Temp Grass/Sav/Shrub',
+    'Flooded Grasslands & Savannas' = 'Flooded Grass/Savannas',
+    'Montane Grasslands & Shrublands' = 'Montane Grass/Shrub',
+    'Tundra' = 'Tundra',
+    'Mediterranean Forests, Woodlands & Scrub' = 'Mediterranean',
+    'Deserts & Xeric Shrublands' = 'Deserts & Xeric Shrub',
+    'Mangroves' = 'Mangroves'
+  )
+
   # Helper to load and clean geometries (masking Antarctica)
   load_and_clean <- function(gpkg_path) {
     d <- st_read(gpkg_path, quiet = TRUE)
@@ -246,7 +263,8 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
     labs(title = "World Bank Regions") +
     theme_void() +
     theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
-          legend.position = "bottom", legend.text = element_text(size = 9)) +
+          legend.position = "bottom", legend.text = element_text(size = 8),
+          legend.key.size = unit(0.3, "cm")) +
     guides(fill = guide_legend(ncol = 3))
 
   # 2. Income Group
@@ -258,7 +276,8 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
     labs(title = "Income Groups") +
     theme_void() +
     theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
-          legend.position = "bottom", legend.text = element_text(size = 9)) +
+          legend.position = "bottom", legend.text = element_text(size = 8),
+          legend.key.size = unit(0.3, "cm")) +
     guides(fill = guide_legend(ncol = 2))
 
   # 3. Biome
@@ -266,12 +285,13 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
   sf_bio$WWF_biome[is.na(sf_bio$WWF_biome) | sf_bio$WWF_biome %in% c("Lakes", "Rock & Ice")] <- NA
   p_bio <- ggplot(sf_bio) +
     geom_sf(aes(fill = WWF_biome), color = "gray50", linewidth = 0.1) +
-    scale_fill_manual(values = group_palettes$biome, na.value = "gray90", name = NULL) +
+    scale_fill_manual(values = group_palettes$biome, labels = biome_labels, na.value = "gray90", name = NULL) +
     labs(title = "WWF Biomes") +
     theme_void() +
     theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
-          legend.position = "bottom", legend.text = element_text(size = 9)) +
-    guides(fill = guide_legend(ncol = 2))
+          legend.position = "bottom", legend.text = element_text(size = 7),
+          legend.key.size = unit(0.3, "cm")) +
+    guides(fill = guide_legend(ncol = 3))
 
   # 4. Country
   sf_ctry <- load_and_clean(groupings_files$Country)
@@ -286,7 +306,7 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
                     theme = theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5)))
 
   out_path <- file.path(out_dir, "context_groupings_map.png")
-  ggsave(out_path, combined_plot, width = 18, height = 14, bg = "white", dpi = 300)
+  ggsave(out_path, combined_plot, width = 16, height = 9, bg = "white", dpi = 300)
   message("Saved context map to: ", out_path)
 }
 

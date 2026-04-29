@@ -98,7 +98,7 @@ if (length(old_hotness) > 0) {
 #| label: load-data
 
 # 1. Load Hotspot Data (plt_long)
-rds_path <- file.path(data_dir(), "processed", params$input_plt_long)
+rds_path <- here::here("home", "jeronimo", "data", "global_ncp", "processed", params$input_plt_long)
 if (file.exists(rds_path)) {
   message("Loading data from: ", rds_path)
   plt_long <- readRDS(rds_path)
@@ -114,7 +114,9 @@ if (file.exists(gpkg_grid)) {
   grid_df <- sf::st_drop_geometry(grid_df)
   if ("orig_fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = orig_fid)
   if ("grid_fid" %in% names(grid_df) && !"fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = grid_fid)
-  if (!"fid" %in% names(grid_df)) grid_df$fid <- seq_len(nrow(grid_df))
+  if ("id" %in% names(grid_df) && !"fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = id)
+
+  if (!"fid" %in% names(grid_df)) stop("Fatal Error: grid_df is missing a stable identifier (fid/orig_fid/grid_fid).")
 
   # FIX: Ensure missing grouping attributes are rejoined from the master grid
   missing_groupings <- setdiff(c("income_grp", "region_wb", "WWF_biome"), names(grid_df))
@@ -274,6 +276,33 @@ group_palettes <- list(
 )
 group_palettes$WWF_biome <- group_palettes$biome
 
+biome_labels <- c(
+  'Tropical & Subtropical Moist Broadleaf Forests' = 'Trop/Subtrop Moist Broadleaf',
+  'Tropical & Subtropical Dry Broadleaf Forests' = 'Trop/Subtrop Dry Broadleaf',
+  'Tropical & Subtropical Coniferous Forests' = 'Trop/Subtrop Coniferous',
+  'Temperate Broadleaf & Mixed Forests' = 'Temp Broadleaf/Mixed',
+  'Temperate Coniferous Forests' = 'Temp Coniferous',
+  'Boreal Forests/Taiga' = 'Boreal/Taiga',
+  'Tropical & Subtropical Grasslands, Savannas & Shrublands' = 'Trop/Subtrop Grass/Sav/Shrub',
+  'Temperate Grasslands, Savannas & Shrublands' = 'Temp Grass/Sav/Shrub',
+  'Flooded Grasslands & Savannas' = 'Flooded Grass/Savannas',
+  'Montane Grasslands & Shrublands' = 'Montane Grass/Shrub',
+  'Tundra' = 'Tundra',
+  'Mediterranean Forests, Woodlands & Scrub' = 'Mediterranean',
+  'Deserts & Xeric Shrublands' = 'Deserts & Xeric Shrub',
+  'Mangroves' = 'Mangroves'
+)
+
+get_short_name <- function(g, grp_name) {
+  g <- as.character(g)
+  if (any(grp_name %in% c("WWF_biome", "biome"))) {
+    res <- biome_labels[g]
+    unname(ifelse(is.na(res), g, res))
+  } else {
+    g
+  }
+}
+
 library(tidytext)
 
 out_intensity_dir <- file.path(out_plots(), paste0("intensity", params$output_suffix))
@@ -294,34 +323,65 @@ for (g_var in valid_groupings) {
     )
   if(nrow(plot_data) == 0) next
 
+  unique_groups <- sort(unique(as.character(plot_data$group)))
+  group_id_map <- setNames(seq_along(unique_groups), unique_groups)
+  unique_groups_desc <- sort(unique_groups, decreasing = TRUE)
+  legend_levels <- paste0("[", group_id_map[unique_groups_desc], "] ", get_short_name(unique_groups_desc, g_var))
+
+  plot_data <- plot_data %>%
+    dplyr::mutate(
+      group = factor(group, levels = unique_groups_desc),
+      grp_num_id = as.character(group_id_map[as.character(group)]),
+      grp_legend_label = factor(paste0("[", grp_num_id, "] ", get_short_name(as.character(group), g_var)), levels = legend_levels)
+    )
+
+  legend_cols <- if (g_var == "WWF_biome") 5 else 4
   custom_palette <- group_palettes[[g_var]]
+  if (!is.null(custom_palette)) {
+    valid_keys <- intersect(names(custom_palette), unique_groups)
+    new_palette <- custom_palette[valid_keys]
+    names(new_palette) <- paste0("[", group_id_map[valid_keys], "] ", get_short_name(valid_keys, g_var))
+    custom_palette <- new_palette
+  }
 
   # 1. Coverage Plot
-  p_cov <- ggplot(plot_data, aes(x = pct_area, y = group, fill = group)) +
-    geom_col() + facet_wrap(~ service, scales = "free_x", ncol = 3) +
+  p_cov <- ggplot(plot_data, aes(x = pct_area, y = group)) +
+    geom_col(fill = "#E83737") +
+    geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
+    geom_text(aes(label = grp_num_id), color = "black", x = -Inf, hjust = 1.5, size = 3, fontface = "bold", show.legend = FALSE) +
+    coord_cartesian(clip = "off") +
+    facet_wrap(~ service, scales = "free_x", ncol = 3) +
     labs(title = paste("Hotspot Coverage by", g_var), x = "% of Area that is a Hotspot", y = NULL) + theme_minimal() +
-    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8)) +
-    guides(fill = guide_legend(ncol = 4))
-  if (!is.null(custom_palette)) p_cov <- p_cov + scale_fill_manual(values = custom_palette, na.value = "gray50")
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8), plot.margin = margin(l = 30)) +
+    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
+  if (!is.null(custom_palette)) p_cov <- p_cov + scale_color_manual(values = custom_palette, na.value = "gray50")
   ggsave(file.path(out_intensity_dir, paste0("hotspot_coverage_", tolower(g_var), ".png")), p_cov, width=14, height=10, bg="white")
 
   # 2. Share Plot
-  p_share <- ggplot(plot_data, aes(x = pct_share, y = group, fill = group)) +
-    geom_col() + facet_wrap(~ service, scales = "free_x", ncol = 3) +
+  p_share <- ggplot(plot_data, aes(x = pct_share, y = group)) +
+    geom_col(fill = "#E83737") +
+    geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
+    geom_text(aes(label = grp_num_id), color = "black", x = -Inf, hjust = 1.5, size = 3, fontface = "bold", show.legend = FALSE) +
+    coord_cartesian(clip = "off") +
+    facet_wrap(~ service, scales = "free_x", ncol = 3) +
     labs(title = paste("Global Hotspot Share by", g_var), x = "% of Global Hotspots", y = NULL) + theme_minimal() +
-    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8)) +
-    guides(fill = guide_legend(ncol = 4))
-  if (!is.null(custom_palette)) p_share <- p_share + scale_fill_manual(values = custom_palette, na.value = "gray50")
+    theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8), plot.margin = margin(l = 30)) +
+    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
+  if (!is.null(custom_palette)) p_share <- p_share + scale_color_manual(values = custom_palette, na.value = "gray50")
   ggsave(file.path(out_intensity_dir, paste0("hotspot_share_", tolower(g_var), ".png")), p_share, width=14, height=10, bg="white")
 
   # 3. Relative Intensity Plot
-  p_enrich <- ggplot(plot_data, aes(x = relative_intensity, y = group, fill = group)) +
-    geom_col(aes(alpha = relative_intensity > 1)) + geom_vline(xintercept = 1, linetype = "dashed", color = "black") + facet_wrap(~ service, scales = "free_x", ncol = 3) +
+  p_enrich <- ggplot(plot_data, aes(x = relative_intensity, y = group)) +
+    geom_col(aes(alpha = relative_intensity > 1), fill = "#E83737") + geom_vline(xintercept = 1, linetype = "dashed", color = "black") +
+    geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
+    geom_text(aes(label = grp_num_id), color = "black", x = -Inf, hjust = 1.5, size = 3, fontface = "bold", show.legend = FALSE) +
+    coord_cartesian(clip = "off") +
+    facet_wrap(~ service, scales = "free_x", ncol = 3) +
     scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.4), guide = "none") +
     labs(title = paste("Relative Hotspot Intensity by", g_var), x = "Intensity Score (Regional Hotspot % ÷ Global Average [~5%])", y = NULL) +
-    theme_minimal() + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8)) +
-    guides(fill = guide_legend(ncol = 4))
-  if (!is.null(custom_palette)) p_enrich <- p_enrich + scale_fill_manual(values = custom_palette, na.value = "gray50")
+    theme_minimal() + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8), plot.margin = margin(l = 30)) +
+    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
+  if (!is.null(custom_palette)) p_enrich <- p_enrich + scale_color_manual(values = custom_palette, na.value = "gray50")
   ggsave(file.path(out_intensity_dir, paste0("hotspot_relative_intensity_", tolower(g_var), ".png")), p_enrich, width=14, height=10, bg="white")
 }
 ```

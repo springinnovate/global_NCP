@@ -199,7 +199,7 @@ What this chunk does:
 
 ```{r}
 #| label: make-signed-bars-data
-#| eval: false
+#| eval: true
 #| echo: false
 #| message: true
 #| warning: false
@@ -250,7 +250,24 @@ if ("grid_fid" %in% names(sf_f) && !"fid" %in% names(sf_f)) {
 # TODO: Robustify grid alignment. Relying on row-order (seq_len) for fid generation is fragile
 # if the input GPKG has been filtered or sorted differently from the base attributes.
 if (!"fid" %in% names(sf_f)) {
-  sf_f$fid <- seq_len(nrow(sf_f))
+  if ("orig_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = orig_fid)
+  else if ("grid_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = grid_fid)
+  else if ("id" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = id)
+  else stop("Fatal Error: sf_f is missing a stable identifier (fid/orig_fid/grid_fid).")
+}
+
+# Join missing attributes from master grid
+missing_groupings <- setdiff(groupings, names(sf_f))
+if (length(missing_groupings) > 0) {
+  message("Joining missing attributes from master grid: ", paste(missing_groupings, collapse = ", "))
+  master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"), quiet = TRUE)
+  master_grid <- sf::st_drop_geometry(master_grid)
+  if ("orig_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = orig_fid)
+  if ("grid_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = grid_fid)
+  if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = id)
+  if (!"fid" %in% names(master_grid)) master_grid$fid <- seq_len(nrow(master_grid))
+  grid_attrs <- master_grid %>% dplyr::select(dplyr::any_of(c("fid", missing_groupings)))
+  sf_f <- sf_f %>% dplyr::left_join(grid_attrs, by = "fid")
 }
 
 # Diagnostic: Check loaded columns
@@ -384,7 +401,7 @@ if (nrow(signed_summary) > 0) {
 
 ```{r}
 #| label: compute-global-refs
-#| eval: false
+#| eval: true
 #| message: false
 #| warning: false
 #| echo: false
@@ -424,7 +441,7 @@ glob_refs <- compute_global_refs(sf_f, services, cut_q = cut_q,
 
 ```{r}
 #| label: make-signed-bars-plot
-#| eval: false
+#| eval: true
 #| message: false
 #| warning: false
 #| echo: false
@@ -452,23 +469,85 @@ group_palettes <- list(
 )
 group_palettes$WWF_biome <- group_palettes$biome
 
+biome_labels <- c(
+  'Tropical & Subtropical Moist Broadleaf Forests' = 'Trop/Subtrop Moist Broadleaf',
+  'Tropical & Subtropical Dry Broadleaf Forests' = 'Trop/Subtrop Dry Broadleaf',
+  'Tropical & Subtropical Coniferous Forests' = 'Trop/Subtrop Coniferous',
+  'Temperate Broadleaf & Mixed Forests' = 'Temp Broadleaf/Mixed',
+  'Temperate Coniferous Forests' = 'Temp Coniferous',
+  'Boreal Forests/Taiga' = 'Boreal/Taiga',
+  'Tropical & Subtropical Grasslands, Savannas & Shrublands' = 'Trop/Subtrop Grass/Sav/Shrub',
+  'Temperate Grasslands, Savannas & Shrublands' = 'Temp Grass/Sav/Shrub',
+  'Flooded Grasslands & Savannas' = 'Flooded Grass/Savannas',
+  'Montane Grasslands & Shrublands' = 'Montane Grass/Shrub',
+  'Tundra' = 'Tundra',
+  'Mediterranean Forests, Woodlands & Scrub' = 'Mediterranean',
+  'Deserts & Xeric Shrublands' = 'Deserts & Xeric Shrub',
+  'Mangroves' = 'Mangroves'
+)
+
+get_short_name <- function(g, grp_name) {
+  g <- as.character(g)
+  if (any(grp_name %in% c("WWF_biome", "biome"))) {
+    res <- biome_labels[g]
+    unname(ifelse(is.na(res), g, res))
+  } else {
+    g
+  }
+}
+
 plot_signed_bars <- function(df, grouping, metric, refs, out_dir_base = "outputs/plots") {
   d <- dplyr::filter(df, grouping == !!grouping, metric == !!metric)
   if (!nrow(d)) return(invisible(NULL))
   d$service <- factor(d$service, levels = services)
-  d$group   <- factor(d$group, levels = rev(sort(unique(d$group))))
+
+  d <- d %>%
+    dplyr::mutate(
+      status = dplyr::case_when(
+        service %in% c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio") & mean_chg > 0 ~ "Good",
+        service %in% c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio") & mean_chg < 0 ~ "Bad",
+        service %in% c("Sed_export","N_export","C_Risk") & mean_chg < 0 ~ "Good",
+        service %in% c("Sed_export","N_export","C_Risk") & mean_chg > 0 ~ "Bad",
+        TRUE ~ "Neutral"
+      )
+    )
+
+  unique_groups <- sort(unique(as.character(d$group)))
+  group_id_map <- setNames(seq_along(unique_groups), unique_groups)
+  unique_groups_desc <- sort(unique_groups, decreasing = TRUE)
+  legend_levels <- paste0("[", group_id_map[unique_groups_desc], "] ", get_short_name(unique_groups_desc, grouping))
+
+  d <- d %>%
+    dplyr::mutate(
+      group = factor(group, levels = unique_groups_desc),
+      grp_num_id = as.character(group_id_map[as.character(group)]),
+      grp_legend_label = factor(paste0("[", grp_num_id, "] ", get_short_name(as.character(group), grouping)), levels = legend_levels)
+    )
+
   refs_use <- dplyr::filter(refs, metric == !!metric)
   refs_use$service <- factor(refs_use$service, levels = services)
 
   custom_palette <- group_palettes[[grouping]]
-  # Handle output directory with suffix
+  if (!is.null(custom_palette)) {
+    valid_keys <- intersect(names(custom_palette), unique_groups)
+    new_palette <- custom_palette[valid_keys]
+    names(new_palette) <- paste0("[", group_id_map[valid_keys], "] ", get_short_name(valid_keys, grouping))
+    custom_palette <- new_palette
+  }
+  legend_cols <- if (grouping == "WWF_biome") 5 else 4
+  status_colors <- c("Good" = "#007930", "Bad" = "#E83737", "Neutral" = "gray70")
+
   out_dir <- out_dir_base
 
-  p <- ggplot(d, aes(x = mean_chg, y = group, fill = group)) +
-    geom_col(show.legend = TRUE) +
+  p <- ggplot(d, aes(x = mean_chg, y = group)) +
+    geom_col(aes(fill = status), show.legend = FALSE) +
+    scale_fill_manual(values = status_colors) +
     geom_vline(xintercept = 0, color = "#7f7f7f", linewidth = 0.6) +
     geom_vline(data = refs_use, aes(xintercept = ref),
                linetype = "dashed", color = "#4a4a4a", linewidth = 0.5) +
+    geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
+    geom_text(aes(label = grp_num_id), color = "black", x = -Inf, hjust = 1.5, size = 3, fontface = "bold", show.legend = FALSE) +
+    coord_cartesian(clip = "off") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
     labs(title = paste0("Regional Mean Change — ", grouping, " [", metric, "]"),
          subtitle = "Averaged over active areas only; dashed line = global mean",
@@ -481,11 +560,12 @@ plot_signed_bars <- function(df, grouping, metric, refs, out_dir_base = "outputs
           axis.ticks.y = element_blank(),
           legend.position = "bottom",
           legend.title = element_blank(),
-          legend.text = element_text(size = 8)) +
-    guides(fill = guide_legend(ncol = 4))
+          legend.text = element_text(size = 8),
+          plot.margin = margin(l = 30)) +
+    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
 
   if (!is.null(custom_palette)) {
-    p <- p + scale_fill_manual(values = custom_palette, na.value = "gray50")
+    p <- p + scale_color_manual(values = custom_palette, na.value = "gray50")
   }
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -572,7 +652,7 @@ if (!exists("sf_f")) {
   sf_f <- sf::st_drop_geometry(sf_f)
   if ("orig_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = orig_fid)
   if ("grid_fid" %in% names(sf_f) && !"fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = grid_fid)
-  if (!"fid" %in% names(sf_f)) sf_f$fid <- seq_len(nrow(sf_f))
+  if (!"fid" %in% names(sf_f)) stop("Fatal Error: sf_f is missing a stable identifier (fid/orig_fid/grid_fid).")
 
   # Robustness: Ensure grouping columns exist before pivoting
   # (Removed redundant AOOGrid join; input GPKG is authoritative)
@@ -816,14 +896,12 @@ if (exists("grid_sf") && inherits(grid_sf, "sf")) {
   master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
   stopifnot(file.exists(master_path))
   geom_sf <- sf::st_read(master_path, quiet = TRUE)
-  if ("id" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) {
-    geom_sf <- dplyr::rename(geom_sf, fid = id)
-  }
 
-  # ASSIGN FID HERE BEFORE FILTERING
-  if (!"fid" %in% names(geom_sf)) {
-    geom_sf$fid <- seq_len(nrow(geom_sf))
-  }
+  # Safely resolve canonical ID, avoiding seq_len() which causes spatial shifts
+  if ("orig_fid" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) geom_sf <- dplyr::rename(geom_sf, fid = orig_fid)
+  if ("grid_fid" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) geom_sf <- dplyr::rename(geom_sf, fid = grid_fid)
+  if ("id" %in% names(geom_sf) && !"fid" %in% names(geom_sf)) geom_sf <- dplyr::rename(geom_sf, fid = id)
+  if (!"fid" %in% names(geom_sf)) geom_sf$fid <- seq_len(nrow(geom_sf))
 
   geom_sf <- geom_sf |> dplyr::select(dplyr::any_of(c("fid", "iso3", "continent", "region_un", "subregion", "nev_name", "region_wb", "income_grp", "WWF_biome")))
 }
@@ -1052,7 +1130,7 @@ dplyr::glimpse(hot_index, width = 120)
 
 ```{r}
 #| label: display-barplots
-#| eval: false
+#| eval: true
 #| echo: false
 #| results: 'asis'
 #| cache: false
@@ -1622,28 +1700,31 @@ if (lc_data_ready) {
     canon_order <- c("C_Risk", "N_export", "Sed_export", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio", "Pollination", "Nature_Access")
     plot_data$service <- factor(plot_data$service, levels = canon_order)
 
-    if (nrow(plot_data) > 100) {
-      p_scatter <- ggplot(plot_data, aes(x = driver_val, y = pct_chg)) +
-        geom_bin2d(bins = 60) +
-        scale_fill_viridis_c(trans = "log10", option = "viridis", labels = scales::comma) +
-        geom_smooth(method = "lm", color = "tomato", linetype = "22", linewidth = 0.5) +
-        facet_wrap(~ service, scales = "free_y", ncol = 3) +
-        labs(title = paste("Driver vs ES Change:", d_name),
-             x = paste(d_name, "(% Area)"),
-             y = "ES Change (%)",
-             fill = "Count\n(log10)") +
-        theme_minimal() +
-        theme(axis.title = element_text(size = 8),
-              axis.text = element_text(size = 8),
-          strip.text = element_text(size = 10),
-          legend.title = element_text(size = 9),
-          legend.text = element_text(size = 7))
+    for (m_col in c("pct_chg", "abs_chg")) {
+      m_label <- if (m_col == "pct_chg") "Percentage" else "Absolute"
+      m_short <- if (m_col == "pct_chg") "pct" else "abs"
 
-      print(p_scatter)
+      plot_subset <- plot_data %>% filter(!is.na(.data[[m_col]]))
 
-      out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
-      dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-      ggsave(file.path(out_dir, paste0("scatter_", d_name, ".png")), p_scatter, width = 12, height = 8, bg = "white", dpi = 300)
+      if (nrow(plot_subset) > 100) {
+        p_scatter <- ggplot(plot_subset, aes(x = driver_val, y = .data[[m_col]])) +
+          geom_bin2d(bins = 60) +
+          scale_fill_viridis_c(trans = "log10", option = "viridis", labels = scales::comma) +
+          geom_smooth(method = "lm", color = "tomato", linetype = "22", linewidth = 0.5) +
+          facet_wrap(~ service, scales = "free_y", ncol = 3) +
+          labs(title = paste("Driver vs ES Change:", d_name, "(", m_label, ")"),
+               x = paste(d_name, "(% Area)"),
+               y = paste("ES Change (", m_label, ")"),
+               fill = "Count\n(log10)") +
+          theme_minimal() +
+          theme(axis.title = element_text(size = 8), axis.text = element_text(size = 8),
+                strip.text = element_text(size = 10), legend.title = element_text(size = 9), legend.text = element_text(size = 7))
+
+        print(p_scatter)
+        out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
+        dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+        ggsave(file.path(out_dir, paste0("scatter_", d_name, "_", m_short, ".png")), p_scatter, width = 12, height = 8, bg = "white", dpi = 300)
+      }
     }
   }
 }
@@ -1671,13 +1752,15 @@ if (lc_data_ready) {
       grid_attrs_path <- file.path(data_dir(), "interim", "..", "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
       if (!file.exists(grid_attrs_path)) stop("Base grid attribute file not found.")
 
-      grid_attrs_df <- sf::st_read(grid_attrs_path, quiet = TRUE) %>%
-        sf::st_drop_geometry() %>%
-        dplyr::select(any_of(c("fid", group_cols)))
+    grid_attrs_df <- sf::st_read(grid_attrs_path, quiet = TRUE) %>% sf::st_drop_geometry()
 
-      if (!"fid" %in% names(grid_attrs_df)) {
-        grid_attrs_df$fid <- seq_len(nrow(grid_attrs_df))
-      }
+    # Safely resolve canonical ID, avoiding seq_len() which causes spatial shifts
+    if ("orig_fid" %in% names(grid_attrs_df) && !"fid" %in% names(grid_attrs_df)) grid_attrs_df <- dplyr::rename(grid_attrs_df, fid = orig_fid)
+    if ("grid_fid" %in% names(grid_attrs_df) && !"fid" %in% names(grid_attrs_df)) grid_attrs_df <- dplyr::rename(grid_attrs_df, fid = grid_fid)
+    if ("id" %in% names(grid_attrs_df) && !"fid" %in% names(grid_attrs_df)) grid_attrs_df <- dplyr::rename(grid_attrs_df, fid = id)
+    if (!"fid" %in% names(grid_attrs_df)) grid_attrs_df$fid <- seq_len(nrow(grid_attrs_df))
+
+    grid_attrs_df <- grid_attrs_df %>% dplyr::select(any_of(c("fid", group_cols)))
 
       attrs <- plt_long %>%
         dplyr::select(fid) %>%

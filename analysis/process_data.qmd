@@ -123,15 +123,16 @@ B <- st_read(ben_path)
 # TODO (v1.4.0 Refactor): Python now preserves the pre-explosion grid ID as `orig_fid`.
 # This entire spatial join and group_by block should be ripped out and replaced with a simple
 # tabular `left_join(by = "orig_fid")` once the new python extractions are fully cached.
-master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land.gpkg")
+master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
 if (!file.exists(master_path)) stop("Master grid not found!")
 master_grid <- sf::st_read(master_path, quiet = TRUE)
-if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) {
-  master_grid <- dplyr::rename(master_grid, fid = id)
-}
-if (!"fid" %in% names(master_grid)) {
-  master_grid$fid <- seq_len(nrow(master_grid))
-}
+
+# Safely resolve canonical ID, avoiding seq_len() which causes spatial shifts
+if ("orig_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = orig_fid)
+if ("grid_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = grid_fid)
+if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = id)
+if (!"fid" %in% names(master_grid)) master_grid$fid <- seq_len(nrow(master_grid))
+
 master_grid <- sf::st_make_valid(master_grid)
 
 # Normalize grouping column names to canonical forms (handle casing issues)
@@ -321,7 +322,10 @@ if (isTRUE(write_full_change)) {
 # This avoids doing too many complex operations in a single chunk.
 
 if (!"fid" %in% names(sf_f)) {
-  sf_f$fid <- seq_len(nrow(sf_f))
+  if ("orig_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = orig_fid)
+  else if ("grid_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = grid_fid)
+  else if ("id" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = id)
+  else stop("Fatal Error: sf_f is missing a stable identifier (fid/orig_fid/grid_fid).")
 }
 
 # Define service rename mapping (same as in consolidation chunk).
@@ -358,7 +362,10 @@ if (!length(chg_cols)) {
   }, silent = TRUE)
   sf_f <- st_read(file.path(processed_dir, "10k_grid_ES_change_benef.gpkg"), quiet = FALSE)
   if (!"fid" %in% names(sf_f)) {
-    sf_f$fid <- seq_len(nrow(sf_f))
+    if ("orig_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = orig_fid)
+    else if ("grid_fid" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = grid_fid)
+    else if ("id" %in% names(sf_f)) sf_f <- dplyr::rename(sf_f, fid = id)
+    else stop("Fatal Error: sf_f is missing a stable identifier (fid/orig_fid/grid_fid).")
   }
   chg_cols <- grep("(_(abs|pct)_chg$)", names(sf_f), value = TRUE)
 }
