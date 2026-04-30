@@ -27,6 +27,7 @@ library(purrr)
 library(tidyr)
 library(here)
 library(patchwork) # Essential for different color scales in a "faceted" layout
+library(rnaturalearth)
 
 # ------------------------------------------------------------------------------
 # 1. Cartography Rule Engine & Lookup Tables
@@ -124,6 +125,28 @@ plot_single_service <- function(sf_data, service_name, value_col = "pct_chg") {
     )
 
   return(p)
+}
+
+# Function to generate a clean "First Look" global transition map
+generate_first_look_map <- function(gpkg_path, out_file) {
+  message("Generating First Look map from: ", gpkg_path)
+  if (!file.exists(gpkg_path)) {
+    message("  -> WARNING: File not found: ", gpkg_path)
+    return(NULL)
+  }
+  
+  hotspots <- st_read(gpkg_path, quiet = TRUE)
+  world <- ne_countries(scale = "medium", returnclass = "sf")
+  
+  p <- ggplot() +
+    geom_sf(data = world, fill = "gray90", color = "white", linewidth = 0.2) +
+    geom_sf(data = hotspots, fill = "#E83737", color = NA) + 
+    coord_sf(crs = "+proj=eqearth") + 
+    theme_void() +
+    theme(panel.background = element_rect(fill = "white", color = NA), plot.background = element_rect(fill = "white", color = NA), plot.margin = margin(0, 0, 0, 0))
+  
+  ggsave(out_file, p, width = 16, height = 9, dpi = 300, bg = "white")
+  message("Saved First Look map to: ", out_file)
 }
 
 # Function to create the faceted layout for a specific grouping
@@ -316,6 +339,16 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
 
 source(here::here("R", "paths.R"))
 
+out_maps_dir <- file.path("outputs", "plots", "maps")
+dir.create(out_maps_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Wipe out old maps before generating new ones to ensure clean state
+old_maps <- list.files(out_maps_dir, pattern = "\\.png$", full.names = TRUE)
+if (length(old_maps) > 0) {
+  unlink(old_maps)
+  message("Cleared ", length(old_maps), " old maps from: ", out_maps_dir)
+}
+
 # Define your groupings and their corresponding GPKG file paths
 groupings_files <- list(
   "World_Bank_Region" = file.path(data_dir(), "processed", "output_maps", "region_wb_change_map.gpkg"),
@@ -324,11 +357,21 @@ groupings_files <- list(
   "Country"           = file.path(data_dir(), "processed", "output_maps", "country_change_map.gpkg")
 )
 
+# 1. Generate First Look Overview Maps
+gpkg_global_pct <- "home/jeronimo/data/global_ncp/processed/hotspots/pct/global/hotspots_global_pct.gpkg"
+gpkg_global_abs <- "home/jeronimo/data/global_ncp/processed/hotspots/abs/global/hotspots_global_abs.gpkg"
+
+generate_first_look_map(gpkg_global_pct, file.path(out_maps_dir, "first_look_map_pct.png"))
+generate_first_look_map(gpkg_global_abs, file.path(out_maps_dir, "first_look_map_abs.png"))
+
 # Run the loop for percentage change maps
 iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "pct"))
+iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "pct", out_dir = out_maps_dir))
 
 # Run the loop for absolute change maps
 iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "abs"))
+iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "abs", out_dir = out_maps_dir))
 
 # Generate the contextual groupings map
 generate_context_groupings_map(groupings_files)
+generate_context_groupings_map(groupings_files, out_dir = out_maps_dir)

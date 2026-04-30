@@ -449,24 +449,16 @@ plot_stacked_overlap <- function(df, g_var) {
     dplyr::filter(!.data[[g_var]] %in% exclude_regions) %>%
     dplyr::filter(hotspot_count > 0) %>% # Conditional on being a hotspot
     dplyr::mutate(
-      cat = dplyr::case_when(
-        hotspot_count == 1 ~ "1",
-        hotspot_count == 2 ~ "2",
-        hotspot_count == 3 ~ "3",
-        hotspot_count == 4 ~ "4",
-        hotspot_count == 5 ~ "5",
-        hotspot_count >= 6 ~ "6+",
-        TRUE ~ as.character(hotspot_count)
-      ),
-      cat = factor(cat, levels = c("1", "2", "3", "4", "5", "6+"))
+      hotspots_capped = pmin(as.numeric(hotspot_count), 4),
+      cat = factor(hotspots_capped, levels = 1:4, labels = c("1", "2", "3", "4+"))
     ) %>%
     dplyr::count(group = .data[[g_var]], cat) %>%
     dplyr::group_by(group) %>%
     dplyr::mutate(pct = n / sum(n)) %>%
     dplyr::ungroup()
 
-  # Filter top 15 groups by severe multi-service share (3 or more combined)
-  top_groups <- d_summ %>% dplyr::filter(cat %in% c("3", "4", "5", "6+")) %>% dplyr::group_by(group) %>% dplyr::summarise(pct = sum(pct)) %>% dplyr::arrange(desc(pct)) %>% dplyr::slice_head(n = 15) %>% dplyr::pull(group)
+  # Filter top 15 groups by severe multi-service share (3 or 4+ combined)
+  top_groups <- d_summ %>% dplyr::filter(cat %in% c("3", "4+")) %>% dplyr::group_by(group) %>% dplyr::summarise(pct = sum(pct)) %>% dplyr::arrange(desc(pct)) %>% dplyr::slice_head(n = 15) %>% dplyr::pull(group)
   if (length(unique(d_summ$group)) > 20) {
     if (length(top_groups) < 15) {
       extra_groups <- setdiff(unique(d_summ$group), top_groups)
@@ -480,7 +472,15 @@ plot_stacked_overlap <- function(df, g_var) {
 
   p <- ggplot2::ggplot(d_summ, ggplot2::aes(x = group, y = pct, fill = cat)) +
     ggplot2::geom_col(position = "fill") +
-    ggplot2::scale_fill_viridis_d(option = "magma", direction = 1, name = "Services") +
+    ggplot2::scale_fill_manual(
+      name = "Overlapping\nHotspots",
+      values = c(
+        "1" = "#FFD54F",
+        "2" = "#FB8C00",
+        "3" = "#E53935",
+        "4+" = "#800026"
+      )
+    ) +
     ggplot2::coord_flip() +
     ggplot2::labs(
       title = paste0("Multi-service Hotspot Distribution by ", g_var),
