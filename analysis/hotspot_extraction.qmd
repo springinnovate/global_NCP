@@ -1452,6 +1452,9 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
   ce_col <- grep("Expansion_Gain_Cropland", names(lc_df), value = TRUE)
   if (length(ce_col) > 0) drivers[["Crop_Exp"]] <- ce_col[1]
 
+    ue_col <- grep("Expansion_Gain_Urban", names(lc_df), value = TRUE)
+  if (length(ue_col) > 0) drivers[["Urban_Exp"]] <- ue_col[1]
+
   # Identify Net Forest Change for correlation analysis
   net_col <- "ForestLoss_dir_ch_Forest_1992_2020"
   if (!net_col %in% names(lc_df)) {
@@ -1484,78 +1487,86 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
 #| message: false
 #| warning: false
 
-overlap_stats <- NULL
+overlap_stats_all <- list()
 if (lc_data_ready) {
-  overlap_list <- list()
+for (m_col in c("pct_chg", "abs_chg")) {
+    m_short <- ifelse(m_col == "pct_chg", "pct", "abs")
+    overlap_list <- list()
 
-  for (d_name in names(drivers)) {
-    d_col <- drivers[[d_name]]
+    for (d_name in names(drivers)) {
+      d_col <- drivers[[d_name]]
 
-    # Define Driver Hotspots (Top 5% of change)
-    # For Loss columns (ForestLoss), high values = high loss.
-    # For Gain columns (Urban/Crop), high values = high expansion.
-    cutoff <- quantile(lc_df[[d_col]], 0.95, na.rm = TRUE)
-    driver_hotspots <- lc_df %>%
-      filter(.data[[d_col]] > cutoff) %>%
-      pull(fid)
+      # Define Driver Hotspots (Top 5% of change)
+      # For Loss columns (ForestLoss), high values = high loss.
+      # For Gain columns (Urban/Crop), high values = high expansion.
+      cutoff <- quantile(lc_df[[d_col]], 0.95, na.rm = TRUE)
+      driver_hotspots <- lc_df %>%
+        filter(.data[[d_col]] > cutoff) %>%
+        pull(fid)
 
-    # Export Driver Hotspots (Top 5%) to GPKG
-    driver_out_dir <- file.path(data_dir(), "processed", paste0("hotspots", params$output_suffix), "drivers")
-    if (!dir.exists(driver_out_dir)) dir.create(driver_out_dir, recursive = TRUE)
+      # Export Driver Hotspots (Top 5%) to GPKG
+      if (m_col == "pct_chg") {
+        driver_out_dir <- file.path(data_dir(), "processed", paste0("hotspots", params$output_suffix), "drivers")
+        if (!dir.exists(driver_out_dir)) dir.create(driver_out_dir, recursive = TRUE)
 
-    driver_layer_name <- paste0("hotspots_", d_name, ".gpkg")
-    out_path <- file.path(driver_out_dir, driver_layer_name)
+        driver_layer_name <- paste0("hotspots_", d_name, ".gpkg")
+        out_path <- file.path(driver_out_dir, driver_layer_name)
 
-    if (file.exists(out_path) && !isTRUE(params$force_export)) {
-      message("Skipping driver hotspot export (file exists): ", out_path)
-    } else {
-      if (isTRUE(params$force_export) && file.exists(out_path)) {
-        message("Overwriting driver hotspot (force_export=TRUE): ", out_path)
-      } else {
-        message("Exported driver hotspot layer: ", out_path)
+        if (file.exists(out_path) && !isTRUE(params$force_export)) {
+          message("Skipping driver hotspot export (file exists): ", out_path)
+        } else {
+          if (isTRUE(params$force_export) && file.exists(out_path)) {
+            message("Overwriting driver hotspot (force_export=TRUE): ", out_path)
+          } else {
+            message("Exported driver hotspot layer: ", out_path)
+          }
+          # Rename fid -> grid_fid to avoid GPKG primary key conflict
+          lc_sf_full %>%
+            filter(fid %in% driver_hotspots) %>%
+            select(grid_fid = fid, value = all_of(d_col)) %>%
+            st_write(out_path, quiet = TRUE, delete_dsn = TRUE)
+        }
       }
-      # Rename fid -> grid_fid to avoid GPKG primary key conflict
-      lc_sf_full %>%
-        filter(fid %in% driver_hotspots) %>%
-        select(grid_fid = fid, value = all_of(d_col)) %>%
-        st_write(out_path, quiet = TRUE, delete_dsn = TRUE)
+
+      # Calculate Overlap
+      stats <- plt_long %>%
+        filter(service %in% c(HOTS_CFG$loss, HOTS_CFG$gain)) %>%
+        group_by(service) %>%
+        summarize(
+          n_es_hotspots = sum(
+            (service %in% HOTS_CFG$loss & .data[[m_col]] <= quantile(.data[[m_col]], HOTS_CFG$pct_cutoff, na.rm=TRUE)) |
+            (service %in% HOTS_CFG$gain & .data[[m_col]] >= quantile(.data[[m_col]], 1-HOTS_CFG$pct_cutoff, na.rm=TRUE)),
+            na.rm = TRUE
+          ),
+          n_overlap = sum(
+            fid %in% driver_hotspots &
+            ((service %in% HOTS_CFG$loss & .data[[m_col]] <= quantile(.data[[m_col]], HOTS_CFG$pct_cutoff, na.rm=TRUE)) |
+             (service %in% HOTS_CFG$gain & .data[[m_col]] >= quantile(.data[[m_col]], 1-HOTS_CFG$pct_cutoff, na.rm=TRUE))),
+            na.rm = TRUE
+          )
+        ) %>%
+        mutate(
+          pct_overlap = (n_overlap / n_es_hotspots) * 100,
+          driver = d_name,
+          metric = m_col
+        )
+
+      overlap_list[[d_name]] <- stats
     }
 
-    # Calculate Overlap
-    stats <- plt_long %>%
-      filter(service %in% c(HOTS_CFG$loss, HOTS_CFG$gain)) %>%
-      group_by(service) %>%
-      summarize(
-        n_es_hotspots = sum(
-          (service %in% HOTS_CFG$loss & pct_chg <= quantile(pct_chg, HOTS_CFG$pct_cutoff, na.rm=TRUE)) |
-          (service %in% HOTS_CFG$gain & pct_chg >= quantile(pct_chg, 1-HOTS_CFG$pct_cutoff, na.rm=TRUE)),
-          na.rm = TRUE
-        ),
-        n_overlap = sum(
-          fid %in% driver_hotspots &
-          ((service %in% HOTS_CFG$loss & pct_chg <= quantile(pct_chg, HOTS_CFG$pct_cutoff, na.rm=TRUE)) |
-           (service %in% HOTS_CFG$gain & pct_chg >= quantile(pct_chg, 1-HOTS_CFG$pct_cutoff, na.rm=TRUE))),
-          na.rm = TRUE
-        )
-      ) %>%
-      mutate(
-        pct_overlap = (n_overlap / n_es_hotspots) * 100,
-        driver = d_name
-      )
+    overlap_stats <- bind_rows(overlap_list) %>%
+      arrange(desc(pct_overlap))
 
-    overlap_list[[d_name]] <- stats
+    overlap_stats_all[[m_col]] <- overlap_stats
+
+    # Export to CSV
+    out_csv <- file.path(data_dir(), "processed", "tables", paste0("lcc_es_hotspot_overlap_", m_short, params$output_suffix, ".csv"))
+    dir.create(dirname(out_csv), recursive = TRUE, showWarnings = FALSE)
+    readr::write_csv(overlap_stats, out_csv)
+
+    # Print to rendered document
+    print(knitr::kable(head(overlap_stats, 20), digits = 1, caption = paste("LCC Attribution Gap (% Overlap) -", m_col)))
   }
-
-  overlap_stats <- bind_rows(overlap_list) %>%
-    arrange(desc(pct_overlap))
-
-  # Export to CSV
-  out_csv <- file.path(data_dir(), "processed", "tables", paste0("lcc_es_hotspot_overlap", params$output_suffix, ".csv"))
-  dir.create(dirname(out_csv), recursive = TRUE, showWarnings = FALSE)
-  readr::write_csv(overlap_stats, out_csv)
-
-  # Print to rendered document
-  print(knitr::kable(head(overlap_stats, 20), digits = 1, caption = "LCC Attribution Gap (% Overlap)"))
 }
 ```
 
@@ -1566,59 +1577,66 @@ if (lc_data_ready) {
 #| message: true
 #| warning: false
 
-if (!is.null(overlap_stats)) {
-  # Make driver labels presentation-ready and enforce canonical ordering
-  canon_order <- rev(c("C_Risk", "N_export", "Sed_export",
-                       "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
-                       "Pollination", "Nature_Access"))
+if (lc_data_ready && length(overlap_stats_all) > 0) {
+  for (m_col in c("pct_chg", "abs_chg")) {
+    m_short <- ifelse(m_col == "pct_chg", "pct", "abs")
+    m_label <- ifelse(m_col == "pct_chg", "Percentage", "Absolute")
+    overlap_stats <- overlap_stats_all[[m_col]]
 
-  overlap_plot_data <- overlap_stats %>%
-    mutate(
-      driver_label = case_when(
-        driver == "Forest_Loss" ~ "Forest Loss",
-        driver == "Crop_Exp" ~ "Cropland Expansion",
-        driver == "Urban_Exp" ~ "Urban Expansion",
-        TRUE ~ driver
-      ),
-      service = factor(service, levels = canon_order)
-    ) %>%
-    filter(!is.na(service))
+    # Make driver labels presentation-ready and enforce canonical ordering
+    canon_order <- rev(c("C_Risk", "N_export", "Sed_export",
+                         "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
+                         "Pollination", "Nature_Access"))
 
-  # Plot
-  p_bar <- ggplot(overlap_plot_data, aes(x = service, y = pct_overlap, fill = driver_label)) +
-   geom_col(position = "dodge") +
-   scale_fill_brewer(palette = "Set2") +
-   coord_flip() +
-   labs(title = "Attribution of ES Hotspots to Land Cover Drivers",
-        subtitle = "% of ES Hotspots overlapping with Top 5% of Driver Change",
-        x = "Service", y = "% Overlap", fill = "Driver") +
-   theme_minimal()
-  print(p_bar)
+    overlap_plot_data <- overlap_stats %>%
+      mutate(
+        driver_label = case_when(
+          driver == "Forest_Loss" ~ "Forest Loss",
+          driver == "Crop_Exp" ~ "Cropland Expansion",
+          driver == "Urban_Exp" ~ "Urban Expansion",
+          TRUE ~ driver
+        ),
+        service = factor(service, levels = canon_order)
+      ) %>%
+      filter(!is.na(service))
 
-  out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
-  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-  out_path_bar <- file.path(out_dir, "bar_driver_overlap.png")
-  ggsave(out_path_bar, p_bar, width = 10, height = 6, bg = "white", dpi = 300)
+    # Plot
+    p_bar <- ggplot(overlap_plot_data, aes(x = service, y = pct_overlap, fill = driver_label)) +
+     geom_col(position = "dodge") +
+     scale_fill_brewer(palette = "Set2") +
+     coord_flip() +
+     labs(title = paste("Attribution of ES Hotspots to Land Cover Drivers (", m_label, ")", sep=""),
+          subtitle = "% of ES Hotspots overlapping with Top 5% of Driver Change",
+          x = "Service", y = "% Overlap", fill = "Driver") +
+     theme_minimal()
+    print(p_bar)
 
-  # Add a Heatmap for instant readability
-  p_heat <- ggplot(overlap_plot_data, aes(x = driver_label, y = service, fill = pct_overlap)) +
-    geom_tile(color = "white", linewidth = 0.5) +
-    geom_text(aes(label = sprintf("%.1f%%", pct_overlap)), color = "black", size = 4) +
-    scale_fill_distiller(palette = "Reds", direction = 1, name = "% Overlap") +
-    labs(title = "Attribution Gap: ES Hotspots vs. LCC Drivers",
-         subtitle = "Percentage of ES Hotspots that overlap with Top 5% of Land Conversion",
-         x = "Land Cover Driver", y = "Ecosystem Service") +
-    theme_minimal(base_size = 14) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          panel.grid = element_blank())
+    out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
+    dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+    out_path_bar <- file.path(out_dir, paste0("bar_driver_overlap_", m_short, ".png"))
+    ggsave(out_path_bar, p_bar, width = 10, height = 6, bg = "white", dpi = 300)
 
-  out_path_heat <- file.path(out_dir, "heatmap_driver_overlap.png")
-  ggsave(out_path_heat, p_heat, width = 8, height = 6, bg = "white", dpi = 300)
+    # Add a Heatmap for instant readability
+    p_heat <- ggplot(overlap_plot_data, aes(x = driver_label, y = service, fill = pct_overlap)) +
+      geom_tile(color = "white", linewidth = 0.5) +
+      geom_text(aes(label = sprintf("%.1f%%", pct_overlap)), color = "black", size = 4) +
+      scale_fill_distiller(palette = "Reds", direction = 1, name = "% Overlap") +
+      labs(title = paste("Attribution Gap: ES Hotspots vs. LCC Drivers (", m_label, ")", sep=""),
+           subtitle = "Percentage of ES Hotspots that overlap with Top 5% of Land Conversion",
+           x = "Land Cover Driver", y = "Ecosystem Service") +
+      theme_minimal(base_size = 14) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+            panel.grid = element_blank())
 
-  message("Saved overlap charts to: ", out_dir)
+    out_path_heat <- file.path(out_dir, paste0("heatmap_driver_overlap_", m_short, ".png"))
+    ggsave(out_path_heat, p_heat, width = 8, height = 6, bg = "white", dpi = 300)
+
+    message("Saved overlap charts to: ", out_dir)
+  }
 } else {
   message("Skipping overlap analysis (data not ready).")
 }
+
 ```
 
 ```{r}
@@ -1629,53 +1647,58 @@ if (!is.null(overlap_stats)) {
 #| warning: false
 
 if (lc_data_ready && !is.null(net_col)) {
-  # Join ES change (plt_long) with Net LC Change
-  # We correlate ES Change (pct_chg) with Net Natural Change (dir_ch_2)
-  # Hypothesis: Loss of Natural (negative dir_ch) -> Loss of ES (negative pct_chg for loss services)
+for (m_col in c("pct_chg", "abs_chg")) {
+    m_short <- ifelse(m_col == "pct_chg", "pct", "abs")
+    m_label <- ifelse(m_col == "pct_chg", "Percentage", "Absolute")
 
-  cor_data <- plt_long %>%
-    dplyr::inner_join(lc_df %>% dplyr::select(fid, dplyr::all_of(net_col)), by = "fid") %>%
-    dplyr::filter(!is.na(pct_chg), !is.na(.data[[net_col]])) %>%
-    dplyr::filter(!service %in% c("USLE", "N_retention"))
+    # Join ES change (plt_long) with Net LC Change
+    # We correlate ES Change with Net Natural Change
+    # Hypothesis: Loss of Natural (negative dir_ch) -> Loss of ES (negative change for loss services)
 
-  # Ensure canonical ordering for facets
-  canon_order <- c("C_Risk", "N_export", "Sed_export", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio", "Pollination", "Nature_Access")
-  cor_data$service <- factor(cor_data$service, levels = canon_order)
+    cor_data <- plt_long %>%
+      dplyr::inner_join(lc_df %>% dplyr::select(fid, dplyr::all_of(net_col)), by = "fid") %>%
+      dplyr::filter(!is.na(.data[[m_col]]), !is.na(.data[[net_col]])) %>%
+      dplyr::filter(!service %in% c("USLE", "N_retention"))
 
-  # Calculate correlation per service
-  cor_stats <- cor_data %>%
-    dplyr::group_by(service) %>%
-    dplyr::summarize(
-      pearson_r = cor(pct_chg, .data[[net_col]], method = "pearson"),
-      spearman_rho = cor(pct_chg, .data[[net_col]], method = "spearman"),
-      n = n()
-    ) %>%
-    dplyr::arrange(desc(abs(spearman_rho)))
+    # Ensure canonical ordering for facets
+    canon_order <- c("C_Risk", "N_export", "Sed_export", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio", "Pollination", "Nature_Access")
+    cor_data$service <- factor(cor_data$service, levels = canon_order)
 
-  print(knitr::kable(cor_stats, digits = 3, caption = "Correlation between ES % Change and Net Natural Land Change"))
+    # Calculate correlation per service
+    cor_stats <- cor_data %>%
+      dplyr::group_by(service) %>%
+      dplyr::summarize(
+        pearson_r = cor(.data[[m_col]], .data[[net_col]], method = "pearson"),
+        spearman_rho = cor(.data[[m_col]], .data[[net_col]], method = "spearman"),
+        n = n()
+      ) %>%
+      dplyr::arrange(desc(abs(spearman_rho)))
 
-  # Faceted plot for all services showing point density
-  p_cor <- ggplot(cor_data, aes(x = .data[[net_col]], y = pct_chg)) +
-    geom_bin2d(bins = 60) +
-    scale_fill_viridis_c(trans = "log10", option = "viridis", labels = scales::comma) +
-    geom_smooth(method = "lm", color = "tomato", linetype = "22", linewidth = 0.5) +
-    facet_wrap(~ service, scales = "free_y", ncol = 3) +
-    labs(title = "ES Change vs. Net Natural Change",
-         x = "Net Change in Natural Land (%)",
-         y = "ES Change (%)",
-         fill = "Count\n(log10)") +
-    theme_minimal() +
-    theme(axis.title = element_text(size = 8),
-          axis.text = element_text(size = 8),
-          strip.text = element_text(size = 10),
-          legend.title = element_text(size = 9),
-          legend.text = element_text(size = 7))
+    print(knitr::kable(cor_stats, digits = 3, caption = paste("Correlation between ES", m_label, "Change and Net Natural Land Change")))
 
-  print(p_cor)
+    # Faceted plot for all services showing point density
+    p_cor <- ggplot(cor_data, aes(x = .data[[net_col]], y = .data[[m_col]])) +
+      geom_bin2d(bins = 60) +
+      scale_fill_viridis_c(trans = "log10", option = "viridis", labels = scales::comma) +
+      geom_smooth(method = "lm", color = "tomato", linetype = "22", linewidth = 0.5) +
+      facet_wrap(~ service, scales = "free_y", ncol = 3) +
+      labs(title = paste("ES Change vs. Net Natural Change (", m_label, ")", sep=""),
+           x = "Net Change in Natural Land (%)",
+           y = paste("ES Change (", m_label, ")", sep=""),
+           fill = "Count\n(log10)") +
+      theme_minimal() +
+      theme(axis.title = element_text(size = 8),
+            axis.text = element_text(size = 8),
+            strip.text = element_text(size = 10),
+            legend.title = element_text(size = 9),
+            legend.text = element_text(size = 7))
 
-  out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
-  dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-  ggsave(file.path(out_dir, "scatter_Net_Natural_Change.png"), p_cor, width = 12, height = 8, bg = "white", dpi = 300)
+    print(p_cor)
+
+    out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
+    dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+    ggsave(file.path(out_dir, paste0("scatter_Net_Natural_Change_", m_short, ".png")), p_cor, width = 12, height = 8, bg = "white", dpi = 300)
+  }
 }
 ```
 
