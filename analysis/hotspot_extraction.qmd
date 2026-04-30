@@ -24,7 +24,7 @@ params:
   analysis_version: "v1.3.1"
   input_gpkg: "10k_change_calc.gpkg"
   output_suffix: "" # e.g., "_v2"
-  force_export: true
+  force_export: false
 ---
 
 ## Overview
@@ -786,8 +786,8 @@ HOTS_CFG <- list(
 # centralize the grouping columns here
   groupings = c("income_grp","region_wb","WWF_biome","nev_name"),
   # IO
-  write_layers = TRUE,
-  write_index  = TRUE,
+  write_layers = FALSE,
+  write_index  = FALSE,
   out_dir      = file.path(data_dir(), "processed", paste0("hotspots", params$output_suffix))
 )
 ```
@@ -1584,18 +1584,19 @@ if (lc_data_ready && length(overlap_stats_all) > 0) {
     overlap_stats <- overlap_stats_all[[m_col]]
 
     # Make driver labels presentation-ready and enforce canonical ordering
-    canon_order <- rev(c("C_Risk", "N_export", "Sed_export",
-                         "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
+    canon_order <- rev(c("C_Risk", "C_Risk_Red_Ratio", 
+                         "N_export", "N_Ret_Ratio", 
+                         "Sed_export", "Sed_Ret_Ratio", 
                          "Pollination", "Nature_Access"))
 
     overlap_plot_data <- overlap_stats %>%
       mutate(
-        driver_label = case_when(
+        driver_label = factor(case_when(
           driver == "Forest_Loss" ~ "Forest Loss",
           driver == "Crop_Exp" ~ "Cropland Expansion",
           driver == "Urban_Exp" ~ "Urban Expansion",
           TRUE ~ driver
-        ),
+        ), levels = c("Forest Loss", "Cropland Expansion", "Urban Expansion")),
         service = factor(service, levels = canon_order)
       ) %>%
       filter(!is.na(service))
@@ -1663,7 +1664,10 @@ for (m_col in c("pct_chg", "abs_chg")) {
       dplyr::filter(!service %in% c("USLE", "N_retention"))
 
     # Ensure canonical ordering for facets
-    canon_order <- c("C_Risk", "N_export", "Sed_export", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio", "Pollination", "Nature_Access")
+    canon_order <- c("C_Risk", "C_Risk_Red_Ratio", 
+                     "N_export", "N_Ret_Ratio", 
+                     "Sed_export", "Sed_Ret_Ratio", 
+                     "Pollination", "Nature_Access")
     cor_data$service <- factor(cor_data$service, levels = canon_order)
 
     # Calculate correlation per service
@@ -1722,7 +1726,10 @@ if (lc_data_ready) {
       dplyr::filter(driver_val > 0, !is.na(pct_chg)) # Focus on areas where change occurred
 
     # Ensure canonical ordering for facets
-    canon_order <- c("C_Risk", "N_export", "Sed_export", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio", "Pollination", "Nature_Access")
+    canon_order <- c("C_Risk", "C_Risk_Red_Ratio", 
+                     "N_export", "N_Ret_Ratio", 
+                     "Sed_export", "Sed_Ret_Ratio", 
+                     "Pollination", "Nature_Access")
     plot_data$service <- factor(plot_data$service, levels = canon_order)
 
     for (m_col in c("pct_chg", "abs_chg")) {
