@@ -21,7 +21,7 @@ lcc_df <- st_read(lcc_path, quiet = TRUE) %>% st_drop_geometry()
 
 # 2. Load base map
 message("Reading and transforming base map...")
-base_map_path <- "/home/jeronimo/data/global_ncp/vector_basedata/cartographic_ee_r264_correspondence.gpkg"
+base_map_path <- here("home", "jeronimo", "data", "global_ncp", "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
 base_sf <- st_read(base_map_path, quiet = TRUE) %>% st_transform(crs = "EPSG:8857")
 
 # 3. Define attribution colors
@@ -55,41 +55,53 @@ for (metric in c("pct", "abs")) {
   # ----------------------------------------------------------------------------
   # 4a. Generate the GLOBAL COMBINED Attribution Map
   # ----------------------------------------------------------------------------
-  message(paste("Generating GLOBAL attribution map for", toupper(metric)))
+  for (min_es in c(1, 2, 3)) {
+    message(paste("Generating GLOBAL attribution map for", toupper(metric), "- Min ES Hotspots:", min_es))
 
-  es_global_joined <- es_sf %>%
-    left_join(lcc_df %>% select(grid_fid, lcc_services = hotspot_services, lcc_count = hotspot_count), by = "grid_fid") %>%
-    mutate(
-      lcc_count = coalesce(as.numeric(lcc_count), 0),
-      lcc_services = coalesce(lcc_services, ""),
-      # Classify the pixel based on which driver is present
-      Attribution = case_when(
-        lcc_count > 1 ~ "Multiple Conversion Drivers",
-        str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
-        str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
-        str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
-        TRUE ~ "Unexplained by Top Conversion (Degradation)"
-      ),
-      Attribution = factor(Attribution, levels = c("Forest Loss", "Cropland Expansion", "Urban Expansion", "Multiple Conversion Drivers", "Unexplained by Top Conversion (Degradation)"))
-    ) %>% st_transform(crs = "EPSG:8857")
+    es_filtered <- es_sf %>% filter(as.numeric(hotspot_count) >= min_es)
+    
+    if (nrow(es_filtered) == 0) {
+      message("  -> No ES hotspots found with count >= ", min_es, ". Skipping.")
+      next
+    }
 
-  p_global <- ggplot() +
-    geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) +
-    geom_sf(data = es_global_joined, aes(fill = Attribution), color = NA) +
-    scale_fill_manual(values = attr_colors, name = "Primary Driver of ES Hotspot") +
-    labs(title = "The Attribution Gap: Drivers of Ecosystem Service Decline",
-         subtitle = paste("Comparing global ES Hotspots (", toupper(metric), " Change) against the Top 5% of physical Land Conversion")) +
-    theme_void() +
-    theme(plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
-          plot.subtitle = element_text(size = 16, hjust = 0.5, margin = margin(b = 20)),
-          legend.position = "bottom", legend.title = element_text(size = 14, face = "bold"),
-          legend.text = element_text(size = 12),
-          legend.key.size = unit(0.75, "cm")) +
-    guides(fill = guide_legend(nrow = 2, byrow = TRUE))
+    es_global_joined <- es_filtered %>%
+      left_join(lcc_df %>% select(grid_fid, lcc_services = hotspot_services, lcc_count = hotspot_count), by = "grid_fid") %>%
+      mutate(
+        lcc_count = coalesce(as.numeric(lcc_count), 0),
+        lcc_services = coalesce(lcc_services, ""),
+        # Classify the pixel based on which driver is present
+        Attribution = case_when(
+          lcc_count > 1 ~ "Multiple Conversion Drivers",
+          str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
+          str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
+          str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
+          TRUE ~ "Unexplained by Top Conversion (Degradation)"
+        ),
+        Attribution = factor(Attribution, levels = c("Forest Loss", "Cropland Expansion", "Urban Expansion", "Multiple Conversion Drivers", "Unexplained by Top Conversion (Degradation)"))
+      ) %>% st_transform(crs = "EPSG:8857")
 
-  out_path_global <- here("outputs", "plots", "maps", paste0("global_attribution_gap_map_", metric, ".png"))
-  ggsave(out_path_global, p_global, width = 16, height = 9, bg = "white", dpi = 300)
-  message("Saving global map to: ", out_path_global)
+    subtitle_text <- paste0("Comparing areas with ", ifelse(min_es == 1, "at least 1 ES Hotspot", paste("at least", min_es, "overlapping ES Hotspots")), 
+                            " (", toupper(metric), " Change) against the Top 5% of Land Conversion")
+
+    p_global <- ggplot() +
+      geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) +
+      geom_sf(data = es_global_joined, aes(fill = Attribution), color = NA) +
+      scale_fill_manual(values = attr_colors, name = "Primary Driver of ES Hotspot") +
+      labs(title = "The Attribution Gap: Drivers of Ecosystem Service Decline",
+           subtitle = subtitle_text) +
+      theme_void() +
+      theme(plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
+            plot.subtitle = element_text(size = 16, hjust = 0.5, margin = margin(b = 20)),
+            legend.position = "bottom", legend.title = element_text(size = 14, face = "bold"),
+            legend.text = element_text(size = 12),
+            legend.key.size = unit(0.75, "cm")) +
+      guides(fill = guide_legend(nrow = 2, byrow = TRUE))
+
+    out_path_global <- here("outputs", "plots", "maps", paste0("global_attribution_gap_map_min", min_es, "_", metric, ".png"))
+    ggsave(out_path_global, p_global, width = 16, height = 9, bg = "white", dpi = 300)
+    message("Saving global map to: ", out_path_global)
+  }
 
   # ----------------------------------------------------------------------------
   # 4b. Generate PER-SERVICE Attribution Maps

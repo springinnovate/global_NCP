@@ -1600,10 +1600,12 @@ if (lc_data_ready && length(overlap_stats_all) > 0) {
       ) %>%
       filter(!is.na(service))
 
+    driver_colors <- c("Forest Loss" = "#2ca25f", "Cropland Expansion" = "#e69138", "Urban Expansion" = "#e41a1c")
+
     # Plot
     p_bar <- ggplot(overlap_plot_data, aes(x = service, y = pct_overlap, fill = driver_label)) +
      geom_col(position = "dodge") +
-     scale_fill_brewer(palette = "Set2") +
+     scale_fill_manual(values = driver_colors) +
      coord_flip() +
      labs(title = paste("Attribution of ES Hotspots to Land Cover Drivers (", m_label, ")", sep=""),
           subtitle = "% of ES Hotspots overlapping with Top 5% of Driver Change",
