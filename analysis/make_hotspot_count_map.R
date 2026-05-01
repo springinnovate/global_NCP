@@ -93,8 +93,8 @@ generate_count_maps <- function(gpkg_path, metric, base_sf) {
 # ==============================================================================
 
 # 1. First Look Overview Maps
-gpkg_global_pct <- file.path("home", "jeronimo", "data", "global_ncp", "processed", "hotspots", "pct", "global", "hotspots_global_pct.gpkg")
-gpkg_global_abs <- file.path("home", "jeronimo", "data", "global_ncp", "processed", "hotspots", "abs", "global", "hotspots_global_abs.gpkg")
+gpkg_global_pct <- file.path(data_dir(), "processed", "hotspots", "pct", "global", "hotspots_global_pct.gpkg")
+gpkg_global_abs <- file.path(data_dir(), "processed", "hotspots", "abs", "global", "hotspots_global_abs.gpkg")
 
 generate_first_look_map(gpkg_global_pct, file.path(out_dir, "first_look_map_pct.png"), metric = "pct")
 generate_first_look_map(gpkg_global_abs, file.path(out_dir, "first_look_map_abs.png"), metric = "abs")

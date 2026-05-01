@@ -15,13 +15,13 @@ out_dir <- here("outputs", "plots", "maps", "attribution_by_service")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 # 1. Load Driver Hotspots - we only need the attributes from the LCC data to do a join
-lcc_path <- here("home", "jeronimo", "data", "global_ncp", "processed", "hotspots", "drivers_by_group", "pct", "global", "hotspots_global_pct.gpkg")
+lcc_path <- file.path(data_dir(), "processed", "hotspots", "drivers_by_group", "pct", "global", "hotspots_global_pct.gpkg")
 message("Reading LCC drivers...")
 lcc_df <- st_read(lcc_path, quiet = TRUE) %>% st_drop_geometry()
 
 # 2. Load base map
 message("Reading and transforming base map...")
-base_map_path <- here("home", "jeronimo", "data", "global_ncp", "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
+base_map_path <- file.path(data_dir(), "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
 base_sf <- st_read(base_map_path, quiet = TRUE) %>% st_transform(crs = "EPSG:8857")
 
 # 3. Define attribution colors
@@ -39,7 +39,7 @@ canon_order <- c("C_Risk", "N_export", "Sed_export",
 
 # 4. Load ES Hotspots, loop through metrics and services, and map
 for (metric in c("pct", "abs")) {
-  es_path <- here("home", "jeronimo", "data", "global_ncp", "processed", "hotspots", metric, "global", paste0("hotspots_global_", metric, ".gpkg"))
+  es_path <- file.path(data_dir(), "processed", "hotspots", metric, "global", paste0("hotspots_global_", metric, ".gpkg"))
 
   if (!file.exists(es_path)) {
     message("\nFile not found, skipping metric ", metric, ": ", es_path)
