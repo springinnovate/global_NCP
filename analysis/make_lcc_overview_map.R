@@ -12,7 +12,7 @@ library(stringr)
 source(here("R", "paths.R"))
 
 # 1. Define Paths
-gpkg_path <- file.path("home", "jeronimo", "data", "global_ncp", "processed", "10k_lcc_metrics.gpkg")
+gpkg_path <- file.path(data_dir(), "processed", "10k_lcc_metrics.gpkg")
 out_dir <- here("outputs", "plots", "maps")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -62,7 +62,7 @@ message("Saved LCC Overview map to: ", out_file)
 # 5. Global Land Cover Conversion Hotspots (Drivers) Map
 # ==============================================================================
 message("\n--- Generating LCC Driver Hotspots Map ---")
-gpkg_drivers <- file.path("home", "jeronimo", "data", "global_ncp", "processed", "hotspots", "drivers_by_group", "pct", "global", "hotspots_global_pct.gpkg")
+gpkg_drivers <- file.path(data_dir(), "processed", "hotspots", "drivers_by_group", "pct", "global", "hotspots_global_pct.gpkg")
 
 if (file.exists(gpkg_drivers)) {
   message("Reading LCC Driver Hotspots from: ", gpkg_drivers)
