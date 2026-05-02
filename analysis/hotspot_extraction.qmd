@@ -544,6 +544,14 @@ for (g in groupings) {
     plot_signed_bars(signed_summary, grouping = g, metric = m,
                      refs = glob_refs,
                      out_dir_base = file.path("outputs", "plots", paste0("signed_bars", params$output_suffix)))
+
+    # Main report version (exclude nonOECD outliers)
+    if (g == "income_grp") {
+      signed_summary_main <- signed_summary %>% dplyr::filter(group != "2. High income: nonOECD")
+      plot_signed_bars(signed_summary_main, grouping = g, metric = m,
+                       refs = glob_refs,
+                       out_dir_base = file.path("outputs", "plots", paste0("signed_bars", params$output_suffix, "_main_report")))
+    }
   }
 }
 ```

@@ -178,3 +178,5 @@ To move beyond binary "Natural vs. Transformed" analysis, we implement two speci
 2.  **Expansion Model:**
     *   **Reclassification:** Maps ESA classes to **Urban**, **Cropland**, and **Other**.
     *   **Metric:** Tracks the specific expansion of Urban and Cropland areas into other land cover types.
+
+**Note on Rangelands:** Logic is updated to explicitly track Forest-to-Grassland transitions as a loss of primary natural cover. Categorizing Grasslands/Shrublands as `Transformed (Rangeland/Pasture)` prevents these critical conversions from being masked as 'Natural-to-Natural' exchange.
