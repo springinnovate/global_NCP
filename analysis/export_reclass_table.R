@@ -34,9 +34,9 @@ reclass_data <- data.frame(
   Binary_Classification = c(
     "Transformed (Human Footprint)",
     "Transformed (Human Footprint)",
-    "Natural",
-    "Natural",
-    "Natural",
+    "Natural (Primary)",
+    "Natural (Primary)",
+    "Transformed (Rangeland/Pasture)",
     "Natural",
     "Natural",
     "Natural",

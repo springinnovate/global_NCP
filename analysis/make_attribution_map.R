@@ -30,7 +30,7 @@ attr_colors <- c(
   "Cropland Expansion" = "#e69138", # Agricultural Orange
   "Urban Expansion" = "#e41a1c", # Built-up Red
   "Multiple Conversion Drivers" = "#984ea3", # Purple
-  "Unexplained by Top Conversion (Degradation)" = "#3182bd" # Striking Blue to highlight the gap
+  "Degradation-driven (Stable Land Cover)" = "#3182bd" # Striking Blue to highlight the gap
 )
 
 canon_order <- c("C_Risk", "N_export", "Sed_export",
@@ -70,15 +70,17 @@ for (metric in c("pct", "abs")) {
       mutate(
         lcc_count = coalesce(as.numeric(lcc_count), 0),
         lcc_services = coalesce(lcc_services, ""),
-        # Classify the pixel based on which driver is present
+        # The 'Attribution Gap' refers to spatial decoupling (at 10km scales) where severe ES
+        # decline occurs within stable land cover types. This highlights areas driven by
+        # degradation (e.g., intensification, climate stress) rather than physical conversion.
         Attribution = case_when(
           lcc_count > 1 ~ "Multiple Conversion Drivers",
           str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
           str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
           str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
-          TRUE ~ "Unexplained by Top Conversion (Degradation)"
+          TRUE ~ "Degradation-driven (Stable Land Cover)"
         ),
-        Attribution = factor(Attribution, levels = c("Forest Loss", "Cropland Expansion", "Urban Expansion", "Multiple Conversion Drivers", "Unexplained by Top Conversion (Degradation)"))
+        Attribution = factor(Attribution, levels = c("Forest Loss", "Cropland Expansion", "Urban Expansion", "Multiple Conversion Drivers", "Degradation-driven (Stable Land Cover)"))
       ) %>% st_transform(crs = "EPSG:8857")
 
     subtitle_text <- paste0("Comparing areas with ", ifelse(min_es == 1, "at least 1 ES Hotspot", paste("at least", min_es, "overlapping ES Hotspots")), 
@@ -129,9 +131,9 @@ for (metric in c("pct", "abs")) {
           str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
           str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
           str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
-          TRUE ~ "Unexplained by Top Conversion (Degradation)"
+          TRUE ~ "Degradation-driven (Stable Land Cover)"
         ),
-        Attribution = factor(Attribution, levels = c("Forest Loss", "Cropland Expansion", "Urban Expansion", "Multiple Conversion Drivers", "Unexplained by Top Conversion (Degradation)"))
+        Attribution = factor(Attribution, levels = c("Forest Loss", "Cropland Expansion", "Urban Expansion", "Multiple Conversion Drivers", "Degradation-driven (Stable Land Cover)"))
       ) %>% st_transform(crs = "EPSG:8857")
 
     p <- ggplot() +

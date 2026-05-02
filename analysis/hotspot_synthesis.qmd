@@ -253,29 +253,6 @@ message("Hotspot area statistics saved to: ", out_csv_path)
 #| label: plot-intensity
 #| message: false
 
-# Universal Palettes for Regional Groupings
-group_palettes <- list(
-  biome = c(
-    'Tropical & Subtropical Moist Broadleaf Forests' = '#319D00',
-    'Tropical & Subtropical Dry Broadleaf Forests' = '#7ABD1B',
-    'Tropical & Subtropical Coniferous Forests' = '#556E19',
-    'Temperate Broadleaf & Mixed Forests' = '#207433',
-    'Temperate Coniferous Forests' = '#3E8D62',
-    'Boreal Forests/Taiga' = '#496FF3',
-    'Tropical & Subtropical Grasslands, Savannas & Shrublands' = '#D6F392',
-    'Temperate Grasslands, Savannas & Shrublands' = '#D1E614',
-    'Flooded Grasslands & Savannas' = '#75D0D5',
-    'Montane Grasslands & Shrublands' = '#98E600',
-    'Tundra' = '#C7DEFF',
-    'Mediterranean Forests, Woodlands & Scrub' = '#AF963C',
-    'Deserts & Xeric Shrublands' = '#C55C5C',
-    'Mangroves' = '#FE04BC'
-  ),
-  income_grp = c('1. High income: OECD' = '#004D33', '2. High income: nonOECD' = '#1d7355', '3. Upper middle income' = '#4b9e80', '4. Lower middle income' = '#8bc5af', '5. Low income' = '#cde9df'),
-  region_wb = c('East Asia & Pacific' = '#2E5A88', 'Europe & Central Asia' = '#D86018', 'Latin America & Caribbean' = '#7A3F91', 'Middle East & North Africa' = '#B38F00', 'North America' = '#1D8A99', 'South Asia' = '#6B8E23', 'Sub-Saharan Africa' = '#8B0000')
-)
-group_palettes$WWF_biome <- group_palettes$biome
-
 biome_labels <- c(
   'Tropical & Subtropical Moist Broadleaf Forests' = 'Trop/Subtrop Moist Broadleaf',
   'Tropical & Subtropical Dry Broadleaf Forests' = 'Trop/Subtrop Dry Broadleaf',
@@ -336,13 +313,6 @@ for (g_var in valid_groupings) {
     )
 
   legend_cols <- if (g_var == "WWF_biome") 5 else 4
-  custom_palette <- group_palettes[[g_var]]
-  if (!is.null(custom_palette)) {
-    valid_keys <- intersect(names(custom_palette), unique_groups)
-    new_palette <- custom_palette[valid_keys]
-    names(new_palette) <- paste0("[", group_id_map[valid_keys], "] ", get_short_name(valid_keys, g_var))
-    custom_palette <- new_palette
-  }
 
   # 1. Coverage Plot
   p_cov <- ggplot(plot_data, aes(x = pct_area, y = group)) +
@@ -353,8 +323,7 @@ for (g_var in valid_groupings) {
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
     labs(title = paste("Hotspot Coverage by", g_var), x = "% of Area that is a Hotspot", y = NULL) + theme_minimal() +
     theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8), plot.margin = margin(l = 30)) +
-    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
-  if (!is.null(custom_palette)) p_cov <- p_cov + scale_color_manual(values = custom_palette, na.value = "gray50")
+    guides(color = "none")
   ggsave(file.path(out_intensity_dir, paste0("hotspot_coverage_", tolower(g_var), ".png")), p_cov, width=14, height=10, bg="white")
 
   # 2. Share Plot
@@ -366,8 +335,7 @@ for (g_var in valid_groupings) {
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
     labs(title = paste("Global Hotspot Share by", g_var), x = "% of Global Hotspots", y = NULL) + theme_minimal() +
     theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8), plot.margin = margin(l = 30)) +
-    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
-  if (!is.null(custom_palette)) p_share <- p_share + scale_color_manual(values = custom_palette, na.value = "gray50")
+    guides(color = "none")
   ggsave(file.path(out_intensity_dir, paste0("hotspot_share_", tolower(g_var), ".png")), p_share, width=14, height=10, bg="white")
 
   # 3. Relative Intensity Plot
@@ -380,8 +348,7 @@ for (g_var in valid_groupings) {
     scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.4), guide = "none") +
     labs(title = paste("Relative Hotspot Intensity by", g_var), x = "Intensity Score (Regional Hotspot % ÷ Global Average [~5%])", y = NULL) +
     theme_minimal() + theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.position = "bottom", legend.title = element_blank(), legend.text = element_text(size = 8), plot.margin = margin(l = 30)) +
-    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
-  if (!is.null(custom_palette)) p_enrich <- p_enrich + scale_color_manual(values = custom_palette, na.value = "gray50")
+    guides(color = "none")
   ggsave(file.path(out_intensity_dir, paste0("hotspot_relative_intensity_", tolower(g_var), ".png")), p_enrich, width=14, height=10, bg="white")
 }
 ```
@@ -436,7 +403,6 @@ plot_hotness <- function(df, g_var) {
     ggplot2::coord_flip() +
     ggplot2::labs(title = paste0("Average Hotspot Overlap by ", g_var), subtitle = "Hotspot Density (including zero-hotspot areas)", x = NULL, y = "Avg. Hotspot Count") +
     ggplot2::theme_minimal()
-  if (!is.null(custom_palette)) p <- p + ggplot2::scale_fill_manual(values = custom_palette, na.value = "#e74c3c")
 
   ggsave(file.path(out_plots(), paste0("hotness_", tolower(g_var), ".png")), p, width = 10, height = 6, bg = "white")
   return(p)
@@ -576,11 +542,20 @@ if (file.exists(pop_exposure_csv)) {
     theme(legend.position = "none",
           axis.text.y = element_text(size = 10))
 
-  if (exists("group_palettes") && !is.null(group_palettes[["income_grp"]])) {
-    p_pop_inc <- p_pop_inc + scale_fill_manual(values = group_palettes[["income_grp"]], na.value = "gray50")
-  }
   ggsave(file.path(out_plots(), paste0("pop_exposure_income", params$output_suffix, ".png")), p_pop_inc, width = 14, height = 10, bg = "white")
 
+  # 1b. Plot by Income Group (Main Report - Excluding Non-OECD)
+  pop_df_main <- pop_df %>% dplyr::filter(income_grp != "2. High income: nonOECD")
+  p_pop_inc_main <- ggplot(pop_df_main, aes(x = exposed_population, y = income_grp, fill = income_grp)) +
+    geom_col() +
+    facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
+    scale_x_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    scale_y_discrete(labels = function(x) stringr::str_remove(x, "^\\d\\.\\s*")) +
+    labs(title = "Absolute Population Exposure in Multi-service Hotspots",
+         subtitle = "By World Bank Income Group (Main Report)",
+         x = "Exposed Population", y = NULL) +
+    theme_minimal() + theme(legend.position = "none", axis.text.y = element_text(size = 10))
+  ggsave(file.path(out_plots(), paste0("pop_exposure_income_main_report", params$output_suffix, ".png")), p_pop_inc_main, width = 14, height = 10, bg = "white")
   # 2. Plot by HDI Bin
   hdi_pal <- c("Low (<0.550)" = "#d7191c", "Medium (0.550-0.700)" = "#fdae61", "High (0.700-0.800)" = "#abdda4", "Very High (>0.800)" = "#2b83ba", "Unknown" = "gray50")
 
