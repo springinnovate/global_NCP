@@ -89,6 +89,13 @@ run_hotspot_boxplots_by <- function(
         dplyr::ungroup() %>%
         dplyr::mutate(plot_label = stats::reorder(paste(.data[[group_col]], service, sep = "__"), middle))
     }
+
+    # Rescale the mean values per service (facet) so that each facet utilizes the full color scale
+    stats_df <- stats_df %>%
+      dplyr::group_by(service) %>%
+      dplyr::mutate(scaled_fill = scales::rescale(abs(mean_val), to = c(0, 1))) %>%
+      dplyr::ungroup()
+
     return(stats_df)
   }
 
@@ -112,13 +119,13 @@ run_hotspot_boxplots_by <- function(
   if (nrow(vals_vol) > 0) {
     # Absolute
     stats_abs_vol <- calc_box_stats(vals_vol, "abs_chg")
-    p_abs_box_vol <- ggplot2::ggplot(stats_abs_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = abs(mean_val))) +
+    p_abs_box_vol <- ggplot2::ggplot(stats_abs_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = scaled_fill)) +
       ggplot2::geom_boxplot(stat = "identity") +
       ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 2) +
       ggplot2::labs(title=paste0("Absolute Change (Volumetric Services) by ", group_col), subtitle=sub_txt, x=NULL, y="Absolute change") +
       ggplot2::theme_minimal(base_size = 11) +
       ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1)) +
-      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Intensity\n(|Mean Change|)")
+      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity")
 
     if (!is.null(top_bottom_n)) {
       p_abs_box_vol <- p_abs_box_vol + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
@@ -132,13 +139,13 @@ run_hotspot_boxplots_by <- function(
 
     # Percent
     stats_pct_vol <- calc_box_stats(vals_vol, "pct_chg")
-    p_pct_box_vol <- ggplot2::ggplot(stats_pct_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = abs(mean_val))) +
+    p_pct_box_vol <- ggplot2::ggplot(stats_pct_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = scaled_fill)) +
       ggplot2::geom_boxplot(stat = "identity") +
       ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 2) +
       ggplot2::labs(title=paste0("Percentage Change (Volumetric Services) by ", group_col), subtitle=sub_txt, x=NULL, y="Percentage change (%)") +
       ggplot2::theme_minimal(base_size = 11) +
       ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1)) +
-      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Intensity\n(|Mean Change|)")
+      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity")
 
     if (!is.null(top_bottom_n)) {
       p_pct_box_vol <- p_pct_box_vol + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
@@ -159,13 +166,13 @@ run_hotspot_boxplots_by <- function(
     dplyr::mutate(service = factor(service, levels = ratio_present))
   if (nrow(vals_ratio) > 0) {
     stats_abs_ratio <- calc_box_stats(vals_ratio, "abs_chg")
-    p_abs_box_ratio <- ggplot2::ggplot(stats_abs_ratio, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = abs(mean_val))) +
+    p_abs_box_ratio <- ggplot2::ggplot(stats_abs_ratio, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = scaled_fill)) +
       ggplot2::geom_boxplot(stat = "identity") +
       ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 1) +
       ggplot2::labs(title=paste0("Change in Ratio/Index Services by ", group_col), subtitle=sub_txt, x=NULL, y="Change (ratio/index units)") +
       ggplot2::theme_minimal(base_size = 11) +
       ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1)) +
-      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Intensity\n(|Mean Change|)")
+      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity")
 
     if (!is.null(top_bottom_n)) {
       p_abs_box_ratio <- p_abs_box_ratio + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()

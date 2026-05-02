@@ -1293,7 +1293,10 @@ if (length(groupings) == 0) {
               ymax   = min(max(.data[[metric]], na.rm = TRUE), upper + 1.5 * iqr),
               v_count = dplyr::n(),
               .groups = "drop"
-            )
+            ) %>%
+            dplyr::group_by(Service) %>%
+            dplyr::mutate(scaled_fill = scales::rescale(abs(mean_val), to = c(0, 1))) %>%
+            dplyr::ungroup()
 
           x_var <- gc
           facet_scales <- "free_y"
@@ -1310,7 +1313,7 @@ if (length(groupings) == 0) {
             facet_scales <- "free"
           }
 
-        p <- ggplot(coast_stats, aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = abs(mean_val))) +
+        p <- ggplot(coast_stats, aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = scaled_fill)) +
           geom_boxplot(stat = "identity") +
             facet_wrap(~Service, scales = facet_scales, ncol = 1) +
             labs(title = paste("Hotspot Change Distribution:", gc),
@@ -1318,7 +1321,7 @@ if (length(groupings) == 0) {
                  y = metric_label, x = NULL) +
             theme_minimal() +
           theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-          scale_fill_distiller(palette = "Reds", direction = 1, name = "Intensity\n(|Mean Change|)")
+          scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity")
 
           if (gc == "nev_name") {
              p <- p + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
