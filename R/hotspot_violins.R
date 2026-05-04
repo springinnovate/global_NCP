@@ -125,7 +125,7 @@ run_hotspot_boxplots_by <- function(
       ggplot2::labs(title=paste0("Absolute Change (Volumetric Services) by ", group_col), subtitle=sub_txt, x=NULL, y="Absolute change") +
       ggplot2::theme_minimal(base_size = 11) +
       ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1)) +
-      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity")
+      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity", limits = c(0, 1))
 
     if (!is.null(top_bottom_n)) {
       p_abs_box_vol <- p_abs_box_vol + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
@@ -145,7 +145,7 @@ run_hotspot_boxplots_by <- function(
       ggplot2::labs(title=paste0("Percentage Change (Volumetric Services) by ", group_col), subtitle=sub_txt, x=NULL, y="Percentage change (%)") +
       ggplot2::theme_minimal(base_size = 11) +
       ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1)) +
-      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity")
+      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity", limits = c(0, 1))
 
     if (!is.null(top_bottom_n)) {
       p_pct_box_vol <- p_pct_box_vol + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
@@ -172,7 +172,7 @@ run_hotspot_boxplots_by <- function(
       ggplot2::labs(title=paste0("Change in Ratio/Index Services by ", group_col), subtitle=sub_txt, x=NULL, y="Change (ratio/index units)") +
       ggplot2::theme_minimal(base_size = 11) +
       ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1)) +
-      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity")
+      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity", limits = c(0, 1))
 
     if (!is.null(top_bottom_n)) {
       p_abs_box_ratio <- p_abs_box_ratio + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
