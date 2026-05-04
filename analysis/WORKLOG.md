@@ -59,6 +59,21 @@ This section highlights the major technical and methodological hurdles overcome 
 
 ## Chronological Log (Newest to Oldest)
 
+### 2026-05-04
+*   **Infrastructure & Environment:** Resolved persistent VS Code Remote SSH synchronization and connection hangs on `lilling`.
+    *   **Diagnosis:** The VS Code server backend was leaving orphaned `node` processes running, which prevented new connections from being established.
+    *   **Troubleshooting:** Initial attempts to manually kill processes (`pkill -u jeronimo -f .vscode-server`) provided a temporary workaround, but the issue recurred.
+    *   **Resolution:** Escalated to IT (Rich) to request a full server reboot to clear any persistent state issues. This should provide a stable environment for the final analysis runs.
+*   **Plotting Refinement:** Updated `compare_and_plot_changes.R` to exclude the "High income: nonOECD" group from the main report's bar plots to remove outliers and clarify the primary trends, as discussed in the last review meeting.
+
+### 2026-05-02
+*   **Infrastructure & Sync:** Diagnosed and bypassed silent VS Code Remote SSH hangs on `lilling` without a hard reboot (safely wiped corrupted `~/.vscode-server`). Established a `tar`-over-SSH sync workaround to bypass strict Windows IT firewalls lacking `rsync`.
+*   **Python Engine Optimization:** Refactored `zonal_stats_toolkit/runner.py` to concurrently schedule both raster and vector tasks in the execution graph, significantly improving parallelism ahead of the v1.4.0 merger.
+*   **Visual Polish (Boxplot Color Ramps):** Solved the `ggplot2` global scale dominance issue in `hotspot_violins.R` and `hotspot_extraction.qmd`. Implemented localized data normalization (`scales::rescale`) so canonical intensity colors (Reds) dynamically scale from 0 to 1 strictly within their respective facets.
+*   **Methodology Documentation:** Updated `README_Methodology.md` to formally transition "Path C" from a hypothetical "Future Analysis" into a completed "Validation Analysis," explicitly confirming that the grid-level hotspots mathematically align with pixel-level differences.
+*   **Feedback Manifesto Audit:** Cross-referenced meeting notes to finalize terminology ("Multi-service Decline" over "collapse"), prepared the biome-faceted scatterplots for the "Attribution Gap", and confirmed non-OECD outlier exclusions for main report boxplots.
+*   **Next Steps Planned:** Ready to implement "Model 3: Grassland Loss" in `LC_change_granular.qmd` to accurately track Forest-to-Grassland and pristine Grassland-to-Cropland transitions.
+
 ### 2026-05-01
 *   **Post-Meeting Debrief & Cleanup:** Successfully presented the "Drivers of Change" (LCC Attribution) and "Who is Affected" (Socioeconomic / KS Tests) sections to Steve and Becky. The compound risk mapping, red-intensity boxplots, and LCC driver correlations resonated strongly. 
 *   **De-escalating "Rescue Mode":** Safely stripped out local hardcoded `here("home", "jeronimo", ...)` fallback paths from all R mapping scripts (`make_socieconomic_maps.R`, `make_attribution_map.R`, `make_lcc_overview_map.R`, `make_hotspot_count_map.R`). Returned the pipeline to universally use `data_dir()` for server-side processing on `lilling`.

@@ -1233,6 +1233,26 @@ if (length(groupings) == 0) {
       cat("[DIAGNOSTIC] ERROR generating boxplots for ", gc, ": ", e$message, "\n", file=stderr())
       stop(e)
     })
+    # Main report version (exclude nonOECD outliers) for income_grp
+    if (gc == "income_grp") {
+      tryCatch({
+        run_hotspot_boxplots_by(
+          df_long             = plt_long %>% dplyr::filter(!service %in% coastal_services, income_grp != "2. High income: nonOECD"),
+          group_col           = gc,
+          loss                = HOTS_CFG$loss,
+          gain                = HOTS_CFG$gain,
+          pct_cutoff          = HOTS_CFG$pct_cutoff,
+          threshold_mode      = HOTS_CFG$threshold_mode,
+          svc_order           = boxplot_order,
+          keep_only_ordered   = TRUE,
+          volumetric_services = volumetric_services,
+          ratio_services      = ratio_services,
+          out_root            = here::here("outputs", "plots", "main_report")
+        )
+      }, error = function(e) {
+        cat("[DIAGNOSTIC] ERROR generating main_report boxplots: ", e$message, "\n", file=stderr())
+      })
+    }
 
     # ------------------------------------------------------------------
     # Custom plotting for Coastal Protection (Free Scales)
