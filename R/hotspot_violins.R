@@ -43,14 +43,19 @@ run_hotspot_boxplots_by <- function(
 
   message("==> Boxplots by: ", group_col)
 
-  # Original data extraction remains the same
-  by_abs <- extract_hotspots_by(df_long, group_cols=group_col, loss=loss, gain=gain, value_col="abs_chg", pct_cutoff=pct_cutoff, threshold_mode=threshold_mode)
-  by_pct <- extract_hotspots_by(df_long, group_cols=group_col, loss=loss, gain=gain, value_col="pct_chg", pct_cutoff=pct_cutoff, threshold_mode=threshold_mode)
+  # --- CORRECTED LOGIC ---
+  # 1. Identify hotspots based *only* on percentage change, as this is our standard definition.
+  hotspots_by_group <- extract_hotspots_by(df_long, group_cols=group_col, loss=loss, gain=gain, value_col="pct_chg", pct_cutoff=pct_cutoff, threshold_mode=threshold_mode)
 
-  abs_vals <- by_abs %>% dplyr::transmute(!!group_col := .data[[group_col]], vals=purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, abs_chg))) %>% tidyr::unnest(vals)
-  pct_vals <- by_pct %>% dplyr::transmute(!!group_col := .data[[group_col]], vals=purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, pct_chg))) %>% tidyr::unnest(vals)
+  # 2. Extract the FID and service for all identified hotspot cells.
+  hotspot_cells <- hotspots_by_group %>%
+    dplyr::select(!!rlang::sym(group_col), hotspots_df) %>%
+    tidyr::unnest(hotspots_df) %>%
+    dplyr::select(!!rlang::sym(group_col), fid, service)
 
-  vals <- dplyr::full_join(abs_vals, pct_vals, by = c(group_col, "fid", "service")) %>%
+  # 3. Join these hotspot identifiers back to the original long data to get BOTH abs_chg and pct_chg for the same cells.
+  vals <- df_long %>%
+    dplyr::inner_join(hotspot_cells, by = c("fid", "service", group_col)) %>%
     { if (isTRUE(keep_only_ordered)) dplyr::filter(., service %in% svc_order) else . } %>%
     dplyr::mutate(service = { extras <- setdiff(unique(service), svc_order); factor(service, levels = c(svc_order, sort(extras))) }) %>%
     dplyr::filter(!is.na(.data[[group_col]])) %>%

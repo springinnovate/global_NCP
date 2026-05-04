@@ -60,11 +60,11 @@ This section highlights the major technical and methodological hurdles overcome 
 ## Chronological Log (Newest to Oldest)
 
 ### 2026-05-04
-*   **Infrastructure & Environment:** Resolved persistent VS Code Remote SSH synchronization and connection hangs on `lilling`.
-    *   **Diagnosis:** The VS Code server backend was leaving orphaned `node` processes running, which prevented new connections from being established.
-    *   **Troubleshooting:** Initial attempts to manually kill processes (`pkill -u jeronimo -f .vscode-server`) provided a temporary workaround, but the issue recurred.
-    *   **Resolution:** Escalated to IT (Rich) to request a full server reboot to clear any persistent state issues. This should provide a stable environment for the final analysis runs.
+*   **Infrastructure & Environment:** Resolved persistent VS Code Remote SSH synchronization and connection hangs that have been occurring since last week on `lilling`.
+    *   *Diagnosis:* The VS Code server backend was fragmenting and leaving behind orphaned `node` processes for language servers (Pylance, Quarto) and the core RPC server, which blocked new connections.
+    *   *Troubleshooting:* Implemented a targeted process-kill command (`pkill -u jeronimo -f .vscode-server`) via terminal to forcefully clean up the hung background processes. This successfully resets the remote connection state without requiring physical or system-level reboots of the server by IT.
 *   **Plotting Refinement:** Updated `compare_and_plot_changes.R` to exclude the "High income: nonOECD" group from the main report's bar plots to remove outliers and clarify the primary trends, as discussed in the last review meeting.
+*   **Housekeeping:** Identified and removed a redundant, outdated copy of `hotspot_extraction.qmd` that was incorrectly located in the `R/` directory. Confirmed `analysis/hotspot_extraction.qmd` is the correct, canonical version.
 
 ### 2026-05-02
 *   **Infrastructure & Sync:** Diagnosed and bypassed silent VS Code Remote SSH hangs on `lilling` without a hard reboot (safely wiped corrupted `~/.vscode-server`). Established a `tar`-over-SSH sync workaround to bypass strict Windows IT firewalls lacking `rsync`.
