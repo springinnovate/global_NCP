@@ -529,51 +529,54 @@ if (file.exists(pop_exposure_csv)) {
     "Nature_Access" = "Nature Access"
   )
 
-  # 1. Plot by Income Group
-  p_pop_inc <- ggplot(pop_df, aes(x = exposed_population, y = income_grp, fill = income_grp)) +
+  # 1. Plot by Income Group - using a red intensity scale
+  p_pop_inc <- ggplot(pop_df, aes(x = exposed_population, y = income_grp, fill = exposed_population)) +
     geom_col() +
     facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
     scale_x_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     scale_y_discrete(labels = function(x) stringr::str_remove(x, "^\\d\\.\\s*")) +
+    scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     labs(title = "Absolute Population Exposure in Hotspots",
          subtitle = "By World Bank Income Group",
          x = "Exposed Population", y = NULL) +
     theme_minimal() +
-    theme(legend.position = "none",
+    theme(legend.position = "right",
           axis.text.y = element_text(size = 10))
 
   ggsave(file.path(out_plots(), paste0("pop_exposure_income", params$output_suffix, ".png")), p_pop_inc, width = 14, height = 10, bg = "white")
 
   # 1b. Plot by Income Group (Main Report - Excluding Non-OECD)
   pop_df_main <- pop_df %>% dplyr::filter(income_grp != "2. High income: nonOECD")
-  p_pop_inc_main <- ggplot(pop_df_main, aes(x = exposed_population, y = income_grp, fill = income_grp)) +
+  p_pop_inc_main <- ggplot(pop_df_main, aes(x = exposed_population, y = income_grp, fill = exposed_population)) +
     geom_col() +
     facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
     scale_x_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     scale_y_discrete(labels = function(x) stringr::str_remove(x, "^\\d\\.\\s*")) +
-    labs(title = "Absolute Population Exposure in Multi-service Hotspots",
+    scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    labs(title = "Absolute Population Exposure in Hotspots",
          subtitle = "By World Bank Income Group (Main Report)",
          x = "Exposed Population", y = NULL) +
-    theme_minimal() + theme(legend.position = "none", axis.text.y = element_text(size = 10))
+    theme_minimal() + theme(legend.position = "right", axis.text.y = element_text(size = 10))
   ggsave(file.path(out_plots(), paste0("pop_exposure_income_main_report", params$output_suffix, ".png")), p_pop_inc_main, width = 14, height = 10, bg = "white")
+
   # 2. Plot by HDI Bin
-  hdi_pal <- c("Low (<0.550)" = "#d7191c", "Medium (0.550-0.700)" = "#fdae61", "High (0.700-0.800)" = "#abdda4", "Very High (>0.800)" = "#2b83ba", "Unknown" = "gray50")
+  hdi_levels <- c("Low (<0.550)", "Medium (0.550-0.700)", "High (0.700-0.800)", "Very High (>0.800)", "Unknown")
 
   pop_df_hdi <- pop_df %>%
     dplyr::group_by(service, hdi_bin) %>%
     dplyr::summarise(exposed_population = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
-    dplyr::mutate(hdi_bin = factor(hdi_bin, levels = rev(names(hdi_pal))))
+    dplyr::mutate(hdi_bin = factor(hdi_bin, levels = rev(hdi_levels)))
 
-  p_pop_hdi <- ggplot(pop_df_hdi, aes(x = exposed_population, y = hdi_bin, fill = hdi_bin)) +
+  p_pop_hdi <- ggplot(pop_df_hdi, aes(x = exposed_population, y = hdi_bin, fill = exposed_population)) +
     geom_col() +
     facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
     scale_x_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
-    scale_fill_manual(values = hdi_pal) +
+    scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     labs(title = "Absolute Population Exposure in Hotspots",
          subtitle = "By UN Human Development Index (HDI)",
          x = "Exposed Population", y = NULL) +
     theme_minimal() +
-    theme(legend.position = "none",
+    theme(legend.position = "right",
           axis.text.y = element_text(size = 10))
   ggsave(file.path(out_plots(), paste0("pop_exposure_hdi", params$output_suffix, ".png")), p_pop_hdi, width = 14, height = 10, bg = "white")
 
