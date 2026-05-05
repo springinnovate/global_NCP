@@ -34,8 +34,8 @@ Using Kolmogorov-Smirnov (KS) tests, we compared the socioeconomic profile of ho
 ## 4. Land Cover Drivers (The "Attribution Gap")
 To move beyond correlation, we assessed the direct overlap between ES hotspots and the top 5% of physical Land Cover Conversion (e.g., gross deforestation, urban expansion).
 
-* **Conversion vs. Degradation:** Not all ecosystem service hotspots perfectly overlap with physical land conversion. A significant portion of ES decline occurs in areas without massive footprint changes, pointing to the critical role of **landscape degradation**, fragmentation, and management intensification (e.g., increased fertilizer application without expanding cropland).
-* **Targeted Drivers:** Where overlap *does* occur, the drivers map logically to the services lost. For example, Coastal Risk hotspots correlate most strongly with Urban Expansion (coastal hardening), while Nitrogen/Sediment export hotspots are more tightly coupled with Cropland Expansion.
+* **Spatial Attribution / Degradation:** Not all ecosystem service hotspots perfectly overlap with physical land conversion within the same 10km cell. A significant portion of ES decline occurs in areas without massive footprint changes, pointing to the critical role of **invisible degradation**, upstream drivers, fragmentation, and management intensification (e.g., increased fertilizer application without expanding cropland).
+* **Targeted Drivers:** Where overlap *does* occur, the drivers map logically to the services lost. For example, Coastal Risk hotspots correlate most strongly with Urban Expansion (coastal hardening), while Nitrogen/Sediment export hotspots are more tightly coupled with Cropland Expansion. Incorporating **Grassland Loss** models further attributes the decline of habitat and soil retention to the transformation of critical rangeland ecosystems.
 
 ---
 

@@ -59,6 +59,14 @@ This section highlights the major technical and methodological hurdles overcome 
 
 ## Chronological Log (Newest to Oldest)
 
+### 2026-05-05
+*   **Visualization Consistency:** Updated `hotspot_synthesis.qmd` to ensure all "hotness" and "exposure" bar charts use a consistent red intensity color scale (`scale_fill_distiller`) mapped to the value, rather than categorical colors for the groups. This improves visual coherence across the analysis.
+*   **Code Health:** Added the `group_palettes` object definition to `hotspot_synthesis.qmd` to resolve a missing object error that was causing rendering to fail.
+*   **Visual Unification & Cleanup:** Systematically removed redundant "main report" plotting blocks and ensured the "High income: nonOECD" category is consistently and globally filtered out from all visualizations in `hotspot_extraction.qmd` and `hotspot_synthesis.qmd` to reduce noise.
+*   **LCC Grasslands Integration:** Integrated "Model 3: Grassland Loss" into the `LC_change_granular.qmd` pipeline, adding a specific reclassification matrix to explicitly track the conversion of grasslands to other uses.
+*   **Narrative Refinement:** Updated `Key_Takeaways.md` to incorporate the "Spatial Attribution / Degradation" findings and highlight the new Grassland Loss model, aligning with the latest feedback.
+*   **Plotting Iteration (Synthesis & Volumetric Plots):** Reverted the combined volumetric plots in `hotspot_extraction.qmd` back to separate figures for absolute and percent change. Fixed the y-axis labels in the `hotspot_synthesis.qmd` bar charts to display the numeric key instead of being blank, improving readability.
+
 ### 2026-05-04
 *   **Infrastructure & Environment:** Resolved persistent VS Code Remote SSH synchronization and connection hangs that have been occurring since last week on `lilling`.
     *   *Diagnosis:* The VS Code server backend was fragmenting and leaving behind orphaned `node` processes for language servers (Pylance, Quarto) and the core RPC server, which blocked new connections.

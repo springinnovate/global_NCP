@@ -379,6 +379,11 @@ if ("WWF_biome" %in% names(sf_subset)) {
   sf_subset <- dplyr::filter(sf_subset, is.na(WWF_biome) | !WWF_biome %in% c("Lakes", "Rock & Ice"))
 }
 
+if ("income_grp" %in% names(sf_subset)) {
+  sf_subset <- sf_subset %>% dplyr::filter(is.na(income_grp) | income_grp != "2. High income: nonOECD")
+  message("Excluding '2. High income: nonOECD' from signed bar analysis.")
+}
+
 cat("Dimensions of sf_subset after filtering: ", paste(dim(sf_subset), collapse = " x "), "\n")
 cat("Filtered out ", original_rows - nrow(sf_subset), " rows.\n")
 
@@ -528,7 +533,7 @@ plot_signed_bars <- function(df, grouping, metric, refs, out_dir_base = "outputs
           axis.ticks.y = element_blank(),
           legend.position = "bottom",
           legend.title = element_blank(),
-          legend.text = element_text(size = 8),
+          legend.text = element_text(size = 10), 
           plot.margin = margin(l = 30))
   dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -544,14 +549,6 @@ for (g in groupings) {
     plot_signed_bars(signed_summary, grouping = g, metric = m,
                      refs = glob_refs,
                      out_dir_base = file.path("outputs", "plots", paste0("signed_bars", params$output_suffix)))
-
-    # Main report version (exclude nonOECD outliers)
-    if (g == "income_grp") {
-      signed_summary_main <- signed_summary %>% dplyr::filter(group != "2. High income: nonOECD")
-      plot_signed_bars(signed_summary_main, grouping = g, metric = m,
-                       refs = glob_refs,
-                       out_dir_base = file.path("outputs", "plots", paste0("signed_bars", params$output_suffix, "_main_report")))
-    }
   }
 }
 ```
@@ -1165,6 +1162,10 @@ if ("WWF_biome" %in% names(plt_long)) {
 if ("region_wb" %in% names(plt_long)) {
   plt_long <- dplyr::filter(plt_long, !region_wb %in% c("Antarctica"))
 }
+if ("income_grp" %in% names(plt_long)) {
+  plt_long <- dplyr::filter(plt_long, is.na(income_grp) | income_grp != "2. High income: nonOECD")
+  cat("[DIAGNOSTIC] Globally excluding '2. High income: nonOECD' from all boxplots.\n", file=stderr())
+}
 
 # Define service lists for directing plotting logic
 volumetric_services <- c("Nature_Access", "Pollination", "Sed_export", "N_export")
@@ -1212,7 +1213,6 @@ if (length(groupings) == 0) {
     }
 
     cat("[DIAGNOSTIC] Rendering hotspot boxplots for: ", gc, "\n", file=stderr())
-    cat("[DIAGNOSTIC] Target out_root: ", here::here("outputs", "plots"), "\n", file=stderr())
     tryCatch({
       run_hotspot_boxplots_by(
         # Exclude coastal services here because they are handled in their own dedicated plot below
@@ -1229,30 +1229,11 @@ if (length(groupings) == 0) {
         top_bottom_n        = if (gc == "nev_name") 10 else NULL,
         out_root            = here::here("outputs", "plots")
       )
-    }, error = function(e) {
+    },
+ error = function(e) {
       cat("[DIAGNOSTIC] ERROR generating boxplots for ", gc, ": ", e$message, "\n", file=stderr())
       stop(e)
     })
-    # Main report version (exclude nonOECD outliers) for income_grp
-    if (gc == "income_grp") {
-      tryCatch({
-        run_hotspot_boxplots_by(
-          df_long             = plt_long %>% dplyr::filter(!service %in% coastal_services, income_grp != "2. High income: nonOECD"),
-          group_col           = gc,
-          loss                = HOTS_CFG$loss,
-          gain                = HOTS_CFG$gain,
-          pct_cutoff          = HOTS_CFG$pct_cutoff,
-          threshold_mode      = HOTS_CFG$threshold_mode,
-          svc_order           = boxplot_order,
-          keep_only_ordered   = TRUE,
-          volumetric_services = volumetric_services,
-          ratio_services      = ratio_services,
-          out_root            = here::here("outputs", "plots", "main_report")
-        )
-      }, error = function(e) {
-        cat("[DIAGNOSTIC] ERROR generating main_report boxplots: ", e$message, "\n", file=stderr())
-      })
-    }
 
     # ------------------------------------------------------------------
     # Custom plotting for Coastal Protection (Free Scales)
@@ -1318,6 +1299,11 @@ if (length(groupings) == 0) {
             dplyr::mutate(scaled_fill = scales::rescale(abs(mean_val), to = c(0, 1))) %>%
             dplyr::ungroup()
 
+          # Explicitly filter non-OECD here for safety, though it should be inherited
+          if (gc == "income_grp") {
+            coast_stats <- coast_stats %>% dplyr::filter(is.na(income_grp) | income_grp != "2. High income: nonOECD")
+          }
+
           x_var <- gc
           facet_scales <- "free_y"
           if (gc == "nev_name") {
@@ -1335,7 +1321,7 @@ if (length(groupings) == 0) {
 
         p <- ggplot(coast_stats, aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = scaled_fill)) +
           geom_boxplot(stat = "identity") +
-            facet_wrap(~Service, scales = facet_scales, ncol = 1) +
+            facet_wrap(~Service, scales = facet_scales, ncol = 2) +
             labs(title = paste("Hotspot Change Distribution:", gc),
                  subtitle = paste("Coastal Services (Free Scale) -", metric_label),
                  y = metric_label, x = NULL) +
@@ -1352,7 +1338,7 @@ if (length(groupings) == 0) {
           dir.create(out_sub, recursive = TRUE, showWarnings = FALSE)
           fname <- file.path(out_sub, paste0("boxplots_", gc, "_", file_tag, "_coastal.png"))
           cat("[DIAGNOSTIC] Saving coastal boxplot to: ", fname, "\n", file=stderr())
-          ggsave(fname, p, width = 8, height = 8, bg = "white")
+          ggsave(fname, p, width = 12, height = 6, bg = "white")
         }
       }
     }
@@ -1422,6 +1408,9 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
 
     ue_col <- grep("Expansion_Gain_Urban", names(lc_df), value = TRUE)
   if (length(ue_col) > 0) drivers[["Urban_Exp"]] <- ue_col[1]
+
+  gl_col <- grep("GrasslandLoss_Loss_Grassland", names(lc_df), value = TRUE)
+  if (length(gl_col) > 0) drivers[["Grassland_Loss"]] <- gl_col
 
   # Identify Net Forest Change for correlation analysis
   net_col <- "ForestLoss_dir_ch_Forest_1992_2020"
@@ -1563,13 +1552,14 @@ if (lc_data_ready && length(overlap_stats_all) > 0) {
           driver == "Forest_Loss" ~ "Forest Loss",
           driver == "Crop_Exp" ~ "Cropland Expansion",
           driver == "Urban_Exp" ~ "Urban Expansion",
+          driver == "Grassland_Loss" ~ "Grassland Loss",
           TRUE ~ driver
-        ), levels = c("Forest Loss", "Cropland Expansion", "Urban Expansion")),
+        ), levels = c("Forest Loss", "Grassland Loss", "Cropland Expansion", "Urban Expansion")),
         service = factor(service, levels = canon_order)
       ) %>%
       filter(!is.na(service))
 
-    driver_colors <- c("Forest Loss" = "#2ca25f", "Cropland Expansion" = "#e69138", "Urban Expansion" = "#e41a1c")
+    driver_colors <- c("Forest Loss" = "#2ca25f", "Grassland Loss" = "#fdbf6f", "Cropland Expansion" = "#e69138", "Urban Expansion" = "#e41a1c")
 
     # Plot
     p_bar <- ggplot(overlap_plot_data, aes(x = service, y = pct_overlap, fill = driver_label)) +
@@ -1664,8 +1654,8 @@ for (m_col in c("pct_chg", "abs_chg")) {
       theme(axis.title = element_text(size = 8),
             axis.text = element_text(size = 8),
             strip.text = element_text(size = 10),
-            legend.title = element_text(size = 9),
-            legend.text = element_text(size = 7))
+            legend.title = element_text(size = 11),
+            legend.text = element_text(size = 9))
 
     print(p_cor)
 
@@ -1718,7 +1708,7 @@ if (lc_data_ready) {
                fill = "Count\n(log10)") +
           theme_minimal() +
           theme(axis.title = element_text(size = 8), axis.text = element_text(size = 8),
-                strip.text = element_text(size = 10), legend.title = element_text(size = 9), legend.text = element_text(size = 7))
+                strip.text = element_text(size = 10), legend.title = element_text(size = 11), legend.text = element_text(size = 9))
 
         print(p_scatter)
         out_dir <- file.path("outputs", "plots", paste0("drivers", params$output_suffix))
