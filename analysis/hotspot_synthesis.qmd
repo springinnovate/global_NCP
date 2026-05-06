@@ -47,6 +47,47 @@ This notebook consolidates all spatial summary statistics for global hotspots in
 
 ## Setup
 
+## Data Dictionary for Output Tables
+
+This notebook produces three key summary tables in the `processed/tables/` directory. Their columns are defined below.
+
+### `hotspot_area_stats.csv`
+
+| Column | Meaning |
+|:---|:---|
+| `service` | The ecosystem service being analyzed. |
+| `group` | The specific value of the grouping variable (e.g., 'East Asia & Pacific', 'Low income'). |
+| `n_total` | Total number of valid grid cells within that `group`. |
+| `n_hot` | Number of hotspot cells within that `group`. |
+| `pct_area` | **Hotspot Intensity (Coverage)**. The percentage of the group's area that is a hotspot. Formula: `(n_hot / n_total) * 100`. |
+| `global_n_hot` | The total number of hotspots for that service across the entire globe. |
+| `pct_share` | **Global Share**. The percentage of all global hotspots for a service that are located within this `group`. Formula: `(n_hot / global_n_hot) * 100`. |
+| `grouping_var` | The grouping variable used for the aggregation (e.g., 'region_wb', 'income_grp'). |
+| `expected_share` | The group's percentage of the total global land area. This is the share of hotspots the group *would* have if hotspots were distributed evenly. |
+| `relative_intensity` | **Enrichment Score**. A measure of disproportionate burden. It is the ratio of the group's actual share of hotspots to its expected share. A score > 1 indicates the region is a "hotspot of hotspots." Formula: `pct_share / expected_share`. |
+
+### `hotspot_multiservice_stats.csv`
+
+| Column | Meaning |
+|:---|:---|
+| `group` | The specific value of the grouping variable. |
+| `mean_hotspots` | **"Hotness"**. The average number of overlapping service hotspots per grid cell within that group. |
+| `pct_multi` | The percentage of grid cells within the group that have more than one hotspot. |
+| `n_pixels` | The total number of grid cells in the group. |
+| `grouping` | The grouping variable used for the aggregation. |
+
+### `hotspot_pop_exposure.csv`
+
+| Column | Meaning |
+|:---|:---|
+| `service` | The ecosystem service being analyzed. |
+| `income_grp` | The World Bank Income Group of the grid cell. |
+| `hdi_bin` | The Human Development Index (HDI) bin of the grid cell. |
+| `exposed_population` | The total population (from GHS-POP) living within the hotspot cells for that specific service and socioeconomic group. |
+| `hotspot_cells` | The number of hotspot cells corresponding to that service and group. |
+
+---
+
 ```{r}
 #| label: setup
 #| message: false

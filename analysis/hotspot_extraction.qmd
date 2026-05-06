@@ -1189,6 +1189,34 @@ if (length(missing_groupings)) {
 }
 groupings <- intersect(groupings, names(plt_long))
 cat("[DIAGNOSTIC] make-hotspot-boxplots groupings to process: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none", "\n", file=stderr())
+
+biome_labels <- c(
+  'Tropical & Subtropical Moist Broadleaf Forests' = 'Trop/Subtrop Moist Broadleaf',
+  'Tropical & Subtropical Dry Broadleaf Forests' = 'Trop/Subtrop Dry Broadleaf',
+  'Tropical & Subtropical Coniferous Forests' = 'Trop/Subtrop Coniferous',
+  'Temperate Broadleaf & Mixed Forests' = 'Temp Broadleaf/Mixed',
+  'Temperate Coniferous Forests' = 'Temp Coniferous',
+  'Boreal Forests/Taiga' = 'Boreal/Taiga',
+  'Tropical & Subtropical Grasslands, Savannas & Shrublands' = 'Trop/Subtrop Grass/Sav/Shrub',
+  'Temperate Grasslands, Savannas & Shrublands' = 'Temp Grass/Sav/Shrub',
+  'Flooded Grasslands & Savannas' = 'Flooded Grass/Savannas',
+  'Montane Grasslands & Shrublands' = 'Montane Grass/Shrub',
+  'Tundra' = 'Tundra',
+  'Mediterranean Forests, Woodlands & Scrub' = 'Mediterranean',
+  'Deserts & Xeric Shrublands' = 'Deserts & Xeric Shrub',
+  'Mangroves' = 'Mangroves'
+)
+
+get_short_name <- function(g, grp_name) {
+  g <- as.character(g)
+  if (any(grp_name %in% c("WWF_biome", "biome"))) {
+    res <- biome_labels[g]
+    unname(ifelse(is.na(res), g, res))
+  } else {
+    g
+  }
+}
+
 boxplot_order <- levels(plt_long$service)
 if (is.null(boxplot_order)) {
   boxplot_order <- unique(plt_long$service)
@@ -1198,11 +1226,6 @@ boxplot_order <- as.character(boxplot_order)
 if (length(groupings) == 0) {
   warning("No grouping columns found in plt_long; skipping hotspot boxplots.")
 } else {
-
-  # Cleanup legacy absolute coastal plots to avoid confusion in outputs
-  legacy_abs_coastal <- list.files(here::here("outputs", "plots"), pattern = ".*_abs_coastal\\.png$", recursive = TRUE, full.names = TRUE)
-  if (length(legacy_abs_coastal) > 0) invisible(file.remove(legacy_abs_coastal))
-
   for (gc in groupings) {
     # Check for valid data before attempting to plot
     n_valid <- sum(!is.na(plt_long[[gc]]))
@@ -1212,136 +1235,85 @@ if (length(groupings) == 0) {
       next
     }
 
-    cat("[DIAGNOSTIC] Rendering hotspot boxplots for: ", gc, "\n", file=stderr())
-    tryCatch({
-      run_hotspot_boxplots_by(
-        # Exclude coastal services here because they are handled in their own dedicated plot below
-        df_long             = plt_long %>% dplyr::filter(!service %in% coastal_services),
-        group_col           = gc,
-        loss                = HOTS_CFG$loss,
-        gain                = HOTS_CFG$gain,
-        pct_cutoff          = HOTS_CFG$pct_cutoff,
-        threshold_mode      = HOTS_CFG$threshold_mode,
-        svc_order           = boxplot_order,
-        keep_only_ordered   = TRUE,
-        volumetric_services = volumetric_services,
-        ratio_services      = ratio_services,
-        top_bottom_n        = if (gc == "nev_name") 10 else NULL,
-        out_root            = here::here("outputs", "plots")
-      )
-    },
- error = function(e) {
-      cat("[DIAGNOSTIC] ERROR generating boxplots for ", gc, ": ", e$message, "\n", file=stderr())
-      stop(e)
-    })
+    # --- 1. Data Preparation (for all service types) ---
+    hotspots_all <- plt_long %>%
+      dplyr::filter(!is.na(.data[[gc]])) %>%
+      dplyr::group_by(service) %>%
+      dplyr::mutate(
+        is_loss = service %in% HOTS_CFG$loss,
+        cutoff = if_else(is_loss, quantile(pct_chg, HOTS_CFG$pct_cutoff, na.rm = TRUE), quantile(pct_chg, 1 - HOTS_CFG$pct_cutoff, na.rm = TRUE)),
+        is_hotspot = if_else(is_loss, pct_chg <= cutoff, pct_chg >= cutoff)
+      ) %>%
+      dplyr::ungroup() %>%
+      dplyr::filter(is_hotspot == TRUE)
 
-    # ------------------------------------------------------------------
-    # Custom plotting for Coastal Protection (Free Scales)
-    # ------------------------------------------------------------------
-    # This addresses the issue where C_Risk (index) and C_Risk_Red_Ratio (ratio)
-    # appear as flat lines when faceted with other ratio services due to scale differences.
+    unique_groups <- sort(unique(as.character(hotspots_all[[gc]])))
+    group_id_map <- setNames(seq_along(unique_groups), unique_groups)
+    unique_groups_desc <- sort(unique_groups, decreasing = TRUE)
+    legend_levels <- paste0("[", group_id_map[unique_groups_desc], "] ", get_short_name(unique_groups_desc, gc))
+    legend_cols <- 3
 
-    # Ensure we have coastal services in the data
-    curr_coastal <- intersect(coastal_services, unique(plt_long$service))
-
-    if (length(curr_coastal) > 0) {
-      cat("[DIAGNOSTIC] Rendering dedicated coastal boxplots for: ", gc, "\n", file=stderr())
-
-      # We plot only Percent change because absolute change doesn't make sense for these indices
-      for (metric in c("pct_chg")) {
-        metric_label <- if (metric == "pct_chg") "Percent Change (%)" else "Absolute Change"
-        file_tag     <- if (metric == "pct_chg") "pct" else "abs"
-
-        plot_data_list <- list()
-
-        for (svc in curr_coastal) {
-          # Filter data for this service and group
-          d_svc <- plt_long %>%
-            dplyr::filter(service == svc, !is.na(.data[[metric]]), !is.na(.data[[gc]]))
-
-          if (nrow(d_svc) == 0) next
-
-          # Identify Hotspots (using PCT cutoff always, per HOTS_CFG)
-          # Note: We use the global percentile logic here for simplicity of visualization
-          is_loss <- svc %in% HOTS_CFG$loss
-
-          # Calculate threshold on PCT change (standard definition)
-          cutoff <- if (is_loss) quantile(d_svc$pct_chg, HOTS_CFG$pct_cutoff, na.rm = TRUE)
-                    else         quantile(d_svc$pct_chg, 1 - HOTS_CFG$pct_cutoff, na.rm = TRUE)
-
-          d_hot <- if (is_loss) d_svc %>% dplyr::filter(pct_chg <= cutoff)
-                   else         d_svc %>% dplyr::filter(pct_chg >= cutoff)
-
-          if (nrow(d_hot) > 0) {
-            d_hot$Service <- svc
-            plot_data_list[[svc]] <- d_hot
-          }
-        }
-
-        if (length(plot_data_list) > 0) {
-          coast_df <- dplyr::bind_rows(plot_data_list)
-
-          coast_stats <- coast_df %>%
-            dplyr::filter(!is.na(.data[[metric]])) %>%
-            dplyr::group_by(dplyr::across(dplyr::all_of(c("Service", gc)))) %>%
+    # --- 2. Unified Plotting Function ---
+    plot_and_save_boxplots <- function(df, services_to_plot, metric, plot_title, out_filename, n_cols, width, height) {
+        plot_stats <- df %>%
+            dplyr::filter(service %in% services_to_plot, !is.na(.data[[metric]])) %>%
+            dplyr::group_by(dplyr::across(dplyr::all_of(c("service", gc)))) %>%
             dplyr::summarise(
-              mean_val = mean(.data[[metric]], na.rm = TRUE),
-              middle = stats::median(.data[[metric]], na.rm = TRUE),
-              lower  = stats::quantile(.data[[metric]], 0.25, na.rm = TRUE),
-              upper  = stats::quantile(.data[[metric]], 0.75, na.rm = TRUE),
-              iqr    = stats::IQR(.data[[metric]], na.rm = TRUE),
-              ymin   = max(min(.data[[metric]], na.rm = TRUE), lower - 1.5 * iqr),
-              ymax   = min(max(.data[[metric]], na.rm = TRUE), upper + 1.5 * iqr),
-              v_count = dplyr::n(),
-              .groups = "drop"
+                middle = stats::median(.data[[metric]], na.rm = TRUE),
+                lower  = stats::quantile(.data[[metric]], 0.25, na.rm = TRUE),
+                upper  = stats::quantile(.data[[metric]], 0.75, na.rm = TRUE),
+                iqr    = stats::IQR(.data[[metric]], na.rm = TRUE),
+                ymin   = max(min(.data[[metric]], na.rm = TRUE), lower - 1.5 * iqr),
+                ymax   = min(max(.data[[metric]], na.rm = TRUE), upper + 1.5 * iqr),
+                .groups = "drop"
             ) %>%
-            dplyr::group_by(Service) %>%
-            dplyr::mutate(scaled_fill = scales::rescale(abs(mean_val), to = c(0, 1))) %>%
-            dplyr::ungroup()
+            dplyr::group_by(service) %>%
+            dplyr::mutate(scaled_fill = scales::rescale(abs(middle))) %>%
+            dplyr::ungroup() %>%
+            dplyr::mutate(
+                group = factor(.data[[gc]], levels = unique_groups_desc),
+                grp_num_id = as.character(group_id_map[as.character(.data[[gc]])]),
+                grp_legend_label = factor(paste0("[", grp_num_id, "] ", get_short_name(as.character(.data[[gc]]), gc)), levels = legend_levels)
+            )
 
-          # Explicitly filter non-OECD here for safety, though it should be inherited
-          if (gc == "income_grp") {
-            coast_stats <- coast_stats %>% dplyr::filter(is.na(income_grp) | income_grp != "2. High income: nonOECD")
-          }
-
-          x_var <- gc
-          facet_scales <- "free_y"
-          if (gc == "nev_name") {
-            coast_stats <- coast_stats %>%
-              dplyr::filter(v_count >= 10) %>%
-              dplyr::arrange(Service, middle) %>%
-              dplyr::group_by(Service) %>%
-              dplyr::filter(dplyr::dense_rank(middle) <= 10 | dplyr::dense_rank(middle) >= max(dplyr::dense_rank(middle)) - 9) %>%
-              dplyr::ungroup() %>%
-              dplyr::mutate(plot_label = stats::reorder(paste(.data[[gc]], Service, sep="__"), middle))
-
-            x_var <- "plot_label"
-            facet_scales <- "free"
-          }
-
-        p <- ggplot(coast_stats, aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = scaled_fill)) +
-          geom_boxplot(stat = "identity") +
-            facet_wrap(~Service, scales = facet_scales, ncol = 2) +
-            labs(title = paste("Hotspot Change Distribution:", gc),
-                 subtitle = paste("Coastal Services (Free Scale) -", metric_label),
-                 y = metric_label, x = NULL) +
-            theme_minimal() +
-          theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-          scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity")
-
-          if (gc == "nev_name") {
-             p <- p + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
-          }
-
-          # Use deterministic outputs/plots path
-          out_sub <- here::here("outputs", "plots", "coastal", gc)
-          dir.create(out_sub, recursive = TRUE, showWarnings = FALSE)
-          fname <- file.path(out_sub, paste0("boxplots_", gc, "_", file_tag, "_coastal.png"))
-          cat("[DIAGNOSTIC] Saving coastal boxplot to: ", fname, "\n", file=stderr())
-          ggsave(fname, p, width = 12, height = 6, bg = "white")
+        if (nrow(plot_stats) == 0) {
+            cat("[DIAGNOSTIC] No data to plot for ", plot_title, "\n", file=stderr())
+            return(NULL)
         }
-      }
+
+        metric_label <- if (metric == "pct_chg") "Percent Change (%)" else "Absolute Change"
+
+        p <- ggplot(plot_stats, aes(x = group, ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
+            geom_boxplot(stat = "identity", aes(fill = scaled_fill)) +
+            geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
+            facet_wrap(~service, scales = "free", ncol = n_cols) +
+            coord_flip() +
+            labs(title = plot_title, subtitle = paste("Metric:", metric_label), x = NULL, y = metric_label) +
+            scale_fill_distiller(palette = "Reds", direction = 1, guide = "none") +
+            scale_x_discrete(labels = function(x) group_id_map[x]) +
+            theme_minimal(base_size = 14) +
+            theme(
+                strip.text = element_text(face = "bold"),
+                axis.text = element_text(size = 12),
+                axis.title = element_text(size = 14),
+                legend.position = "bottom",
+                legend.title = element_blank(),
+                legend.text = element_text(size = 12)
+            ) +
+            guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
+
+        out_dir <- here::here("outputs", "plots", "boxplots_unified", gc)
+        dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+        fname <- file.path(out_dir, out_filename)
+        ggsave(fname, p, width = width, height = height, bg = "white", dpi = 300)
+        cat("[DIAGNOSTIC] Saved unified boxplot to: ", fname, "\n", file=stderr())
     }
+
+    # --- 3. Execute Plotting for Each Service Type ---
+    plot_and_save_boxplots(hotspots_all, volumetric_services, "abs_chg", paste("Hotspot Distribution (Volumetric):", gc), "boxplots_volumetric_abs.png", n_cols = 2, width = 12, height = 10)
+    plot_and_save_boxplots(hotspots_all, volumetric_services, "pct_chg", paste("Hotspot Distribution (Volumetric):", gc), "boxplots_volumetric_pct.png", n_cols = 2, width = 12, height = 10)
+    plot_and_save_boxplots(hotspots_all, ratio_services, "pct_chg", paste("Hotspot Distribution (Ratios):", gc), "boxplots_ratios_pct.png", n_cols = 2, width = 12, height = 6)
+    plot_and_save_boxplots(hotspots_all, coastal_services, "pct_chg", paste("Hotspot Distribution (Coastal):", gc), "boxplots_coastal_pct.png", n_cols = 2, width = 12, height = 6)
   }
 }
 
