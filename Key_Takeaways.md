@@ -39,6 +39,15 @@ To move beyond correlation, we assessed the direct overlap between ES hotspots a
 
 ---
 
+## 5. Absolute Population Exposure (The Scale of Human Impact)
+While socioeconomic profiling (KS tests) reveals the *relative* characteristics of hotspot areas, analyzing the absolute population living within them provides a complementary view of the human dimension of ES decline.
+
+*   **Concentration in Middle-Income Nations:** The vast majority of people exposed to ES decline hotspots reside in Upper and Lower Middle-Income countries. For declines in **Nature Access** and **N Retention Ratio**, over 400 million and 300 million people are affected in Upper Middle-Income countries alone, respectively. [1]
+*   **Service-Specific Exposure:** The burden is not uniform. Hotspots for increased **Nitrogen Export** are most heavily concentrated in Upper Middle-Income countries, while **Pollination** loss hotspots affect a more evenly distributed population across Upper Middle, Lower Middle, and Low-Income countries. [1]
+*   **The High-Income Paradox:** Despite the statistical correlation showing hotspots often occur in areas with higher-than-average GDP, the absolute number of people affected in High-Income countries is significantly lower than in middle-income nations for most services. This highlights the difference between the *character* of a location and the *scale* of its human impact. [1]
+
+---
+
 ## 5. Next Steps & Future Directions
 Now that the core V1.3.2 data pipeline is robust, mathematically validated, and fully automated, future analytical phases can easily explore:
 * **Bright Spots:** Flipping the threshold to identify and analyze the top 5% of areas experiencing *gains* and improvements in ecosystem services (e.g., successful reforestation or restoration impacts).
