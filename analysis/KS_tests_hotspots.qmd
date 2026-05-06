@@ -1,8 +1,7 @@
 ---
 title: "Relative Socioeconomic Shift"
-subtitle: "v1.3.1"
-author: "Jerónimo Rodríguez Escobar"
-analysis_version: "v1.3.1"
+subtitle: "v1.3.3"
+analysis_version: "v1.3.3"
 date: now
 date-format: "YYYY-MM-DD HH:mm zzz"
 format:
@@ -67,30 +66,26 @@ Uses the hotspot definition from the extraction report to compare hotspots vs no
 
 | Column | Meaning |
 |------------------|------------------------------------------------------|
-| `service` | Ecosystem service for the comparison (row group). |
-| `var` | Socioeconomic variable being tested (e.g., GDP total, population). |
-| `D` | Kolmogorov–Smirnov statistic; maximum vertical gap between hotspot and non-hotspot ECDFs (unsigned). Larger ⇒ stronger distributional difference. |
-| `p_value` | Two-sided KS p-value (asymptotic). Small values indicate the two distributions differ. |
-| `p_perm` | Optional permutation p-value (label shuffle within a service). `NA` if permutations were not requested. |
-| `n_hot` | Sample size of the hotspot group used in the test. |
-| `n_non` | Sample size of the non-hotspot group used in the test. |
-| `mean_hot` | Mean of `var` in the hotspot group. |
-| `mean_non` | Mean of `var` in the non-hotspot group. |
-| `median_hot` | Median of `var` in the hotspot group. |
-| `median_non` | Median of `var` in the non-hotspot group. |
-| `q10_hot` | 10th percentile of `var` in the hotspot group. |
-| `q90_hot` | 90th percentile of `var` in the hotspot group. |
-| `q10_non` | 10th percentile of `var` in the non-hotspot group. |
-| `q90_non` | 90th percentile of `var` in the non-hotspot group. |
-| `median_delta` | `median_hot − median_non`. Positive ⇒ hotspots typically have larger values. |
-| `mean_delta` | `mean_hot − mean_non`. Positive ⇒ hotspots typically have larger values. |
-| `auc` | Probability of superiority (AUC; equivalent to normalized Mann–Whitney U): P(value_hotspot > value_nonhotspot). 0.5 ⇒ no tendency; >0.5 ⇒ hotspots tend higher; <0.5 ⇒ hotspots tend lower. |
-| `cliffs_delta` | Nonparametric effect size on [−1, 1], computed as `2*auc − 1`. Rule-of-thumb magnitude: ~0.15 negligible, ~0.33 small, ~0.47 medium, ≥0.47 large (use absolute value for magnitude). |
-| `p_hot_greater` | One-sided KS p-value testing whether hotspots are stochastically greater than non-hotspots. |
-| `p_hot_less` | One-sided KS p-value testing whether hotspots are stochastically smaller than non-hotspots. |
-| `p_adj` | Benjamini–Hochberg FDR-adjusted version of `p_value` (adjusted within each `var` across services). |
-| `p_hot_greater_adj` | BH-adjusted version of `p_hot_greater` (adjusted within `var`). |
-| `p_hot_less_adj` | BH-adjusted version of `p_hot_less` (adjusted within `var`). |
+| `service` | Ecosystem service being analyzed. |
+| `var` | Socioeconomic variable being tested (e.g., GDP, Population). |
+| `D` | The Kolmogorov–Smirnov D statistic, representing the maximum absolute difference between the empirical cumulative distribution functions (ECDFs) of the hotspot and non-hotspot groups. It is a non-parametric measure of the distance between the two distributions, with larger values indicating a greater difference. |
+| `p_value` | Two-sided KS p-value. Small values (e.g., < 0.05) indicate the two distributions are significantly different. |
+| `p_perm` | Optional permutation p-value (from label shuffling). `NA` if permutations were not run. |
+| `n_hot` | Number of grid cells in the hotspot group. |
+| `n_non` | Number of grid cells in the non-hotspot (comparison) group. |
+| `mean_hot`, `mean_non` | Mean of the variable in the hotspot and non-hotspot groups. |
+| `median_hot`, `median_non` | Median of the variable in the hotspot and non-hotspot groups. |
+| `q10_hot`, `q90_hot` | 10th and 90th percentiles of the variable in the hotspot group. |
+| `q10_non`, `q90_non` | 10th and 90th percentiles of the variable in the non-hotspot group. |
+| `median_delta` | `median_hot − median_non`. The direction of the shift in the median. |
+| `mean_delta` | `mean_hot − mean_non`. The direction of the shift in the mean. |
+| `auc` | Area Under the Curve (AUC) of the ROC curve. Represents the probability that a randomly chosen observation from the hotspot group is greater than one from the non-hotspot group. A value of 0.5 indicates identical distributions. |
+| `cliffs_delta` | A non-parametric effect size (`2*auc - 1`) that quantifies the magnitude and direction of the difference. Ranges from -1 (all hotspot values are smaller) to +1 (all hotspot values are larger). A value of 0 means the distributions are perfectly overlapping. Rule-of-thumb for magnitude: `|d| < 0.147` (negligible), `|d| < 0.33` (small), `|d| < 0.474` (medium), `|d| ≥ 0.474` (large). |
+| `p_hot_greater` | One-sided KS p-value testing if the hotspot distribution is stochastically greater than the non-hotspot one. |
+| `p_hot_less` | One-sided KS p-value testing if the hotspot distribution is stochastically smaller than the non-hotspot one. |
+| `p_adj` | Benjamini–Hochberg FDR-adjusted version of `p_value` (corrected for multiple comparisons). |
+| `p_hot_greater_adj` | FDR-adjusted version of `p_hot_greater`. |
+| `p_hot_less_adj` | FDR-adjusted version of `p_hot_less`. |
 
 ::: callout-note
 **Exporting KS results for review and further interpretation**

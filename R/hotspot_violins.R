@@ -40,39 +40,22 @@ run_hotspot_boxplots_by <- function(
   }
   svc_order <- as.character(svc_order)
 
-  # Universal Palettes for Regional Groupings
-  group_palettes <- list(
-    biome = c(
-      'Tropical & Subtropical Moist Broadleaf Forests' = '#319D00',
-      'Tropical & Subtropical Dry Broadleaf Forests' = '#7ABD1B',
-      'Tropical & Subtropical Coniferous Forests' = '#556E19',
-      'Temperate Broadleaf & Mixed Forests' = '#207433',
-      'Temperate Coniferous Forests' = '#3E8D62',
-      'Boreal Forests/Taiga' = '#496FF3',
-      'Tropical & Subtropical Grasslands, Savannas & Shrublands' = '#D6F392',
-      'Temperate Grasslands, Savannas & Shrublands' = '#D1E614',
-      'Flooded Grasslands & Savannas' = '#75D0D5',
-      'Montane Grasslands & Shrublands' = '#98E600',
-      'Tundra' = '#C7DEFF',
-      'Mediterranean Forests, Woodlands & Scrub' = '#AF963C',
-      'Deserts & Xeric Shrublands' = '#C55C5C',
-      'Mangroves' = '#FE04BC'
-    ),
-    income_grp = c('1. High income: OECD' = '#004D33', '2. High income: nonOECD' = '#1d7355', '3. Upper middle income' = '#4b9e80', '4. Lower middle income' = '#8bc5af', '5. Low income' = '#cde9df'),
-    region_wb = c('East Asia & Pacific' = '#2E5A88', 'Europe & Central Asia' = '#D86018', 'Latin America & Caribbean' = '#7A3F91', 'Middle East & North Africa' = '#B38F00', 'North America' = '#1D8A99', 'South Asia' = '#6B8E23', 'Sub-Saharan Africa' = '#8B0000')
-  )
-  group_palettes$WWF_biome <- group_palettes$biome
 
   message("==> Boxplots by: ", group_col)
 
-  # Original data extraction remains the same
-  by_abs <- extract_hotspots_by(df_long, group_cols=group_col, loss=loss, gain=gain, value_col="abs_chg", pct_cutoff=pct_cutoff, threshold_mode=threshold_mode)
-  by_pct <- extract_hotspots_by(df_long, group_cols=group_col, loss=loss, gain=gain, value_col="pct_chg", pct_cutoff=pct_cutoff, threshold_mode=threshold_mode)
+  # --- CORRECTED LOGIC ---
+  # 1. Identify hotspots based *only* on percentage change, as this is our standard definition.
+  hotspots_by_group <- extract_hotspots_by(df_long, group_cols=group_col, loss=loss, gain=gain, value_col="pct_chg", pct_cutoff=pct_cutoff, threshold_mode=threshold_mode)
 
-  abs_vals <- by_abs %>% dplyr::transmute(!!group_col := .data[[group_col]], vals=purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, abs_chg))) %>% tidyr::unnest(vals)
-  pct_vals <- by_pct %>% dplyr::transmute(!!group_col := .data[[group_col]], vals=purrr::map(hotspots_df, ~ dplyr::select(.x, fid, service, pct_chg))) %>% tidyr::unnest(vals)
+  # 2. Extract the FID and service for all identified hotspot cells.
+  hotspot_cells <- hotspots_by_group %>%
+    dplyr::select(!!rlang::sym(group_col), hotspots_df) %>%
+    tidyr::unnest(hotspots_df) %>%
+    dplyr::select(!!rlang::sym(group_col), fid, service)
 
-  vals <- dplyr::full_join(abs_vals, pct_vals, by = c(group_col, "fid", "service")) %>%
+  # 3. Join these hotspot identifiers back to the original long data to get BOTH abs_chg and pct_chg for the same cells.
+  vals <- df_long %>%
+    dplyr::inner_join(hotspot_cells, by = c("fid", "service", group_col)) %>%
     { if (isTRUE(keep_only_ordered)) dplyr::filter(., service %in% svc_order) else . } %>%
     dplyr::mutate(service = { extras <- setdiff(unique(service), svc_order); factor(service, levels = c(svc_order, sort(extras))) }) %>%
     dplyr::filter(!is.na(.data[[group_col]])) %>%
@@ -91,6 +74,7 @@ run_hotspot_boxplots_by <- function(
       dplyr::filter(!is.na(.data[[var]])) %>%
       dplyr::group_by(dplyr::across(dplyr::all_of(c("service", group_col)))) %>%
       dplyr::summarise(
+        mean_val = mean(.data[[var]], na.rm = TRUE),
         middle = stats::median(.data[[var]], na.rm = TRUE),
         lower  = stats::quantile(.data[[var]], 0.25, na.rm = TRUE),
         upper  = stats::quantile(.data[[var]], 0.75, na.rm = TRUE),
@@ -110,6 +94,13 @@ run_hotspot_boxplots_by <- function(
         dplyr::ungroup() %>%
         dplyr::mutate(plot_label = stats::reorder(paste(.data[[group_col]], service, sep = "__"), middle))
     }
+
+    # Rescale the mean values per service (facet) so that each facet utilizes the full color scale
+    stats_df <- stats_df %>%
+      dplyr::group_by(service) %>%
+      dplyr::mutate(scaled_fill = scales::rescale(abs(mean_val), to = c(0, 1))) %>%
+      dplyr::ungroup()
+
     return(stats_df)
   }
 
@@ -133,16 +124,13 @@ run_hotspot_boxplots_by <- function(
   if (nrow(vals_vol) > 0) {
     # Absolute
     stats_abs_vol <- calc_box_stats(vals_vol, "abs_chg")
-    p_abs_box_vol <- ggplot2::ggplot(stats_abs_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = .data[[group_col]])) +
+    p_abs_box_vol <- ggplot2::ggplot(stats_abs_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = scaled_fill)) +
       ggplot2::geom_boxplot(stat = "identity") +
       ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 2) +
       ggplot2::labs(title=paste0("Absolute Change (Volumetric Services) by ", group_col), subtitle=sub_txt, x=NULL, y="Absolute change") +
       ggplot2::theme_minimal(base_size = 11) +
-      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1), legend.position = "none")
-
-    if (!is.null(group_palettes[[group_col]])) {
-      p_abs_box_vol <- p_abs_box_vol + ggplot2::scale_fill_manual(values = group_palettes[[group_col]], na.value = "gray50")
-    }
+      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1)) +
+      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity", limits = c(0, 1))
 
     if (!is.null(top_bottom_n)) {
       p_abs_box_vol <- p_abs_box_vol + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
@@ -156,16 +144,13 @@ run_hotspot_boxplots_by <- function(
 
     # Percent
     stats_pct_vol <- calc_box_stats(vals_vol, "pct_chg")
-    p_pct_box_vol <- ggplot2::ggplot(stats_pct_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = .data[[group_col]])) +
+    p_pct_box_vol <- ggplot2::ggplot(stats_pct_vol, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = scaled_fill)) +
       ggplot2::geom_boxplot(stat = "identity") +
       ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 2) +
       ggplot2::labs(title=paste0("Percentage Change (Volumetric Services) by ", group_col), subtitle=sub_txt, x=NULL, y="Percentage change (%)") +
       ggplot2::theme_minimal(base_size = 11) +
-      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1), legend.position = "none")
-
-    if (!is.null(group_palettes[[group_col]])) {
-      p_pct_box_vol <- p_pct_box_vol + ggplot2::scale_fill_manual(values = group_palettes[[group_col]], na.value = "gray50")
-    }
+      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1)) +
+      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity", limits = c(0, 1))
 
     if (!is.null(top_bottom_n)) {
       p_pct_box_vol <- p_pct_box_vol + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()
@@ -186,16 +171,13 @@ run_hotspot_boxplots_by <- function(
     dplyr::mutate(service = factor(service, levels = ratio_present))
   if (nrow(vals_ratio) > 0) {
     stats_abs_ratio <- calc_box_stats(vals_ratio, "abs_chg")
-    p_abs_box_ratio <- ggplot2::ggplot(stats_abs_ratio, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = .data[[group_col]])) +
+    p_abs_box_ratio <- ggplot2::ggplot(stats_abs_ratio, ggplot2::aes(x = .data[[x_var]], ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax, fill = scaled_fill)) +
       ggplot2::geom_boxplot(stat = "identity") +
       ggplot2::facet_wrap(~ service, scales = facet_scales, ncol = 1) +
       ggplot2::labs(title=paste0("Change in Ratio/Index Services by ", group_col), subtitle=sub_txt, x=NULL, y="Change (ratio/index units)") +
       ggplot2::theme_minimal(base_size = 11) +
-      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1), legend.position = "none")
-
-    if (!is.null(group_palettes[[group_col]])) {
-      p_abs_box_ratio <- p_abs_box_ratio + ggplot2::scale_fill_manual(values = group_palettes[[group_col]], na.value = "gray50")
-    }
+      ggplot2::theme(axis.text.x = ggplot2::element_text(size = 8, angle = 45, hjust = 1)) +
+      ggplot2::scale_fill_distiller(palette = "Reds", direction = 1, name = "Relative\nIntensity", limits = c(0, 1))
 
     if (!is.null(top_bottom_n)) {
       p_abs_box_ratio <- p_abs_box_ratio + ggplot2::scale_x_discrete(labels = function(x) gsub("__.*$", "", x)) + ggplot2::coord_flip()

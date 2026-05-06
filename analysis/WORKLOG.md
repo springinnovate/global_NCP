@@ -1,4 +1,4 @@
-# Worklog — Global NCP Hotspots (v1.3.2)
+# Worklog — Global NCP Hotspots (v1.3.3)
 
 ## Project Overview & Goals
 
@@ -59,7 +59,56 @@ This section highlights the major technical and methodological hurdles overcome 
 
 ## Chronological Log (Newest to Oldest)
 
+### 2026-05-05
+*   **Visualization Consistency:** Updated `hotspot_synthesis.qmd` to ensure all "hotness" and "exposure" bar charts use a consistent red intensity color scale (`scale_fill_distiller`) mapped to the value, rather than categorical colors for the groups. This improves visual coherence across the analysis.
+*   **Code Health:** Added the `group_palettes` object definition to `hotspot_synthesis.qmd` to resolve a missing object error that was causing rendering to fail.
+*   **Visual Unification & Cleanup:** Systematically removed redundant "main report" plotting blocks and ensured the "High income: nonOECD" category is consistently and globally filtered out from all visualizations in `hotspot_extraction.qmd` and `hotspot_synthesis.qmd` to reduce noise.
+*   **LCC Grasslands Integration:** Integrated "Model 3: Grassland Loss" into the `LC_change_granular.qmd` pipeline, adding a specific reclassification matrix to explicitly track the conversion of grasslands to other uses.
+*   **Narrative Refinement:** Updated `Key_Takeaways.md` to incorporate the "Spatial Attribution / Degradation" findings and highlight the new Grassland Loss model, aligning with the latest feedback.
+*   **Plotting Iteration (Synthesis & Volumetric Plots):** Reverted the combined volumetric plots in `hotspot_extraction.qmd` back to separate figures for absolute and percent change. Fixed the y-axis labels in the `hotspot_synthesis.qmd` bar charts to display the numeric key instead of being blank, improving readability.
+
+### 2026-05-06
+*   **Boxplot Unification & Refinement:** Refactored the entire boxplot generation logic in `hotspot_extraction.qmd` into a single, unified function. This ensures all boxplots (volumetric, ratio, coastal) have a consistent aspect ratio, a universal numeric legend with a key at the bottom, and larger, more readable fonts. This resolves previous inconsistencies and simplifies future maintenance.
+*   **Data Dictionary Updates:** Improved the data dictionaries in `KS_tests_hotspots.qmd` and `hotspot_synthesis.qmd` to provide clearer, more accessible definitions for key statistical terms and output table columns, enhancing the project's usability for collaborators.
+*   **Granular LCC Integration:** Verified and finalized the integration of the "Grassland Loss" model into `LC_change_granular.qmd`, ensuring its results are correctly consolidated into the final output GeoPackage.
+
+### 2026-05-04
+*   **Infrastructure & Environment:** Resolved persistent VS Code Remote SSH synchronization and connection hangs that have been occurring since last week on `lilling`.
+    *   *Diagnosis:* The VS Code server backend was fragmenting and leaving behind orphaned `node` processes for language servers (Pylance, Quarto) and the core RPC server, which blocked new connections.
+    *   *Troubleshooting:* Implemented a targeted process-kill command (`pkill -u jeronimo -f .vscode-server`) via terminal to forcefully clean up the hung background processes. This successfully resets the remote connection state without requiring physical or system-level reboots of the server by IT.
+*   **Plotting Refinement:** Updated `compare_and_plot_changes.R` to exclude the "High income: nonOECD" group from the main report's bar plots to remove outliers and clarify the primary trends, as discussed in the last review meeting.
+*   **Housekeeping:** Identified and removed a redundant, outdated copy of `hotspot_extraction.qmd` that was incorrectly located in the `R/` directory. Confirmed `analysis/hotspot_extraction.qmd` is the correct, canonical version.
+
+### 2026-05-02
+*   **Infrastructure & Sync:** Diagnosed and bypassed silent VS Code Remote SSH hangs on `lilling` without a hard reboot (safely wiped corrupted `~/.vscode-server`). Established a `tar`-over-SSH sync workaround to bypass strict Windows IT firewalls lacking `rsync`.
+*   **Python Engine Optimization:** Refactored `zonal_stats_toolkit/runner.py` to concurrently schedule both raster and vector tasks in the execution graph, significantly improving parallelism ahead of the v1.4.0 merger.
+*   **Visual Polish (Boxplot Color Ramps):** Solved the `ggplot2` global scale dominance issue in `hotspot_violins.R` and `hotspot_extraction.qmd`. Implemented localized data normalization (`scales::rescale`) so canonical intensity colors (Reds) dynamically scale from 0 to 1 strictly within their respective facets.
+*   **Methodology Documentation:** Updated `README_Methodology.md` to formally transition "Path C" from a hypothetical "Future Analysis" into a completed "Validation Analysis," explicitly confirming that the grid-level hotspots mathematically align with pixel-level differences.
+*   **Feedback Manifesto Audit:** Cross-referenced meeting notes to finalize terminology ("Multi-service Decline" over "collapse"), prepared the biome-faceted scatterplots for the "Attribution Gap", and confirmed non-OECD outlier exclusions for main report boxplots.
+*   **Next Steps Planned:** Ready to implement "Model 3: Grassland Loss" in `LC_change_granular.qmd` to accurately track Forest-to-Grassland and pristine Grassland-to-Cropland transitions.
+
+### 2026-05-01
+*   **Post-Meeting Debrief & Cleanup:** Successfully presented the "Drivers of Change" (LCC Attribution) and "Who is Affected" (Socioeconomic / KS Tests) sections to Steve and Becky. The compound risk mapping, red-intensity boxplots, and LCC driver correlations resonated strongly. 
+*   **De-escalating "Rescue Mode":** Safely stripped out local hardcoded `here("home", "jeronimo", ...)` fallback paths from all R mapping scripts (`make_socieconomic_maps.R`, `make_attribution_map.R`, `make_lcc_overview_map.R`, `make_hotspot_count_map.R`). Returned the pipeline to universally use `data_dir()` for server-side processing on `lilling`.
+*   **Server Stability & Repackaging:** Remotely rendered `hotspot_extraction.qmd` on `lilling` to establish the final, single source of truth. Repackaged the `global_ncp_data_archive.tar.gz` archive with the updated Data Dictionary, preparing the data outputs for distribution without plot files.
+*   **Path to v1.4.0 (The Merger):** With Pillar 4 and Pillar 5 validated, the repository is officially ready for the massive architectural merge. The upcoming `v1.4.0` will natively integrate the Python `zonal_stats_toolkit` directly into the `global_NCP` repo, creating a single, unified pipeline repository.
+
+### 2026-04-30
+*   **Visual Unification (4+ Hotspot Cap):** Standardized the compound risk narrative by capping overlapping hotspot counts at "4+" across both spatial maps and regional stacked barplots. Applied a unified semantic color ramp (Yellow to Dark Red) across `make_hotspot_count_map.R` and `hotspot_synthesis.qmd` to ensure immediate visual recognition of extreme compound risk.
+*   **"First Look" Overview Maps:** Created minimalist, high-resolution global overview maps (solid red, no heatmaps) for both absolute and percentage hotspots to serve as clean anchor visuals for the presentation slide deck.
+*   **Server Rendering & Single Source of Truth:** Pushed all visualization updates to the remote repository and successfully re-rendered the canonical `hotspot_synthesis.qmd` pipeline on the Lilling server, ensuring all plots and CSVs remain perfectly in sync.
+*   **Next Immediate Step:** Diving into the "Attribution Gap" (Pillar 4) by analyzing Land Cover Conversion (LCC) overlaps using `lcc_es_hotspot_overlap_pct.csv` to build out the narrative for Coastal Risk (driven by Urban Expansion) and Pollination (driven by Forest Loss/Cropland Expansion).
+
 ### 2026-04-28
+*   **Spatial Alignment Crisis Averted**: Diagnosed and eliminated a critical `seq_len()` reassignment bug in variable-length datasets across `process_data.qmd`, `hotspot_extraction.qmd`, and `hotspot_synthesis.qmd` that was scrambling downstream spatial joins and creating "striped" artifacts in maps. Enforced strict `stop()` fallbacks to prevent silent spatial corruption.
+*   **Emergency "Rescue Mode" Implementation**: Successfully extracted and utilized a 2.2GB data archive (`global_ncp_data_archive.tar.gz`) to bypass long-running spatial joins under a strict deadline, temporarily routing scripts to safely read local `plt_long.rds` and GPKGs.
+*   **Visualization Overhaul (Barplots & Intensity)**: Replaced confusing categorical color ramps in signed change bars and intensity plots with strict, semantic "Good (Green) / Bad (Red)" logic. Implemented an automatic alphanumeric `[ID]` key system on the y-axis to perfectly map subregions to legends.
+*   **Dual-Metric Driver Analysis**: Upgraded `make_attribution_map.R` and the `hotspot_extraction.qmd` land-cover driver overlap chunks to loop over both Absolute (`abs_chg`) and Percentage (`pct_chg`) metrics. Programmatically recreated the massive `global_attribution_gap_map.png` directly in R to eliminate QGIS bottlenecks.
+*   **Upcoming Priorities (Next 48 Hours)**:
+    *   **Drivers**: Review and compare the newly generated `abs_chg` vs `pct_chg` scatterplots and heatmaps to finalize the "Attribution Gap" narrative.
+    *   **Equity**: Review the "Absolute Population Exposure" (affected people) outputs generated by `hotspot_synthesis.qmd`.
+    *   **Socioeconomics**: Perform a final validation pass on the KS analysis results.
+    *   **Presentation**: Finalize the "Why" (drivers) and "Who" (people) sections of the presentation slide deck.
 *   **Version 1.3.2 Release**: Unified pipeline visual styling (Mermaid flowcharts, spatial maps, and plots) to strictly use canonical WWF colors. Cleaned up redundant documentation and finalized the narrative methodology structure for the presentation slide deck.
 
 ### 2026-04-27
@@ -102,7 +151,7 @@ This section highlights the major technical and methodological hurdles overcome 
 *   **Automated Faceted Mapping:** Developed `make_faceted_maps.R` to fully automate the generation of spatial maps across 4 groupings (World Bank Region, Income Group, Biome, Country). Implemented a dynamic Cartography Rule Engine for automatic color ramp selection (diverging/sequential, goods/damages) and utilized `patchwork` for complex multi-scale layout stitching. Applied Equal Earth projection (`EPSG:8857`) and 1st/99th percentile outlier trimming to ensure high-quality visualization of absolute change.
 *   **Documentation Refinement (Conceptual Framing):** Harmonized `README_Methodology.md` with explicit definitions of a "hotspot" (framing it as a *relative extreme* ranking label rather than an absolute threshold or evidence of cause). This analogy (the "marathon finisher") will directly support the framing of the final methods paper.
 
-### 2026-03-20
+### 2026-03-20 (Pre-v1.3.3)
 *   **Architectural Validation (Spatial Extraction Strategies):** Ran a test using `exactextract` in Python for large regional groupings (Biomes/WB Regions) by exploding them into 85,000 fragments. It ran for over 33 hours without finishing. Definitively proved `exactextract` is unscalable for massive regional groupings. Permanently adopted hybrid approach (`zonal_stats_toolkit` for regions, `exactextract` for 10km grids). Drafted open source feature request for C++ level `groupby`.
 *   **Methodological Pivot (True Regional Baselines):** Configured regional base-year extraction to strictly bypass the 10km grid. By summarizing directly from the per-hectare rasters to the large spatial units, we bypass MAUP and grid-level division-by-zero artifacts.
 *   **Pipeline & Cache Fixes:** Resolved Quarto caching trap in `KS_tests_hotspots.qmd` and re-enabled hotspot export chunks.

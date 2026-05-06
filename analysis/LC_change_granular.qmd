@@ -235,7 +235,34 @@ expansion_results <- run_granular_lcc_analysis(
 )
 ```
 
-## 3. Consolidate and Export Results
+### Model 3: Grassland Loss 
+This model isolates the conversion of grasslands and shrublands to other uses (e.g., agriculture, urban), which is critical for understanding rangeland degradation. 
+```{r} 
+#| label: run-grassland-model 
+#| #
+# Reclassification: 9-class -> Grassland (1) vs. Non-Grassland (2) 
+grassland_reclass_matrix <- matrix(c(
+1, 2, # Cropland -> Non-Grassland
+2, 2, # Forest -> Non-Forest
+3, 1, # Grassland -> Grassland
+4, 2, # Sparse -> Non-Grassland
+5, 2, # Wetland -> Non-Grassland
+6, 2, # Urban -> Non-Grassland
+7, 2, # Bare -> Non-Grassland
+8, 2, # Water -> Non-Grassland
+9, 2 # Snow/Ice -> Non-Grassland 
+), ncol = 2, byrow = TRUE)
+grassland_class_labels <- c("1" = "Grassland", "2" = "NonGrassland") 
+
+grassland_results <- run_granular_lcc_analysis(
+model_name = "GrasslandLoss",
+rasters_9class = landcover_rasters_9class,
+reclass_matrix = grassland_reclass_matrix,
+class_labels = grassland_class_labels,
+spatial_units = spatial_units,
+id_col = id_col_name) 
+```
+## 4. Consolidate and Export Results
 
 The results from both models are combined and pivoted into a wide format, creating one column for each metric, class, and model. This final dataset is then joined to the grid geometry and saved.
 
@@ -243,7 +270,7 @@ The results from both models are combined and pivoted into a wide format, creati
 #| label: consolidate-and-save
 
 message("Combining results from all models...")
-all_results_long <- bind_rows(forest_results, expansion_results)
+all_results_long <- bind_rows(forest_results, expansion_results, grassland_results)
 
 # Pivot to wide format
 message("Pivoting to wide format...")
