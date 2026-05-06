@@ -1,6 +1,6 @@
 # Global NCP – AI Context (v1.3.1)
-*Attach this file to all coding prompts to ensure correct paths, schemas, and architectural awareness.*
-
+*Attach this file to all coding prompts to ensure correct paths, schemas, and architectural awareness. This file is the slimmed-down version of `docs/codex_context.md`.*
+ 
 ## 1. Architecture & Pipeline
 *   **Python Pre-Processing:** Uses `taskgraph` & `exactextract` to generate zonal stats (1992/2020) over a 10km grid.
 *   **R Analysis Runbook:**

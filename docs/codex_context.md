@@ -2,7 +2,7 @@
 
 *Last updated: 2026-02-04*
 
-This document captures the full project context for assistants (e.g., Codex in VS Code) and collaborators. Use it alongside the slimmer spec in `doc/codex_context.min.md`. When coding or refactoring, prefer the **minimal** file as your primary context and consult this long version for rationale and narrative background.
+This document captures the full project context for assistants (e.g., Codex in VS Code) and collaborators. Use it alongside the slimmer spec in `docs/codex_context.min.md`. When coding or refactoring, prefer the **minimal** file as your primary context and consult this long version for rationale and narrative background.
 
 ---
 
@@ -80,12 +80,12 @@ Pollination, Nature_Access
 project root
 ├── analysis/
 │   ├── prepare_data.qmd              # preprocessing & consolidation
-│   ├── process_data.qmd              # change calculation & metric derivation
+│   ├── process_data.qmd              # change calculation & metric derivation (see docs/methodology.md for details)
 │   ├── hotspot_extraction.qmd        # main narrative & orchestration
 │   ├── hotspot_synthesis.qmd         # intensity, enrichment, and multi-service overlap analysis
 │   ├── KS_tests_hotspots.qmd         # statistical comparisons (KS tests)
 │   └── restore_checkpoint.R          # restores big tidy tables (plt_long, grid_sf)
-├── R/
+├── R/                                # R helper functions and scripts
 │   ├── paths.R                       # data_dir(), ncp_data_root(), etc.
 │   ├── extract_hotspots.R            # extract_hotspots(); returns list of outputs
 │   ├── hotspot_violins.R             # run_hotspot_boxplots_by()
@@ -104,9 +104,12 @@ project root
 │       ├── abs/<group_col>/bars_*.png
 │       ├── pct/<group_col>/bars_*.png
 │       └── violins/<group_col>/*_violins.png
-└── doc/
-    ├── codex_context.md              # this file
-    └── codex_context.min.md          # slim spec for assistants
+└── docs/                             # Project documentation
+    ├── codex_context.md              # This detailed context for AI assistants
+    ├── codex_context.min.md          # Slim context for AI assistants
+    ├── methodology.md                # Detailed theoretical framework and mathematical definitions
+    ├── runbook.md                    # Technical guide for executing the R/Quarto analysis scripts
+    └── data_dictionary.md            # Detailed definitions for all key output tables
 ```
 
 > The exact file names under `R/` can evolve; the key point is to keep **hotspot logic** and **plot logic** modular, roxygen‑documented, and imported with `devtools::load_all()`.
