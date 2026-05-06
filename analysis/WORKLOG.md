@@ -67,6 +67,11 @@ This section highlights the major technical and methodological hurdles overcome 
 *   **Narrative Refinement:** Updated `Key_Takeaways.md` to incorporate the "Spatial Attribution / Degradation" findings and highlight the new Grassland Loss model, aligning with the latest feedback.
 *   **Plotting Iteration (Synthesis & Volumetric Plots):** Reverted the combined volumetric plots in `hotspot_extraction.qmd` back to separate figures for absolute and percent change. Fixed the y-axis labels in the `hotspot_synthesis.qmd` bar charts to display the numeric key instead of being blank, improving readability.
 
+### 2026-05-06
+*   **Boxplot Unification & Refinement:** Refactored the entire boxplot generation logic in `hotspot_extraction.qmd` into a single, unified function. This ensures all boxplots (volumetric, ratio, coastal) have a consistent aspect ratio, a universal numeric legend with a key at the bottom, and larger, more readable fonts. This resolves previous inconsistencies and simplifies future maintenance.
+*   **Data Dictionary Updates:** Improved the data dictionaries in `KS_tests_hotspots.qmd` and `hotspot_synthesis.qmd` to provide clearer, more accessible definitions for key statistical terms and output table columns, enhancing the project's usability for collaborators.
+*   **Granular LCC Integration:** Verified and finalized the integration of the "Grassland Loss" model into `LC_change_granular.qmd`, ensuring its results are correctly consolidated into the final output GeoPackage.
+
 ### 2026-05-04
 *   **Infrastructure & Environment:** Resolved persistent VS Code Remote SSH synchronization and connection hangs that have been occurring since last week on `lilling`.
     *   *Diagnosis:* The VS Code server backend was fragmenting and leaving behind orphaned `node` processes for language servers (Pylance, Quarto) and the core RPC server, which blocked new connections.

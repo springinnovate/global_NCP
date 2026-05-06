@@ -615,19 +615,19 @@ if (file.exists(pop_exposure_csv)) {
   )
 
   # 1. Plot by Income Group - using a red intensity scale
-  p_pop_inc <- ggplot(pop_df, aes(x = exposed_population, y = income_grp, fill = exposed_population)) +
+  p_pop_inc <- ggplot(pop_df, aes(x = income_grp, y = exposed_population, fill = exposed_population)) +
     geom_col() +
     facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
-    scale_x_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
-    scale_y_discrete(labels = function(x) stringr::str_remove(x, "^\\d\\.\\s*")) +
+    scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    scale_x_discrete(labels = function(x) stringr::str_remove(x, "^\\d\\.\\s*")) +
     scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     labs(title = "Absolute Population Exposure in Hotspots",
          subtitle = "By World Bank Income Group",
-         x = "Exposed Population", y = NULL) +
+         y = "Exposed Population", x = NULL) +
     theme_minimal() +
     theme(legend.position = "right", 
+          axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
           axis.text.y = element_text(size = 12),
-          axis.text.x = element_text(size = 10),
           axis.title = element_text(size = 14),
           legend.text = element_text(size = 10),
           legend.title = element_text(size = 12))
@@ -640,20 +640,20 @@ if (file.exists(pop_exposure_csv)) {
   pop_df_hdi <- pop_df %>%
     dplyr::group_by(service, hdi_bin) %>%
     dplyr::summarise(exposed_population = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
-    dplyr::mutate(hdi_bin = factor(hdi_bin, levels = rev(hdi_levels)))
+    dplyr::mutate(hdi_bin = factor(hdi_bin, levels = hdi_levels))
 
-  p_pop_hdi <- ggplot(pop_df_hdi, aes(x = exposed_population, y = hdi_bin, fill = exposed_population)) +
+  p_pop_hdi <- ggplot(pop_df_hdi, aes(x = hdi_bin, y = exposed_population, fill = exposed_population)) +
     geom_col() +
     facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
-    scale_x_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     labs(title = "Absolute Population Exposure in Hotspots",
          subtitle = "By UN Human Development Index (HDI)",
-         x = "Exposed Population", y = NULL) +
+         y = "Exposed Population", x = NULL) +
     theme_minimal() +
     theme(legend.position = "right", 
+          axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
           axis.text.y = element_text(size = 12),
-          axis.text.x = element_text(size = 10),
           axis.title = element_text(size = 14),
           legend.text = element_text(size = 10),
           legend.title = element_text(size = 12))

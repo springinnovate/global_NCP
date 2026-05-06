@@ -2,6 +2,8 @@
 
 This document outlines the directory structure and defines the core datasets used and produced by the Global NCP Time-Series Analysis (1992–2020).
 
+**For a detailed dictionary of all key output tables and columns, please see `analysis/README_Data_Dictionary.md`.**
+
 **Local Data Root:** `/home/jeronimo/data/global_ncp/`
 
 ---
