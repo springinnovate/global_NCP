@@ -28,11 +28,9 @@ base_sf <- st_read(base_map_path, quiet = TRUE) %>% st_transform(crs = "EPSG:885
 attr_colors <- c(
   "Forest Loss" = "#2ca25f", # Forest Green
   "Cropland Expansion" = "#e69138", # Agricultural Orange
-  "Urban Expansion" = "#e41a1c", # Built-up Red
-  "Multiple Conversion Drivers" = "#984ea3", # Purple
-  "Degradation-driven (Stable Land Cover)" = "#3182bd" # Striking Blue to highlight the gap
+  "Grassland Loss" = "#fdbf6f",and Cover)" = "#3182
+  "Savannization / Pasture" = "#ffff99", # Light Ye
 )
-
 canon_order <- c("C_Risk", "N_export", "Sed_export",
                  "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
                  "Pollination", "Nature_Access")
@@ -74,37 +72,25 @@ for (metric in c("pct", "abs")) {
         # decline occurs within stable land cover types. This highlights areas driven by
         # degradation (e.g., intensification, climate stress) rather than physical conversion.
         Attribution = case_when(
-          lcc_count > 1 ~ "Multiple Conversion Drivers",
-          str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
-          str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
-          str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
-          TRUE ~ "Degradation-driven (Stable Land Cover)"
-        ),
-        Attribution = factor(Attribution, levels = c("Forest Loss", "Cropland Expansion", "Urban Expansion", "Multiple Conversion Drivers", "Degradation-driven (Stable Land Cover)"))
-      ) %>% st_transform(crs = "EPSG:8857")
-
-    subtitle_text <- paste0("Comparing areas with ", ifelse(min_es == 1, "at least 1 ES Hotspot", paste("at least", min_es, "overlapping ES Hotspots")), 
-                            " (", toupper(metric), " Change) against the Top 5% of Land Conversion")
-
-    p_global <- ggplot() +
-      geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) +
-      geom_sf(data = es_global_joined, aes(fill = Attribution), color = NA) +
+          # Specific combinations first
+          str_detect(lcc_servicedetect(lcc_services, "Grassland_Gain") ~ "Savannization / Pasture",
+          r_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
+          str_detect(lcc_service Expansion",
+         oibution = factor(Attribution, levels = names(attr_colors))
+      ) %>% st_transform(crs = "
+ subtitettf(data = base_sf, fill = "gray95", col0+ribution), color = NA) +
       scale_fill_manual(values = attr_colors, name = "Primary Driver of ES Hotspot") +
       labs(title = "The Attribution Gap: Drivers of Ecosystem Service Decline",
-           subtitle = subtitle_text) +
-      theme_void() +
+        tte_void() +
       theme(plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
             plot.subtitle = element_text(size = 16, hjust = 0.5, margin = margin(b = 20)),
-            legend.position = "bottom", legend.title = element_text(size = 14, face = "bold"),
-            legend.text = element_text(size = 12),
+            legend.position = "bottom", legend.tit,e
             legend.key.size = unit(0.75, "cm")) +
       guides(fill = guide_legend(nrow = 2, byrow = TRUE))
-
-    out_path_global <- here("outputs", "plots", "maps", paste0("global_attribution_gap_map_min", min_es, "_", metric, ".png"))
+th_global <- here("outputs", "plots", "maps", paste0("global_attribution_gap_map_min", min_es, "_", metric, ".png"))
     ggsave(out_path_global, p_global, width = 16, height = 9, bg = "white", dpi = 300)
     message("Saving global map to: ", out_path_global)
   }
-
   # ----------------------------------------------------------------------------
   # 4b. Generate PER-SERVICE Attribution Maps
   # ----------------------------------------------------------------------------
@@ -127,31 +113,30 @@ for (metric in c("pct", "abs")) {
         lcc_services = coalesce(lcc_services, ""),
         # Classify the pixel based on which driver is present
         Attribution = case_when(
-          lcc_count > 1 ~ "Multiple Conversion Drivers",
+          # Specific combinations first
+          str_detect(lcc_services, "Forest_Loss") & str_detect(lcc_services, "Crop_Exp") ~ "Deforestation for Cropland",
+          str_detect(lcc_services, "Forest_Loss") & str_detect(lcc_services, "Grassland_Gain") ~ "Savannization / Pasture",
+          str_detect(lcc_services, "Grassland_Loss") & str_detect(lcc_services, "Crop_Exp") ~ "Grassland to Cropland",
+          # General, single drivers next
           str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
-          str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
-          str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
-          TRUE ~ "Degradation-driven (Stable Land Cover)"
+          str_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
+          str_detect(lcc_service Expansion",
+          # If no LCC driver hotspot, it's degradation
+          TRUE ~ "Degradation-driven (Stable Land Cover)" # Fallback
         ),
-        Attribution = factor(Attribution, levels = c("Forest Loss", "Cropland Expansion", "Urban Expansion", "Multiple Conversion Drivers", "Degradation-driven (Stable Land Cover)"))
+        Attribution = factor(Attribution, levels = names(attr_colors))
       ) %>% st_transform(crs = "EPSG:8857")
 
     p <- ggplot() +
-      geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) +
-      geom_sf(data = es_joined, aes(fill = Attribution), color = NA) +
-      scale_fill_manual(values = attr_colors, name = "Primary Driver of ES Hotspot") +
+      geom_sf(data = base_sf, fi color = NA)mary Driver of ES Hotspot") +
       labs(title = paste("Attribution of", service_name, "Hotspots to LCC Drivers"),
            subtitle = paste("Comparing ES Hotspots (", toupper(metric), " Change) against the Top 5% of physical Land Conversion")) +
-      theme_void() +
-      theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+      thez
             plot.subtitle = element_text(size = 10, hjust = 0.5, margin = margin(b = 10)),
             legend.position = "bottom", legend.title = element_text(size = 10, face = "bold"),
             legend.text = element_text(size = 8),
             legend.key.size = unit(0.75, "cm")) +
-      guides(fill = guide_legend(nrow = 2, byrow = TRUE))
-
-    out_path <- file.path(out_dir, paste0("attribution_map_", gsub("[^[:alnum:]]", "_", service_name), "_", metric, ".png"))
+      guides(fill = guide_legendc, ".png"))
     ggsave(out_path, p, width = 10, height = 6, bg = "white", dpi = 300)
     message("Saving map to: ", out_path)
   }
-}

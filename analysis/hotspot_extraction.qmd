@@ -904,7 +904,8 @@ if (file.exists(lc_gpkg)) {
   drivers <- list(
     "Forest_Loss" = "ForestLoss_Loss_Forest_1992_2020",
     "Urban_Exp"   = "Expansion_Gain_Urban_1992_2020",
-    "Crop_Exp"    = "Expansion_Gain_Cropland_1992_2020"
+    "Crop_Exp"    = "Expansion_Gain_Cropland_1992_2020",
+    "Grassland_Loss" = "GrasslandLoss_Loss_Grassland_1992_2020"
   )
 
   # Fallback to pattern matching
@@ -1388,16 +1389,19 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
   # Using pattern matching to ensure robustness against year suffix changes
   drivers <- list()
   fl_col <- grep("ForestLoss_Loss_Forest", names(lc_df), value = TRUE)
-  if (length(fl_col) > 0) drivers[["Forest_Loss"]] <- fl_col[1]
+  if (length(fl_col) > 0) drivers[["Forest_Loss"]] <- fl_col
 
   ce_col <- grep("Expansion_Gain_Cropland", names(lc_df), value = TRUE)
-  if (length(ce_col) > 0) drivers[["Crop_Exp"]] <- ce_col[1]
+  if (length(ce_col) > 0) drivers[["Crop_Exp"]] <- ce_col
 
     ue_col <- grep("Expansion_Gain_Urban", names(lc_df), value = TRUE)
   if (length(ue_col) > 0) drivers[["Urban_Exp"]] <- ue_col[1]
 
   gl_col <- grep("GrasslandLoss_Loss_Grassland", names(lc_df), value = TRUE)
   if (length(gl_col) > 0) drivers[["Grassland_Loss"]] <- gl_col
+
+  gg_col <- grep("GrasslandLoss_Gain_Grassland", names(lc_df), value = TRUE)
+  if (length(gg_col) > 0) drivers[["Grassland_Gain"]] <- gg_col
 
   # Identify Net Forest Change for correlation analysis
   net_col <- "ForestLoss_dir_ch_Forest_1992_2020"
@@ -1544,7 +1548,7 @@ if (lc_data_ready && length(overlap_stats_all) > 0) {
         ), levels = c("Forest Loss", "Grassland Loss", "Cropland Expansion", "Urban Expansion")),
         service = factor(service, levels = canon_order)
       ) %>%
-      filter(!is.na(service))
+      dplyr::filter(!is.na(service))
 
     driver_colors <- c("Forest Loss" = "#2ca25f", "Grassland Loss" = "#fdbf6f", "Cropland Expansion" = "#e69138", "Urban Expansion" = "#e41a1c")
 
