@@ -24,8 +24,8 @@ params:
   analysis_version: "v1.3.3"
   input_gpkg: "10k_change_calc.gpkg"
   output_suffix: "" # e.g., "_v2"
-  force_export: false
-  run_hotspot_export: false
+  force_export: true
+  run_hotspot_export: true
 ---
 
 ## Overview
@@ -1541,16 +1541,17 @@ if (lc_data_ready && length(overlap_stats_all) > 0) {
       mutate(
         driver_label = factor(case_when(
           driver == "Forest_Loss" ~ "Forest Loss",
+          driver == "Grassland_Loss" ~ "Grassland Loss",
+          driver == "Grassland_Gain" ~ "Grassland Expansion",
           driver == "Crop_Exp" ~ "Cropland Expansion",
           driver == "Urban_Exp" ~ "Urban Expansion",
-          driver == "Grassland_Loss" ~ "Grassland Loss",
           TRUE ~ driver
-        ), levels = c("Forest Loss", "Grassland Loss", "Cropland Expansion", "Urban Expansion")),
+        ), levels = c("Forest Loss", "Grassland Loss", "Grassland Expansion", "Cropland Expansion", "Urban Expansion")),
         service = factor(service, levels = canon_order)
       ) %>%
       dplyr::filter(!is.na(service))
 
-    driver_colors <- c("Forest Loss" = "#2ca25f", "Grassland Loss" = "#fdbf6f", "Cropland Expansion" = "#e69138", "Urban Expansion" = "#e41a1c")
+    driver_colors <- c("Forest Loss" = "#2ca25f", "Grassland Loss" = "#fdbf6f", "Grassland Expansion" = "#ffff99", "Cropland Expansion" = "#e69138", "Urban Expansion" = "#e41a1c")
 
     # Plot
     p_bar <- ggplot(overlap_plot_data, aes(x = service, y = pct_overlap, fill = driver_label)) +

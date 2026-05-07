@@ -1,5 +1,28 @@
 # ==============================================================================
 # The Attribution Gap: ES Hotspots vs LCC Drivers Map
+#
+# OVERVIEW:
+# This script generates the primary "Attribution Gap" maps for the Global NCP
+# time-series analysis. It visualizes the spatial relationship between Ecosystem
+# Service (ES) hotspots and hotspots of physical Land Cover Change (LCC).
+#
+# The core purpose is to attribute ES decline to different drivers, distinguishing
+# between areas where decline is linked to direct land conversion (e.g.,
+# deforestation, urban expansion) and areas where it is not, pointing to
+# "invisible" degradation within a stable land cover type.
+#
+# WORKFLOW:
+# 1.  Loads pre-calculated ES hotspot data (from hotspot_extraction.qmd).
+# 2.  Loads pre-calculated LCC driver hotspot data (also from hotspot_extraction.qmd).
+# 3.  Joins the two datasets based on the 10km grid cell ID (`grid_fid`).
+# 4.  Applies a `case_when` classification logic to attribute each ES hotspot cell
+#     to a primary driver based on which LCC hotspots it overlaps with. This
+#     logic prioritizes specific, policy-relevant transitions (e.g.,
+#     "Deforestation for Cropland") before falling back to general categories.
+# 5.  Generates and saves two types of maps to `outputs/plots/maps/`:
+#     a. A global map showing attribution for cells with 1, 2, or 3+ ES hotspots.
+#     b. A series of individual maps, one for each of the 8 canonical services.
+#
 # ==============================================================================
 
 library(sf)
@@ -26,11 +49,17 @@ base_sf <- st_read(base_map_path, quiet = TRUE) %>% st_transform(crs = "EPSG:885
 
 # 3. Define attribution colors
 attr_colors <- c(
-  "Forest Loss" = "#2ca25f", # Forest Green
-  "Cropland Expansion" = "#e69138", # Agricultural Orange
-  "Grassland Loss" = "#fdbf6f",and Cover)" = "#3182
-  "Savannization / Pasture" = "#ffff99", # Light Ye
+  "Forest Loss" = "#2ca25f",
+  "Cropland Expansion" = "#e69138",
+  "Grassland Loss" = "#fdbf6f",
+  "Urban Expansion" = "#e41a1c",
+  "Multiple Conversion Drivers" = "#984ea3",
+  "Degradation-driven (Stable Land Cover)" = "#3182bd",
+  "Deforestation for Cropland" = "#b15928",
+  "Savannization / Pasture" = "#ffff99",
+  "Grassland to Cropland" = "#a65628"
 )
+
 canon_order <- c("C_Risk", "N_export", "Sed_export",
                  "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
                  "Pollination", "Nature_Access")
@@ -73,21 +102,38 @@ for (metric in c("pct", "abs")) {
         # degradation (e.g., intensification, climate stress) rather than physical conversion.
         Attribution = case_when(
           # Specific combinations first
-          str_detect(lcc_servicedetect(lcc_services, "Grassland_Gain") ~ "Savannization / Pasture",
-          r_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
-          str_detect(lcc_service Expansion",
-         oibution = factor(Attribution, levels = names(attr_colors))
-      ) %>% st_transform(crs = "
- subtitettf(data = base_sf, fill = "gray95", col0+ribution), color = NA) +
+          str_detect(lcc_services, "Forest_Loss") & str_detect(lcc_services, "Crop_Exp") ~ "Deforestation for Cropland",
+          str_detect(lcc_services, "Forest_Loss") & str_detect(lcc_services, "Grassland_Gain") ~ "Savannization / Pasture",
+          str_detect(lcc_services, "Grassland_Loss") & str_detect(lcc_services, "Crop_Exp") ~ "Grassland to Cropland",
+          # General, single drivers next
+          str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
+          str_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
+          str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
+          str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
+          # If no LCC driver hotspot, it's degradation
+          TRUE ~ "Degradation-driven (Stable Land Cover)" # Fallback
+        ),
+        Attribution = factor(Attribution, levels = names(attr_colors))
+      ) %>% st_transform(crs = "EPSG:8857")
+
+    subtitle_text <- paste0("Comparing areas with ", ifelse(min_es == 1, "at least 1 ES Hotspot", paste("at least", min_es, "overlapping ES Hotspots")), 
+                           " against the Top 5% of physical Land Conversion")
+
+    p_global <- ggplot() +
+      geom_sf(data = base_sf, fill = "gray95", color = NA) +
+      geom_sf(data = es_global_joined, aes(fill = Attribution), color = NA) +
       scale_fill_manual(values = attr_colors, name = "Primary Driver of ES Hotspot") +
       labs(title = "The Attribution Gap: Drivers of Ecosystem Service Decline",
-        tte_void() +
+           subtitle = subtitle_text) +
+      theme_void() +
       theme(plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
             plot.subtitle = element_text(size = 16, hjust = 0.5, margin = margin(b = 20)),
-            legend.position = "bottom", legend.tit,e
+            legend.position = "bottom", legend.title = element_text(size = 12, face = "bold"),
+            legend.text = element_text(size = 10),
             legend.key.size = unit(0.75, "cm")) +
       guides(fill = guide_legend(nrow = 2, byrow = TRUE))
-th_global <- here("outputs", "plots", "maps", paste0("global_attribution_gap_map_min", min_es, "_", metric, ".png"))
+
+    out_path_global <- here("outputs", "plots", "maps", paste0("global_attribution_gap_map_min", min_es, "_", metric, ".png"))
     ggsave(out_path_global, p_global, width = 16, height = 9, bg = "white", dpi = 300)
     message("Saving global map to: ", out_path_global)
   }
@@ -120,7 +166,8 @@ th_global <- here("outputs", "plots", "maps", paste0("global_attribution_gap_map
           # General, single drivers next
           str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
           str_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
-          str_detect(lcc_service Expansion",
+          str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
+          str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
           # If no LCC driver hotspot, it's degradation
           TRUE ~ "Degradation-driven (Stable Land Cover)" # Fallback
         ),
@@ -128,15 +175,21 @@ th_global <- here("outputs", "plots", "maps", paste0("global_attribution_gap_map
       ) %>% st_transform(crs = "EPSG:8857")
 
     p <- ggplot() +
-      geom_sf(data = base_sf, fi color = NA)mary Driver of ES Hotspot") +
+      geom_sf(data = base_sf, fill = "gray95", color = NA) +
+      geom_sf(data = es_joined, aes(fill = Attribution), color = NA) +
+      scale_fill_manual(values = attr_colors, name = "Primary Driver of ES Hotspot") +
       labs(title = paste("Attribution of", service_name, "Hotspots to LCC Drivers"),
            subtitle = paste("Comparing ES Hotspots (", toupper(metric), " Change) against the Top 5% of physical Land Conversion")) +
-      thez
+      theme_void() +
+      theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
             plot.subtitle = element_text(size = 10, hjust = 0.5, margin = margin(b = 10)),
             legend.position = "bottom", legend.title = element_text(size = 10, face = "bold"),
             legend.text = element_text(size = 8),
             legend.key.size = unit(0.75, "cm")) +
-      guides(fill = guide_legendc, ".png"))
+      guides(fill = guide_legend(nrow = 2, byrow = TRUE))
+
+    out_path <- file.path(out_dir, paste0("map_attr_", service_name, "_", metric, ".png"))
     ggsave(out_path, p, width = 10, height = 6, bg = "white", dpi = 300)
     message("Saving map to: ", out_path)
   }
+}
