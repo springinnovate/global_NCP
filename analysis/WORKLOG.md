@@ -57,6 +57,18 @@ This section highlights the major technical and methodological hurdles overcome 
 
 ---
 
+### 2026-05-08 (Urgent Task: Rasterization)
+### 2026-05-08 (Major Conceptual & Analytical Refinements)
+*   **Nuanced Driver Mapping:** Finalized the land cover change driver analysis by significantly refining the classification logic in `make_lcc_driver_map.R`. Replaced the generic "Multiple Overlapping Drivers" category with specific, policy-relevant transitions like "Deforestation for Cropland," "Savannization / Pasture," and "Grassland to Cropland."
+*   **Grassland Dynamics:** Fully integrated both "Grassland Loss" and "Grassland Expansion" as distinct drivers into the mapping scripts, ensuring these critical rangeland dynamics are no longer masked.
+*   **Refined Attribution Terminology:** Replaced the presumptive "Degradation-driven (Stable Land Cover)" category in `make_attribution_map.R` with the more accurate and defensible term **"Attribution Gap (Change without Conversion)"**. This new label correctly describes ES hotspots that are spatially decoupled from major land conversion.
+*   **Clarified Metric Interpretation:** Added a detailed methodological note to `make_lcc_driver_map.R` to explicitly state that the land conversion metrics are calculated as a percentage of the *total 10km cell area*, clarifying the interpretation of "landscape transformation intensity".
+*   **Expanded Socioeconomic Analysis:** Enhanced `hotspot_synthesis.qmd` to include absolute population exposure analysis by GDP and Gini quartiles. Removed the redundant 'Built Area' variable from the `KS_tests_hotspots.qmd` analysis.
+*   **Visualization & Documentation Polish:** Increased map output resolution to 600 DPI for clarity, improved color palettes for distinguishability, and updated `Key_Takeaways.md` and other documentation to reflect all conceptual shifts.
+*   **Hotspot Count Rasterization:** Developed a new Python script `python_scripts/convert_hotspot_gpkg_to_raster.py` to convert the vector-based hotspot count maps (from `hotspots_global_pct.gpkg`) into a GeoTIFF raster. This provides a raster-based output of hotspot frequency, as urgently requested.
+
+---
+
 ## Chronological Log (Newest to Oldest)
 
 ### 2026-05-05
