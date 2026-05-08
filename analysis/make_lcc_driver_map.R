@@ -114,7 +114,7 @@ message("Generating categorical map...")
 driver_colors <- c(
   "Deforestation for Cropland" = "#b15928",   # Brown
   "Savannization / Pasture" = "#ffff99",      # Light Yellow
-  "Grassland to Cropland" = "#a65628",        # Darker Orange
+  "Grassland to Cropland" = "#cc4c02",        # More distinct Dark Orange
   "Forest Loss" = "#2ca25f",                  # Forest Green (for standalone loss)
   "Grassland Expansion" = "#a6d854",          # Light green
   "Grassland Loss" = "#fdbf6f",               # Sandy yellow/brown (for standalone loss)
@@ -143,14 +143,14 @@ p <- ggplot() +
     legend.text = element_text(size = 12),
     legend.key.size = unit(1, "cm")
   ) +
-  guides(fill = guide_legend(nrow = 2, byrow = TRUE))
+  guides(fill = guide_legend(ncol = 4, byrow = TRUE))
 
 out_dir <- here("outputs", "plots", "maps")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 out_path <- file.path(out_dir, "global_lcc_driver_map.png")
 
 message("Saving map to: ", out_path)
-ggsave(out_path, p, width = 16, height = 9, bg = "white", dpi = 300)
+ggsave(out_path, p, width = 16, height = 9, bg = "white", dpi = 600)
 
 # --- Summary Table ---
 message("Calculating summary of driver categories...")
