@@ -1,6 +1,6 @@
 # ==============================================================================
 # Global Land Cover Change Driver Hotspots Map (v2 - Nuanced Transitions)
-#
+# 
 # OVERVIEW:
 # This script generates a global map visualizing the primary hotspots of direct
 # land cover conversion. It identifies the top 5% of 10km grid cells
@@ -19,8 +19,31 @@
 #   - "Savannization / Pasture" (Forest Loss + Grassland Gain)
 #   - "Grassland to Cropland" (Grassland Loss + Cropland Expansion)
 #
+# The previous version of this map used a generic "Multiple Overlapping Drivers"
+# category. This was not very informative for understanding the actual land
+# transition processes happening on the ground.
+#
+# This updated version refines the classification logic to identify specific,
+# policy-relevant driver combinations. Instead of a generic "multiple", we now
+# explicitly map critical transitions like:
+#   - "Deforestation for Cropland" (Forest Loss + Cropland Expansion)
+#   - "Savannization / Pasture" (Forest Loss + Grassland Gain)
+#   - "Grassland to Cropland" (Grassland Loss + Cropland Expansion)
+#
 # This gives us a much richer map that tells a clearer story about the pathways
 # of land conversion. Let me know what you think of this approach.
+# ---
+#
+# --- METHODOLOGICAL NOTE ON INTERPRETATION ---
+# It is critical to understand what the hotspot metric represents. The underlying
+# values (e.g., `ForestLoss_Loss_Forest_1992_2020`) are calculated as a
+# percentage of the *total 10km grid cell area*.
+#
+# This means a hotspot of "10% Forest Loss" could represent a cell that was 10%
+# forested and lost all of it, or a cell that was 90% forested and lost ~11% of
+# its forest. The map therefore shows hotspots of *landscape transformation
+# intensity*, not change relative to the initial cover type's area within the cell.
+# This is a key distinction for interpretation and future discussion.
 # ---
 #
 # WORKFLOW:
@@ -109,7 +132,7 @@ p <- ggplot() +
   scale_fill_manual(values = driver_colors, name = "Primary Land Conversion Driver\n(Top 5% Most Intense)") +
   labs(
     title = "Hotspots of Direct Land Cover Conversion (1992 - 2020)",
-    subtitle = "Locations experiencing the most extreme physical landscape transformation"
+    subtitle = "Locations experiencing the most intense physical landscape transformation"
   ) +
   theme_void() +
   theme(
@@ -128,3 +151,16 @@ out_path <- file.path(out_dir, "global_lcc_driver_map.png")
 
 message("Saving map to: ", out_path)
 ggsave(out_path, p, width = 16, height = 9, bg = "white", dpi = 300)
+
+# --- Summary Table ---
+message("Calculating summary of driver categories...")
+
+driver_summary <- sf_data %>%
+  st_drop_geometry() %>%
+  count(Driver, name = "Hotspot_Cell_Count") %>%
+  mutate(
+    Percentage_of_Total = (Hotspot_Cell_Count / sum(Hotspot_Cell_Count)) * 100
+  ) %>%
+  arrange(desc(Hotspot_Cell_Count))
+
+print(driver_summary)

@@ -1,15 +1,27 @@
 # ==============================================================================
 # The Attribution Gap: ES Hotspots vs LCC Drivers Map
 #
+# --- NOTE FOR DISCUSSION (Steve & Becky) ---
+# This script previously used the term "Degradation-driven (Stable Land Cover)"
+# for ES hotspots that did not overlap with a major land conversion hotspot.
+# This term is problematic because:
+#   1. It assumes "degradation" is the cause, which we haven't proven.
+#   2. It assumes "stable land cover," when in reality the cell just isn't in
+#      the top 5% of LCC intensity; change could still be occurring.
+#
+# This version proposes a more accurate and defensible term:
+#   "Attribution Gap (Change without Conversion)"
+#
+# This new label correctly describes what we observe—a significant change in ES
+# without a corresponding major land conversion—and directly frames the map
+# around the "Attribution Gap" concept, highlighting areas where other drivers
+# (intensification, climate, or upstream/downstream effects) are likely at play.
+# ---
+#
 # OVERVIEW:
 # This script generates the primary "Attribution Gap" maps for the Global NCP
 # time-series analysis. It visualizes the spatial relationship between Ecosystem
 # Service (ES) hotspots and hotspots of physical Land Cover Change (LCC).
-#
-# The core purpose is to attribute ES decline to different drivers, distinguishing
-# between areas where decline is linked to direct land conversion (e.g.,
-# deforestation, urban expansion) and areas where it is not, pointing to
-# "invisible" degradation within a stable land cover type.
 #
 # WORKFLOW:
 # 1.  Loads pre-calculated ES hotspot data (from hotspot_extraction.qmd).
@@ -54,7 +66,7 @@ attr_colors <- c(
   "Grassland Loss" = "#fdbf6f",
   "Urban Expansion" = "#e41a1c",
   "Multiple Conversion Drivers" = "#984ea3",
-  "Degradation-driven (Stable Land Cover)" = "#3182bd",
+  "Attribution Gap (Change without Conversion)" = "#3182bd", # Blue for the gap
   "Deforestation for Cropland" = "#b15928",
   "Savannization / Pasture" = "#ffff99",
   "Grassland to Cropland" = "#a65628"
@@ -97,21 +109,19 @@ for (metric in c("pct", "abs")) {
       mutate(
         lcc_count = coalesce(as.numeric(lcc_count), 0),
         lcc_services = coalesce(lcc_services, ""),
-        # The 'Attribution Gap' refers to spatial decoupling (at 10km scales) where severe ES
-        # decline occurs within stable land cover types. This highlights areas driven by
-        # degradation (e.g., intensification, climate stress) rather than physical conversion.
         Attribution = case_when(
           # Specific combinations first
           str_detect(lcc_services, "Forest_Loss") & str_detect(lcc_services, "Crop_Exp") ~ "Deforestation for Cropland",
           str_detect(lcc_services, "Forest_Loss") & str_detect(lcc_services, "Grassland_Gain") ~ "Savannization / Pasture",
           str_detect(lcc_services, "Grassland_Loss") & str_detect(lcc_services, "Crop_Exp") ~ "Grassland to Cropland",
-          # General, single drivers next
+          # If multiple drivers but not a special case, use the generic multiple
+          lcc_count > 1 ~ "Multiple Conversion Drivers",
           str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
           str_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
           str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
           str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
-          # If no LCC driver hotspot, it's degradation
-          TRUE ~ "Degradation-driven (Stable Land Cover)" # Fallback
+          # If no LCC driver hotspot, it's part of the attribution gap
+          TRUE ~ "Attribution Gap (Change without Conversion)" # Fallback
         ),
         Attribution = factor(Attribution, levels = names(attr_colors))
       ) %>% st_transform(crs = "EPSG:8857")
@@ -163,13 +173,15 @@ for (metric in c("pct", "abs")) {
           str_detect(lcc_services, "Forest_Loss") & str_detect(lcc_services, "Crop_Exp") ~ "Deforestation for Cropland",
           str_detect(lcc_services, "Forest_Loss") & str_detect(lcc_services, "Grassland_Gain") ~ "Savannization / Pasture",
           str_detect(lcc_services, "Grassland_Loss") & str_detect(lcc_services, "Crop_Exp") ~ "Grassland to Cropland",
+          # If multiple drivers but not a special case, use the generic multiple
+          lcc_count > 1 ~ "Multiple Conversion Drivers",
           # General, single drivers next
           str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
           str_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
           str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
           str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
-          # If no LCC driver hotspot, it's degradation
-          TRUE ~ "Degradation-driven (Stable Land Cover)" # Fallback
+          # If no LCC driver hotspot, it's part of the attribution gap
+          TRUE ~ "Attribution Gap (Change without Conversion)" # Fallback
         ),
         Attribution = factor(Attribution, levels = names(attr_colors))
       ) %>% st_transform(crs = "EPSG:8857")
