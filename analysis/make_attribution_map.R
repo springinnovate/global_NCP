@@ -144,7 +144,7 @@ for (metric in c("pct", "abs")) {
       guides(fill = guide_legend(nrow = 2, byrow = TRUE))
 
     out_path_global <- here("outputs", "plots", "maps", paste0("global_attribution_gap_map_min", min_es, "_", metric, ".png"))
-    ggsave(out_path_global, p_global, width = 16, height = 9, bg = "white", dpi = 300)
+    ggsave(out_path_global, p_global, width = 16, height = 9, bg = "white", dpi = 600)
     message("Saving global map to: ", out_path_global)
   }
   # ----------------------------------------------------------------------------
@@ -201,7 +201,7 @@ for (metric in c("pct", "abs")) {
       guides(fill = guide_legend(nrow = 2, byrow = TRUE))
 
     out_path <- file.path(out_dir, paste0("map_attr_", service_name, "_", metric, ".png"))
-    ggsave(out_path, p, width = 10, height = 6, bg = "white", dpi = 300)
+    ggsave(out_path, p, width = 10, height = 6, bg = "white", dpi = 600)
     message("Saving map to: ", out_path)
   }
 }
