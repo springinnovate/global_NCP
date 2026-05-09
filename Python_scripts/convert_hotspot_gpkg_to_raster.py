@@ -7,23 +7,35 @@ from rasterio.transform import from_bounds
 import numpy as np
 import os
 
-def main(input_gpkg, output_dir, columns_to_rasterize, resolution=10000):
+def main(input_gpkg, output_dir, resolution=10000):
     """
-    Rasterizes specified numeric attribute columns from a GeoPackage of grid cells.
+    Rasterizes a fixed list of canonical service hotspot columns from a GeoPackage.
+
+    This is a simplified, high-performance version of the script that targets
+    a specific, hardcoded list of columns for rasterization.
 
     Args:
         input_gpkg (str): Path to the input GeoPackage file.
         output_dir (str): Path to the output directory for GeoTIFFs.
-        columns_to_rasterize (list): A list of column names to rasterize.
         resolution (int): The resolution of the output raster in meters.
     """
+    # --- Configuration: Hardcoded list of columns to rasterize ---
+    # As requested, these are the exact column names to be processed.
+    columns_to_rasterize = [
+        "Nature_Access", "Sed_Ret_Ratio", "Pollination", "C_Risk",
+        "C_Risk_Red_Ratio", "N_export", "N_Ret_Ratio", "Sed_export"
+    ]
+    print(f"Target columns for rasterization: {', '.join(columns_to_rasterize)}")
+
     print(f"Reading vector data from: {input_gpkg}")
     gdf = gpd.read_file(input_gpkg)
+    print("Vector data loaded.")
 
     print("Reprojecting to Equal Earth (EPSG:8857) for rasterization...")
     # Use an equal-area projection suitable for global analysis
     target_crs = "EPSG:8857"
     gdf = gdf.to_crs(target_crs)
+    print("Reprojection complete.")
 
     # --- Raster Metadata Calculation (once for all columns) ---
     xmin, ymin, xmax, ymax = gdf.total_bounds
@@ -38,23 +50,23 @@ def main(input_gpkg, output_dir, columns_to_rasterize, resolution=10000):
     print(f"Output raster dimensions: {width} x {height}")
     os.makedirs(output_dir, exist_ok=True)
 
+    # --- Main Processing Loop ---
     for column in columns_to_rasterize:
         print(f"\n--- Processing column: {column} ---")
 
-        # --- Data Validation ---
         if column not in gdf.columns:
-            print(f"Warning: Column '{column}' not found in GeoPackage. Skipping.")
+            print(f"!!! WARNING: Column '{column}' not found in GeoPackage. Skipping. !!!")
+            print(f"Available columns are: {', '.join(gdf.columns)}")
             continue
 
-        # Ensure the column is numeric, coercing errors. This is key for 1/0 hotspot flags.
-        print(f"Preparing column '{column}' for rasterization...")
-        gdf[column] = pd.to_numeric(gdf[column], errors='coerce').fillna(0).astype(np.int16)
+        # Ensure the column is numeric (0 or 1 for hotspots)
+        print(f"Preparing column '{column}'...")
+        # Using .loc to avoid SettingWithCopyWarning
+        gdf.loc[:, column] = pd.to_numeric(gdf[column], errors='coerce').fillna(0).astype(np.int16)
 
-        # --- Rasterization ---
         print(f"Rasterizing '{column}' attribute...")
         shapes = ((geom, value) for geom, value in zip(gdf.geometry, gdf[column]))
 
-        # Burn the vector shapes into a raster array
         rasterized_data = rasterize(
             shapes=shapes,
             out_shape=(height, width),
@@ -87,12 +99,13 @@ def main(input_gpkg, output_dir, columns_to_rasterize, resolution=10000):
     print("\nProcess complete.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Convert vector layers to rasters for one or more columns.")
+    parser = argparse.ArgumentParser(
+        description="Rasterizes a predefined set of service hotspot columns from a GeoPackage."
+    )
     parser.add_argument("input_gpkg", help="Path to the input GeoPackage file (e.g., hotspots_global_pct.gpkg).")
     parser.add_argument("output_dir", help="Path to the directory where output GeoTIFFs will be saved.")
-    parser.add_argument("--columns", nargs='+', required=True, help="One or more column names to rasterize into separate files.")
     parser.add_argument("--resolution", type=int, default=10000, help="Output raster resolution in meters (default: 10000).")
 
     args = parser.parse_args()
 
-    main(args.input_gpkg, args.output_dir, args.columns, args.resolution)
+    main(args.input_gpkg, args.output_dir, args.resolution)
