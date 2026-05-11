@@ -1,23 +1,6 @@
 # ==============================================================================
 # The Attribution Gap: ES Hotspots vs LCC Drivers Map
 #
-# --- NOTE FOR DISCUSSION (Steve & Becky) ---
-# This script previously used the term "Degradation-driven (Stable Land Cover)"
-# for ES hotspots that did not overlap with a major land conversion hotspot.
-# This term is problematic because:
-#   1. It assumes "degradation" is the cause, which we haven't proven.
-#   2. It assumes "stable land cover," when in reality the cell just isn't in
-#      the top 5% of LCC intensity; change could still be occurring.
-#
-# This version proposes a more accurate and defensible term:
-#   "Attribution Gap (Change without Conversion)"
-#
-# This new label correctly describes what we observe—a significant change in ES
-# without a corresponding major land conversion—and directly frames the map
-# around the "Attribution Gap" concept, highlighting areas where other drivers
-# (intensification, climate, or upstream/downstream effects) are likely at play.
-# ---
-#
 # OVERVIEW:
 # This script generates the primary "Attribution Gap" maps for the Global NCP
 # time-series analysis. It visualizes the spatial relationship between Ecosystem
@@ -45,6 +28,10 @@ library(here)
 
 source(here("R", "paths.R"))
 
+# --- Configuration ---
+# This percentage should match the cutoff used to define LCC hotspots.
+hotspot_percent_threshold <- 5
+
 # Define the output directory
 out_dir <- here("outputs", "plots", "maps", "attribution_by_service")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
@@ -66,7 +53,7 @@ attr_colors <- c(
   "Grassland Loss" = "#fdbf6f",
   "Urban Expansion" = "#e41a1c",
   "Multiple Conversion Drivers" = "#984ea3",
-  "Attribution Gap (Change without Conversion)" = "#3182bd", # Blue for the gap
+  "Change Occuring Off-Pixel" = "#3182bd",
   "Deforestation for Cropland" = "#b15928",
   "Savannization / Pasture" = "#ffff99",
   "Grassland to Cropland" = "#a65628"
@@ -120,14 +107,13 @@ for (metric in c("pct", "abs")) {
           str_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
           str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
           str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
-          # If no LCC driver hotspot, it's part of the attribution gap
-          TRUE ~ "Attribution Gap (Change without Conversion)" # Fallback
+          TRUE ~ "Change Occuring Off-Pixel"
         ),
         Attribution = factor(Attribution, levels = names(attr_colors))
       ) %>% st_transform(crs = "EPSG:8857")
 
-    subtitle_text <- paste0("Comparing areas with ", ifelse(min_es == 1, "at least 1 ES Hotspot", paste("at least", min_es, "overlapping ES Hotspots")), 
-                           " against the Top 5% of physical Land Conversion")
+    subtitle_text <- paste0("Comparing areas with ", ifelse(min_es == 1, "at least 1 ES Hotspot", paste("at least", min_es, "overlapping ES Hotspots")),
+                           " against the Top ", hotspot_percent_threshold, "% of physical Land Conversion")
 
     p_global <- ggplot() +
       geom_sf(data = base_sf, fill = "gray95", color = NA) +
@@ -180,8 +166,7 @@ for (metric in c("pct", "abs")) {
           str_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
           str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
           str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
-          # If no LCC driver hotspot, it's part of the attribution gap
-          TRUE ~ "Attribution Gap (Change without Conversion)" # Fallback
+          TRUE ~ "Change Occuring Off-Pixel"
         ),
         Attribution = factor(Attribution, levels = names(attr_colors))
       ) %>% st_transform(crs = "EPSG:8857")
@@ -191,7 +176,7 @@ for (metric in c("pct", "abs")) {
       geom_sf(data = es_joined, aes(fill = Attribution), color = NA) +
       scale_fill_manual(values = attr_colors, name = "Primary Driver of ES Hotspot") +
       labs(title = paste("Attribution of", service_name, "Hotspots to LCC Drivers"),
-           subtitle = paste("Comparing ES Hotspots (", toupper(metric), " Change) against the Top 5% of physical Land Conversion")) +
+           subtitle = paste("Comparing ES Hotspots (", toupper(metric), " Change) against the Top ", hotspot_percent_threshold, "% of physical Land Conversion")) +
       theme_void() +
       theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
             plot.subtitle = element_text(size = 10, hjust = 0.5, margin = margin(b = 10)),

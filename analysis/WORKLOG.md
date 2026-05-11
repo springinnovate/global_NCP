@@ -69,6 +69,14 @@ This section highlights the major technical and methodological hurdles overcome 
 
 ---
 
+### 2026-05-11
+*   **General-Purpose Rasterization Utility:** Refactored the specialized `convert_hotspot_gpkg_to_raster.py` script into a flexible, general-purpose command-line tool named `vector_to_raster.py`.
+    *   The new script is no longer hardcoded to specific "hotspot" columns. It now accepts a list of columns to rasterize via a required `--columns` argument.
+    *   Enhanced flexibility by adding command-line arguments to control the output `--resolution`, target `--crs`, `--nodata` value, and raster `--dtype` (e.g., `float32`, `int16`).
+    *   This provides a robust and reusable utility for converting any attribute from a vector file into a GeoTIFF, addressing the need for a more reliable rasterization method than manual QGIS operations for our various grid-level summary files.
+
+---
+
 ## Chronological Log (Newest to Oldest)
 
 ### 2026-05-05
