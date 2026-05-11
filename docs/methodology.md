@@ -34,6 +34,16 @@ This is the primary pathway for the main analysis, including hotspot identificat
 
 **Use Case:** This path underpins all hotspot maps, regional summaries, and relative intensity analyses.
 
+### Clarification: Rasterizing the Grid vs. Resampling the Difference
+
+A crucial methodological distinction exists between the output of Path B and another potential approach.
+
+*   **Rasterizing the Vector Grid (This Project's Method - Path B):** We first aggregate the 1992 and 2020 high-resolution data to the 10km vector grid, and *then* calculate the difference for each grid cell. The final rasters are created by "burning" the attribute values from this final vector file (`10k_change_calc.gpkg`) into a GeoTIFF. This is the **"difference of the aggregates."**
+
+*   **Resampling the Difference Raster (Path A):** This would involve taking the original high-resolution rasters, calculating the pixel-by-pixel difference first (creating a "difference raster"), and then aggregating that result to a 10km grid (e.g., by resampling or zonal statistics). This would be the **"aggregate of the differences."**
+
+As noted below, these two paths are not always mathematically identical. This project has officially chosen **Path B** as the canonical method for the hotspot analysis. Therefore, the rasterization performed by `vector_to_raster.py` on the final GeoPackage is the correct and validated approach for this analysis.
+
 ---
 
 ## Why Might Results from Path A and Path B Differ?
@@ -82,7 +92,7 @@ This "Best of Both Worlds" architecture ensures stability and speed regardless o
 A major challenge in multi-stage spatial pipelines is maintaining exact 1:1 row integrity between extracted statistics and the canonical master grid.
 
 *   **The Fragment Bug:** To bypass C++ GEOS bottlenecks during Python zonal statistics extraction, complex master grid cells were exploded into simpler fragments (e.g., `gdf.explode()` resulting in ~1.67M fragments for a 1.5M cell grid). If joined directly to downstream datasets, this causes severe data duplication (e.g., impossible overlapping hotspot counts per cell) and geographic striping.
-*   **The Re-aggregation Solution (v1.3.1):** The R pipeline (`analysis/process_data.qmd`) implements a mathematically rigorous recovery step. It uses an `st_intersects` spatial join (mapping fragment centroids to the master grid) to trace every fragment back to its pristine 10km parent cell. It then performs a re-aggregation (`group_by %>% summarise`), collapsing the fragments back together. This ensures perfect geometric alignment with the canonical grid and strictly bounds the data.
+*   **The Re-aggregation Solution (v1.3.1):** The R pipeline (`process_data.qmd`) implements a mathematically rigorous recovery step. It uses an `st_intersects` spatial join (mapping fragment centroids to the master grid) to trace every fragment back to its pristine 10km parent cell. It then performs a re-aggregation (`group_by %>% summarise`), collapsing the fragments back together. This ensures perfect geometric alignment with the canonical grid and strictly bounds the data.
 
 
 ## Unit Standardization (Per Hectare)
@@ -104,7 +114,7 @@ This per-hectare normalization is a key methodological improvement (v1.2.1) and 
 *   **Relative Extreme:** We call a cell a "hotspot" because its change sits in the most extreme 5% *within that specific service's own distribution*. It is a ranking label, not an absolute physical threshold. A cell can enter or leave the top 5% even if its raw change isn't huge in absolute terms, simply because it is relative to the rest of the globe.
 *   **Comparability:** Comparisons are strictly within-service. A top 5% decline in Service A isn't necessarily comparable in absolute magnitude to a top 5% decline in Service B.
 *   **Not Evidence of Cause:** Being a hotspot flags that "this cell's change is unusually large (relative to peers)," but it does not inherently prove *why* the value is extreme. Hotspots are starting points for explanation, not conclusions. To discuss drivers, we use additional robust analyses (like LCC attribution and KS socioeconomic profiling).
-*   **Quick Analogy:** Top 5% finishers in two different marathons are both "elite," but their finishing times (absolute performance) and the reasons they're fast (training, course, weather) can differ. Similarly, hotspots are elite by rank, not a proof of shared cause or identical absolute loss.
+*   **Quick Analogy:** Top 5% finishers in two different marathons are both "elite," but their finishing times (absolute performance) and the reasons they're fast (training, course, weather) can differ. Similarly, hotspots are elite by rank, not necessarily a proof of shared cause or identical absolute loss.
 
 
 ## Symmetric Percentage Change
@@ -117,7 +127,7 @@ To address mathematical artifacts where the sign of percentage change differs fr
 When assessing the relationship between Land Cover drivers and Ecosystem Service declines (e.g., scatterplots of Forest Loss vs. ES Change), **Symmetric Percentage Change (SPC)** is strictly preferred over Absolute Change.
 
 *   **Absolute Change** is inherently biased by the *baseline size* of the local ecosystem. A massive, dense forest that loses just 5% of its area might show a huge absolute drop in Carbon simply because of its initial size. Conversely, a small patch of forest that is 100% destroyed would show a tiny absolute drop. Analyzing Absolute Change creates highly skewed, heteroskedastic outputs that largely just map "where the largest baseline ecosystems are."
-*   **Symmetric Percentage Change** normalized this scale effect. It isolates the *intensity of the ecological shock* relative to the local baseline. This ensures that a severe multi-service decline in a small grid cell is properly recognized as a severe impact, making it mathematically appropriate for correlating against land cover conversion percentages.
+*   **Symmetric Percentage Change** normalizes this scale effect. It isolates the *intensity of the ecological shock* relative to the local baseline. This ensures that a severe multi-service decline in a small grid cell is properly recognized as a severe impact, making it mathematically appropriate for correlating against land cover conversion percentages.
 
 
 ## Addressing Aggregation Divergence (Simpson's Paradox)

@@ -2,6 +2,12 @@
 
 *Last updated: 2026-02-04*
 
+::: callout-note
+**Documentation Single Source of Truth**
+
+To prevent documentation sprawl, this project has consolidated all key documents into the `/docs` directory and the root `README.md`. These are the single sources of truth. Do not create new, overlapping `README` files in other directories. All methodological details, runbooks, and data dictionaries should be updated in their canonical locations within `/docs`.
+:::
+
 This document captures the full project context for assistants (e.g., Codex in VS Code) and collaborators. Use it alongside the slimmer spec in `docs/codex_context.min.md`. When coding or refactoring, prefer the **minimal** file as your primary context and consult this long version for rationale and narrative background.
 
 ---
