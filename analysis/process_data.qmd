@@ -107,7 +107,7 @@ latest_interim <- function(pattern) {
 inpath <- processed_dir
 # Optional: export name indexes to CSV
 write_index <- FALSE
-write_base_synth <- TRUE
+write_base_synth <- FALSE
 
 # New workflow: means + sums are in the same synth output.
 serv_path  <- latest_interim("^10k_grid_services_base\\.gpkg$")
@@ -279,7 +279,7 @@ sf_f <- sf_f %>%
   )))
 
 # NaN are divisions by 0, NA is when values are NA
-write_full_change <- TRUE
+write_full_change <- FALSE
 
 # Expanded change synthesis (raw + change) for QA/validation
 if (isTRUE(write_full_change)) {

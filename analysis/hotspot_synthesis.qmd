@@ -381,6 +381,7 @@ for (g_var in valid_groupings) {
   # 1. Coverage Plot
   p_cov <- ggplot(plot_data, aes(x = pct_area, y = group)) +
     geom_col(fill = "#E83737") +
+    # HACK: Add an invisible geom_point to generate a color aesthetic, which we can then use to build a manual legend for the y-axis labels.
     geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
     coord_cartesian(clip = "off") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
@@ -400,6 +401,7 @@ for (g_var in valid_groupings) {
   # 2. Share Plot
   p_share <- ggplot(plot_data, aes(x = pct_share, y = group)) +
     geom_col(fill = "#E83737") +
+    # HACK: Add an invisible geom_point to generate a color aesthetic for the legend.
     geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
     coord_cartesian(clip = "off") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
@@ -419,6 +421,7 @@ for (g_var in valid_groupings) {
   # 3. Relative Intensity Plot
   p_enrich <- ggplot(plot_data, aes(x = relative_intensity, y = group)) +
     geom_col(aes(alpha = relative_intensity > 1), fill = "#E83737") + geom_vline(xintercept = 1, linetype = "dashed", color = "black") +
+    # HACK: Add an invisible geom_point to generate a color aesthetic for the legend.
     geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
     coord_cartesian(clip = "off") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
@@ -554,13 +557,25 @@ if (length(plots_hotness) > 0) plots_hotness[]
 #| label: calc-pop-exposure
 #| message: false
 
+::: callout-note
+## Note on Aggregation (Sum vs. Mean)
+
+This analysis uses socioeconomic variables aggregated as both sums (e.g., `GHS_POP_E2020_GLOBE_sum` for total population) and means (e.g., `hdi_raster_predictions_2020_mean` for average HDI). This is a deliberate and methodologically sound choice.
+
+For reporting absolute exposure, using the `_sum` of population is critical to capture the total number of people affected. For statistical comparisons like the KS test, the choice between sum and mean has no impact on the results because our equal-area grid ensures they are perfectly proportional. For more details, see the "Aggregation Logic: Sum vs. Mean" section in `docs/methodology.md`.
+:::
+
 # Define the canonical socioeconomic variables to use for exposure
 pop_var <- "GHS_POP_E2020_GLOBE_sum"
 hdi_var <- "hdi_raster_predictions_2020_mean"
-req_vars <- c(pop_var, hdi_var, "income_grp")
+gdp_var <- "rast_gdpTot_1990_2020_30arcsec_2020_sum"
+gini_var <- "rast_adm1_gini_disp_2020_mean"
+
+req_vars <- c(pop_var, hdi_var, gdp_var, gini_var, "income_grp")
 
 missing_vars <- setdiff(req_vars, names(grid_df))
 
+# Check if all required variables are present in grid_df
 if (length(missing_vars) == 0) {
   pop_exposure <- hs_flags %>%
     dplyr::left_join(grid_df %>% dplyr::select(fid, dplyr::all_of(req_vars)), by = "fid") %>%
@@ -575,6 +590,14 @@ if (length(missing_vars) == 0) {
       ),
       hdi_bin = factor(hdi_bin, levels = c("Low (<0.550)", "Medium (0.550-0.700)", "High (0.700-0.800)", "Very High (>0.800)", "Unknown"))
     ) %>%
+    dplyr::mutate(
+      gdp_bin = ntile(.data[[gdp_var]], 4), # Quartiles for GDP
+      gdp_bin = factor(gdp_bin, labels = c("Q1 (Lowest GDP)", "Q2", "Q3", "Q4 (Highest GDP)"))
+    ) %>%
+    dplyr::mutate(
+      gini_bin = ntile(.data[[gini_var]], 4), # Quartiles for Gini
+      gini_bin = factor(gini_bin, labels = c("Q1 (Lowest Gini)", "Q2", "Q3", "Q4 (Highest Gini)"))
+    ) %>%
     dplyr::group_by(service, income_grp, hdi_bin) %>%
     dplyr::summarise(
       exposed_population = sum(.data[[pop_var]], na.rm = TRUE),
@@ -582,6 +605,28 @@ if (length(missing_vars) == 0) {
       .groups = "drop"
     ) %>%
     dplyr::arrange(service, income_grp, hdi_bin)
+
+  # Also calculate for GDP bins
+  pop_exposure_gdp <- hs_flags %>%
+    dplyr::left_join(grid_df %>% dplyr::select(fid, dplyr::all_of(req_vars)), by = "fid") %>%
+    dplyr::filter(!is.na(.data[[pop_var]]), !is.na(.data[[gdp_var]])) %>%
+    dplyr::mutate(gdp_bin = ntile(.data[[gdp_var]], 4), # Quartiles for GDP
+                  gdp_bin = factor(gdp_bin, labels = c("Q1 (Lowest GDP)", "Q2", "Q3", "Q4 (Highest GDP)"))) %>%
+    dplyr::group_by(service, gdp_bin) %>%
+    dplyr::summarise(exposed_population = sum(.data[[pop_var]], na.rm = TRUE),
+                     hotspot_cells = dplyr::n(), .groups = "drop") %>%
+    dplyr::arrange(service, gdp_bin)
+
+  # Also calculate for Gini bins
+  pop_exposure_gini <- hs_flags %>%
+    dplyr::left_join(grid_df %>% dplyr::select(fid, dplyr::all_of(req_vars)), by = "fid") %>%
+    dplyr::filter(!is.na(.data[[pop_var]]), !is.na(.data[[gini_var]])) %>%
+    dplyr::mutate(gini_bin = ntile(.data[[gini_var]], 4), # Quartiles for Gini
+                  gini_bin = factor(gini_bin, labels = c("Q1 (Lowest Gini)", "Q2", "Q3", "Q4 (Highest Gini)"))) %>%
+    dplyr::group_by(service, gini_bin) %>%
+    dplyr::summarise(exposed_population = sum(.data[[pop_var]], na.rm = TRUE),
+                     hotspot_cells = dplyr::n(), .groups = "drop") %>%
+    dplyr::arrange(service, gini_bin)
 
   out_pop_csv <- file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv")
   dir.create(dirname(out_pop_csv), recursive = TRUE, showWarnings = FALSE)
@@ -617,10 +662,10 @@ if (file.exists(pop_exposure_csv)) {
   # 1. Plot by Income Group - using a red intensity scale
   p_pop_inc <- ggplot(pop_df, aes(x = income_grp, y = exposed_population, fill = exposed_population)) +
     geom_col() +
-    facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
+    facet_wrap(~ service, scales = "free_y", ncol = 3, labeller = as_labeller(facet_names)) + # Changed to free_y for better comparison
     scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     scale_x_discrete(labels = function(x) stringr::str_remove(x, "^\\d\\.\\s*")) +
-    scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M"), breaks = scales::pretty_breaks(n = 5)) + # Added breaks
     labs(title = "Absolute Population Exposure in Hotspots",
          subtitle = "By World Bank Income Group",
          y = "Exposed Population", x = NULL) +
@@ -641,10 +686,10 @@ if (file.exists(pop_exposure_csv)) {
     dplyr::group_by(service, hdi_bin) %>%
     dplyr::summarise(exposed_population = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
     dplyr::mutate(hdi_bin = factor(hdi_bin, levels = hdi_levels))
-
+  
   p_pop_hdi <- ggplot(pop_df_hdi, aes(x = hdi_bin, y = exposed_population, fill = exposed_population)) +
     geom_col() +
-    facet_wrap(~ service, scales = "free_x", ncol = 3, labeller = as_labeller(facet_names)) +
+    facet_wrap(~ service, scales = "free_y", ncol = 3, labeller = as_labeller(facet_names)) + # Changed to free_y
     scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     labs(title = "Absolute Population Exposure in Hotspots",
@@ -659,7 +704,43 @@ if (file.exists(pop_exposure_csv)) {
           legend.title = element_text(size = 12))
   ggsave(file.path(out_plots(), paste0("pop_exposure_hdi", params$output_suffix, ".png")), p_pop_hdi, width = 14, height = 10, bg = "white")
 
-  plots_pop <- list(p_pop_inc, p_pop_hdi)
+  # 3. Plot by GDP Bin
+  p_pop_gdp <- ggplot(pop_exposure_gdp, aes(x = gdp_bin, y = exposed_population, fill = exposed_population)) +
+    geom_col() +
+    facet_wrap(~ service, scales = "free_y", ncol = 3, labeller = as_labeller(facet_names)) +
+    scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    labs(title = "Absolute Population Exposure in Hotspots",
+         subtitle = "By GDP Quartile",
+         y = "Exposed Population", x = NULL) +
+    theme_minimal() +
+    theme(legend.position = "right", 
+          axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 12),
+          axis.title = element_text(size = 14),
+          legend.text = element_text(size = 10),
+          legend.title = element_text(size = 12))
+  ggsave(file.path(out_plots(), paste0("pop_exposure_gdp", params$output_suffix, ".png")), p_pop_gdp, width = 14, height = 10, bg = "white")
+
+  # 4. Plot by Gini Bin
+  p_pop_gini <- ggplot(pop_exposure_gini, aes(x = gini_bin, y = exposed_population, fill = exposed_population)) +
+    geom_col() +
+    facet_wrap(~ service, scales = "free_y", ncol = 3, labeller = as_labeller(facet_names)) +
+    scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
+    labs(title = "Absolute Population Exposure in Hotspots",
+         subtitle = "By Gini Quartile",
+         y = "Exposed Population", x = NULL) +
+    theme_minimal() +
+    theme(legend.position = "right", 
+          axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 12),
+          axis.title = element_text(size = 14),
+          legend.text = element_text(size = 10),
+          legend.title = element_text(size = 12))
+  ggsave(file.path(out_plots(), paste0("pop_exposure_gini", params$output_suffix, ".png")), p_pop_gini, width = 14, height = 10, bg = "white")
+
+  plots_pop <- list(p_pop_inc, p_pop_hdi, p_pop_gdp, p_pop_gini)
   if (length(plots_pop) > 0) plots_pop[]
 }
 ```

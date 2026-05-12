@@ -57,6 +57,37 @@ This section highlights the major technical and methodological hurdles overcome 
 
 ---
 
+### 2026-05-08 (Urgent Task: Rasterization)
+### 2026-05-08 (Major Conceptual & Analytical Refinements)
+*   **Nuanced Driver Mapping:** Finalized the land cover change driver analysis by significantly refining the classification logic in `make_lcc_driver_map.R`. Replaced the generic "Multiple Overlapping Drivers" category with specific, policy-relevant transitions like "Deforestation for Cropland," "Savannization / Pasture," and "Grassland to Cropland."
+*   **Grassland Dynamics:** Fully integrated both "Grassland Loss" and "Grassland Expansion" as distinct drivers into the mapping scripts, ensuring these critical rangeland dynamics are no longer masked.
+*   **Refined Attribution Terminology:** Replaced the presumptive "Degradation-driven (Stable Land Cover)" category in `make_attribution_map.R` with the more accurate and defensible term **"Attribution Gap (Change without Conversion)"**. This new label correctly describes ES hotspots that are spatially decoupled from major land conversion.
+*   **Clarified Metric Interpretation:** Added a detailed methodological note to `make_lcc_driver_map.R` to explicitly state that the land conversion metrics are calculated as a percentage of the *total 10km cell area*, clarifying the interpretation of "landscape transformation intensity".
+*   **Expanded Socioeconomic Analysis:** Enhanced `hotspot_synthesis.qmd` to include absolute population exposure analysis by GDP and Gini quartiles. Removed the redundant 'Built Area' variable from the `KS_tests_hotspots.qmd` analysis.
+*   **Visualization & Documentation Polish:** Increased map output resolution to 600 DPI for clarity, improved color palettes for distinguishability, and updated `Key_Takeaways.md` and other documentation to reflect all conceptual shi*   **Hotspot Count Rasterization:** Developed a new Python script `Python_scripts/convert_hotspot_gpkg_to_raster.py` to convert the vector-based hotspot count maps (from `hotspots_global_pct.gpkg`) into a GeoTIFF raster. This provides a raster-based output of hotspot frequency, as urgently requested.
+*   **Hotspot Count Rasterization:** Developed a new Python script `Python_scripts/convert_hotspot_gpkg_to_raster.py` to convert the vector-based hotspot count maps (from `hotspots_global_pct.gpkg`) into a GeoTIFF raster. This provides a raster-based output of hotspot frequency, as urgently requested.
+
+---
+
+### 2026-05-11
+*   **General-Purpose Rasterization Utility:** Refactored the specialized `convert_hotspot_gpkg_to_raster.py` script into a flexible, general-purpose command-line tool named `vector_to_raster.py`.
+    *   The new script is no longer hardcoded to specific "hotspot" columns. It now accepts a list of columns to rasterize via a required `--columns` argument.
+    *   Enhanced flexibility by adding command-line arguments to control the output `--resolution`, target `--crs`, `--nodata` value, and raster `--dtype` (e.g., `float32`, `int16`).
+    *   This provides a robust and reusable utility for converting any attribute from a vector file into a GeoTIFF, addressing the need for a more reliable rasterization method than manual QGIS operations for our various grid-level summary files.
+
+*   **Pipeline Cleanup & Housekeeping:**
+    *   Disabled the creation of large intermediate synthesis files (`10k_grid_synth_all.gpkg`, `10k_grid_ES_change_benef.gpkg`) in `process_data.qmd` by default. These files were useful for debugging but are not required for the final analysis and can be recreated if needed. This change will keep the `processed/` directory cleaner.
+    *   Documented the legacy status of `prepare_data.qmd` with a note explaining it is a one-time setup script for the base grid and not part of the routine analytical workflow.
+    *   Confirmed that existing intermediate files can be safely deleted to free up disk space.
+
+*   **Documentation Consolidation:** Overhauled the project's documentation to eliminate redundant `README` files and establish a clear, maintainable structure.
+    *   Consolidated all high-level information into a single, comprehensive root `README.md`.
+    *   Created a central `docs/` directory to house detailed, long-form documentation.
+    *   Moved content from various `README_*.md` files into `docs/methodology.md`, `docs/data_dictionary.md`, and `docs/runbook.md`.
+    *   Explicitly documented the key methodological distinction between the project's "difference of aggregates" approach (Path B) and the alternative "aggregate of differences" (Path A) in `docs/methodology.md`.
+
+---
+
 ## Chronological Log (Newest to Oldest)
 
 ### 2026-05-05

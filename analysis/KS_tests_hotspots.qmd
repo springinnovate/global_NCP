@@ -36,6 +36,18 @@ A direct comparison of hotspots (the top/bottom 5% of pixels) against the entire
 
 ### Workflow
 
+### Aggregation Method (Sum vs. Mean) and KS Tests
+
+The socioeconomic variables used in this analysis are a mix of extensive totals (e.g., `GHS_POP_E2020_GLOBE_sum`) and intensive means (e.g., `hdi_raster_predictions_2020_mean`). This choice is deliberate: population and GDP are correctly summed, while indices like HDI or Gini are averaged.
+
+Crucially, for the KS test, this distinction has **no impact on the results**.
+*   The KS test is non-parametric and rank-based; it is invariant to monotonic transformations.
+*   Because we use an equal-area grid, the `sum` and `mean` for any given variable are perfectly proportional (`sum = mean * constant_area`).
+*   Therefore, the D-statistic and p-value will be identical whether the test is run on the `_sum` or `_mean` version of a variable. The choice only affects the interpretation of the descriptive statistics (e.g., `mean_hot`, `median_hot`).
+
+---
+
+
 Uses the hotspot definition from the extraction report to compare hotspots vs non-hotspots across socio-environmental covariates. Workflow: load helpers and cached `plt_long`, derive hotspot/complement subsets with the same thresholds, run KS tests per service × variable, and export heatmaps/bars/ECDFs to `outputs/plots/ks/` (mirrored in `outputs/plots/latest/ks/`). The goal is a quick, reproducible readout of which covariates most strongly distinguish hotspot cells.
 
 ## Interpreting the KS Results
@@ -169,7 +181,6 @@ KS_CFG <- list(
     "fields_mehrabi_2017_mean",
     "hdi_raster_predictions_2020_mean",
     "rast_adm1_gini_disp_2020_mean",
-    "GHS_BUILT_S_E2020_mean"
   ),
   sampling          = "match_hot",  # none | match_hot | cap_nonhot
   comparison_mode   = "median",     # "random" (all non-hotspots) | "median" (middle 5% of change)
@@ -184,7 +195,6 @@ KS_CFG <- list(
   transform_by_var = c(
     "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "log1p",
     "GHS_POP_E2020_GLOBE_sum"                 = "log1p",
-    "GHS_BUILT_S_E2020_mean"                  = "log1p"
   ),
   ecdf_top_k              = 8,
   ecdf_service_selection  = "top_k",  # top_k | all | custom

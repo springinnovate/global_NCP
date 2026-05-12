@@ -1,22 +1,22 @@
-# Analysis Entry Points
+# Analysis Directory
 
-This repository still contains several historical Rmd/Qmd notebooks under `analysis/`, but only a few drive the current hotspot workflow. Run the following in order when regenerating results:
+::: callout-note
+**Directory Scope & Archival Policy**
 
-1. **Optional checkpoint restore** – `analysis/restore_checkpoint.R`                        
-   Loads `HOTS_CFG`, `plt_long`, and `grid_sf` from the latest saved checkpoint under `data/processed/intermediate`. Use this to skip rebuilding `plt_long` when nothing upstream changed.
+This directory is for **active** narrative analysis and synthesis notebooks (`.qmd`).
 
-2. **Hotspot extraction + plots** – `analysis/hotspot_extraction.qmd`                        
-   - Builds `plt_long` (if not restored), validates `HOTS_CFG`, and runs the hotspot export chunk (writes `processed/hotspots/...` and `_hotspots_index.csv`).                        
-   - Generates trimmed-change bar plots and hotspot violins via functions in `R/`.                        
-   - Writes figures to `outputs/plots/{abs|pct}/<group_col>/...`.
+*   Core R functions belong in `/R/`.
+*   Standalone utility scripts (e.g., for map generation) belong in `/scripts/`.
+*   **Legacy or completed notebooks** from previous analysis phases are moved to the root `/notebooks/` directory to keep this folder focused.
+:::
 
-3. **Spatial clustering & overlap** – `analysis/hotspot_synthesis.qmd`
-   Consumes `plt_long` and canonical geometries to calculate hotspot intensity (coverage), relative intensity, and multi-service "hotness". Exports summary tables and clustering plots.
+This directory contains the primary Quarto notebooks for the data processing, synthesis, and interpretation stages of the Global NCP hotspot analysis.
 
-4. **Checkpoint save** – `analysis/save_checkpoint.R` (optional)                        
-   Saves updated `plt_long`, `grid_sf`, `HOTS_CFG`, and `hot_index` back to `data/processed/intermediate` for future sessions.
+## Core Notebooks
 
-5. **KS tests / follow-up notebooks** – `analysis/KS_tests_hotspots.qmd` (and others as they come online).                        
-   These consume the hotspot outputs and produce statistical summaries or additional figures.
+*   `hotspot_synthesis.qmd`: The main data production script. It takes the grid-level change data (`10k_change_calc.gpkg`) and generates all summary tables for hotspot intensity, multi-service overlap, and population exposure. **This is the primary script for generating the data used in the final analysis.**
 
-> Historical notebooks such as `ch_analysis.Rmd`, `data_prep.Rmd`, etc., are kept for reference but are not part of the reproducible pipeline. Leave them untouched unless you intentionally need legacy code.
+*   `results_interpretation.qmd`: The primary interpretation script. It loads the summary tables produced by `hotspot_synthesis.qmd` and is used to generate the narrative, key takeaways, and figures for the manuscript.
+
+---
+*This README should be updated as the project evolves.*

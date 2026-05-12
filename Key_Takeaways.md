@@ -34,8 +34,17 @@ Using Kolmogorov-Smirnov (KS) tests, we compared the socioeconomic profile of ho
 ## 4. Land Cover Drivers (The "Attribution Gap")
 To move beyond correlation, we assessed the direct overlap between ES hotspots and the top 5% of physical Land Cover Conversion (e.g., gross deforestation, urban expansion).
 
-* **Spatial Attribution / Degradation:** Not all ecosystem service hotspots perfectly overlap with physical land conversion within the same 10km cell. A significant portion of ES decline occurs in areas without massive footprint changes, pointing to the critical role of **invisible degradation**, upstream drivers, fragmentation, and management intensification (e.g., increased fertilizer application without expanding cropland).
+* **The Attribution Gap:** A significant portion of ecosystem service hotspots do not overlap with major land conversion hotspots within the same 10km cell. This "Attribution Gap" highlights areas where ES decline is spatially decoupled from major land conversion, pointing to the critical role of other factors. These may include land degradation/intensification (e.g., increased fertilizer use), fragmentation, or upstream drivers from adjacent areas (the "service shed" effect).
 * **Targeted Drivers:** Where overlap *does* occur, the drivers map logically to the services lost. For example, Coastal Risk hotspots correlate most strongly with Urban Expansion (coastal hardening), while Nitrogen/Sediment export hotspots are more tightly coupled with Cropland Expansion. Incorporating **Grassland Loss** models further attributes the decline of habitat and soil retention to the transformation of critical rangeland ecosystems.
+
+---
+
+## 5. Absolute Population Exposure (The Scale of Human Impact)
+While socioeconomic profiling (KS tests) reveals the *relative* characteristics of hotspot areas, analyzing the absolute population living within them provides a complementary view of the human dimension of ES decline.
+
+*   **Concentration in Middle-Income Nations:** The vast majority of people exposed to ES decline hotspots reside in Upper and Lower Middle-Income countries. For declines in **Nature Access** and **N Retention Ratio**, over 400 million and 300 million people are affected in Upper Middle-Income countries alone, respectively. [1]
+*   **Service-Specific Exposure:** The burden is not uniform. Hotspots for increased **Nitrogen Export** are most heavily concentrated in Upper Middle-Income countries, while **Pollination** loss hotspots affect a more evenly distributed population across Upper Middle, Lower Middle, and Low-Income countries. [1]
+*   **The High-Income Paradox:** Despite the statistical correlation showing hotspots often occur in areas with higher-than-average GDP, the absolute number of people affected in High-Income countries is significantly lower than in middle-income nations for most services. This highlights the difference between the *character* of a location and the *scale* of its human impact. [1]
 
 ---
 
