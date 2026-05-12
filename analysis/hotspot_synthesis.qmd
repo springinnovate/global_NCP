@@ -381,6 +381,7 @@ for (g_var in valid_groupings) {
   # 1. Coverage Plot
   p_cov <- ggplot(plot_data, aes(x = pct_area, y = group)) +
     geom_col(fill = "#E83737") +
+    # HACK: Add an invisible geom_point to generate a color aesthetic, which we can then use to build a manual legend for the y-axis labels.
     geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
     coord_cartesian(clip = "off") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
@@ -400,6 +401,7 @@ for (g_var in valid_groupings) {
   # 2. Share Plot
   p_share <- ggplot(plot_data, aes(x = pct_share, y = group)) +
     geom_col(fill = "#E83737") +
+    # HACK: Add an invisible geom_point to generate a color aesthetic for the legend.
     geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
     coord_cartesian(clip = "off") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
@@ -419,6 +421,7 @@ for (g_var in valid_groupings) {
   # 3. Relative Intensity Plot
   p_enrich <- ggplot(plot_data, aes(x = relative_intensity, y = group)) +
     geom_col(aes(alpha = relative_intensity > 1), fill = "#E83737") + geom_vline(xintercept = 1, linetype = "dashed", color = "black") +
+    # HACK: Add an invisible geom_point to generate a color aesthetic for the legend.
     geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
     coord_cartesian(clip = "off") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
@@ -553,6 +556,14 @@ if (length(plots_hotness) > 0) plots_hotness[]
 ```{r}
 #| label: calc-pop-exposure
 #| message: false
+
+::: callout-note
+## Note on Aggregation (Sum vs. Mean)
+
+This analysis uses socioeconomic variables aggregated as both sums (e.g., `GHS_POP_E2020_GLOBE_sum` for total population) and means (e.g., `hdi_raster_predictions_2020_mean` for average HDI). This is a deliberate and methodologically sound choice.
+
+For reporting absolute exposure, using the `_sum` of population is critical to capture the total number of people affected. For statistical comparisons like the KS test, the choice between sum and mean has no impact on the results because our equal-area grid ensures they are perfectly proportional. For more details, see the "Aggregation Logic: Sum vs. Mean" section in `docs/methodology.md`.
+:::
 
 # Define the canonical socioeconomic variables to use for exposure
 pop_var <- "GHS_POP_E2020_GLOBE_sum"

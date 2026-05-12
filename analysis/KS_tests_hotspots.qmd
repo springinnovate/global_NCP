@@ -36,6 +36,18 @@ A direct comparison of hotspots (the top/bottom 5% of pixels) against the entire
 
 ### Workflow
 
+### Aggregation Method (Sum vs. Mean) and KS Tests
+
+The socioeconomic variables used in this analysis are a mix of extensive totals (e.g., `GHS_POP_E2020_GLOBE_sum`) and intensive means (e.g., `hdi_raster_predictions_2020_mean`). This choice is deliberate: population and GDP are correctly summed, while indices like HDI or Gini are averaged.
+
+Crucially, for the KS test, this distinction has **no impact on the results**.
+*   The KS test is non-parametric and rank-based; it is invariant to monotonic transformations.
+*   Because we use an equal-area grid, the `sum` and `mean` for any given variable are perfectly proportional (`sum = mean * constant_area`).
+*   Therefore, the D-statistic and p-value will be identical whether the test is run on the `_sum` or `_mean` version of a variable. The choice only affects the interpretation of the descriptive statistics (e.g., `mean_hot`, `median_hot`).
+
+---
+
+
 Uses the hotspot definition from the extraction report to compare hotspots vs non-hotspots across socio-environmental covariates. Workflow: load helpers and cached `plt_long`, derive hotspot/complement subsets with the same thresholds, run KS tests per service × variable, and export heatmaps/bars/ECDFs to `outputs/plots/ks/` (mirrored in `outputs/plots/latest/ks/`). The goal is a quick, reproducible readout of which covariates most strongly distinguish hotspot cells.
 
 ## Interpreting the KS Results

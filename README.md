@@ -4,7 +4,7 @@ Jeronimo Rodriguez Escobar
 Affiliation: Global Science, WWF
 Supervisor: Becky Chaplin-Kramer
 Version: v1.3.3
-Last updated: 2026-04-28
+Last updated: 2026-05-12
 
 # Executive Summary
 
@@ -26,7 +26,7 @@ Working version of a structured workflow for extracting, analyzing, and visualiz
 
 The core extraction workflow uses Python (`taskgraph` + `exactextract`) for zonal summaries; R/Quarto is used for consolidation, change calculations, hotspot extraction, and KS tests.
 
-For a detailed technical description of the pipeline steps, see analysis/README_pipeline.md.
+For a detailed technical description of the pipeline, see the project's official documentation in the `/docs` directory, particularly `docs/methodology.md` and `docs/runbook.md`.
 
 ### Pipeline Architecture
 
@@ -41,56 +41,56 @@ flowchart LR
     %% Input Layer
     subgraph INPUTS [" "]
         direction TB
-        RawES["<span style='font-size: 38px;'><b>Global InVEST ES Models</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 & 2020)</i></span>"]
-        RawGrid["<span style='font-size: 38px;'><b>IUCN AOO 10km Master Grid</b></span> <br/> <span style='font-size: 32px;'><i>Vector with Subregional Attributes</i></span>"]
-        RawLC["<span style='font-size: 38px;'><b>ESA CCI Land Cover</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 & 2020)</i></span>"]
-        RawSoc["<span style='font-size: 38px;'><b>Socioeconomic Data</b></span> <br/> <span style='font-size: 32px;'>Rasters <i>(Pop, GDP, HDI)</i></span>"]
+        RawES["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Global InVEST ES Models&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;300m Rasters &lt;i&gt;(1992 & 2020)&lt;/i&gt;&lt;/span&gt;"]
+        RawGrid["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;IUCN AOO 10km Master Grid&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;&lt;i&gt;Vector with Subregional Attributes&lt;/i&gt;&lt;/span&gt;"]
+        RawLC["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;ESA CCI Land Cover&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;300m Rasters &lt;i&gt;(1992 & 2020)&lt;/i&gt;&lt;/span&gt;"]
+        RawSoc["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Socioeconomic Data&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;Rasters &lt;i&gt;(Pop, GDP, HDI)&lt;/i&gt;&lt;/span&gt;"]
     end
 
     %% Processing Layer
     subgraph PROCESSING [" "]
         direction TB
-        IntA["<span style='font-size: 38px;'><b>Path A: Global Trajectories</b></span> <br/> <span style='font-size: 32px;'>Zonal Summaries <i>(1992 & 2020)</i></span>"]
-        MathA["<span style='font-size: 38px;'><b>Path A Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC & Absolute Difference</span>"]
+        IntA["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path A: Global Trajectories&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;Zonal Summaries &lt;i&gt;(1992 & 2020)&lt;/i&gt;&lt;/span&gt;"]
+        MathA["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path A Metrics&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;SPC & Absolute Difference&lt;/span&gt;"]
 
-        IntB["<span style='font-size: 38px;'><b>Path B: Grid Analysis</b></span> <br/> <span style='font-size: 32px;'>10km Zonal Summaries <i>(1992 & 2020)</i></span>"]
-        MathB["<span style='font-size: 38px;'><b>Path B Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC & Absolute Difference</span>"]
+        IntB["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path B: Grid Analysis&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;10km Zonal Summaries &lt;i&gt;(1992 & 2020)&lt;/i&gt;&lt;/span&gt;"]
+        MathB["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path B Metrics&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;SPC & Absolute Difference&lt;/span&gt;"]
 
-        MathLC["<span style='font-size: 38px;'><b>Land Cover Transitions</b></span> <br/> <span style='font-size: 32px;'>Reclassified LC Contingency <br/> Matrices per 10km Gridcell</span>"]
-        MathSoc["<span style='font-size: 38px;'><b>Socioeconomic Stats & KS Tests</b></span> <br/> <span style='font-size: 32px;'>10km Grid Aggregation <br/> & Statistical Profiling</span>"]
+        MathLC["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Land Cover Transitions&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;Reclassified LC Contingency &lt;br/&gt; Matrices per 10km Gridcell&lt;/span&gt;"]
+        MathSoc["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Socioeconomic Stats & KS Tests&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;10km Grid Aggregation &lt;br/&gt; & Statistical Profiling&lt;/span&gt;"]
     end
 
     %% Outputs Layer
     subgraph OUTPUTS [" "]
         direction TB
-        P1["<span style='font-size: 38px;'><b>WHAT: Global Trajectories</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Bar Charts, Summary Tables, <br/> & Cartographies (GPKGs)</i>"]
-        P2["<span style='font-size: 38px;'><b>WHERE: Hotspot Detection (Top/Bottom 5%)</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Abs & SPC GPKGs, Synthesis Maps, <br/> & Distribution Plots</i>"]
-        P3["<span style='font-size: 38px;'><b>WHY: Attribution Gap</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>LCC Overlap CSVs, Heatmaps, <br/> Scatterplots, & Driver Maps</i>"]
-        P4["<span style='font-size: 38px;'><b>WHO: Equity & Exposure</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>KS Test Plots & <br/> Population Exposure CSVs</i>"]
+        P1["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHAT: Global Trajectories&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;Bar Charts, Summary Tables, &lt;br/&gt; & Cartographies (GPKGs)&lt;/i&gt;"]
+        P2["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHERE: Hotspot Detection (Top/Bottom 5%)&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;Abs & SPC GPKGs, Synthesis Maps, &lt;br/&gt; & Distribution Plots&lt;/i&gt;"]
+        P3["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHY: Attribution Gap&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;LCC Overlap CSVs, Heatmaps, &lt;br/&gt; Scatterplots, & Driver Maps&lt;/i&gt;"]
+        P4["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHO: Equity & Exposure&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;KS Test Plots & &lt;br/&gt; Population Exposure CSVs&lt;/i&gt;"]
     end
 
     %% Logical Connections
-    RawGrid ==> IntB
-    RawGrid ==> MathLC
-    RawGrid ==> MathSoc
+    RawGrid ==&gt; IntB
+    RawGrid ==&gt; MathLC
+    RawGrid ==&gt; MathSoc
 
-    RawES ==> IntA
-    RawES ==> IntB
+    RawES ==&gt; IntA
+    RawES ==&gt; IntB
 
-    IntA ==> MathA
-    IntB ==> MathB
+    IntA ==&gt; MathA
+    IntB ==&gt; MathB
 
-    MathA ==> P1
-    MathB ==> P2
+    MathA ==&gt; P1
+    MathB ==&gt; P2
 
     %% Downstream Analysis from Hotspots (P2)
-    P2 ==> P3
-    RawLC ==> MathLC
-    MathLC ==> P3
+    P2 ==&gt; P3
+    RawLC ==&gt; MathLC
+    MathLC ==&gt; P3
 
-    P2 ==> P4
-    RawSoc ==> MathSoc
-    MathSoc ==> P4
+    P2 ==&gt; P4
+    RawSoc ==&gt; MathSoc
+    MathSoc ==&gt; P4
 
     %% Layout Guides
     RawSoc ~~~ MathSoc
@@ -109,14 +109,21 @@ flowchart LR
     class RawSoc,MathSoc,P4 c_who;
 ```
 
-## Documentation Structure
+## Repository Structure
 
-To keep information organized, this project uses a centralized `docs/` directory:
+The project is organized into the following key directories. For detailed technical documentation, refer to the files within the `/docs` directory.
 
-*   **`README.md` (This file):** High-level project overview, setup, and pipeline usage.
-*   **`docs/methodology.md`:** Detailed theoretical framework, mathematical definitions (e.g., Symmetric Percentage Change), and key architectural decisions.
-*   **`docs/runbook.md`:** A technical **Runbook** for executing the R/Quarto analysis scripts in the correct order.
-*   **`docs/data_dictionary.md`:** Detailed definitions for all key CSV output tables generated by the analysis pipeline.
+*   `/analysis/`: Contains the **active** Quarto notebooks for data processing, synthesis, and interpretation. This is where the main narrative of the analysis lives.
+
+*   `/notebooks/`: An **archive** for legacy or completed notebooks from previous analysis phases. This keeps the `/analysis/` directory clean and focused on current work.
+
+*   `/R/`: Contains the core, reusable R functions for the project. This directory is structured like an R package source directory.
+
+*   `/scripts/`: Contains standalone utility scripts for specific, often automated, tasks like map generation or monitoring long-running jobs.
+
+*   `/docs/`: Contains all project documentation, including the detailed methodology, runbooks, and data dictionaries. This is the single source of truth for project context.
+
+*   `/outputs/`: Contains generated plots, maps, and other visual outputs from the analysis. This directory is in `.gitignore`.
 
 # Objectives
 
@@ -145,11 +152,11 @@ Stored under the external data root (`raw/`), include:
 
 ## Modeled Ecosystem Services
 
-1.  **Nitrogen Export** – [InVEST NDR](https://naturalcapitalproject.stanford.edu/software/invest): kg/hectare/year (Standardized from pixel)
-2.  **Sediment Export/Retention** – [InVEST SDR](https://naturalcapitalproject.stanford.edu/software/invest): ton/hectare/year (Standardized from pixel)
-3.  **USLE** – Soil erosion proxy. Derived from the *Revised Universal Soil Loss Equation* [USLE](https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/sdr.html)
-4.  **Pollination** – [InVEST Pollination Model](https://naturalcapitalproject.stanford.edu/software/invest): People fed on habitat
-5.  **Coastal Protection** – [InVEST Coastal Vulnerability](https://naturalcapitalproject.stanford.edu/software/invest): Unitless vulnerability index
+1.  **Nitrogen Export** – InVEST NDR: kg/hectare/year (Standardized from pixel)
+2.  **Sediment Export/Retention** – InVEST SDR: ton/hectare/year (Standardized from pixel)
+3.  **USLE** – Soil erosion proxy. Derived from the *Revised Universal Soil Loss Equation* USLE
+4.  **Pollination** – InVEST Pollination Model: People fed on habitat
+5.  **Coastal Protection** – InVEST Coastal Vulnerability: Unitless vulnerability index
 6.  Sediment Retention Service: $$
     \text{Potential Sediment Retention} = \frac{\text{USLE} - \text{Export}}{\text{USLE}}
     $$
@@ -170,7 +177,7 @@ Land cover change metrics (gain, loss, persistence, etc.) are derived using `dif
 Metrics are computed for each class and overall and then reshaped into wide format.
 
 ::: {.cell layout-align="center"}
-<img src="output_maps/OriginalServices_chg_1992_2020.png" width="60%"/>
+&lt;img src="output_maps/OriginalServices_chg_1992_2020.png" width="60%"/&gt;
 :::
 
 # Pipeline Usage (Python)
@@ -232,16 +239,16 @@ ls -lt summary_pipeline_workspace/*.gpkg
 OUT_DIR=/home/jeronimo/data/global_ncp/interim
 TS=$(date +%Y%m%d_%H%M%S)
 
-SERV_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/<services_file>.gpkg
+SERV_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/&lt;services_file&gt;.gpkg
 ogr2ogr -wrapdateline -datelineoffset 180 \
   "$OUT_DIR/10k_grid_synth_serv_${TS}.gpkg" "$SERV_SRC"
 
-BEN_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/<beneficiaries_file>.gpkg
+BEN_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/&lt;beneficiaries_file&gt;.gpkg
 ogr2ogr -wrapdateline -datelineoffset 180 \
   "$OUT_DIR/10k_grid_synth_benef_${TS}.gpkg" "$BEN_SRC"
 
 # coastal protection summary (single output in workspace)
-COAST_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/<coastal_file>.gpkg
+COAST_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/&lt;coastal_file&gt;.gpkg
 ogr2ogr -wrapdateline -datelineoffset 180 \
   "$OUT_DIR/10k_grid_synth_coastal_${TS}.gpkg" "$COAST_SRC"
 
@@ -252,7 +259,7 @@ ogr2ogr -wrapdateline -datelineoffset 180 \
 
 The R analysis workflow is conducted through a series of Quarto notebooks located in the `analysis/` directory. For a detailed guide on the execution order and purpose of each script, please refer to the main project runbook:
 
-*   **Analysis Runbook**
+*   **`docs/runbook.md`**
 
 # Future Directions
 
@@ -274,11 +281,11 @@ Here are some ideas and future tasks for this analysis:
 
 ## License
 
-This project is licensed under the [Apache License 2.0](LICENSE).
+This project is licensed under the Apache License 2.0.
 
 # Contributors
 
 -   Jeronimo Rodriguez Escobar
 -   Richard P. Sharp
 
-For contributions or issues, [open a GitHub issue](https://github.com/springinnovate/global_NCP/issues) or submit a pull request.
+For contributions or issues, open a GitHub issue or submit a pull request.
