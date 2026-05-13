@@ -54,6 +54,7 @@ attr_colors <- c(
   "Urban Expansion" = "#e41a1c",
   "Multiple Conversion Drivers" = "#984ea3",
   "Change Occuring Off-Pixel" = "#3182bd",
+  "Attribution Gap (Change without Conversion)" = "#3182bd",
   "Deforestation for Cropland" = "#b15928",
   "Savannization / Pasture" = "#ffff99",
   "Grassland to Cropland" = "#a65628"
@@ -62,6 +63,24 @@ attr_colors <- c(
 canon_order <- c("C_Risk", "N_export", "Sed_export",
                  "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
                  "Pollination", "Nature_Access")
+
+# Helper function to classify attribution based on LCC services
+classify_attribution <- function(lcc_services, lcc_count) {
+  case_when(
+    # Specific combinations first
+    str_detect(lcc_services, "Forest_Loss") & str_detect(lcc_services, "Crop_Exp") ~ "Deforestation for Cropland",
+    str_detect(lcc_services, "Forest_Loss") & str_detect(lcc_services, "Grassland_Gain") ~ "Savannization / Pasture",
+    str_detect(lcc_services, "Grassland_Loss") & str_detect(lcc_services, "Crop_Exp") ~ "Grassland to Cropland",
+    # If multiple drivers but not a special case, use the generic multiple
+    lcc_count > 1 ~ "Multiple Conversion Drivers",
+    # General, single drivers next
+    str_detect(lcc_services, "Forest_Loss") ~ "Forest Loss",
+    str_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
+    str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
+    str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
+    TRUE ~ "Attribution Gap (Change without Conversion)"
+  )
+}
 
 # 4. Load ES Hotspots, loop through metrics and services, and map
 for (metric in c("pct", "abs")) {
@@ -109,6 +128,7 @@ for (metric in c("pct", "abs")) {
           str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
           TRUE ~ "Change Occuring Off-Pixel"
         ),
+        Attribution = classify_attribution(lcc_services, lcc_count),
         Attribution = factor(Attribution, levels = names(attr_colors))
       ) %>% st_transform(crs = "EPSG:8857")
 
@@ -168,6 +188,7 @@ for (metric in c("pct", "abs")) {
           str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
           TRUE ~ "Change Occuring Off-Pixel"
         ),
+        Attribution = classify_attribution(lcc_services, lcc_count),
         Attribution = factor(Attribution, levels = names(attr_colors))
       ) %>% st_transform(crs = "EPSG:8857")
 

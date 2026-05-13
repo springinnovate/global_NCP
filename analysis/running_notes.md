@@ -57,11 +57,11 @@ Range capped at -200% to +200% instead of traditional -100% to +100%
 -200% represents complete service disappearance (zero endpoint)
 Method specifically chosen to handle infinite values and NAs in temporal comparisons
 Literature-validated approach for ecosystem service change analysis
-Visualization effectiveness comparison
-Box-and-whisker plots superior to violin plots for pattern recognition
-Violin plot tails dominated by extreme values, obscuring central tendencies
-Box plots clearly highlight range differences and outlier patterns
-Recommendation: Use box-and-whisker for main paper, violin plots for supplement
+Visualization effectiveness comparison [Decision: Boxplots]
+Box-and-whisker plots were chosen over violin plots for pattern recognition.
+Violin plot tails were dominated by extreme values, obscuring central tendencies.
+Boxplots clearly highlight range differences and outlier patterns.
+Recommendation: Use box-and-whisker plots for all primary visualizations.
 Hotspot analysis findings and data quality concerns
 Biome-level distribution vs intensity showing distinct patterns
 Critical data quality issues requiring correction:
@@ -109,23 +109,22 @@ Chat with meeting transcript: https://notes.granola.ai/t/adb4f3bf-3724-4353-8029
 Wed, 14 Jan 2026
 Technical Issues Resolution
 Sediment Retention Ratio: [RESOLVED] Status: successfully recalculated ratio rasters and difference maps. Zonal statistics have been extracted and validated.
-Output: New plots generated; currently refining visualization Pending to add C_prtection Ratio.
+Output: New plots generated; currently refining visualization. Pending to add C_protection Ratio.
 
-Need to either remove trimming and rescale axes instead of capping data values
-Violin Plots: [RESOLVED] Refactored code to remove hard trimming (which caused "fat tails"). Moving to a dynamic axis-rescaling approach (using 1st/99th percentiles for view limits only).
-
+Need to either remove trimming and rescale axes instead of capping data values.
+Boxplots: [RESOLVED] Refactored code to remove hard trimming (which caused "fat tails" in early violin plot tests). Moving to a dynamic axis-rescaling approach (using 1st/99th percentiles for view limits only).
 
 Data Analysis Progress & Methodology
 Switched to equal area grid (from 10km grid) - Pixel-level calculations vs spreadsheet calculations showing mostly consistent results
 Error bars minimal but present in pixel-level analysis
 Nitrogen retention showing comparable values between methods
-Trimming approach causing artificial distribution shapes in violin plots
+Trimming approach was causing artificial distribution shapes in early violin plots.
 Thresholding creates fat tails at both ends —low end because it's top 5% of values, high end because we're trimming at 99.9%
-Need to either remove trimming and rescale axes instead of capping data values
-Violin Plots: Refactoring code to remove hard trimming (which caused "fat tails"). Moving to a dynamic axis-rescaling approach (using 1st/99th percentiles for view limits only). [RESOLVED] Refactored code to remove hard trimming (which caused "fat tails"). Moving to a dynamic axis-rescaling approach (using 1st/99th percentiles for view limits only)
+Need to either remove trimming and rescale axes instead of capping data values.
+Boxplots: Refactoring code to remove hard trimming (which caused "fat tails" in early violin plot tests). Moving to a dynamic axis-rescaling approach (using 1st/99th percentiles for view limits only). [RESOLVED] Refactored code to remove hard trimming. Moving to a dynamic axis-rescaling approach.
 Percent Area Calculations: Percent Area Calculations: [RESOLVED] Developed code to calculate the percentage of land area classified as "Hotspots" within each spatial grouping.
 Hotspot Analysis Results
-Violin plots completed for all variables across different groupings
+Boxplots completed for all variables across different groupings
 Continent, income group, biome classifications
 Absolute and percent change distributions
 Key findings from distributions:
@@ -136,7 +135,7 @@ Distribution Limits Resolved: The extreme values and clustering at $\pm 200%$ ar
 Socioeconomic Relationships (KS Test)
 GDP analysis showing hotspots concentrated in lower? (or higher?)-GDP areas
 If lower, that's a reversal from previous findings that caused concern
-Need validation through violin plots comparison so we can see what the mean (and distributions) of GDP are in hotspots and not-hotspots
+Need validation through boxplots comparison so we can see what the mean (and distributions) of GDP are in hotspots and not-hotspots
 Population and built environment showing similar patterns
 Sample size imbalance issue: 5% hotspots vs 95% non-hotspots
 Plan to subsample non-hotspots for fair comparison: Re analysis run on a subset. [COMPLETED]
@@ -147,7 +146,7 @@ Percent area that is hotspot by region/biome/income group [completed]
 Average number of hotspots per location
 “Hotness” intensity analysis for existing hotspots
 Secondary tasks:
-Fix violin plot trimming issues (remove data trimming, cap axes only)
+Fix boxplot trimming issues (remove data trimming, cap axes only)
 Create equal sample size KS test comparisons
 Establish living PowerPoint with current figures (not static PDF)
 Share sediment retention file for debugging
@@ -176,18 +175,18 @@ Socioeconomic KS tests & comparisons
 
 
 Jeronimo:
-Create sanity-check violin (or similar) plots comparing GDP (and other covariates) in hotspots vs non-hotspots to verify KS-test interpretation.
+Create sanity-check boxplots comparing GDP (and other covariates) in hotspots vs non-hotspots to verify KS-test interpretation.
 Address sample-size imbalance by:
 Subsampling non-hotspots (random 5% to match hotspot share).
 Optionally sampling around the median (5% of “typical change” pixels).
 Re-run KS tests with these balanced samples.
 
-Hotspot distributions & violin plots
+Hotspot distributions & boxplots
 
 
 Jeronimo:
 Remove percentile trimming of underlying values; instead fix axis limits (no capping data, only rescaling axes).
-Re-generate violin/box plots with these fixed axes.
+Re-generate boxplots with these fixed axes.
 Test alternative visualizations if needed (e.g., box-and-whisker, zoomed-in versions).
 
 Absolute vs pixel-level aggregation check (lower priority)
@@ -255,7 +254,7 @@ Chat with meeting transcript: https://notes.granola.ai/t/a295059a-f927-4a9e-9c22
 ### Next Steps
 
 *   **Interpretation**:
-    *   Review `ks_results_hot_vs_non.csv` and new violin plots to validate socioeconomic findings.
+    *   Review `ks_results_hot_vs_non.csv` and new boxplots to validate socioeconomic findings.
     *   Analyze `hotspot_area_stats.csv` and `hotspot_multiservice_stats.csv` for key geographic takeaways.
 *   **Documentation**:
     *   Assemble "Living PowerPoint" with the new canonical figures.
@@ -264,6 +263,6 @@ Chat with meeting transcript: https://notes.granola.ai/t/a295059a-f927-4a9e-9c22
 The updates above address the following detailed action items (for your reference in updating the existing list):
 Hotspot summary statistics (priority) is largely complete.
 Socioeconomic KS tests & comparisons is in progress (plots created, next step is interpretation).
-Hotspot distributions & violin plots is in progress (visualizations refactored).
+Hotspot distributions & boxplots is in progress (visualizations refactored).
 Figure management is a next step (assemble "Living PowerPoint").
 Admin / collaboration / evaluation is a next step (Mid-year evaluation).

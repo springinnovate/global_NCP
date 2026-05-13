@@ -10,7 +10,7 @@ This repository contains several historical Rmd/Qmd notebooks under `analysis/`,
 2.  **Hotspot Extraction & Plots** – `analysis/hotspot_extraction.qmd`
     *   Reads `10k_change_calc.gpkg` and identifies hotspots based on the rules in `HOTS_CFG`.
     *   Exports hotspot vector layers to `processed/hotspots/`.
-    *   Generates summary plots (e.g., bar plots, violins) and saves them to `outputs/plots/`.
+    *   Generates summary plots (e.g., bar plots, boxplots) and saves them to `outputs/plots/`.
 
 3.  **Spatial Clustering & Synthesis** – `analysis/hotspot_synthesis.qmd`
     *   Calculates hotspot intensity (coverage), relative intensity, and multi-service "hotness".

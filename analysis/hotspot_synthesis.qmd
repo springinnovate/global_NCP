@@ -4,15 +4,10 @@ subtitle: "Intensity, Relative Intensity, and Multi-service Overlap"
 author: "Jerónimo Rodríguez Escobar"
 date: last-modified
 format:
-#  html:
-#    toc: true
-#    number-sections: true
-#    theme: cosmo
-  pdf:
+  html:
     toc: true
     number-sections: true
-    geometry: margin=1in
-    df-print: kable
+    theme: cosmo
 editor: source
 params:
   input_gpkg: "10k_change_calc.gpkg"
@@ -45,7 +40,6 @@ This notebook consolidates all spatial summary statistics for global hotspots in
     -   **Question**: How many people are directly living within these top 5% areas of ES decline?
     -   **Metrics**: Total population count within hotspots, segmented by Human Development Index (HDI) vulnerability bins and World Bank Income Group.
 
-## Setup
 
 ## Data Dictionary for Output Tables
 
@@ -92,11 +86,13 @@ This notebook produces three key summary tables in the `processed/tables/` direc
 #| label: setup
 #| message: false
 #| warning: false
+#| echo: false
 
 library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(here)
+library(knitr)
 library(devtools)
 
 # Initialize paths and load project functions
@@ -107,14 +103,15 @@ devtools::load_all(quiet = TRUE)
 options(dplyr.summarise.inform = FALSE)
 ```
 
-## Cleanup Legacy Outputs
+
 ```{r}
 #| label: cleanup-legacy
-
+#| echo: false
 # 1. Clear summary CSVs
 csvs_to_remove <- c(
 file.path(data_dir(), "processed", "hotspot_area_stats.csv"),
-file.path(data_dir(), "processed", "hotspot_multiservice_stats.csv")
+file.path(data_dir(), "processed", "tables", "hotspot_multiservice_stats.csv"),
+file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv")
 )
 for (f in csvs_to_remove) if (file.exists(f)) file.remove(f)
 
@@ -137,9 +134,10 @@ if (length(old_hotness) > 0) {
 
 ```{r}
 #| label: load-data
+#| echo: false
 
 # 1. Load Hotspot Data (plt_long)
-rds_path <- here::here("home", "jeronimo", "data", "global_ncp", "processed", params$input_plt_long)
+rds_path <- file.path(data_dir(), "processed", params$input_plt_long)
 if (file.exists(rds_path)) {
   message("Loading data from: ", rds_path)
   plt_long <- readRDS(rds_path)
@@ -206,7 +204,11 @@ if ("income_grp" %in% names(grid_df)) {
 ## Configuration & Exclusions
 
 ```{r}
-#| label: config
+#| label: config-summary
+#| echo: false
+#| results: 'asis'
+
+`%||%` <- function(x, y) if (is.null(x)) y else x
 
 HOTS_CFG <- list(
   pct_cutoff      = 0.05,
@@ -233,13 +235,41 @@ exclude_regions  <- c(
   "Lakes", "Rock & Ice"
 )
 
+# Create a summary table of the configuration
+config_summary_df <- tibble::tribble(
+  ~Parameter, ~Value,
+  "Hotspot Cutoff (%)", as.character(HOTS_CFG$pct_cutoff * 100),
+  "Threshold Mode", HOTS_CFG$threshold_mode,
+  "Rule Mode", HOTS_CFG$rule_mode,
+  "Loss Services", paste(HOTS_CFG$loss, collapse = ", "),
+  "Gain Services", paste(HOTS_CFG$gain, collapse = ", "),
+  "Degradation Combo", paste(HOTS_CFG$combos$deg_combo, collapse = ", "),
+  "Recovery Combo", paste(HOTS_CFG$combos$rec_combo, collapse = ", "),
+  "Grouping Variables", paste(HOTS_CFG$groupings, collapse = ", "),
+  "Service Order", paste(HOTS_CFG$svc_order, collapse = ", ")
+)
+
+kable(
+  config_summary_df,
+  caption = "Hotspot Analysis Configuration Parameters",
+  col.names = c("Parameter", "Value"),
+  align = c("l", "l")
+)
+
+# Display the exclusion lists as text
+cat("\n\n### Exclusions\n\n")
+cat("The following services are excluded from all calculations:\n")
+cat(paste("-", exclude_services, collapse = "\n"), "\n\n")
+cat("The following regions/biomes are excluded from all calculations:\n")
+cat(paste("-", exclude_regions, collapse = "\n"), "\n\n")
+
 valid_groupings <- intersect(HOTS_CFG$groupings, names(grid_df))
 ```
 
-## Extract Global Hotspots
 
 ```{r}
 #| label: extract-hotspots
+#| echo: false
 
 hs_global_obj <- extract_hotspots(
   df = plt_long,
@@ -258,6 +288,7 @@ hs_global_obj <- extract_hotspots(
 
 ```{r}
 #| label: calc-intensity
+#| echo: false  
 
 hs_flags <- hs_global_obj$hotspots_df %>%
   dplyr::select(fid, service) %>%
@@ -316,6 +347,8 @@ message("Hotspot area statistics saved to: ", out_csv_path)
 ```{r}
 #| label: plot-intensity
 #| message: false
+#| echo: false
+
 
 biome_labels <- c(
   'Tropical & Subtropical Moist Broadleaf Forests' = 'Trop/Subtrop Moist Broadleaf',
@@ -445,6 +478,7 @@ for (g_var in valid_groupings) {
 
 ```{r}
 #| label: calc-overlap
+#| echo: false
 
 hotspot_counts <- hs_global_obj$hotspots_df %>%
   dplyr::group_by(fid) %>%
@@ -479,6 +513,7 @@ readr::write_csv(hotness_stats, out_csv)
 
 ```{r}
 #| label: plot-overlap
+#| echo: false
 
 plot_hotness <- function(df, g_var) {
   d_plot <- df %>% dplyr::filter(grouping == g_var) %>% dplyr::slice_head(n = 15) %>%
@@ -553,10 +588,6 @@ if (length(plots_hotness) > 0) plots_hotness[]
 
 ## Part 3: Absolute Population Exposure
 
-```{r}
-#| label: calc-pop-exposure
-#| message: false
-
 ::: callout-note
 ## Note on Aggregation (Sum vs. Mean)
 
@@ -564,6 +595,10 @@ This analysis uses socioeconomic variables aggregated as both sums (e.g., `GHS_P
 
 For reporting absolute exposure, using the `_sum` of population is critical to capture the total number of people affected. For statistical comparisons like the KS test, the choice between sum and mean has no impact on the results because our equal-area grid ensures they are perfectly proportional. For more details, see the "Aggregation Logic: Sum vs. Mean" section in `docs/methodology.md`.
 :::
+
+```{r}
+#| label: calc-pop-exposure
+#| message: false
 
 # Define the canonical socioeconomic variables to use for exposure
 pop_var <- "GHS_POP_E2020_GLOBE_sum"
@@ -579,6 +614,17 @@ missing_vars <- setdiff(req_vars, names(grid_df))
 if (length(missing_vars) == 0) {
   pop_exposure <- hs_flags %>%
     dplyr::left_join(grid_df %>% dplyr::select(fid, dplyr::all_of(req_vars)), by = "fid") %>%
+    dplyr::filter(!is.na(income_grp)) %>%
+    # Clean income_grp to canonical names before further processing
+    dplyr::mutate(
+      income_grp = dplyr::case_when(
+        grepl("High income", income_grp) ~ "High income",
+        grepl("Upper middle income", income_grp) ~ "Upper middle income",
+        grepl("Lower middle income", income_grp) ~ "Lower middle income",
+        grepl("Low income", income_grp) ~ "Low income",
+        TRUE ~ NA_character_ # Assign NA to anything that doesn't match
+      )) %>%
+    dplyr::filter(!is.na(income_grp)) %>% # Filter out any NAs created by the cleaning
     dplyr::filter(!is.na(.data[[pop_var]]), !is.na(.data[[hdi_var]])) %>%
     dplyr::mutate(
       hdi_bin = dplyr::case_when(
@@ -647,6 +693,9 @@ if (length(missing_vars) == 0) {
 pop_exposure_csv <- file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv")
 if (file.exists(pop_exposure_csv)) {
   pop_df <- readr::read_csv(pop_exposure_csv, show_col_types = FALSE)
+  # Explicitly filter out any NA income groups that may have been written to the CSV.
+  # This prevents an "NA" bar from appearing in the plot.
+  pop_df <- pop_df %>% dplyr::filter(!is.na(income_grp))
 
   facet_names <- c(
     "C_Risk" = "Coastal Risk",
@@ -659,18 +708,30 @@ if (file.exists(pop_exposure_csv)) {
     "Nature_Access" = "Nature Access"
   )
 
-  # 1. Plot by Income Group - using a red intensity scale
-  p_pop_inc <- ggplot(pop_df, aes(x = income_grp, y = exposed_population, fill = exposed_population)) +
+  # 1. Plot by Income Group - Corrected to be a clear bar chart
+  pop_df_inc <- pop_df %>%
+    mutate(service = factor(service, levels = HOTS_CFG$svc_order)) %>%
+    group_by(service, income_grp) %>%
+    summarise(exposed_population = sum(exposed_population, na.rm = TRUE), .groups = "drop")
+
+  income_order <- c("High income", "Upper middle income", "Lower middle income", "Low income")
+
+  pop_df_inc <- pop_df_inc %>%
+    mutate(
+      income_group_label = stringr::str_remove(income_grp, "^\\d+\\.?\\s*"),
+      income_group_label = factor(income_group_label, levels = income_order)
+    )
+
+  p_pop_inc <- ggplot(pop_df_inc, aes(x = income_group_label, y = exposed_population, fill = income_group_label)) +
     geom_col() +
-    facet_wrap(~ service, scales = "free_y", ncol = 3, labeller = as_labeller(facet_names)) + # Changed to free_y for better comparison
+    facet_wrap(~ service, scales = "fixed", ncol = 3, labeller = as_labeller(facet_names)) +
     scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
-    scale_x_discrete(labels = function(x) stringr::str_remove(x, "^\\d\\.\\s*")) +
-    scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M"), breaks = scales::pretty_breaks(n = 5)) + # Added breaks
+    scale_fill_brewer(palette = "RdYlBu", direction = -1, name = "Income Group") +
     labs(title = "Absolute Population Exposure in Hotspots",
          subtitle = "By World Bank Income Group",
-         y = "Exposed Population", x = NULL) +
+         y = "Exposed Population", x = "World Bank Income Group") +
     theme_minimal() +
-    theme(legend.position = "right", 
+    theme(legend.position = "bottom",
           axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
           axis.text.y = element_text(size = 12),
           axis.title = element_text(size = 14),
@@ -683,13 +744,14 @@ if (file.exists(pop_exposure_csv)) {
   hdi_levels <- c("Low (<0.550)", "Medium (0.550-0.700)", "High (0.700-0.800)", "Very High (>0.800)", "Unknown")
 
   pop_df_hdi <- pop_df %>%
+    mutate(service = factor(service, levels = HOTS_CFG$svc_order)) %>%
     dplyr::group_by(service, hdi_bin) %>%
     dplyr::summarise(exposed_population = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
     dplyr::mutate(hdi_bin = factor(hdi_bin, levels = hdi_levels))
-  
+
   p_pop_hdi <- ggplot(pop_df_hdi, aes(x = hdi_bin, y = exposed_population, fill = exposed_population)) +
     geom_col() +
-    facet_wrap(~ service, scales = "free_y", ncol = 3, labeller = as_labeller(facet_names)) + # Changed to free_y
+    facet_wrap(~ service, scales = "fixed", ncol = 3, labeller = as_labeller(facet_names)) +
     scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     labs(title = "Absolute Population Exposure in Hotspots",
@@ -705,9 +767,11 @@ if (file.exists(pop_exposure_csv)) {
   ggsave(file.path(out_plots(), paste0("pop_exposure_hdi", params$output_suffix, ".png")), p_pop_hdi, width = 14, height = 10, bg = "white")
 
   # 3. Plot by GDP Bin
-  p_pop_gdp <- ggplot(pop_exposure_gdp, aes(x = gdp_bin, y = exposed_population, fill = exposed_population)) +
+  p_pop_gdp <- pop_exposure_gdp %>%
+    mutate(service = factor(service, levels = HOTS_CFG$svc_order)) %>%
+    ggplot(aes(x = gdp_bin, y = exposed_population, fill = exposed_population)) +
     geom_col() +
-    facet_wrap(~ service, scales = "free_y", ncol = 3, labeller = as_labeller(facet_names)) +
+    facet_wrap(~ service, scales = "fixed", ncol = 3, labeller = as_labeller(facet_names)) +
     scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     labs(title = "Absolute Population Exposure in Hotspots",
@@ -723,9 +787,11 @@ if (file.exists(pop_exposure_csv)) {
   ggsave(file.path(out_plots(), paste0("pop_exposure_gdp", params$output_suffix, ".png")), p_pop_gdp, width = 14, height = 10, bg = "white")
 
   # 4. Plot by Gini Bin
-  p_pop_gini <- ggplot(pop_exposure_gini, aes(x = gini_bin, y = exposed_population, fill = exposed_population)) +
+  p_pop_gini <- pop_exposure_gini %>%
+    mutate(service = factor(service, levels = HOTS_CFG$svc_order)) %>%
+    ggplot(aes(x = gini_bin, y = exposed_population, fill = exposed_population)) +
     geom_col() +
-    facet_wrap(~ service, scales = "free_y", ncol = 3, labeller = as_labeller(facet_names)) +
+    facet_wrap(~ service, scales = "fixed", ncol = 3, labeller = as_labeller(facet_names)) +
     scale_y_continuous(labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     scale_fill_distiller(palette = "Reds", direction = 1, name = "Population", labels = scales::label_number(scale = 1e-6, suffix = "M")) +
     labs(title = "Absolute Population Exposure in Hotspots",
