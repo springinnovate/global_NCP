@@ -1,5 +1,19 @@
 # Worklog — Global NCP Hotspots (v1.3.3)
 
+### 2026-05-12
+*   **Finalize `hotspot_synthesis.qmd` & Prepare for Interpretation:**
+    *   Completed a major debugging and refinement pass on `analysis/hotspot_synthesis.qmd` to ensure it runs locally and produces clean, final outputs.
+    *   Resolved numerous rendering errors, including TeX installation failures (by switching to HTML output), missing `kable()` function errors (by adding `library(knitr)`), and data type mismatches in summary tables.
+    *   Significantly improved the population exposure plots by:
+        *   Correctly handling and filtering income group categories to remove "NA" values from plots.
+        *   Enforcing a canonical service order for facets.
+        *   Switching to a fixed y-axis scale for better comparability across services.
+    *   Enhanced the report's clarity by replacing the raw configuration code chunk with a clean, formatted summary table.
+    *   The `hotspot_synthesis.qmd` notebook is now stable and produces all necessary summary tables and visualizations, paving the way for the final interpretation phase.
+    *   Prepared a transfer prompt and a git commit message to checkpoint this progress before moving to a new chat session focused on `analysis/results_interpretation.qmd`.
+
+---
+
 ## Project Overview & Goals
 
 **Goal:** Quantify global change in multiple ecosystem services (ES) at ~10-km resolution over 1992–2020, identify **hotspots** of concerning change, and attribute those changes to environmental and socioeconomic drivers.

@@ -15,11 +15,11 @@ editor: source
 
 This document synthesizes the primary outputs of the Global NCP hotspot analysis. It loads the final summary tables to build a narrative around the three core questions of the project:
 
-1.  **Where are the hotspots?** (Geographic Distribution & Intensity)
-2.  **Who is affected?** (Socioeconomic Profile of Exposed Populations)
-3.  **What are the drivers?** (Land Cover Change Attribution)
+1.  **Where are the hotspots?** We identify the geographic distribution, intensity, and overlap of ES hotspots.
+2.  **Who is affected?** We profile the socioeconomic characteristics of the populations living within these hotspots.
+3.  **What are the drivers?** We attribute ES decline to specific land cover change dynamics.
 
-The goal is to move from quantitative tables to qualitative insights and key takeaways for the final manuscript.
+The goal is to move from quantitative tables to qualitative insights for the final manuscript.
 
 ## Setup
 
@@ -144,6 +144,20 @@ if (exists("area_stats")) {
     arrange(Service) %>%
     kable(digits = 2)
 }
+
+cat("\n\n#### Top Regions & Biomes by Multi-service Hotspots ('Hotness')\n\n")
+if (exists("multiservice_stats")) {
+  multiservice_stats %>%
+    filter(grouping %in% c("region_wb", "WWF_biome")) %>%
+    group_by(grouping) %>%
+    slice_max(order_by = mean_hotspots, n = 5) %>%
+    ungroup() %>%
+    select(`Grouping` = grouping, `Group` = group, `Mean Hotspots` = mean_hotspots) %>%
+    arrange(Grouping, desc(`Mean Hotspots`)) %>%
+    kable(digits = 2, caption = "Top 5 Regions/Biomes by Average Number of Overlapping Hotspots")
+}
+
+
 ```
 
 **Narrative Point:** Latin America and Sub-Saharan Africa carry a vastly disproportionate share of the global damage compared to their landmass. For example, Latin America contains roughly 15.6% of global land, but hosts 22.2% of all global Sediment Retention hotspots (a relative intensity of 1.42).
@@ -210,7 +224,9 @@ if (exists("ks_res")) {
 #| fig-cap: "Directionality of socioeconomic effects in hotspots. Positive values (red) indicate hotspots have higher values of the variable (e.g., higher GDP, more population) than the background. Negative values (blue) indicate the opposite."
 #| echo: false
 
-ks_plot_path <- here("outputs", "plots", "ks", "directionality_cliffs_delta.png")
+# The knitr root directory is set to the project root, so we can use a path relative to there.
+# Using here() can sometimes cause issues with knitr's path resolution for existing graphics.
+ks_plot_path <- "outputs/plots/ks/directionality_cliffs_delta.png"
 if(file.exists(ks_plot_path)) {
   knitr::include_graphics(ks_plot_path)
 } else {
