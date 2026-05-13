@@ -145,6 +145,35 @@ if (exists("area_stats")) {
     kable(digits = 2)
 }
 
+cat("\n\n#### Top Income Group by Relative Hotspot Intensity\n\n")
+if (exists("area_stats")) {
+  area_stats %>%
+    filter(grouping_var == "income_grp") %>%
+    group_by(service) %>%
+    slice_max(order_by = relative_intensity, n = 1) %>%
+    ungroup() %>%
+    select(Service = service, `Top Income Group` = group, `Relative Intensity` = relative_intensity) %>%
+    arrange(Service) %>%
+    kable(digits = 2)
+}
+
+cat("\n\n#### Top 10 Countries by Relative Hotspot Intensity (excluding smallest 10% by area)\n\n")
+if (exists("area_stats") && "country" %in% area_stats$grouping_var) {
+  country_areas <- area_stats %>% filter(grouping_var == "country") %>% distinct(group, n_total)
+  large_countries <- country_areas %>% filter(n_total > quantile(n_total, 0.1, na.rm = TRUE)) %>% pull(group)
+  
+  area_stats %>%
+    filter(grouping_var == "country", group %in% large_countries) %>%
+    group_by(service) %>%
+    slice_max(order_by = relative_intensity, n = 10) %>%
+    ungroup() %>%
+    select(Service = service, Country = group, `Relative Intensity` = relative_intensity) %>%
+    arrange(Service, desc(`Relative Intensity`)) %>%
+    kable(digits = 2, caption = "Top 10 Countries by Relative Hotspot Intensity")
+} else {
+  cat("Country-level data not found in `hotspot_area_stats.csv`. Please ensure 'country' is in the `groupings` parameter of `hotspot_synthesis.qmd` and re-run it.")
+}
+
 cat("\n\n#### Top Regions & Biomes by Multi-service Hotspots ('Hotness')\n\n")
 if (exists("multiservice_stats")) {
   multiservice_stats %>%
@@ -156,6 +185,23 @@ if (exists("multiservice_stats")) {
     arrange(Grouping, desc(`Mean Hotspots`)) %>%
     kable(digits = 2, caption = "Top 5 Regions/Biomes by Average Number of Overlapping Hotspots")
 }
+
+cat("\n\n#### Top 10 Countries by Multi-service Hotspots ('Hotness') (excluding smallest 10% by area)\n\n")
+if (exists("multiservice_stats") && exists("area_stats") && "country" %in% multiservice_stats$grouping) {
+  # Re-use the large_countries list from the previous chunk if it exists, otherwise create it.
+  if (!exists("large_countries")) {
+    country_areas <- area_stats %>% filter(grouping_var == "country") %>% distinct(group, n_total)
+    large_countries <- country_areas %>% filter(n_total > quantile(n_total, 0.1, na.rm = TRUE)) %>% pull(group)
+  }
+  multiservice_stats %>%
+    filter(grouping == "country", group %in% large_countries) %>%
+    slice_max(order_by = mean_hotspots, n = 10) %>%
+    ungroup() %>%
+    select(Country = group, `Mean Hotspots` = mean_hotspots) %>%
+    arrange(desc(`Mean Hotspots`)) %>%
+    kable(digits = 2, caption = "Top 10 Countries by Average Number of Overlapping Hotspots")
+}
+
 
 
 ```
@@ -220,6 +266,22 @@ if (exists("ks_res")) {
 ```
 
 ```{r}
+#| label: analyze-socioeconomic-profile-hdi-gini
+#| echo: false
+
+if (exists("ks_res")) {
+  ks_res %>%
+    filter(grepl("hdi|gini", var)) %>%
+    mutate(
+      Variable = if_else(grepl("hdi", var), "HDI", "Gini")
+    ) %>%
+    select(Service = service, Variable, `Cliff's Delta` = cliffs_delta, p_adj) %>%
+    pivot_wider(names_from = Variable, values_from = `Cliff's Delta`) %>%
+    kable(caption = "Socioeconomic Profile of Hotspots (Cliff's Delta) for HDI and Gini", digits = 3)
+}
+```
+
+```{r}
 #| label: plot-ks-directionality
 #| fig-cap: "Directionality of socioeconomic effects in hotspots. Positive values (red) indicate hotspots have higher values of the variable (e.g., higher GDP, more population) than the background. Negative values (blue) indicate the opposite."
 #| echo: false
@@ -238,7 +300,7 @@ if(file.exists(ks_plot_path)) {
 
 ### Analysis 2: Absolute Population Exposure
 
-While the KS tests show the *relative* profile of hotspot areas, this analysis shows the *absolute* number of people living within them. This helps us understand the total scale of human impact.
+**Narrative Point:** The socioeconomic story is two-sided. The KS tests reveal the *relative* profile of hotspot areas (e.g., they tend to have higher GDP than the background), but analyzing absolute population numbers tells a different story about the *scale* of human impact. The vast majority of people exposed to ES decline reside not in high-income nations, but in Upper and Lower Middle-Income countries. This highlights the difference between the *character* of a location where decline occurs and the *scale* of its human impact.
 
 ```{r}
 #| label: plot-pop-exposure-income
@@ -259,29 +321,91 @@ if (exists("pop_exposure")) {
       # Use the dynamically found column name and clean it
       rename(income_group = all_of(income_col_name)) %>%
       group_by(service, income_group) %>%
-      summarise(total_exposed_pop = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
+      summarise(total_exposed_pop = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>% 
+      filter(!is.na(income_group)) %>%
       mutate(service = factor(service, levels = svc_order),
              income_group = factor(income_group, levels = income_order))
 
     ggplot(plot_data, aes(x = income_group, y = total_exposed_pop, fill = income_group)) +
-      geom_col() + # The legend is now shown by default
+      geom_col(show.legend = FALSE) +
       scale_y_continuous(labels = scales::label_number(suffix = " M", scale = 1e-6)) +
-      # Add a clear name for the legend title
-      scale_fill_brewer(palette = "RdYlBu", direction = -1, name = "Income Group") +
-      facet_wrap(~service, ncol = 2, scales = "free_y") +
+      scale_fill_brewer(palette = "RdYlBu", direction = -1) +
+      facet_wrap(~service, ncol = 3, scales = "fixed") +
       labs(
         title = "Population Exposure to Hotspots by Income Group",
         subtitle = "Total population living in areas with critical ecosystem service decline.",
         x = "World Bank Income Group",
         y = "Total Exposed Population"
       ) +
-      theme_minimal() +
-      theme(
-        axis.text.x = element_text(angle = 45, hjust = 1), 
-        strip.text = element_text(face = "bold"),
-        legend.position = "bottom" # Move legend to bottom for clarity
-      )
+      theme_minimal(base_size = 12) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), strip.text = element_text(face = "bold"))
   }
+}
+```
+
+```{r}
+#| label: plot-pop-exposure-hdi
+#| fig-cap: "Absolute population exposure in hotspots, by Human Development Index (HDI) bin."
+#| fig-width: 10
+#| fig-height: 8
+#| echo: false
+
+if (exists("pop_exposure")) {
+  svc_order <- c("C_Risk", "N_export", "Sed_export", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio", "Pollination", "Nature_Access")
+  hdi_levels <- c("Low (<0.550)", "Medium (0.550-0.700)", "High (0.700-0.800)", "Very High (>0.800)", "Unknown")
+
+  plot_data_hdi <- pop_exposure %>%
+    filter(!is.na(hdi_bin)) %>%
+    group_by(service, hdi_bin) %>%
+    summarise(total_exposed_pop = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
+    mutate(service = factor(service, levels = svc_order),
+           hdi_bin = factor(hdi_bin, levels = hdi_levels))
+
+  ggplot(plot_data_hdi, aes(x = hdi_bin, y = total_exposed_pop, fill = hdi_bin)) +
+    geom_col(show.legend = FALSE) +
+    scale_y_continuous(labels = scales::label_number(suffix = " M", scale = 1e-6)) +
+    scale_fill_brewer(palette = "RdYlBu", direction = -1) +
+    facet_wrap(~service, ncol = 3, scales = "fixed") +
+    labs(
+      title = "Population Exposure to Hotspots by HDI",
+      subtitle = "Total population living in areas with critical ecosystem service decline.",
+      x = "Human Development Index Bin",
+      y = "Total Exposed Population"
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), strip.text = element_text(face = "bold"))
+}
+```
+
+```{r}
+#| label: plot-pop-exposure-gini
+#| fig-cap: "Absolute population exposure in hotspots, by Gini Quartile."
+#| fig-width: 10
+#| fig-height: 8
+#| echo: false
+
+if (exists("pop_exposure") && "gini_bin" %in% names(pop_exposure)) {
+  svc_order <- c("C_Risk", "N_export", "Sed_export", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio", "Pollination", "Nature_Access")
+
+  plot_data_gini <- pop_exposure %>%
+    filter(!is.na(gini_bin)) %>%
+    group_by(service, gini_bin) %>%
+    summarise(total_exposed_pop = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
+    mutate(service = factor(service, levels = svc_order))
+
+  ggplot(plot_data_gini, aes(x = gini_bin, y = total_exposed_pop, fill = gini_bin)) +
+    geom_col(show.legend = FALSE) +
+    scale_y_continuous(labels = scales::label_number(suffix = " M", scale = 1e-6)) +
+    scale_fill_brewer(palette = "RdYlBu", direction = -1) +
+    facet_wrap(~service, ncol = 3, scales = "fixed") +
+    labs(
+      title = "Population Exposure to Hotspots by Gini Quartile",
+      subtitle = "Total population living in areas with critical ecosystem service decline.",
+      x = "Gini Quartile",
+      y = "Total Exposed Population"
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), strip.text = element_text(face = "bold"))
 }
 ```
 
