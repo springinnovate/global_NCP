@@ -91,6 +91,13 @@ def main(input_vector, output_dir, columns, resolution, target_crs, nodata, dtyp
         # Using .loc to avoid SettingWithCopyWarning
         gdf.loc[:, column] = pd.to_numeric(gdf[column], errors='coerce').fillna(nodata).astype(output_dtype)
 
+        # --- DIAGNOSTIC STEP ---
+        # Check what unique values the script is actually seeing before rasterizing.
+        unique_values = gdf[column].unique()
+        print(f"--> DIAGNOSTIC: Found unique values in '{column}' to be burned: {unique_values}")
+        if len(unique_values) < 2:
+            print("--> WARNING: Only one unique value found. The raster should be uniform.")
+
         print(f"Rasterizing '{column}' attribute...")
         shapes = ((geom, value) for geom, value in zip(gdf.geometry, gdf[column]))
 

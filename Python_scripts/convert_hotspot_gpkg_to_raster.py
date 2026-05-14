@@ -20,12 +20,9 @@ def main(input_gpkg, output_dir, resolution=10000):
         resolution (int): The resolution of the output raster in meters.
     """
     # --- Configuration: Hardcoded list of columns to rasterize ---
-    # As requested, these are the exact column names to be processed.
-    columns_to_rasterize = [
-        "Nature_Access", "Sed_Ret_Ratio", "Pollination", "C_Risk",
-        "C_Risk_Red_Ratio", "N_export", "N_Ret_Ratio", "Sed_export"
-    ]
-    print(f"Target columns for rasterization: {', '.join(columns_to_rasterize)}")
+    # This script is now specialized to rasterize only the 'hotspot_count' column.
+    columns_to_rasterize = ["hotspot_count"]
+    print(f"Target column for rasterization: {columns_to_rasterize[0]}")
 
     print(f"Reading vector data from: {input_gpkg}")
     gdf = gpd.read_file(input_gpkg)
@@ -59,10 +56,17 @@ def main(input_gpkg, output_dir, resolution=10000):
             print(f"Available columns are: {', '.join(gdf.columns)}")
             continue
 
-        # Ensure the column is numeric (0 or 1 for hotspots)
-        print(f"Preparing column '{column}'...")
+        # Ensure the column is numeric. Using uint8 as hotspot_count is a small integer (0-8).
+        print(f"Preparing column '{column}' for rasterization...")
         # Using .loc to avoid SettingWithCopyWarning
-        gdf.loc[:, column] = pd.to_numeric(gdf[column], errors='coerce').fillna(0).astype(np.int16)
+        gdf.loc[:, column] = pd.to_numeric(gdf[column], errors='coerce').fillna(0).astype(np.uint8)
+
+        # --- DIAGNOSTIC STEP ---
+        # Check what unique values the script is actually seeing before rasterizing.
+        unique_values = gdf[column].unique()
+        print(f"--> DIAGNOSTIC: Found unique values in '{column}' to be burned: {unique_values}")
+        if len(unique_values) < 2:
+            print("--> WARNING: Only one unique value found. The raster should be uniform.")
 
         print(f"Rasterizing '{column}' attribute...")
         shapes = ((geom, value) for geom, value in zip(gdf.geometry, gdf[column]))
@@ -71,16 +75,16 @@ def main(input_gpkg, output_dir, resolution=10000):
             shapes=shapes,
             out_shape=(height, width),
             transform=transform,
-            fill=0,  # Use 0 as the fill value for non-hotspot areas
-            dtype=rasterio.int16,
+            fill=0,  # Use 0 as the fill/nodata value
+            dtype=rasterio.uint8,
             all_touched=True
         )
 
         # --- Write Output ---
-        # For binary hotspot rasters (1/0), setting nodata=0 means only cells with value 1 are visible.
+        # For hotspot_count, setting nodata=0 means only cells with >0 hotspots are visible.
         profile = {
             'driver': 'GTiff',
-            'dtype': rasterio.int16,
+            'dtype': rasterio.uint8,
             'nodata': 0,
             'width': width,
             'height': height,
