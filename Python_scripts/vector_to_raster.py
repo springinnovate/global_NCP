@@ -103,7 +103,8 @@ def main(input_vector, output_dir, columns, resolution, target_crs, nodata, dtyp
         gdf.loc[:, column] = pd.to_numeric(gdf[column], errors='coerce').fillna(nodata).astype(output_dtype)
 
         print(f"Rasterizing '{column}' attribute...")
-        shapes = ((geom, value) for geom, value in zip(gdf.geometry, gdf[column]))
+        # Forcing the generator into a list can sometimes resolve obscure iteration bugs.
+        shapes = list(zip(gdf.geometry, gdf[column]))
 
         rasterized_data = rasterize(
             shapes=shapes,
@@ -112,6 +113,12 @@ def main(input_vector, output_dir, columns, resolution, target_crs, nodata, dtyp
             fill=nodata,  # Use the specified nodata value as the fill value
             dtype=output_dtype,
         )
+
+        # --- DIAGNOSTIC STEP ---
+        # Check the in-memory array before writing to disk.
+        unique_pixels, counts = np.unique(rasterized_data, return_counts=True)
+        print(f"--> DIAGNOSTIC: Unique pixel values in memory: {unique_pixels}")
+        print(f"--> DIAGNOSTIC: Counts of unique values: {dict(zip(unique_pixels, counts))}")
 
         # --- Write Output ---
         profile = {
