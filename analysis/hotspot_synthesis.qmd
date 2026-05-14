@@ -151,6 +151,13 @@ if (file.exists(gpkg_grid)) {
   message("Loading canonical grid from: ", gpkg_grid)
   grid_df <- sf::st_read(gpkg_grid, quiet = TRUE)
   grid_df <- sf::st_drop_geometry(grid_df)
+  # Standardize country column name from 'nev_name' to 'country' if necessary.
+  # This makes the pipeline more robust if the input GPKG uses 'nev_name'.
+  if ("nev_name" %in% names(grid_df) && !"country" %in% names(grid_df)) {
+    message("Found 'nev_name' in grid_df, renaming to 'country' for standardization.")
+    grid_df <- dplyr::rename(grid_df, country = nev_name)
+  }
+
   if ("orig_fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = orig_fid)
   if ("grid_fid" %in% names(grid_df) && !"fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = grid_fid)
   if ("id" %in% names(grid_df) && !"fid" %in% names(grid_df)) grid_df <- dplyr::rename(grid_df, fid = id)
@@ -163,6 +170,12 @@ if (file.exists(gpkg_grid)) {
     message("Joining missing attributes from master grid: ", paste(missing_groupings, collapse = ", "))
     master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"), quiet = TRUE)
     master_grid <- sf::st_drop_geometry(master_grid)
+    # Standardize country column name from 'nev_name' to 'country' if necessary.
+    # This is based on a hint in downstream scripts that the column may be named 'nev_name'.
+    if ("nev_name" %in% names(master_grid) && !"country" %in% names(master_grid)) {
+      message("Found 'nev_name' in master grid, renaming to 'country' for standardization.")
+      master_grid <- dplyr::rename(master_grid, country = nev_name)
+    }
     if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) {
       master_grid <- dplyr::rename(master_grid, fid = id)
     }
