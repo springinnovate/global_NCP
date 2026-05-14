@@ -52,29 +52,40 @@ def main(input_vector, output_dir, columns, resolution, target_crs, nodata, dtyp
     print(f"Vector data loaded. Source CRS detected: {gdf.crs.to_string()}")
 
     # --- CRS Handling ---
-    # If a target CRS is provided and it's different from the source, reproject.
-    if target_crs and gdf.crs != target_crs:
-        print(f"Reprojecting to {target_crs} for rasterization...")
-        gdf = gdf.to_crs(target_crs)
-        print("Reprojection complete.")
-    # If no target CRS is provided, use the source's CRS for the output.
-    elif not target_crs:
+    # The script now assumes the input vector is ALREADY in the target CRS.
+    # The --crs parameter is used to tag the output raster correctly.
+    if not target_crs:
         target_crs = gdf.crs
-        print("Using source CRS for output. No reprojection necessary.")
-    else: # target_crs is specified but is the same as the source
-        print(f"Input and target CRS are the same ({target_crs}). No reprojection needed.")
+        print(f"No target CRS specified. Using source CRS for output: {target_crs.to_string()}")
+    elif gdf.crs != target_crs:
+        print("!!! WARNING: Input vector CRS does not match the target CRS. !!!")
+        print(f"Input CRS: {gdf.crs.to_string()}")
+        print(f"Target CRS: {target_crs}")
+        print("Results may be incorrect. Please reproject the input vector first using reproject_vector.py.")
+    else:
+        print(f"Input and target CRS match ({target_crs}). Proceeding.")
 
     # --- Raster Metadata Calculation ---
     xmin, ymin, xmax, ymax = gdf.total_bounds
 
-    # Calculate output dimensions
-    width = int(np.ceil((xmax - xmin) / resolution))
-    height = int(np.ceil((ymax - ymin) / resolution))
+    # --- GRID SNAPPING LOGIC ---
+    # To ensure perfect alignment and prevent pixels from shifting relative to
+    # the vector grid, we "snap" the output raster's origin to the resolution.
+    # We define the transform from a snapped origin and fixed resolution, rather
+    # than deriving it from the layer's total_bounds, which can introduce
+    # floating-point errors and cause misalignment.
 
-    # Create the affine transform
-    transform = from_bounds(xmin, ymin, xmax, ymax, width, height)
+    snapped_xmin = np.floor(xmin / resolution) * resolution
+    snapped_ymax = np.ceil(ymax / resolution) * resolution
 
-    print(f"Output raster dimensions: {width} x {height}")
+    # The transform is now anchored to a snapped corner with a fixed pixel size.
+    # The y-resolution is negative because raster coordinates originate from the top-left.
+    transform = rasterio.transform.from_origin(snapped_xmin, snapped_ymax, resolution, -resolution)
+
+    # Calculate the new width and height required to cover the original extent.
+    width = int(np.ceil((xmax - snapped_xmin) / resolution))
+    height = int(np.ceil((snapped_ymax - ymin) / resolution))
+
     os.makedirs(output_dir, exist_ok=True)
 
     # --- Main Processing Loop ---
@@ -91,13 +102,6 @@ def main(input_vector, output_dir, columns, resolution, target_crs, nodata, dtyp
         # Using .loc to avoid SettingWithCopyWarning
         gdf.loc[:, column] = pd.to_numeric(gdf[column], errors='coerce').fillna(nodata).astype(output_dtype)
 
-        # --- DIAGNOSTIC STEP ---
-        # Check what unique values the script is actually seeing before rasterizing.
-        unique_values = gdf[column].unique()
-        print(f"--> DIAGNOSTIC: Found unique values in '{column}' to be burned: {unique_values}")
-        if len(unique_values) < 2:
-            print("--> WARNING: Only one unique value found. The raster should be uniform.")
-
         print(f"Rasterizing '{column}' attribute...")
         shapes = ((geom, value) for geom, value in zip(gdf.geometry, gdf[column]))
 
@@ -107,7 +111,6 @@ def main(input_vector, output_dir, columns, resolution, target_crs, nodata, dtyp
             transform=transform,
             fill=nodata,  # Use the specified nodata value as the fill value
             dtype=output_dtype,
-            all_touched=True
         )
 
         # --- Write Output ---
@@ -120,7 +123,6 @@ def main(input_vector, output_dir, columns, resolution, target_crs, nodata, dtyp
             'count': 1,
             'crs': target_crs,
             'transform': transform,
-            'compress': 'lzw'
         }
 
         output_raster = os.path.join(output_dir, f"{column}.tif")
@@ -139,7 +141,7 @@ if __name__ == "__main__":
     parser.add_argument("output_dir", help="Path to the directory where output GeoTIFFs will be saved.")
     parser.add_argument("--columns", nargs='+', required=True, help="One or more column names to rasterize.")
     parser.add_argument("--resolution", type=int, default=10000, help="Output raster resolution in the units of the target CRS (default: 10000).")
-    parser.add_argument("--crs", type=str, default=None, help="Target CRS for the output raster (e.g., 'EPSG:8857'). Defaults to the source file's CRS.")
+    parser.add_argument("--crs", type=str, default=None, help="Target CRS to tag the output raster with (e.g., 'EPSG:8857'). Assumes input is already in this CRS.")
     parser.add_argument("--nodata", type=float, default=-9999.0, help="Nodata value for the output raster (default: -9999.0).")
     parser.add_argument("--dtype", type=str, default='float32', choices=list(DTYPE_MAP.keys()), help="Output raster data type (default: 'float32').")
     
