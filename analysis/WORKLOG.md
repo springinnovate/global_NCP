@@ -1,5 +1,30 @@
 # Worklog — Global NCP Hotspots (v1.3.3)
 
+### 2026-05-17 (cont.)
+*   **Rasterization Workflow Template:** Created `scripts/gdal_rasterization_template.sh` to formalize and document the robust `gdal_rasterize`-based workflow. This template includes steps for GeoPackage reprojection and rasterization of both continuous and binary columns, ensuring easy reusability and preventing loss of this critical methodological knowledge.
+
+---
+
+### 2026-05-17
+*   **Output Naming Convention:** Standardized raster output filenames to include the change metric (`_abs` or `_pct`) for clarity and consistency. For example, `hotspot_count.tif` is now `hotspot_count_abs.tif`. This ensures that all raster files can be distinguished by their filename alone.
+
+---
+
+### 2026-05-16
+*   **Methodological Reflection:** Acknowledged that the extensive time spent debugging Python-based rasterization was inefficient. The direct use of `gdal_rasterize` from the command line proved to be a faster, more powerful, and more reliable solution from the beginning. Future rasterization tasks should default to using the core GDAL command-line tools to avoid similar issues with high-level library wrappers.
+
+---
+
+### 2026-05-15
+*   **Rasterization & Grid Validation Saga:**
+    *   Spent significant time debugging a persistent and subtle rasterization issue. Initial attempts to rasterize hotspot counts using the `vector_to_raster.py` script resulted in "ghost rasters" (tiny file sizes, empty when loaded in QGIS/R) and severe spatial misalignment artifacts (a single vector grid cell producing up to four raster pixels).
+    *   After exhausting multiple fixes within the Python `rasterio` library (grid snapping, nodata value changes, removing compression/tiling), the root cause was identified as a deep incompatibility within the library stack in the server's Python environment.
+    *   **Definitive Solution:** Abandoned the Python script in favor of the core `gdal_rasterize` command-line tool. This immediately produced a correctly aligned raster with a 1-to-1 mapping between vector cells and raster pixels. This will be the standard procedure for all future rasterizations.
+    *   **Grid Geometry Verification:** A subsequent check of the reprojected vector grid's geometry (`hotspots_global_abs_epsg8857.gpkg`) initially caused confusion, as the bounding box of individual cells was not 10km x 10km.
+    *   **Final Validation:** Developed a new verification script (`verify_grid_area.py`) to measure the true geometric **area** of the reprojected polygons, not just their bounding box. This definitively confirmed that each grid cell has an area of **100 km²**, validating the integrity of our equal-area grid and resolving a long-standing point of uncertainty. The project's core spatial foundation is now fully verified.
+
+---
+
 ### 2026-05-12
 *   **Finalize `hotspot_synthesis.qmd` & Prepare for Interpretation:**
     *   Completed a major debugging and refinement pass on `analysis/hotspot_synthesis.qmd` to ensure it runs locally and produces clean, final outputs.

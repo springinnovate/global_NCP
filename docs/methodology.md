@@ -106,6 +106,15 @@ This ensures that the zonal statistics (Mean/Sum) reflect physical densities com
 
 This per-hectare normalization is a key methodological improvement (v1.2.1) and is applied to the base year rasters that form the foundation of **Path B (Grid-Level Change)**.
 
+## Grid Geometry & Reprojection Effects
+
+A common source of confusion in global-scale GIS analysis is the visual and geometric distortion that occurs during reprojection. This section clarifies why the project's 10km grid cells may not appear as perfect squares and confirms the validity of their size.
+
+*   **Geographic vs. Projected Grids:** The original analysis grid is defined in a geographic coordinate system (WGS 84, EPSG:4326), where cells are defined by degrees of latitude and longitude. When this grid is reprojected into an equal-area system (like Equal Earth, EPSG:8857) for analysis, the shapes of the cells are necessarily distorted (stretched and tilted) to preserve their area on a flat map.
+*   **Bounding Box vs. True Area:** As a result of this distortion, measuring the `width` and `height` of a reprojected grid cell's bounding box will **not** yield 10km x 10km. These dimensions will vary depending on the cell's latitude.
+*   **Area is the Invariant:** The critical property preserved by an equal-area projection is the **area**. A dedicated validation script (`Python_scripts/verify_grid_area.py`) was developed to measure the true geometric area of the reprojected grid cells.
+*   **Validation Outcome:** This analysis definitively confirmed that each grid cell in the reprojected analysis files (e.g., `..._epsg8857.gpkg`) has an area of **100 km²** (10km x 10km), within a very small tolerance. This validates the integrity of the project's spatial foundation and ensures that all area-based calculations are correct.
+
 ## Key Analysis Parameters
 
 -   **Hotspot Threshold:** The threshold for identifying hotspots is defined in `analysis/hotspot_extraction.qmd`. It is configured in an R object named `HOTS_CFG` with the parameter `pct_cutoff = 0.05`, representing the top/bottom 5% of SPC values.
