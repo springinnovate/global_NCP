@@ -8,6 +8,7 @@ format:
     toc: true
     number-sections: true
     theme: cosmo
+    embed-resources: true
 editor: source
 ---
 
@@ -114,7 +115,7 @@ This section uses `hotspot_area_stats.csv` and `hotspot_multiservice_stats.csv` 
 *   Which regions/biomes show the highest **Relative Intensity**, indicating a disproportionate burden?
 *   Where are multi-service hotspots concentrated (high **"Hotness"**)?
 
-### Analysis: Regional Hotspot Concentration (World Bank Regions)
+### Analysis: Hotspot Concentration by Grouping
 
 ```{r}
 #| label: analyze-regional-intensity
@@ -124,37 +125,37 @@ This section uses `hotspot_area_stats.csv` and `hotspot_multiservice_stats.csv` 
 if (exists("area_stats")) {
   # By World Bank Region
   cat("#### Top World Bank Region by Relative Hotspot Intensity\n\n")
-  area_stats %>%
+  print(area_stats %>%
     filter(grouping_var == "region_wb") %>%
     group_by(service) %>%
     slice_max(order_by = relative_intensity, n = 1) %>%
     ungroup() %>%
     select(Service = service, `Top Region` = group, `Relative Intensity` = relative_intensity) %>%
     arrange(Service) %>%
-    kable(digits = 2)
+    kable(digits = 2))
 
   # By WWF Biome
   cat("\n\n#### Top WWF Biome by Relative Hotspot Intensity\n\n")
-  area_stats %>%
+  print(area_stats %>%
     filter(grouping_var == "WWF_biome") %>%
     group_by(service) %>%
     slice_max(order_by = relative_intensity, n = 1) %>%
     ungroup() %>%
     select(Service = service, `Top Biome` = group, `Relative Intensity` = relative_intensity) %>%
     arrange(Service) %>%
-    kable(digits = 2)
+    kable(digits = 2))
 }
 
 cat("\n\n#### Top Income Group by Relative Hotspot Intensity\n\n")
 if (exists("area_stats")) {
-  area_stats %>%
+  print(area_stats %>%
     filter(grouping_var == "income_grp") %>%
     group_by(service) %>%
     slice_max(order_by = relative_intensity, n = 1) %>%
     ungroup() %>%
     select(Service = service, `Top Income Group` = group, `Relative Intensity` = relative_intensity) %>%
     arrange(Service) %>%
-    kable(digits = 2)
+    kable(digits = 2))
 }
 
 cat("\n\n#### Top 10 Countries by Relative Hotspot Intensity (excluding smallest 10% by area)\n\n")
@@ -162,28 +163,28 @@ if (exists("area_stats") && "country" %in% area_stats$grouping_var) {
   country_areas <- area_stats %>% filter(grouping_var == "country") %>% distinct(group, n_total)
   large_countries <- country_areas %>% filter(n_total > quantile(n_total, 0.1, na.rm = TRUE)) %>% pull(group)
   
-  area_stats %>%
+  print(area_stats %>%
     filter(grouping_var == "country", group %in% large_countries) %>%
     group_by(service) %>%
     slice_max(order_by = relative_intensity, n = 10) %>%
     ungroup() %>%
     select(Service = service, Country = group, `Relative Intensity` = relative_intensity) %>%
     arrange(Service, desc(`Relative Intensity`)) %>%
-    kable(digits = 2, caption = "Top 10 Countries by Relative Hotspot Intensity")
+    kable(digits = 2, caption = "Top 10 Countries by Relative Hotspot Intensity"))
 } else {
   cat("Country-level data not found in `hotspot_area_stats.csv`. Please ensure 'country' is in the `groupings` parameter of `hotspot_synthesis.qmd` and re-run it.")
 }
 
 cat("\n\n#### Top Regions & Biomes by Multi-service Hotspots ('Hotness')\n\n")
 if (exists("multiservice_stats")) {
-  multiservice_stats %>%
+  print(multiservice_stats %>%
     filter(grouping %in% c("region_wb", "WWF_biome")) %>%
     group_by(grouping) %>%
     slice_max(order_by = mean_hotspots, n = 5) %>%
     ungroup() %>%
     select(`Grouping` = grouping, `Group` = group, `Mean Hotspots` = mean_hotspots) %>%
     arrange(Grouping, desc(`Mean Hotspots`)) %>%
-    kable(digits = 2, caption = "Top 5 Regions/Biomes by Average Number of Overlapping Hotspots")
+    kable(digits = 2, caption = "Top 5 Regions/Biomes by Average Number of Overlapping Hotspots"))
 }
 
 cat("\n\n#### Top 10 Countries by Multi-service Hotspots ('Hotness') (excluding smallest 10% by area)\n\n")
@@ -193,13 +194,13 @@ if (exists("multiservice_stats") && exists("area_stats") && "country" %in% multi
     country_areas <- area_stats %>% filter(grouping_var == "country") %>% distinct(group, n_total)
     large_countries <- country_areas %>% filter(n_total > quantile(n_total, 0.1, na.rm = TRUE)) %>% pull(group)
   }
-  multiservice_stats %>%
+  print(multiservice_stats %>%
     filter(grouping == "country", group %in% large_countries) %>%
     slice_max(order_by = mean_hotspots, n = 10) %>%
     ungroup() %>%
     select(Country = group, `Mean Hotspots` = mean_hotspots) %>%
     arrange(desc(`Mean Hotspots`)) %>%
-    kable(digits = 2, caption = "Top 10 Countries by Average Number of Overlapping Hotspots")
+    kable(digits = 2, caption = "Top 10 Countries by Average Number of Overlapping Hotspots"))
 }
 
 
@@ -249,51 +250,100 @@ This section uses `hotspot_pop_exposure.csv` to quantify the human dimension of 
 
 ### Analysis 1: Relative Socioeconomic Profile (KS Tests)
 
-```{r}
+```{r, results='asis'}
 #| label: analyze-socioeconomic-profile
 #| echo: false
 
 if (exists("ks_res")) {
-  ks_res %>%
-    filter(grepl("gdp|POP", var)) %>%
-    mutate(
-      Variable = if_else(grepl("gdp", var), "GDP", "Population")
-    ) %>%
-    select(Service = service, Variable, `Cliff's Delta` = cliffs_delta, p_adj) %>%
-    pivot_wider(names_from = Variable, values_from = `Cliff's Delta`) %>%
-    kable(caption = "Socioeconomic Profile of Hotspots (Cliff's Delta)", digits = 3)
+  cat("#### Profile by Population\n\n")
+  print(ks_res %>%
+    filter(grepl("POP", var)) %>%
+    select(Service = service, `Cliff's Delta` = cliffs_delta, `P-value (adj)` = p_adj) %>%
+    arrange(Service) %>%
+    kable(caption = "Socioeconomic Profile of Hotspots: Population", digits = 3))
+
+  cat("\n\n#### Profile by GDP\n\n")
+  print(ks_res %>%
+    filter(grepl("gdp", var, ignore.case = TRUE)) %>%
+    select(Service = service, `Cliff's Delta` = cliffs_delta, `P-value (adj)` = p_adj) %>%
+    arrange(Service) %>%
+    kable(caption = "Socioeconomic Profile of Hotspots: GDP", digits = 3))
+
+  cat("\n\n#### Profile by HDI\n\n")
+  print(ks_res %>%
+    filter(grepl("hdi", var, ignore.case = TRUE)) %>%
+    select(Service = service, `Cliff's Delta` = cliffs_delta, `P-value (adj)` = p_adj) %>%
+    arrange(Service) %>%
+    kable(caption = "Socioeconomic Profile of Hotspots: HDI", digits = 3))
+
+  cat("\n\n#### Profile by Gini\n\n")
+  print(ks_res %>%
+    filter(grepl("gini", var, ignore.case = TRUE)) %>%
+    select(Service = service, `Cliff's Delta` = cliffs_delta, `P-value (adj)` = p_adj) %>%
+    arrange(Service) %>%
+    kable(caption = "Socioeconomic Profile of Hotspots: Gini", digits = 3))
 }
 ```
 
 ```{r}
-#| label: analyze-socioeconomic-profile-hdi-gini
-#| echo: false
-
-if (exists("ks_res")) {
-  ks_res %>%
-    filter(grepl("hdi|gini", var)) %>%
-    mutate(
-      Variable = if_else(grepl("hdi", var), "HDI", "Gini")
-    ) %>%
-    select(Service = service, Variable, `Cliff's Delta` = cliffs_delta, p_adj) %>%
-    pivot_wider(names_from = Variable, values_from = `Cliff's Delta`) %>%
-    kable(caption = "Socioeconomic Profile of Hotspots (Cliff's Delta) for HDI and Gini", digits = 3)
-}
-```
-
 ```{r}
-#| label: plot-ks-directionality
+#| label: plot-ks-directionality-embedded
 #| fig-cap: "Directionality of socioeconomic effects in hotspots. Positive values (red) indicate hotspots have higher values of the variable (e.g., higher GDP, more population) than the background. Negative values (blue) indicate the opposite."
 #| echo: false
+#| fig-width: 14
+#| fig-height: 10
 
-# The knitr root directory is set to the project root, so we can use a path relative to there.
-# Using here() can sometimes cause issues with knitr's path resolution for existing graphics.
-ks_plot_path <- "outputs/plots/ks/directionality_cliffs_delta.png"
-if(file.exists(ks_plot_path)) {
-  knitr::include_graphics(ks_plot_path)
+if (exists("ks_res")) {
+  svc_order <- c(
+    "C_Risk", "N_export", "Sed_export",
+    "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
+    "Pollination", "Nature_Access"
+  )
+
+  # Clean up variable names for plotting (from KS_tests_hotspots.qmd)
+  ks_res_plot <- ks_res %>%
+    mutate(
+      var_label = case_when(
+        grepl("gdpTot", var) ~ "GDP",
+        grepl("POP", var) ~ "Population",
+        grepl("hdi", var) ~ "HDI",
+        grepl("gini", var) ~ "Gini Index",
+        grepl("mehrabi", var) ~ "Field Size",
+        TRUE ~ var
+      ),
+      var_label = stringr::str_wrap(var_label, 40)
+    )
+
+  # Define signed 4th root transform to improve visibility of low values
+  signed_pow4 <- scales::trans_new(
+    "signed_pow4",
+    transform = function(x) sign(x) * abs(x)^0.25,
+    inverse = function(x) sign(x) * abs(x)^4
+  )
+
+  # Create the plot object. This will be automatically rendered by Quarto.
+  ggplot(ks_res_plot, aes(x = service, y = cliffs_delta, fill = cliffs_delta)) +
+    geom_bar(stat = "identity", position = "identity") +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Cliff's Delta", trans = signed_pow4) +
+    scale_x_discrete(drop = FALSE, limits = rev(svc_order)) +
+    facet_wrap(~ var_label, ncol = 2, scales = "free_y") +
+    coord_flip() +
+    labs(
+      title = "Directionality of Hotspot Effects (Cliff's Delta)",
+      subtitle = "Cliff's Delta > 0 (red) indicates hotspots have higher values of the covariate.\nCliff's Delta < 0 (blue) indicates hotspots have lower values.",
+      x = "Ecosystem Service",
+      y = "Cliff's Delta (Effect Size)"
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      strip.text = element_text(size = 8)
+    )
 } else {
-  "Directionality plot not found. Run KS_tests_hotspots.qmd to generate it."
+  "KS test results not found. Run KS_tests_hotspots.qmd to generate the required data."
 }
+
 ```
 
 **Narrative Point:** The socioeconomic profile of hotspots reveals a critical distinction. For services like **Nature Access** and **Coastal Risk Reduction**, hotspots are consistently found in areas with significantly higher GDP and Population than the background landscape. This points to degradation driven by urbanization and development. Conversely, hotspots for **Pollination** loss and increased **Sediment Export** are found in areas with lower GDP and population, highlighting a different set of rural and agricultural pressures.
