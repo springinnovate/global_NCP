@@ -9,7 +9,8 @@
 # 2. Loads the master grid and the country correspondence table.
 # 3. Joins the full country name (`nev_name`) using `iso3` as the key.
 # 4. Renames `nev_name` to `country` for standardization.
-# 5. Overwrites the original grid file with the enriched version.
+# 5. Validates the join to ensure no data was lost.
+# 6. Overwrites the original grid file with the enriched version.
 
 library(sf)
 library(dplyr)
@@ -27,7 +28,8 @@ source(here::here("R", "paths.R"))
 # --- Configuration ---
 master_grid_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
 country_corr_path <- file.path(data_dir(), "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
-backup_path <- sub("\\.gpkg$", "_backup.gpkg", master_grid_path)
+timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+backup_path <- sub("\\.gpkg$", paste0("_backup_", timestamp, ".gpkg"), master_grid_path)
 
 # --- Safety Checks ---
 if (!file.exists(master_grid_path)) {
@@ -39,7 +41,7 @@ if (!file.exists(country_corr_path)) {
 
 # --- 1. Create a backup ---
 message("Creating backup of master grid to: ", backup_path)
-file.copy(master_grid_path, backup_path, overwrite = TRUE)
+file.copy(master_grid_path, backup_path)
 
 # --- 2. Load Data ---
 message("Loading master grid...")
@@ -59,7 +61,21 @@ enriched_grid <- master_grid %>%
   left_join(country_corr, by = "iso3") %>%
   rename(country = nev_name)
 
-# --- 4. Overwrite Original File ---
+# --- 4. Validation ---
+message("Validating the enrichment...")
+unmatched_rows <- enriched_grid %>%
+  filter(is.na(country)) %>%
+  st_drop_geometry() %>%
+  distinct(iso3)
+
+if (nrow(unmatched_rows) > 0) {
+  warning("The following 'iso3' codes in the master grid did not have a matching country name and resulted in NA: ",
+          paste(unmatched_rows$iso3, collapse = ", "))
+} else {
+  message("All grid cells successfully matched to a country.")
+}
+
+# --- 5. Overwrite Original File ---
 message("Overwriting original master grid with enriched version...")
 st_write(enriched_grid, master_grid_path, delete_dsn = TRUE)
 
