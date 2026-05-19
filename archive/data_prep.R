@@ -1,8 +1,4 @@
 # data_prep.R
-library(terra)  # Raster data handling
-library(sf)     # Vector data handling
-library(dplyr)  # Data manipulation
-library(yaml)   # Configuration handling
 
 prepare_data <- function(config_path) {
   config <- yaml::read_yaml(config_path)

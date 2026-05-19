@@ -2,27 +2,24 @@
 #'
 #' Creates vertical bar plots of trimmed mean |absolute change| and |percent change|
 #' for each service, faceted in the order you supply via `svc_order`. X-axis bars can
-#' be sorted by magnitude within each facet. Optionally includes a “Global” bar.
+#' be sorted by magnitude within each facet. Optionally includes a "Global" bar.
 #'
 #' @param group_col Character scalar naming the grouping column (e.g., "region_wb").
 #' @param stub File name stub for PNGs.
-#' @param svc_order Character vector giving the facet order (only these are shown
-#'   by default; set `keep_only_ordered = FALSE` inside your function if you want extras).
-#' @param include_global Logical; include a “Global” bar in each facet.
-#' @param keep_only_ordered Logical; if TRUE (default in your function), hide services
+#' @param svc_order Character vector giving the facet order.
+#' @param metric Character scalar. One of `"pct"` or `"abs"`.
+#' @param include_global Logical; include a "Global" bar in each facet.
+#' @param svc_order_only Logical; if TRUE (default in your function), hide services
 #'   not in `svc_order`.
 #' @param sort_bars Logical; order x-bars within each facet by `sort_stat`.
-#' @param sort_stat One of `"abs_mean"` or `"pct_mean"`.
-#' @param sort_desc Logical; descending order if TRUE.
+#' @param cut_q Numeric; trim quantile for |change| (default `0.999`).
+#' @param out_dir Output directory for PNGs.
 #' @param save Logical; write PNGs.
 #' @param show Logical; print plots to device.
-#' @param out_dir Output directory for PNGs.
-#' @param file_tag Optional suffix for filenames (helps avoid overwrites).
-#' @param width,height,dpi PNG settings.
-#' @param pin_global Logical; if TRUE, place "Global" first on x-axis when present.
+#' @param title_prefix Optional prefix for the plot title.
 #'
 #' @return (invisibly) a list with `abs_plot`, `pct_plot`, and the `data` used.
-#' @export---------------------------------------------
+#' @export
 make_change_bars <- function(group_col,
                              stub,
                              svc_order,
