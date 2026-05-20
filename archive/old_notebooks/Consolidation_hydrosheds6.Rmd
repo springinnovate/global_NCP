@@ -1,0 +1,381 @@
+---
+title: "Current Status"
+output: html_notebook
+---
+
+
+```{r setup, message=FALSE, warning=FALSE}
+library(terra)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(glue)
+library(tidyr)
+library(purrr)
+library(diffeR)
+library(here)
+library(stringr)
+library(tidytext)
+library(rlang)
+library(tidyr)
+library(forcats)
+library(scales)
+library(RColorBrewer)
+library(htmltools)
+library(leaflet)
+library(devtools)
+load_all()
+#source the helper functions
+source(here("R", "hotSpotR.R"))
+source(here("R","utils_pct_change.R"))
+source(here("R", "utils_lcc_metrics.R"))
+source(here("R","utils_pct_change.R"))
+source(here("R", "perc_filteR.R"))
+```
+
+
+# 1. Clean and Organize Synthesis Data 
+
+
+Right now, 24/04/2025 the problem is on the way the dataframe with the class colors and names is built. The process is still too manual (writing the table) and is easy to get it wrong when it should not be big deal. Ideally, there should be a dialogue box to fill this instead. This should take care of the class names, values and colors neatl
+Also, the order of the factors needs to be set, and new classes have to be added. Again, i don't how to do it easily. I mean, it is easy, but annoying to do and easy to get wrong.
+
+
+Here, i need to clean the directory form a lot of old versions. Only the groupings. If pct not there, it is fine, that is easy to calculate now. 
+**Finally, synthesis data consolidated into a single dataset**
+
+```{r consolidate final outputs}
+
+#Builds a list of files in the vector directory
+inpath <- '/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector'
+sets <- file.path(inpath, list.files(inpath, pattern = "hydrosheds.*\\.gpkg$"))
+# Set and select an index to load the desired dastaset
+t <- 1
+set <- sets[t]
+
+print(lyr)
+test1 <- st_read(set) #I already procesed this, not necessary anymore. 
+
+lyr <- st_layers(sets[2])
+poly <- st_read(sets[2],layer= "hydrosheds_lv6_synth")
+
+# 1. Drop geometry from the one you're joining in
+test1 <-test1 %>% st_drop_geometry()
+
+# 2. Identify overlapping columns (besides ID or join key)
+overlap <- intersect(names(poly), names(test1))
+
+# Optionally drop duplicates (except for the join key, say "HYBAS_ID")
+join_key <- "HYBAS_ID"
+to_drop <- setdiff(overlap, join_key)
+
+
+# 3. Remove those overlapping columns from b_data
+test1 <- test1 %>% select(-all_of(to_drop))
+test1 <- test1 %>% mutate(HYBAS_ID = as.character(HYBAS_ID))
+
+
+poly<- left_join(poly, test1, by = join_key)
+poly<- left_join(poly2, test1, by = join_key)
+poly <- poly %>% rename(N_Ret_Ratio_pct_ch = N_Ret_Ratio)
+
+poly<- left_join(poly, test1, by = join_key)
+
+
+# Move columns 41–42 (Nitrogen export sqkm) after column 34
+# Move column 54 (area_sqkm_country) after column 40
+poly <- poly %>%
+  select(
+    1:16,53:59,17:52,62:65, geom)
+
+ st_write(poly, paste0(inpath, '/', 'hydrosheds_lv6_synth.gpkg'), append=FALSE)
+```
+
+# 2 Load Vector Data and pivot 
+
+Here, the spatial objects with the additional attributes are loaded and reformatted for analysis and chart preparation - **pivot & tidy**. 
+Add to the documentation , environment or however that's called the vectors to select and order the columns. 
+This should actually be done as a database structure. The columns live somewhere and are summoned upon need from a set of options (list_dir). 
+  
+```{r pivot, eval=FALSE, include=FALSE}
+# 
+#  get pct as standalone data to add to the table
+# Most recent version of synthesis data:
+ 
+ plt <- st_drop_geometry(poly)
+ 
+ # Edit/Adjust column names # not yet
+ names(plt) <- stringr::str_replace_all(names(plt), "_2020_1992", "")
+ # calculate POP Density
+
+ct <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_ES_TimeSeries/vector/cartographic_ee_ee_r264_correspondence.gpkg')
+
+ct <- ct %>% mutate(area_sqkm_country = as.numeric(st_area(geom)) / 10^6)
+ct <- st_drop_geometry(ct)
+ct <- ct[c(1,37)]
+plt <- left_join(plt, ct)
+#. Have a method to name versions or something (maybe?)
+write.csv(plt, file= here('output_data', "full_metrics_wide.csv")) # This maybe not be necessary anymore
+
+############# PIVOT TABLE ##############################
+
+plt <- st_drop_geometry(poly)
+ 
+ # Define the socioeconomic variables
+socio_vars <- c(
+  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",# this is also a problem!!!Will have to calculate again, but the sum. not the mean. 
+  "rast_gdpTot_1990_2020_30arcsec.7_mean",
+  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # this is a problem here!!!! Will have to calculate again, but the sum. not the mean. 
+  #"GlobPOP_Count_30arc_2020_I32.1_sum", we don't need this one anymore, already calc per sq km
+  "hdi_raster_predictions_2020.1_mean",
+  "farmsize_mehrabi.1_mean",
+  "GlobPOP_sqkm"
+)
+###### #### #### Attention, thos will be reviewd for per sq/km and check pollinayion and USLE, but 
+# Pivot all columns that contain pct_ch, keeping other relevant vars
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_ch"),
+    names_to = "service",
+    values_to = "pct_ch"
+  ) %>%
+  select(HYBAS_ID, service, pct_ch, all_of(socio_vars)) %>% 
+   mutate(service = str_replace(service, "_pct_ch.*", ""))
+  
+
+plt_long <- plt_long%>% filter(service != "Pop") %>% filter(service!= "n_export")
+# remove infinite values 
+plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)  
+
+  plt_long <- plt_long %>% mutate(service = case_when(
+   service == "sed_export" ~ "Sed_export",
+   service == "Sed_retention_ratio" ~ "Sed_Ret_Ratio",
+   service == "Usle" ~ "USLE",
+   TRUE ~ service
+   ))
+ # here, we only have 8 columns, are missing basin and country data, biome, etc etc. , but the services are complete. An intermediary output, that's why i did not export it yet!
+```
+
+
+# 3. Get Hotspots 
+
+Need to think on an effectve way to change the value (the share/quantile we want to extract and also filter by group!!!!)
+
+So, we need a long table format, then define the threshold the services with gains/losses and then (optional) set the filters by groups. Taht wouls be awesome 
+
+
+
+```{r get_hotspots}
+
+# 1. Identify hotspots by service. Here i will have to adjust, because in some cases the key hotspots are the gains, and in others are the losses. 
+
+
+# ---------------------------------------------------------
+# Identify Hotspots by Service Type (Losses and Damages)
+# ---------------------------------------------------------
+# Set cutoff
+pct_cutoff <- 0.05  # for top/bottom 5%
+
+
+# Define which services are considered "losses" vs "damages"
+loss_services <- c("Coastal_Protection", "Pollination", "N_Ret_Ratio", "Sed_Ret_Ratio")
+gain_services <- c("Sed_export", "N_export", "USLE")
+
+# STEP 1: Identify Top/Bottom % Hotspots Per Service
+df_hotspots <- plt_long %>%
+  group_by(service) %>%
+  mutate(
+    n_total = n(),
+    n_cut = ceiling(n_total * pct_cutoff),
+    rank_high = rank(-pct_ch, ties.method = "first"),
+    rank_low = rank(pct_ch, ties.method = "first"),
+    hotspot_flag = case_when(
+      rank_high <= n_cut ~ "high",
+      rank_low <= n_cut ~ "low",
+      TRUE ~ NA_character_
+    ),
+    hotspot_binary = !is.na(hotspot_flag)
+  ) %>%
+  ungroup()
+
+# STEP 2: Aggregate Hotspot Summary Per HYBAS_ID
+hotspot_summary <- df_hotspots %>%
+  filter(hotspot_binary) %>%
+  group_by(HYBAS_ID) %>%
+  summarise(
+    hotspot_count = n(),
+    hotspot_services = list(unique(service))
+  ) %>%
+  mutate(
+    hotspot_services = sapply(hotspot_services, \(x) paste(trimws(as.character(x)), collapse = ", "))
+  )
+
+# STEP 3: Add Hotspot Types and Negative-Impact Subset
+hotspot_summary <- hotspot_summary %>%
+  mutate(
+    # Extract list of services again for classification
+    hotspot_services_list = strsplit(hotspot_services, ",\\s*"),
+    # Classify each service as loss or damage
+    hotspot_types = lapply(hotspot_services_list, function(svcs) {
+      sapply(svcs, function(s) {
+        if (s %in% loss_services) "loss"
+        else if (s %in% gain_services) "damage"
+        else NA_character_
+      })
+    }),
+    hotspot_types = sapply(hotspot_types, function(x) paste(x[!is.na(x)], collapse = ", ")),
+    # Keep only "negative" services
+    hotspot_services_negative = sapply(hotspot_services_list, function(svcs) {
+      neg <- svcs[svcs %in% c(loss_services, gain_services)]
+      paste(neg, collapse = ", ")
+    })
+  ) %>%
+  select(-hotspot_services_list)  # Optional cleanup
+
+
+hotspot_1 <- left_join(poly, hotspot_summary)
+
+# remove unnecesary columns (original 92-2020 values, keep)
+spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
+# reorganize columns
+spring_ES <- spring_ES[c(1:19, 20, 22,21,25,34,23,24,26:33)]
+spring_ES$N_export_2020_sqkm <- NULL
+
+# ###############################################
+# # remove unnecesary columns (original 92-2020 values, keep)
+# spring_ES <- poly[c(1:18,22,36:40,45,46:54)]
+# # reorganize columns
+# spring_ES <- spring_ES[c(1:19, 20, 22,21,25,34,23,24,26:33)]
+# spring_ES$N_export_2020_sqkm <- NULL
+
+spring_ES <- left_join(spring_ES, hotspot_summary, by = "HYBAS_ID")
+hotspots_change <- spring_ES # rename (i could just clean this but too lazy)
+
+#hotspots_change <- left_join(hotspots_change,ct)
+names(hotspots_change) <- stringr::str_replace_all(names(hotspots_change), "_2020_1992", "")
+
+spring_ES <- left_join(spring_ES, hotspot_summary, by = "HYBAS_ID")
+hotspots_change <- spring_ES # rename (i could just clean this but too lazy)
+
+hotspots_change <- left_join(hotspots_change,ct)
+names(hotspots_change) <- stringr::str_replace_all(names(hotspots_change), "_2020_1992", "")
+# Export aoutputs (this also needs to be adjusted, it makes no sense to kee storing this inb two differnet places)
+st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
+st_write(hotspots_change, paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"), append=FALSE)
+
+
+# Define the services interested in
+services <- c("Sed_export", "USLE", "Sed_Ret_Ratio", "Coastal_Protection", 
+              "Pollination", "N_export", "N_Ret_Ratio")
+
+# Create binary columns from the hotspot_services_negative column
+for (s in services) {
+  hotspots_change[[s]] <- ifelse(grepl(s, hotspots_change$hotspot_services_negative), 1, 0)
+}
+
+
+# Export aoutputs (this also needs to be adjusted, it makes no sense to kee storing this inb two differnet places)
+st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), layer= "hotspots_1_pct", append = TRUE)
+st_write(hotspots_change, paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"), layer= "hotspots_1_pct", append = TRUE)
+
+# Drop Geometry 
+
+hotspots_change <- st_drop_geometry(hotspots_change)
+
+
+ # Define the socioeconomic variables
+socio_vars <- c(
+  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",# this is also a problem!!!Will have to calculate again, but the sum. not the mean. 
+  "rast_gdpTot_1990_2020_30arcsec.7_mean",
+  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # this is a problem here!!!! Will have to calculate again, but the sum. not the mean. 
+  #"GlobPOP_Count_30arc_2020_I32.1_sum", we don't need this one anymore, already calc per sq km
+  "hdi_raster_predictions_2020.1_mean",
+  "farmsize_mehrabi.1_mean",
+  "GlobPOP_sqkm")
+
+
+
+###### #### #### Attention, thos will be reviewd for per sq/km and check pollinayion and USLE, but 
+# Pivot all columns that contain pct_ch, keeping other relevant vars
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_ch"),
+    names_to = "service",
+    values_to = "pct_ch"
+  ) %>%
+  select(HYBAS_ID,SUB_AREA, id, ee_r264_name, iso3, gtapv7_r50_description, area_sqkm_country, continent, region_wb,fao_reg,income_grp, subregion, BIOME, ecoregion, service, dir_ch_2, pct_ch, all_of(socio_vars), hotspot_count,hotspot_services,hotspot_types, hotspot_services_negative) %>% 
+   mutate(service = str_replace(service, "_pct_ch.*", ""))
+  
+
+plt_long <- plt_long%>% filter(service != "Pop") %>% filter(service!= "n_export")
+# remove infinite values 
+
+# Remove unnecesary columns
+hot <- hotspots_change[c(1:19,35:37)]
+
+ # Define the socioeconomic variables
+socio_vars <- c(
+  "GHS_BUILT_S_E2020_GLOBE_R2023A_4326_3ss_V1_0_mean",# this is also a problem!!!Will have to calculate again, but the sum. not the mean. 
+  "rast_gdpTot_1990_2020_30arcsec.7_mean",
+  #"GHS_POP_E2020_GLOBE_R2023A_4326_3ss_V1_0.1_mean", # this is a problem here!!!! Will have to calculate again, but the sum. not the mean. 
+  #"GlobPOP_Count_30arc_2020_I32.1_sum", we don't need this one anymore, already calc per sq km
+  "hdi_raster_predictions_2020.1_mean",
+  "farmsize_mehrabi.1_mean",
+  "GlobPOP_sqkm")
+
+# Remove NAs and Inf values
+
+###### #### #### Attention, thos will be reviewd for per sq/km and check pollinayion and USLE, but 
+# Pivot all columns that contain pct_ch, keeping other relevant vars
+plt_long <- plt %>%
+  pivot_longer(
+    cols = matches("pct_ch"),
+    names_to = "service",
+    values_to = "pct_ch"
+  ) %>%
+  select(HYBAS_ID,SUB_AREA, id, ee_r264_name, iso3, gtapv7_r50_description, area_sqkm_country, continent, region_wb,fao_reg,income_grp, subregion, BIOME, ecoregion, service, dir_ch_2, pct_ch, all_of(socio_vars), hotspot_count,hotspot_services,hotspot_types, hotspot_services_negative) %>% 
+   mutate(service = str_replace(service, "_pct_ch.*", ""))
+  
+
+plt_long <- plt_long%>% filter(service != "Pop") %>% filter(service!= "n_export")
+# remove infinite values 
+plt_long <- plt_long%>% filter(!is.na(pct_ch)) %>% filter(pct_ch != Inf)  
+
+  plt_long <- plt_long %>% mutate(service = case_when(
+   service == "sed_export" ~ "Sed_export",
+   service == "Sed_retention_ratio" ~ "Sed_Ret_Ratio",
+   service == "Usle" ~ "USLE",
+   TRUE ~ service
+   ))
+
+
+# join hotspot data with the small plt_long data (8 columns). Th
+#plt_long <- left_join(hot, plt_long)
+
+# export final database long. 
+
+write.csv(plt_long, here("output_data", "hotspot_data_long.csv")) 
+```
+
+
+# 4. Join Country Data (improve Analysis)
+
+**I still have not been able to make sense of this shit. And it is really annoyingm anbd a huge waste of time. I absolutely need to transcend this.**
+```{r add country data, eval=FALSE, include=FALSE}
+# load the country data (to get income level and stuff)
+hotspots_change <- st_read(paste0(inpath, '/',"hydrosheds_lv_6_hotspots.gpkg"))
+
+
+# oad contries correpsondence data
+cart_corr <- st_read('/Users/rodriguez/Library/CloudStorage/OneDrive-WorldWildlifeFund,Inc/global_NCP/data/vector/cartographic_ee_ee_r264_correspondence.gpkg')
+# drop geometry
+cart_corr <- st_drop_geometry(cart_corr)
+# Drop unnecessary columns
+cart_corr <- cart_corr[c(1,21,25,27,30,31,35)]
+hotspots_change <- left_join(hotspots_change, cart_corr)
+#reorder columns to keep related togetert <- 
+hotspots_change <- hotspots_change[c(1:16,38:43,17,18,19:37)]
+st_write(hotspots_change, here('vector', "hydrosheds_lv_6_hotspots.gpkg"), append = FALSE)
+
+```
+

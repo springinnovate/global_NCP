@@ -1,0 +1,227 @@
+---
+title: "Legacy: Zonal Statistics (R)"
+subtitle: "Archived workflow using exactextractr"
+author: "Jeronimo Rodriguez-Escobar"
+date: "2025-02-12"
+status: "Archived / Superseded"
+format:
+  html:
+    toc: true
+    code-fold: true
+editor: source
+---
+
+::: callout-important
+## DEPRECATION NOTICE
+
+This workflow has been superseded by the Python-based `summary_pipeline_landgrid.py` which uses `taskgraph` and is optimized for batch processing.
+
+**Why was this replaced?**
+- R's `exactextractr` implementation was less efficient for the scale of this project.
+- Manual handling of file paths and raster names was error-prone.
+- The Python pipeline offers better parallelization and caching via `taskgraph`.
+
+This file is preserved for archival purposes to document the original R-based approach.
+:::
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = FALSE) # Disable execution globally
+
+# Load required libraries
+library(sf)             # For reading and working with vector data
+library(dplyr)          # For data manipulation
+library(terra)          # For reading raster data (SpatRasters)
+library(exactextractr)  # For zonal statistics
+library(ggplot2)        # For plotting
+library(forcats)        # For factor reordering
+library(tidytext)
+library(here)
+library(patchwork)
+library(tidyr)
+library(parallel)
+library(purrr)
+```
+
+## 1. Load Polygons
+
+```{r load polygons}
+# Replace with the actual path to your polygon file (e.g., a shapefile)
+poly <- st_read(here('vector', 'global_poly_means.gpkg'))
+# poly <- st_read(here('vector','poly_wb.geojson'))
+# poly <- st_read(here('vector','income_group.gpkg'))
+```
+
+## 2. Load a List of GeoTIFF Rasters
+
+Following products were assessed:
+
+```{r load raster es}
+# Vector of raster file paths
+inpath <- here('input_ES')
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+filename<- basename(tiffes)
+
+# Use terra::rast() to load each file as a SpatRaster object
+rasters_list <- lapply(tiffes, rast)
+
+# add the names of the services.
+service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each=2)
+filename<- as_tibble(cbind(service,filename))
+print(filename)
+```
+
+## 3. Compute Zonal Statistics
+
+Using `exactextractr` to compute mean and median.
+
+```{r compute stats 1}
+target_stats <- c("mean", "median")
+# this is the column in the vector file that we are going to use.
+cols <- 'id'
+
+# Number of CPU cores to use
+num.cores <- 4
+
+results_list <- lapply(rasters_list, function(r) {
+  # Perform exact extraction
+  res <- exact_extract(r, poly,
+                       fun = target_stats,
+                       append_cols = cols)
+  r_name <- names(r)
+  # Add a column labeling which raster these results are from
+  res$raster_name <- r_name
+  return(res)
+})
+
+# Combine results from all rasters into one data frame
+zonal_df <- do.call(rbind, results_list)
+
+raster_name <- unique(zonal_df$raster_name)
+service <- rep(c("Coastal Protection", "Nitrogen Export", "Sediment Export", "Nature Access", "Pollination"), each = 2)
+color <- rep(c("#9e9ac8", "#2c944c", "#08306b", "#A57C00", "#dd1c77"), each=2)
+cd <- as_tibble(cbind(raster_name, service, color))
+
+zonal_df <- left_join(zonal_df,cd)
+
+zonal_df$year <- ifelse(grepl("1992", zonal_df$raster_name),
+                          1992,
+                          ifelse(grepl("2020", zonal_df$raster_name), 2020, NA))
+
+# Join with polygon attributes
+poly_df <- st_drop_geometry(poly)
+zonal_df <- zonal_df %>% left_join(poly_df, by = cols)
+
+# save(zonal_df, file=here('output_data', 'zonal_df_global.RData'))
+# write.csv(zonal_df, here('output_data', 'zonal_df_global.csv'))
+```
+
+## 4. Compute Stats for Differences
+
+Logic for handling pre-calculated difference rasters.
+
+```{r compute stats diff}
+# set the path and load the rasters with the differences
+inpath <- here('input_ES', 'change_calc')
+
+# load the rasters with the calculated differences
+tiffes <- file.path(inpath, list.files(paste0(inpath),pattern= 'tif$'))
+filename<- basename(tiffes)
+
+# Use terra::rast() to load each file as a SpatRaster object
+rast_list <- lapply(tiffes, rast)
+service <- c("Coastal Protection", "Nature Access","Nitrogen Export","Pollination","Sediment Export")
+filename<- as_tibble(cbind(service,filename))
+print(filename)
+
+target_stats <- c("mean", "median")
+
+results_list <- lapply(rast_list, function(r) {
+  # Perform exact extraction
+  res <- exact_extract(r, poly,
+                       fun = target_stats,
+                       append_cols = "id")
+  r_name <- names(r)
+  res$raster_name <- r_name
+  return(res)
+})
+
+# Combine results from all rasters into one data frame
+zonal_df_diff <- do.call(rbind, results_list)
+
+# Adjust column so i can assemble the whole thing (yearly and difference values) in the same dataframe
+# (Assuming 'cd' exists from previous steps)
+cd <- cd %>% mutate(year='diff')
+zonal_df_diff <- left_join(zonal_df_diff, cd)
+
+zonal_wide <- pivot_wider(zonal_df_diff, id_cols=all_of(cols), names_from=c(service), values_from = mean)
+
+# adjust column names
+colnames(zonal_wide)[colnames(zonal_wide) != cols] <- paste0(colnames(zonal_wide)[colnames(zonal_wide) != cols], "_diff")
+
+poly <- left_join(poly, zonal_wide, by= "id")
+# st_write(poly, here('vector', 'global_poly_means.gpkg'), append = FALSE)
+```
+
+## 5. Visualization
+
+### Barplots
+
+```{r ggplot 2020}
+plot_ecosystem_services <- function(data, year, col) {
+  col_sym <- sym(col)
+
+  data_prepped <- data %>%
+    filter(!is.na(mean) & mean > 0 & year == !!year) %>%
+    mutate(temp_col = reorder_within(!!col_sym, -mean, service))
+
+  # ... (Logic for min/max and top/bottom 10) ...
+
+  p <- ggplot(data_prepped, aes(x = temp_col, y = mean, fill = color)) +
+    geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_identity() +
+    facet_wrap(~ service, scales = "free") +
+    scale_x_reordered() +
+    labs(
+      title = paste("Mean Ecosystem Service Values,", year),
+      x = col,
+      y = "Mean Value"
+    ) +
+    theme_bw() +
+    theme(
+      strip.text = element_text(face = "bold", size = 12),
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 10)
+    )
+
+  return(p)
+}
+
+# p_1992 <- plot_ecosystem_services(zonal_df, 1992, "region_wb")
+# print(p_1992)
+```
+
+### Maps
+
+```{r mapping f}
+map_data <- poly %>%
+  left_join(zonal_df, by = "id")
+
+services <- unique(map_data$service)
+
+for (s in services) {
+  df_1992 <- map_data %>% filter(service == s, year == 1992)
+
+  p_1992 <- ggplot(df_1992) +
+    geom_sf(aes(fill = mean), color = NA) +
+    scale_fill_gradientn(
+      colors   = c("white", "blue"),
+      na.value = "gray40"
+    ) +
+    labs(
+      title = paste0(s, " (1992)"),
+      fill  = "Mean"
+    ) +
+    theme_minimal()
+
+  # print(p_1992)
+}
+```

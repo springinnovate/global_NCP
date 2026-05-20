@@ -1,0 +1,82 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+Get Nitrogen Retention potential 
+```{r get modeled N retention potential} 
+# Set path to the directory. already everything there
+# Define varnames names and colors
+year <- c(1992,1995) 
+
+
+
+filename <- as_tibble(cbind(filename, year))
+
+# Set the target statistics to calculate
+target_stats <- c("sum", "mean", "stdev") # here, i am not sure if we need all these metrics for all cases. I have not yet used the stdev. sum is good to calcualte amounst / ha, mean for those for which it is not possible but have to think about a way to indicate this correctly to avoid unnecessary calculations.  
+num.cores <- length(rasters_list) # set as many cores as rasters to be evaluated.  
+# iterate over the input rasters 
+results_list <- mclapply(rasters_list, function(r) {
+  # Perform exact extraction
+  # - append_cols = "country" retains the country identifier with each result
+  res <- exact_extract(r, poly,
+                       fun = target_stats,
+                       append_cols = cols[t])
+  r_name <- names(r)
+  # Add a column labeling which raster these results are from
+  res$raster_name <- r_name
+  return(res)},mc.cores = num.cores)
+
+
+ results_list <- Map(function(df,y)  {
+  df$year <- y
+  return(df)
+}, results_list, year) 
+
+# Combine results from all rasters into one data frame
+zonal_df <- do.call(rbind, results_list)
+zonal_df <- zonal_df %>% mutate(service = "N_export")
+
+zonal_wide <- pivot_wider(zonal_df, id_cols=c(cols[t]), names_from=c(year, service), values_from = c(sum, mean, stdev))
+
+
+# here i am running out of ideas on how to name all these columns. Also there must be a smarter way to do this 
+# Calculate % change between consecutive years
+zonal_wide <- zonal_wide %>%
+  mutate(
+    pct_ch_1995_1992 = 100 * (mean_1995_n_ret - mean_1992_n_ret) / mean_1992_n_ret,
+    pct_ch_1998_1995 = 100 * (mean_1998_n_ret - mean_1995_n_ret) / mean_1995_n_ret,
+    pct_ch_2001_1998 = 100 * (mean_2001_n_ret - mean_1998_n_ret) / mean_1998_n_ret,
+    pct_ch_2004_2001 = 100 * (mean_2004_n_ret - mean_2001_n_ret) / mean_2001_n_ret
+  )
+
+
+# here i am running out of ideas on how to name all these columns
+# Calculate % change between consecutive years
+zonal_wide <- zonal_wide %>%
+  mutate(
+    pct_ch_1995_1992_n_export = 100 * (mean_1995_N_export - mean_1992_N_export) / mean_1992_N_export,
+    pct_ch_1998_1995_n_export = 100 * (mean_1998_N_export - mean_1995_N_export) / mean_1995_N_export,
+    pct_ch_2001_1998_n_export = 100 * (mean_2001_N_export - mean_1998_N_export) / mean_1998_N_export,
+    pct_ch_2004_2001_n_export = 100 * (mean_2004_N_export - mean_2001_N_export) / mean_2001_N_export
+  )
+
+
+poly <- poly[c(1:13)]
+poly <- left_join(poly,zonal_wide)
+
+
+# Find all 'sum' columns for N_export
+sum_cols <- names(poly)[str_detect(names(poly), "^sum_\\d{4}_N_export")]
+
+# Iterate through them and create new columns
+for (col in sum_cols) {
+  year <- str_extract(col, "\\d{4}")  # Extract the year
+  new_col <- paste0("N_export_ha_", year)  # Construct new column name
+  
+  poly[[new_col]] <- poly[[col]] / poly$SUB_AREA  # Divide by area (assumed in ha)
+}
+# I think this is great as gpkg because it exports the new thing as a layer. We should edit here to export as layer/ 
+st_write(poly, paste0(here('vector'),'/', "N_export_", set), append=TRUE)
+    
+```
