@@ -1,5 +1,15 @@
 # Worklog — Global NCP Hotspots (v1.3.3)
 
+### 2026-05-21
+*   **Dashboard Layout Debugging Saga:** Spent significant time debugging the layout of `analysis/eda_dashboard.qmd`.
+    *   **Initial Problem:** Plots were rendering too small to be readable in the dashboard format.
+    *   **Attempt 1:** Switched the document format from `html` (page) back to `dashboard` and enabled `scrollable: true` to allow tall plots to render at their full height.
+    *   **Attempt 2:** Implemented a side-by-side `columns` layout for the main plot sections to improve readability and use of space.
+    *   **Core Issue Identified:** An unclosed `div` block (caused by a missing `:::` to close a `columns` section) was making all subsequent dashboard tabs appear empty.
+    *   **Resolution & Final Layout:** Correctly structured the `columns` blocks for all sections, which fixed the empty tabs. After experimentation with side-by-side layouts (e.g., `width="50%"`), the decision was made to lock in a vertically stacked layout (`width="100%"` for all columns) within each major section. This provides a consistent, readable, top-to-bottom flow for all plots and tables in the dashboard. The layout is now considered stable.
+
+---
+
 ### 2026-05-17 (cont.)
 *   **Rasterization Workflow Template:** Created `scripts/gdal_rasterization_template.sh` to formalize and document the robust `gdal_rasterize`-based workflow. This template includes steps for GeoPackage reprojection and rasterization of both continuous and binary columns, ensuring easy reusability and preventing loss of this critical methodological knowledge.
 
