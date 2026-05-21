@@ -148,13 +148,14 @@ if (!file.exists(corr_path)) stop("Correspondence file not found!")
 corr_df <- sf::st_read(corr_path, quiet = TRUE) %>%
   sf::st_drop_geometry() %>%
   # Select all potential grouping variables from the correspondence file
-  dplyr::select(iso3, nev_name, region_wb, income_grp, continent, region_un, subregion)
+  # Use any_of to be robust to missing columns in the source file.
+  dplyr::select(any_of(c("iso3", "nev_name", "region_wb", "income_grp", "continent", "region_un", "subregion")))
 
 # Load Biome attributes separately, as they are in a different file
 biome_path <- file.path(data_dir(), "vector_basedata", "Biome.gpkg")
 if (!file.exists(biome_path)) stop("Biome file not found!")
 biome_sf <- sf::st_read(biome_path, quiet = TRUE) %>%
-  dplyr::select(WWF_biome) %>% # Select only the biome name and its geometry (sf objects preserve geometry by default)
+  dplyr::select(WWF_biome) %>%
   sf::st_make_valid()
 
 # Rebuild the master grid's attributes to ensure they are complete
@@ -167,9 +168,15 @@ if (sf::st_crs(master_grid) != sf::st_crs(biome_sf)) {
 }
 master_grid <- sf::st_join(master_grid, biome_sf, join = st_intersects, left = TRUE)
 
+# Define the full set of desired columns
+desired_cols <- c("fid", "iso3", "nev_name", "region_wb", "income_grp", 
+                  "continent", "region_un", "subregion", "WWF_biome", "geometry")
+
 # After all joins, select the desired stable keys and attributes, ensuring geometry is kept
+# Use any_of() to select only the columns that actually exist in the final object,
+# preventing errors if a column was missing from the source files.
 master_grid <- master_grid %>%
-  dplyr::select(fid, iso3, nev_name, region_wb, income_grp, continent, region_un, subregion, WWF_biome, geometry)
+  dplyr::select(any_of(desired_cols))
 
 message("Master grid attributes rebuilt successfully.")
 
