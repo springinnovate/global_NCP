@@ -5,14 +5,14 @@ author: "Jerónimo Rodríguez Escobar"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
 format:
-#  html:
-#    toc: true
-#    number-sections: true
-#   theme: cosmo
-  pdf:
+  html:
     toc: true
     number-sections: true
-    geometry: margin=1in
+    theme: cosmo
+#  pdf:
+#    toc: true
+#    number-sections: true
+#    geometry: margin=1in
 editor: source
 execute:
   eval: false
@@ -154,12 +154,11 @@ corr_df <- sf::st_read(corr_path, quiet = TRUE) %>%
 biome_path <- file.path(data_dir(), "vector_basedata", "Biome.gpkg")
 if (!file.exists(biome_path)) stop("Biome file not found!")
 biome_sf <- sf::st_read(biome_path, quiet = TRUE) %>%
-  dplyr::select(WWF_biome) %>%
+  dplyr::select(WWF_biome) %>% # Select only the biome name and its geometry (sf objects preserve geometry by default)
   sf::st_make_valid()
 
 # Rebuild the master grid's attributes to ensure they are complete
-master_grid <- master_grid %>%
-  dplyr::select(fid, iso3, geometry) %>% # Keep only stable keys and geometry
+master_grid <- master_grid %>% # Start with the master_grid (which has geometry)
   dplyr::left_join(corr_df, by = "iso3") # Re-join country/region attributes from source
 
 # Spatially join the biome information
@@ -167,6 +166,10 @@ if (sf::st_crs(master_grid) != sf::st_crs(biome_sf)) {
   biome_sf <- sf::st_transform(biome_sf, sf::st_crs(master_grid))
 }
 master_grid <- sf::st_join(master_grid, biome_sf, join = st_intersects, left = TRUE)
+
+# After all joins, select the desired stable keys and attributes, ensuring geometry is kept
+master_grid <- master_grid %>%
+  dplyr::select(fid, iso3, nev_name, region_wb, income_grp, continent, region_un, subregion, WWF_biome, geometry)
 
 message("Master grid attributes rebuilt successfully.")
 
