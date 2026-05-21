@@ -14,6 +14,8 @@ format:
     number-sections: true
     geometry: margin=1in
 editor: source
+execute:
+  eval: false
 ---
 
 ```{r setup, message=FALSE, warning=FALSE}
@@ -134,6 +136,39 @@ if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid 
 if (!"fid" %in% names(master_grid)) master_grid$fid <- seq_len(nrow(master_grid))
 
 master_grid <- sf::st_make_valid(master_grid)
+
+# --- Robust Attribute Assembly ---
+# To prevent data loss from intermediate file states (e.g., missing biomes after
+# country enrichment), we explicitly re-join all key attributes from their
+# original source file, rather than trusting the master_grid file alone.
+message("Assembling attributes from original sources for robustness...")
+corr_path <- file.path(data_dir(), "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
+if (!file.exists(corr_path)) stop("Correspondence file not found!")
+
+corr_df <- sf::st_read(corr_path, quiet = TRUE) %>%
+  sf::st_drop_geometry() %>%
+  # Select all potential grouping variables from the correspondence file
+  dplyr::select(iso3, nev_name, region_wb, income_grp, continent, region_un, subregion)
+
+# Load Biome attributes separately, as they are in a different file
+biome_path <- file.path(data_dir(), "vector_basedata", "Biome.gpkg")
+if (!file.exists(biome_path)) stop("Biome file not found!")
+biome_sf <- sf::st_read(biome_path, quiet = TRUE) %>%
+  dplyr::select(WWF_biome) %>%
+  sf::st_make_valid()
+
+# Rebuild the master grid's attributes to ensure they are complete
+master_grid <- master_grid %>%
+  dplyr::select(fid, iso3, geometry) %>% # Keep only stable keys and geometry
+  dplyr::left_join(corr_df, by = "iso3") # Re-join country/region attributes from source
+
+# Spatially join the biome information
+if (sf::st_crs(master_grid) != sf::st_crs(biome_sf)) {
+  biome_sf <- sf::st_transform(biome_sf, sf::st_crs(master_grid))
+}
+master_grid <- sf::st_join(master_grid, biome_sf, join = st_intersects, left = TRUE)
+
+message("Master grid attributes rebuilt successfully.")
 
 # Normalize grouping column names to canonical forms (handle casing issues)
 expected_attrs <- c(

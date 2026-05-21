@@ -1,0 +1,347 @@
+---
+title: "Global NCP Hotspots: Interactive EDA"
+author: "Jerónimo Rodríguez Escobar"
+format: 
+  html:
+    theme: flatly
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+    page-layout: full
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(here)
+library(readr)
+library(scales)
+library(tidytext)
+
+has_dt <- requireNamespace("DT", quietly = TRUE)
+if(has_dt) library(DT)
+
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R", "paths.R"))
+
+# Safely load the CSVs
+load_csv <- function(filename) {
+  path <- file.path(data_dir(), "processed", "tables", filename)
+  if (file.exists(path)) {
+    read_csv(path, show_col_types = FALSE)
+  } else {
+    tibble::tibble(service = character(), message = "Data not found")
+  }
+}
+
+area_stats         <- load_csv("hotspot_area_stats.csv")
+multiservice_stats <- load_csv("hotspot_multiservice_stats.csv")
+pop_exposure       <- load_csv("hotspot_pop_exposure.csv")
+lcc_stats          <- load_csv("lcc_es_hotspot_overlap_pct.csv")
+ks_res             <- load_csv("ks_results_hot_vs_non.csv")
+
+# Ensure ordering for HDI and Income
+hdi_levels <- c("Low (<0.550)", "Medium (0.550-0.700)", "High (0.700-0.800)", "Very High (>0.800)", "Unknown")
+inc_levels <- c("Low income", "Lower middle income", "Upper middle income", "High income")
+
+if(nrow(pop_exposure) > 0 && "hdi_bin" %in% names(pop_exposure)) {
+  pop_exposure <- pop_exposure %>%
+    mutate(hdi_bin = factor(hdi_bin, levels = hdi_levels))
+}
+
+# Biome Short Names
+biome_labels <- c(
+  'Tropical & Subtropical Moist Broadleaf Forests' = 'Trop/Subtrop Moist Broadleaf',
+  'Tropical & Subtropical Dry Broadleaf Forests' = 'Trop/Subtrop Dry Broadleaf',
+  'Tropical & Subtropical Coniferous Forests' = 'Trop/Subtrop Coniferous',
+  'Temperate Broadleaf & Mixed Forests' = 'Temp Broadleaf/Mixed',
+  'Temperate Coniferous Forests' = 'Temp Coniferous',
+  'Boreal Forests/Taiga' = 'Boreal/Taiga',
+  'Tropical & Subtropical Grasslands, Savannas & Shrublands' = 'Trop/Subtrop Grass/Sav/Shrub',
+  'Temperate Grasslands, Savannas & Shrublands' = 'Temp Grass/Sav/Shrub',
+  'Flooded Grasslands & Savannas' = 'Flooded Grass/Savannas',
+  'Montane Grasslands & Shrublands' = 'Montane Grass/Shrub',
+  'Tundra' = 'Tundra',
+  'Mediterranean Forests, Woodlands & Scrub' = 'Mediterranean',
+  'Deserts & Xeric Shrublands' = 'Deserts & Xeric Shrub',
+  'Mangroves' = 'Mangroves'
+)
+
+# Plot Helper Functions
+make_intensity_plot <- function(df, grp_var) {
+  if(nrow(df) == 0) return(ggplot() + theme_void() + ggtitle("No data"))
+  d <- df %>% filter(grouping_var == grp_var) %>% filter(!is.na(group))
+  if(nrow(d) == 0) return(ggplot() + theme_void() + ggtitle("No data for this grouping"))
+  
+  if (grp_var == "WWF_biome") {
+    d <- d %>% mutate(group = ifelse(group %in% names(biome_labels), biome_labels[group], group))
+  }
+  
+  # --- TEMPORARY DEBUGGING STEP ---
+  if (grp_var == "WWF_biome") {
+    message("Unique biomes found in data for intensity plot:")
+    print(sort(unique(d$group)))
+  }
+  # ------------------------------
+
+  # Set factor levels for consistent alphabetical ordering across all facets.
+  # `rev(sort(...))` ensures 'A' is at the top of the plot.
+  all_groups <- sort(unique(d$group))
+  d <- d %>% mutate(group = factor(group, levels = rev(all_groups)))
+  
+  ggplot(d, aes(x = relative_intensity, y = group, fill = relative_intensity > 1)) +
+    geom_col() +
+    geom_vline(xintercept = 1, linetype = "dashed", color = "black") +
+    scale_fill_manual(values = c("TRUE" = "#E83737", "FALSE" = "gray70")) +
+    facet_wrap(~service, scales = "free_x", ncol = 2) +
+    labs(x = "Relative Intensity Score (Share of Hotspots / Share of Area)", y = NULL) +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "none", panel.grid.minor.y = element_blank())
+}
+
+make_multi_plot <- function(df, grp_var) {
+  if(nrow(df) == 0) return(ggplot() + theme_void() + ggtitle("No data"))
+  d <- df %>% filter(grouping == grp_var) %>% filter(!is.na(group))
+  if(nrow(d) == 0) return(ggplot() + theme_void() + ggtitle("No data for this grouping"))
+  
+  if (grp_var == "WWF_biome") {
+    d <- d %>% mutate(group = ifelse(group %in% names(biome_labels), biome_labels[group], group))
+  }
+  
+  # Strictly alphabetical
+  d <- d %>% mutate(group = factor(group, levels = rev(sort(unique(as.character(group))))))
+  
+  ggplot(d, aes(x = mean_hotspots, y = group, fill = mean_hotspots)) +
+    geom_col() +
+    scale_fill_distiller(palette = "Reds", direction = 1) +
+    labs(x = "Average Number of Overlapping Hotspots per 10km Cell", y = NULL) +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "none", panel.grid.minor.y = element_blank())
+}
+
+make_country_intensity_plot <- function(df) {
+  d <- df %>% filter(grouping_var == "country") %>% filter(!is.na(group))
+  if(nrow(d) == 0) return(ggplot() + theme_void() + ggtitle("No data"))
+  
+  # Order descending by intensity within each facet
+  d <- d %>% mutate(group_ordered = tidytext::reorder_within(group, relative_intensity, service))
+  
+  ggplot(d, aes(x = relative_intensity, y = group_ordered, fill = relative_intensity > 1)) +
+    geom_col() +
+    geom_vline(xintercept = 1, linetype = "dashed", color = "black") +
+    scale_fill_manual(values = c("TRUE" = "#E83737", "FALSE" = "gray70")) +
+    facet_wrap(~service, scales = "free_y", ncol = 2) +
+    tidytext::scale_y_reordered() +
+    labs(x = "Relative Intensity Score", y = NULL) +
+    theme_minimal() +
+    theme(legend.position = "none", axis.text.y = element_text(size = 7), panel.grid.minor.y = element_blank())
+}
+
+make_country_multi_plot <- function(df) {
+  d <- df %>% filter(grouping == "country") %>% filter(!is.na(group))
+  if(nrow(d) == 0) return(ggplot() + theme_void() + ggtitle("No data"))
+  
+  # Order strictly descending by value
+  d <- d %>% arrange(mean_hotspots) %>% mutate(group = factor(group, levels = unique(group)))
+  
+  ggplot(d, aes(x = mean_hotspots, y = group, fill = mean_hotspots)) +
+    geom_col() +
+    scale_fill_distiller(palette = "Reds", direction = 1) +
+    labs(x = "Average Number of Overlapping Hotspots", y = NULL) +
+    theme_minimal() +
+    theme(legend.position = "none", axis.text.y = element_text(size = 7), panel.grid.minor.y = element_blank())
+}
+```
+
+# 🌍 Hotspot Intensity (WHERE)
+
+### Disproportionate Burden (Relative Intensity) 
+
+::: {.panel-tabset}
+
+#### Region (WB)
+```{r}
+#| fig-height: 8
+#| fig-width: 12
+make_intensity_plot(area_stats, "region_wb")
+```
+
+#### Income Group
+```{r}
+#| fig-height: 8
+#| fig-width: 12
+make_intensity_plot(area_stats, "income_grp")
+```
+
+#### Biome
+```{r}
+#| fig-height: 16
+#| fig-width: 12
+make_intensity_plot(area_stats, "WWF_biome")
+```
+
+:::
+
+### Compound Risk: Multi-service Overlap
+
+::: {.panel-tabset}
+
+#### Region (WB)
+```{r}
+#| fig-height: 6
+#| fig-width: 10
+make_multi_plot(multiservice_stats, "region_wb")
+```
+
+#### Income Group
+```{r}
+#| fig-height: 6
+#| fig-width: 10
+make_multi_plot(multiservice_stats, "income_grp")
+```
+
+#### Biome
+```{r}
+#| fig-height: 8
+#| fig-width: 10
+make_multi_plot(multiservice_stats, "WWF_biome")
+```
+
+:::
+
+# 🗺️ Country Profiles (All)
+
+### Disproportionate Burden (All Countries)
+```{r}
+#| fig-height: 90
+#| fig-width: 14
+make_country_intensity_plot(area_stats)
+```
+
+### Compound Risk (All Countries)
+```{r}
+#| fig-height: 45
+#| fig-width: 10
+make_country_multi_plot(multiservice_stats)
+```
+
+# 👥 Population Exposure (WHO)
+
+### Absolute Population Exposure by Income Group
+```{r}
+#| fig-height: 10
+#| fig-width: 10
+if(nrow(pop_exposure) > 0 && "income_grp" %in% names(pop_exposure)) {
+  pop_inc <- pop_exposure %>%
+    filter(!is.na(income_grp)) %>%
+    group_by(service, income_grp) %>%
+    summarise(exposed_population = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
+    mutate(
+      income_grp_label = stringr::str_remove(income_grp, "^\\d+\\.?\\s*"),
+      income_grp_label = factor(income_grp_label, levels = inc_levels)
+    )
+  
+  ggplot(pop_inc, aes(x = income_grp_label, y = exposed_population, fill = income_grp_label)) +
+    geom_col() +
+    facet_wrap(~ service, scales = "free_y", ncol = 2) +
+    scale_y_continuous(labels = label_number(scale = 1e-6, suffix = "M")) +
+    scale_fill_brewer(palette = "RdYlBu", direction = -1) +
+    labs(x = NULL, y = "Total Exposed Population") +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+} else {
+  "Data not available."
+}
+```
+
+### Absolute Population Exposure by HDI Bin
+```{r}
+#| fig-height: 10
+#| fig-width: 10
+if(nrow(pop_exposure) > 0 && "hdi_bin" %in% names(pop_exposure)) {
+  pop_hdi <- pop_exposure %>%
+    filter(!is.na(hdi_bin)) %>%
+    group_by(service, hdi_bin) %>%
+    summarise(exposed_population = sum(exposed_population, na.rm = TRUE), .groups = "drop")
+  
+  ggplot(pop_hdi, aes(x = hdi_bin, y = exposed_population, fill = hdi_bin)) +
+    geom_col() +
+    facet_wrap(~ service, scales = "free_y", ncol = 2) +
+    scale_y_continuous(labels = label_number(scale = 1e-6, suffix = "M")) +
+    scale_fill_brewer(palette = "YlOrRd", direction = 1) +
+    labs(x = NULL, y = "Total Exposed Population") +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+} else {
+  "Data not available."
+}
+```
+
+# 📊 Socioeconomic Drivers (KS Tests)
+
+### Directionality (Cliff's Delta)
+```{r}
+#| fig-height: 12
+#| fig-width: 8
+if(nrow(ks_res) > 0 && "cliffs_delta" %in% names(ks_res)) {
+  ks_res %>%
+    mutate(var_clean = gsub("_", " ", var)) %>%
+    ggplot(aes(x = service, y = cliffs_delta, fill = cliffs_delta)) +
+    geom_col() +
+    scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+    facet_wrap(~var_clean, scales = "free_y", ncol = 1) +
+    coord_flip() +
+    labs(x = NULL, y = "Cliff's Delta (Red = Hotspots have higher values)") +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "none")
+} else {
+  "Data not available."
+}
+```
+
+### Statistical Results Table
+```{r}
+if(nrow(ks_res) > 0) {
+  ks_display <- ks_res %>%
+    select(Service = service, Variable = var, `KS Stat (D)` = D, `Cliff's Delta` = cliffs_delta, `P-Value` = p_adj) %>%
+    mutate(across(is.numeric, ~round(., 4))) %>%
+    arrange(desc(abs(`Cliff's Delta`)))
+    
+  if(has_dt) {
+    datatable(ks_display, options = list(pageLength = 20, searchHighlight = TRUE, scrollX = TRUE), filter = "top")
+  } else {
+    knitr::kable(ks_display)
+  }
+} else {
+  "Data not available."
+}
+```
+
+# 🌲 LCC Attribution (WHY)
+
+### The Attribution Gap: Drivers of Ecosystem Service Decline
+```{r}
+#| fig-height: 12
+#| fig-width: 14
+if(nrow(lcc_stats) > 0) {
+  lcc_plot_data <- lcc_stats %>%
+    rename_with(~"overlap_pct", any_of(c("pct_overlap", "percent", "value", "pct_hotspot_in_lcc"))) %>%
+    rename_with(~"Attribution", any_of(c("attribution", "Driver", "driver", "Category"))) %>%
+    filter(Attribution != "Change Occuring Off-Pixel")
+    
+  ggplot(lcc_plot_data, aes(x = overlap_pct, y = reorder(Attribution, overlap_pct), fill = Attribution)) +
+    geom_col() +
+    facet_wrap(~ service, ncol = 3) +
+    scale_x_continuous(labels = percent_format()) +
+    labs(x = "% of Hotspot Area Overlapping with Driver", y = NULL) +
+    theme_minimal(base_size = 14) +
+    theme(legend.position = "none")
+} else {
+  "Data not available."
+}
+```
