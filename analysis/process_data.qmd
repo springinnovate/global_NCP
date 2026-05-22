@@ -129,56 +129,13 @@ master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_43
 if (!file.exists(master_path)) stop("Master grid not found!")
 master_grid <- sf::st_read(master_path, quiet = TRUE)
 
-# Safely resolve canonical ID, avoiding seq_len() which causes spatial shifts
-if ("orig_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = orig_fid)
-if ("grid_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = grid_fid)
-if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = id)
-if (!"fid" %in% names(master_grid)) master_grid$fid <- seq_len(nrow(master_grid))
-
-master_grid <- sf::st_make_valid(master_grid)
-
-# --- Robust Attribute Assembly ---
-# To prevent data loss from intermediate file states (e.g., missing biomes after
-# country enrichment), we explicitly re-join all key attributes from their
-# original source file, rather than trusting the master_grid file alone.
-message("Assembling attributes from original sources for robustness...")
-corr_path <- file.path(data_dir(), "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
-if (!file.exists(corr_path)) stop("Correspondence file not found!")
-
-corr_df <- sf::st_read(corr_path, quiet = TRUE) %>%
-  sf::st_drop_geometry() %>%
-  # Select all potential grouping variables from the correspondence file
-  # Use any_of to be robust to missing columns in the source file.
-  dplyr::select(any_of(c("iso3", "nev_name", "region_wb", "income_grp", "continent", "region_un", "subregion")))
-
-# Load Biome attributes separately, as they are in a different file
-biome_path <- file.path(data_dir(), "vector_basedata", "Biome.gpkg")
-if (!file.exists(biome_path)) stop("Biome file not found!")
-biome_sf <- sf::st_read(biome_path, quiet = TRUE) %>%
-  dplyr::select(WWF_biome) %>%
-  sf::st_make_valid()
-
-# Rebuild the master grid's attributes to ensure they are complete
-master_grid <- master_grid %>% # Start with the master_grid (which has geometry)
-  dplyr::left_join(corr_df, by = "iso3") # Re-join country/region attributes from source
-
-# Spatially join the biome information
-if (sf::st_crs(master_grid) != sf::st_crs(biome_sf)) {
-  biome_sf <- sf::st_transform(biome_sf, sf::st_crs(master_grid))
+message("Loading master grid. Attributes are assumed to be pre-joined and clean.")
+if ("ID" %in% names(master_grid) && !"fid" %in% names(master_grid)) {
+  master_grid <- dplyr::rename(master_grid, fid = ID)
 }
-master_grid <- sf::st_join(master_grid, biome_sf, join = st_intersects, left = TRUE)
-
-# Define the full set of desired columns
-desired_cols <- c("fid", "iso3", "nev_name", "region_wb", "income_grp", 
-                  "continent", "region_un", "subregion", "WWF_biome", "geometry")
-
-# After all joins, select the desired stable keys and attributes, ensuring geometry is kept
-# Use any_of() to select only the columns that actually exist in the final object,
-# preventing errors if a column was missing from the source files.
-master_grid <- master_grid %>%
-  dplyr::select(any_of(desired_cols))
-
-message("Master grid attributes rebuilt successfully.")
+if (!"fid" %in% names(master_grid)) {
+  stop("Master grid is missing the 'fid' column.")
+}
 
 # Normalize grouping column names to canonical forms (handle casing issues)
 expected_attrs <- c(

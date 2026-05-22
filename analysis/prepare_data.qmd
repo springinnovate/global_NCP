@@ -137,37 +137,62 @@ Area of Occupancy (AOO) 10×10 km equal-area grid and subset it to land
 by intersecting with the correspondence polygons. We keep the full grid
 cells that touch land (no clipping) and append attributes used for
 subregional aggregation (country/continent/region/biome).
+```
 
-```{r prep-grid-aoo-land, eval=FALSE}
+```{r prep-grid-aoo-land, eval=TRUE, echo=TRUE}
+#| label: prep-grid-aoo-land
+#| eval: true
+#| echo: true
+# This chunk creates the canonical, analysis-ready 10km grid. It performs
+# several critical steps:
+# 1. Filters the global AOO grid to only land-intersecting cells.
+# 2. Spatially joins all necessary attributes (country, region, biome) from their source files.
+# 3. Fixes the dateline wraparound artifact to ensure global maps render correctly.
+# 4. Reprojects the final grid to EPSG:4326 for compatibility with raster extraction tools.
+#
+# Run this chunk only if you need to regenerate the base grid from scratch.
+
 library(sf)
 library(dplyr)
 
-grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"))
-land_polys <- st_read(
-  data_vectors("cartographic_ee_ee_r264_correspondence.gpkg"),
-  layer = "ee_r264_correspondence"
-)
+message("Loading raw data sources...")
+grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"), quiet = TRUE)
 
-if (st_crs(grid_raw) != st_crs(land_polys)) {
-  land_polys <- st_transform(land_polys, st_crs(grid_raw))
-}
+corr_path <- file.path(data_dir(), "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
+land_polys <- st_read(corr_path, quiet = TRUE)
 
-# Keep grid cells that intersect any land polygon
-grid_land <- st_filter(grid_raw, land_polys, .predicate = st_intersects)
+biome_path <- file.path(data_dir(), "vector_basedata", "Biome.gpkg")
+biome_sf <- st_read(biome_path, quiet = TRUE)
 
-# Define grouping variables
-GROUPING_VARS <- c("nev_name", "region_wb", "income_grp", "WWF_biome")
+message("Filtering grid to land areas...")
+grid_land <- st_filter(grid_raw, st_transform(land_polys, st_crs(grid_raw)), .predicate = st_intersects)
 
-# Attach attributes for aggregation (spatial join or fid-based join)
-land_attrs <- land_polys |>
-  dplyr::select(all_of(GROUPING_VARS))
-grid_land <- st_join(grid_land, land_attrs, join = st_intersects, left = TRUE)
+message("Attaching attributes via spatial join...")
+# Use point-on-surface for a robust join that avoids duplicating grid cells that touch multiple polygons
+grid_pts <- st_point_on_surface(grid_land)
 
-st_write(
-  grid_land,
-  data_vectors("AOOGrid_10x10km_land.gpkg"),
-  delete_layer = TRUE
-)
+grid_attrs <- grid_pts %>%
+  st_join(st_transform(land_polys, st_crs(grid_pts)) %>% select(iso3, nev_name, region_wb, income_grp, continent, region_un, subregion)) %>%
+  st_join(st_transform(biome_sf, st_crs(grid_pts)) %>% select(WWF_biome)) %>%
+  st_drop_geometry() %>%
+  select(fid = ID, iso3, nev_name, region_wb, income_grp, continent, region_un, subregion, WWF_biome) %>%
+  distinct(fid, .keep_all = TRUE) # Ensure one row per grid cell
+
+grid_land_attrs <- grid_land %>%
+  select(fid = ID) %>%
+  left_join(grid_attrs, by = "fid")
+
+message("Fixing dateline wraparound artifact...")
+grid_clean <- st_wrap_dateline(grid_land_attrs, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
+
+message("Reprojecting to EPSG:4326 for final output...")
+grid_4326 <- st_transform(grid_clean, "EPSG:4326")
+
+out_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
+message("Writing final clean grid to: ", out_path)
+st_write(grid_4326, out_path, delete_dsn = TRUE)
+
+message("Base grid preparation complete.")
 ```
 
 ```{python}
