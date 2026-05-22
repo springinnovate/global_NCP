@@ -1,5 +1,20 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-05-22
+*   **Major Data Pipeline Overhaul & Rerun:**
+    *   **Root Cause Identified:** The critical `orig_fid not found` error in `process_data.qmd` was traced back to a stale base grid file (`AOOGrid_10x10km_land_4326_clean.gpkg`). This old grid was missing key attributes (like country names) and contained geometric artifacts (dateline wraparound), which were causing cascading failures in the Python pipeline.
+    *   **Robust Solution Implemented:**
+        1.  The `prepare_data.qmd` script was updated with a new, authoritative chunk (`prep-grid-aoo-land`) to generate a clean master grid from the original sources. This new grid correctly joins all attributes and fixes the dateline artifact.
+        2.  The `process_data.qmd` script was simplified by removing the redundant and error-prone "Robust Attribute Assembly" logic, as the pipeline can now trust its clean input.
+    *   **Full Data Regeneration Initiated:** A full rerun of the data pipeline has been started on the `lilling` server. This involves:
+        1.  Running `prepare_data.qmd` to create the new master grid (a long process, ~1.5 hours).
+        2.  Running the upstream Python pipeline (`summary_pipeline_landgrid.py`) for both services and beneficiaries using the new clean grid.
+        3.  Running `process_data.qmd` to generate the final analysis-ready datasets.
+    *   **YAML Fix:** Corrected a `YAMLException` in `chapters/01-problem.qmd` caused by improper indentation in the YAML header.
+*   **Next Steps:** While the data regeneration runs, the focus will shift to refining the narrative, language, and presentation of the final Quarto book. A transfer prompt has been created to start a new chat session for this purpose.
+
+---
+
 ### 2026-05-21
 *   **Dashboard Layout Debugging Saga:** Spent significant time debugging the layout of `analysis/eda_dashboard.qmd`.
     *   **Initial Problem:** Plots were rendering too small to be readable in the dashboard format.
