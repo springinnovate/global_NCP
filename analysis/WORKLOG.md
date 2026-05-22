@@ -1,4 +1,4 @@
-# Worklog — Global NCP Hotspots (v1.3.3)
+# Worklog — Global NCP Hotspots (v1.3.4)
 
 ### 2026-05-21
 *   **Dashboard Layout Debugging Saga:** Spent significant time debugging the layout of `analysis/eda_dashboard.qmd`.

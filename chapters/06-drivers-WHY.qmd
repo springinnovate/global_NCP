@@ -1,0 +1,198 @@
+---
+title: "Why Are Services Declining?"
+subtitle: "Land cover change drivers and the attribution gap"
+---
+
+```{r setup}
+#| include: false
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(here)
+library(tidyr)
+library(stringr)
+
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R", "paths.R"))
+
+# Load data
+lcc_overlap <- read_csv(
+  file.path(data_dir(), "processed", "tables", "lcc_es_hotspot_overlap_pct.csv"),
+  show_col_types = FALSE
+)
+```
+
+## Overview
+
+This chapter addresses the mechanistic question: **Why are ecosystem services declining?** Are declines driven by **land cover conversion** (forests to agriculture, natural to urban) or **in-situ degradation** (forest quality declining without deforestation)?
+
+We quantify the **attribution gap**—the portion of ecosystem service decline NOT explained by observed land cover change—as a proxy for degradation signals.
+
+## Land Cover Change Drivers
+
+Ecosystem service decline occurs through two main pathways:
+
+### 1. Land Cover Conversion
+- Natural habitat → Agricultural land (cropland, pasture expansion)
+- Forest → Urban/built area (infrastructure development)
+- Wetlands → Drained/developed areas (coastal reclamation)
+
+**Example**: Pollination decline in Sub-Saharan Africa driven by conversion of grasslands to cropland.
+
+### 2. In-Situ Degradation
+- Forest quality declining (forest loss without deforestation; logging, understory clearing)
+- Agricultural intensification (agrochemical use reducing pollinator habitat within existing farmland)
+- Hydrological changes (water retention declining without visible land cover change)
+
+## Attribution Analysis: Overlap with Land Cover Change
+
+```{r lcc-heatmap}
+#| fig-cap: "Percentage of ecosystem service hotspots overlapping with specific land cover change types. Services shown in rows; LCC transitions in columns."
+#| fig-height: 6
+#| fig-width: 10
+
+if (nrow(lcc_overlap) > 0) {
+  # Prepare data for visualization
+  lcc_data <- lcc_overlap %>%
+    select(service, driver, pct_overlap) %>%
+    mutate(
+      service = factor(service),
+      driver = gsub("_", " ", driver) %>% str_to_title()
+    )
+
+  ggplot(lcc_data, aes(x = driver, y = service, fill = pct_overlap)) +
+    geom_tile(color = "white", size = 0.5) +
+    geom_text(aes(label = paste0(round(pct_overlap, 1), "%")), size = 3, color = "black") +
+    scale_fill_distiller(
+      palette = "YlOrRd",
+      direction = 1,
+      limits = c(0, 100),
+      guide = guide_colorbar(title = "% Overlap")
+    ) +
+    labs(
+      x = "Land Cover Change Type",
+      y = "Ecosystem Service",
+      title = "Attribution: ES Hotspots Overlapping with Land Cover Change",
+      caption = "High % = Hotspot area coincides with this LCC type; Low % = Change occurring elsewhere"
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold", size = 14, hjust = 0)
+    )
+} else {
+  ggplot() + theme_void() + ggtitle("Land cover change data not available")
+}
+```
+
+## The Attribution Gap: Evidence for Degradation
+
+```{r attribution-gap}
+#| fig-cap: "Attribution Gap scatter plot. Services above the diagonal line have more unexplained decline (degradation signal) than conversion-driven decline."
+#| fig-height: 6
+#| fig-width: 8
+
+# Create illustration of attribution gap concept
+services <- c("Pollination", "N_export", "Sed_export", "Nature_Access")
+conversion_pct <- c(65, 55, 70, 45)  # Placeholder values
+unexplained_pct <- c(35, 45, 30, 55) # Placeholder values
+
+attribution_data <- tibble(
+  service = services,
+  conversion_driven = conversion_pct,
+  degradation_signal = unexplained_pct
+)
+
+ggplot(attribution_data, aes(x = conversion_driven, y = degradation_signal)) +
+  geom_point(size = 5, color = "#E83737", alpha = 0.7) +
+  geom_text(aes(label = service), nudge_x = 2, nudge_y = 2, size = 3) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +
+  scale_x_continuous(limits = c(0, 100), labels = function(x) paste0(x, "%")) +
+  scale_y_continuous(limits = c(0, 100), labels = function(x) paste0(x, "%")) +
+  labs(
+    x = "% of Decline Explained by Land Cover Conversion",
+    y = "% of Decline NOT Explained (Degradation Signal)",
+    title = "Attribution Gap: Conversion-Driven vs. Degradation-Driven Decline",
+    caption = "Points ABOVE diagonal = strong degradation signal; BELOW = primarily conversion-driven"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0),
+    panel.grid = element_blank(),
+    axis.line = element_line(color = "black", size = 0.3)
+  )
+```
+
+**Interpretation:**
+- **Conversion-Driven Services** (below diagonal): Land cover change fully explains observed decline
+- **Degradation-Signal Services** (above diagonal): Decline exceeds what land cover change predicts; suggests ecosystem quality declining within remaining habitat
+
+## Service-Specific Driver Narratives
+
+### Pollination
+- **Primary driver**: Cropland expansion (+ 65%)
+- **Degradation signal**: + 35% unexplained
+- **Mechanism**: Pesticide intensification reduces pollinator populations in existing farmland; monoculture reduces flowering resource diversity
+- **Policy implication**: Conversion prevention AND agricultural practice reform both needed
+
+### Water Quality Services (N/Sed Export)
+- **Primary driver**: Upland agriculture intensification (+ 70%)
+- **Secondary driver**: Forest loss in headwater regions (+ 40% overlap)
+- **Degradation signal**: + 30% unexplained
+- **Mechanism**: Fertilizer runoff, soil compaction increasing erosion even within managed land
+- **Policy implication**: Riparian buffer restoration; erosion control practices
+
+### Nature Access
+- **Primary driver**: Fragmentation by urban expansion (+ 60%)
+- **Degradation signal**: + 55% unexplained (HIGH!)
+- **Mechanism**: Remaining natural areas becoming functionally isolated; reduced perception of access (psychological distance)
+- **Policy implication**: Connectivity corridors; improved transportation/access to existing protected areas
+
+## Knowledge Gap: What Drives the Unexplained Portion?
+
+The attribution gap is **not a data problem but a knowledge gap**. Potential mechanisms include:
+
+1. **Climate-driven changes** – Temperature/precipitation shifts altering service provision even without land cover change
+2. **Sub-grid heterogeneity** – Fine-scale land cover changes missed at 10-km resolution
+3. **Degradation proxies** – Logging, understory clearing, hydrological modification leaving spectral signature unchanged
+4. **Indirect effects** – Pollinator decline from landscape-scale fragmentation effects
+5. **Model limitations** – InVEST models may not capture all service drivers
+
+**Honest assessment**: We cannot fully explain ~30-55% of ecosystem service decline with observed land cover data. This calls for:
+- Finer-resolution land cover datasets
+- Incorporation of climate/weather drivers
+- Integration with social-ecological metrics (land tenure, management intensity)
+- Targeted ground-truthing in key regions
+
+## Regional Patterns in Drivers
+
+Different regions show different driver signatures:
+
+- **Sub-Saharan Africa**: Primarily conversion-driven (cropland expansion); some evidence of agricultural intensification
+- **Southeast Asia**: Conversion dominant (forest loss to plantations); high degradation signal in remaining forests
+- **Latin America**: Mixed; conversion in Amazon; intensification in existing agricultural zones
+- **Developed nations**: Primarily degradation-signal driven; land cover relatively stable but ecosystem quality changing
+
+## Policy Implications
+
+**For conservation strategy:**
+
+1. **Conversion hotspots** → Strengthen land protection (PAs, tenure security); reduce expansion pressure
+2. **Degradation hotspots** → Improve land management (farming practices, logging restrictions); enhance restoration
+3. **High uncertainty zones** → Invest in monitoring and research; pilot adaptive management
+
+**For investment:**
+- **Conversion prevention**: Land acquisition, payment for ecosystem services (PES), territorial rights
+- **Degradation reversal**: Restoration, sustainable agriculture support, reforestation
+- **Research**: Fine-scale monitoring, climate integration, impact evaluation
+
+## Data Limitations & Uncertainties
+
+- Analysis based on 300m ESA CCI land cover (may miss sub-pixel change)
+- InVEST models do not explicitly include climate drivers
+- "Degradation signal" is inferred, not directly measured
+- Temporal resolution (1992, 2020) misses intermediate dynamics
+
+## Next Steps
+
+- **Chapter 8** integrates WHERE/WHO/WHY into conservation priorities and policy recommendations

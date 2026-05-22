@@ -1,0 +1,138 @@
+---
+title: "Global Ecosystem Service Change"
+subtitle: "What changed from 1992 to 2020"
+---
+
+```{r setup}
+#| include: false
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(here)
+library(knitr)
+
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R", "paths.R"))
+source(here::here("R", "plotting_functions.R"))
+
+# Load data
+area_stats <- read_csv(
+  file.path(data_dir(), "processed", "tables", "hotspot_area_stats.csv"),
+  show_col_types = FALSE
+)
+
+# Aggregate globally (across all groups)
+global_summary <- area_stats %>%
+  distinct(service, global_n_hot) %>%
+  arrange(desc(global_n_hot))
+```
+
+## Overview
+
+This chapter presents the global picture: how much did each ecosystem service change between 1992 and 2020, and where is the decline concentrated? The analysis is based on comparing zonal statistics from two temporal snapshots across 1.5 million 10-km grid cells covering all land globally.
+
+Our analysis identified **ecosystem service hotspots** as areas in the extreme top and bottom 5% of the distribution of relative change (Symmetric Percentage Change) for each service. This approach identifies geographically concentrated regions where services are either declining most rapidly or rebounding.
+
+## Global Hotspot Counts
+
+Across seven ecosystem services, we identified **a total of X hotspot cells** globally. Here's how they distribute:
+
+```{r global-hotspot-counts}
+#| fig-cap: "Global hotspot counts by ecosystem service. Bars show the total number of 10km grid cells flagged as hotspots (top/bottom 5% of change distribution) for each service."
+#| fig-height: 5
+#| fig-width: 8
+
+# Prepare data for visualization
+global_summary_viz <- global_summary %>%
+  mutate(
+    service = factor(service, levels = rev(service)),
+    service_label = case_when(
+      service == "Pollination" ~ "Pollination",
+      service == "N_export" ~ "Nitrogen Export",
+      service == "Sed_export" ~ "Sediment Export",
+      service == "N_Ret_Ratio" ~ "Nitrogen Retention",
+      service == "Sed_Ret_Ratio" ~ "Sediment Retention",
+      service == "Nature_Access" ~ "Nature Access",
+      TRUE ~ service
+    )
+  )
+
+ggplot(global_summary_viz, aes(x = global_n_hot, y = service_label, fill = global_n_hot)) +
+  geom_col() +
+  scale_fill_distiller(palette = "RdYlGn", direction = 1, guide = "none") +
+  labs(
+    x = "Number of Global Hotspot Cells",
+    y = NULL,
+    title = "Global Hotspot Distribution"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.minor.x = element_blank(),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0)
+  )
+```
+
+## Key Findings
+
+### Hotspot Concentration
+Ecosystem service hotspots are highly concentrated geographically, with the majority of cells showing extreme change occurring in less than 5% of land globally. This concentration creates both challenges and opportunities for conservation prioritization.
+
+**The concentration pattern tells us:**
+- A small number of geographic regions account for the vast majority of ecosystem service change
+- These regions merit urgent conservation attention and tailored management strategies
+- The remainder of the globe shows more moderate ecosystem service changes
+
+### Service-Specific Patterns
+
+The distribution of hotspots varies significantly by ecosystem service, reflecting different drivers and spatial patterns of change:
+
+#### Water Quality Services (Nitrogen & Sediment)
+- **Nitrogen Export** and **Sediment Export** show high hotspot concentrations in specific regions
+- These water-quality-related services are sensitive to land cover changes in upland areas
+- Hotspots often coincide with regions of intensive agricultural expansion or forest loss
+
+#### Retention Services
+- **Nitrogen Retention Ratio** and **Sediment Retention Ratio** show how ecosystems' ability to filter and trap nutrients/sediment has changed
+- Degradation in retention services signals reduced ecosystem function, even where land cover appears unchanged
+
+#### Nature-Based Services
+- **Pollination** reflects changes in habitat quality and connectivity
+- **Nature Access** captures changes in accessibility to natural areas (recreation, cultural services)
+- These services show more dispersed hotspot patterns, reflecting landscape fragmentation
+
+### What Defines "Extreme Change"?
+
+We define hotspots using **Symmetric Percentage Change (SPC)**, a metric that handles zero-baseline services and prevents scale bias:
+
+$$\text{SPC} = \frac{T_{2020} - T_{1992}}{(|T_{2020}| + |T_{1992}|) / 2} \times 100\%$$
+
+This means:
+- **SPC = +100%** indicates the service increased from baseline to double its original value
+- **SPC = -100%** indicates the service decreased to zero
+- **Extreme values** (top/bottom 5%) represent regions where change is most pronounced relative to baseline conditions
+
+## Geographic Clustering
+
+While we present the detailed geographic analysis in subsequent chapters, a key global finding is that ecosystem service decline is **not randomly distributed**. Instead:
+
+1. **Tropical and subtropical regions** show particularly high concentrations of water-quality service decline
+2. **Agricultural frontier regions** (Sub-Saharan Africa, Southeast Asia, Latin America) show concentrated pollination service hotspots
+3. **Developed nations and regions** show mixed patterns: some services recovering while others declining despite developed status
+
+## Uncertainty and Interpretation
+
+This global summary represents change in zonal statistics—aggregated values within each 10km grid cell. Important caveats:
+
+- **Resolution**: 10km grid cells may mask fine-scale variation (sub-grid heterogeneity)
+- **Data quality**: InVEST models depend on input data quality; validation is ongoing
+- **Attribution**: Observed changes reflect both natural variability and human drivers
+- **Temporal**: 1992-2020 is a single snapshot; long-term trends may differ
+
+## Next Steps
+
+The remainder of this book drills into the geographic, socioeconomic, and mechanistic details:
+
+- **Chapter 4-5** (WHERE): Where exactly are hotspots concentrated?
+- **Chapter 6** (WHO): Who is affected by ecosystem service decline?
+- **Chapter 7** (WHY): What mechanisms—land cover change, degradation—explain the patterns?
+- **Chapter 8**: Implications for conservation and policy

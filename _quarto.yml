@@ -2,25 +2,58 @@ project:
   type: book
 
 book:
-  title: "Global NCP: Two-Path Analysis Structure"
-  author: "Jerónimo Rodríguez Escobar"
+  title: "Ecosystem Service Hotspots: A Global Policy Analysis"
+  subtitle: "Where nature is changing, who is affected, and what drives change"
+  author: "Jerónimo Rodríguez Escobar, Richard P. Sharp"
   date: last-modified
+
   chapters:
+    # Main narrative chapters (policy-focused)
     - index.qmd
-    - docs/methodology.md
-    - analysis/prepare_data.qmd
-    - analysis/process_data.qmd
-    - analysis/LC_change.qmd
-    - analysis/hotspot_extraction.qmd
-    - analysis/hotspot_synthesis.qmd
-    - analysis/KS_tests_hotspots.qmd
-    - analysis/results_interpretation.qmd
+
+    - part: "Part 1: Understanding the Challenge"
+      chapters:
+        - chapters/01-problem.qmd
+        - chapters/02-methods.qmd
+
+    - part: "Part 2: Global State"
+      chapters:
+        - chapters/03-global-patterns.qmd
+
+    - part: "Part 3: Geographic Analysis (WHERE)"
+      chapters:
+        - chapters/04-hotspot-WHERE.qmd
+        - chapters/07-regional-profiles.qmd
+
+    - part: "Part 4: Socioeconomic Analysis (WHO)"
+      chapters:
+        - chapters/05-hotspot-WHO.qmd
+
+    - part: "Part 5: Understanding Drivers (WHY)"
+      chapters:
+        - chapters/06-drivers-WHY.qmd
+
+    - part: "Part 6: Implications & Action"
+      chapters:
+        - chapters/08-conclusions.qmd
+
+    # Technical appendix (reference only, not main narrative)
+    - part: "Technical Documentation"
+      chapters:
+        - docs/methodology.md
+        - analysis/hotspot_extraction.qmd
+        - analysis/KS_tests_hotspots.qmd
 
 format:
   html:
     theme: cosmo
     toc: true
+    toc-depth: 2
     number-sections: true
+    embed-resources: true
+    css: chapters/_custom.css
+    include-in-header: chapters/_header.html
+
   pdf:
     documentclass: scrreprt
 
@@ -28,3 +61,4 @@ execute:
   echo: false
   warning: false
   message: false
+  cache: true
