@@ -9,10 +9,10 @@ format:
     toc: true
     number-sections: true
     theme: cosmo
-  pdf:
-    toc: true
-    number-sections: true
-    geometry: margin=1in
+ # pdf:
+ #   toc: true
+ #   number-sections: true
+ #   geometry: margin=1in
 editor: source
 ---
 
@@ -139,7 +139,7 @@ cells that touch land (no clipping) and append attributes used for
 subregional aggregation (country/continent/region/biome).
 
 
-```{r prep-grid-aoo-land, eval=TRUE, echo=TRUE}
+```{r}
 #| label: prep-grid-aoo-land
 #| eval: true
 #| echo: true
@@ -157,6 +157,13 @@ library(dplyr)
 
 message("Loading raw data sources...")
 grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"), quiet = TRUE)
+
+# Add a check to standardize the ID column name. The raw shapefile might use
+# 'id' (lowercase) instead of 'ID'. This makes the script more robust.
+if (!"ID" %in% names(grid_raw) && "id" %in% names(grid_raw)) {
+  message("Standardizing ID column: renaming 'id' to 'ID'.")
+  grid_raw <- dplyr::rename(grid_raw, ID = id)
+}
 
 corr_path <- file.path(data_dir(), "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
 land_polys <- st_read(corr_path, quiet = TRUE)
