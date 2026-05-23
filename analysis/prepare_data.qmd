@@ -158,24 +158,6 @@ library(dplyr)
 message("Loading raw data sources...")
 grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"), quiet = TRUE)
 
-# Add a check to standardize the ID column name. The raw shapefile might use
-# 'id' (lowercase) instead of 'ID'. This makes the script more robust.
-id_candidates <- c("ID", "id", "fid", "FID") # Common names for unique identifiers
-found_id_col <- NULL
-for (col in id_candidates) {
-    if (col %in% names(grid_raw)) {
-        found_id_col <- col
-        break
-    }
-}
-
-if (is.null(found_id_col)) {
-    stop("Could not find a suitable ID column in the raw grid. Looked for: ", paste(id_candidates, collapse = ", "))
-} else if (found_id_col != "ID") {
-    message(glue::glue("Standardizing ID column: renaming '{found_id_col}' to 'ID'."))
-    grid_raw <- dplyr::rename(grid_raw, ID = all_of(found_id_col))
-}
-
 corr_path <- file.path(data_dir(), "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
 land_polys <- st_read(corr_path, quiet = TRUE)
 
@@ -183,7 +165,8 @@ biome_path <- file.path(data_dir(), "vector_basedata", "Biome.gpkg")
 biome_sf <- st_read(biome_path, quiet = TRUE)
 
 message("Filtering grid to land areas...")
-grid_land <- st_filter(grid_raw, st_transform(land_polys, st_crs(grid_raw)), .predicate = st_intersects)
+grid_land <- st_filter(grid_raw, st_transform(land_polys, st_crs(grid_raw)), .predicate = st_intersects) %>%
+  mutate(ID = row_number()) # Create a new, stable ID after filtering to land.
 
 message("Attaching attributes via spatial join...")
 # Use point-on-surface for a robust join that avoids duplicating grid cells that touch multiple polygons
