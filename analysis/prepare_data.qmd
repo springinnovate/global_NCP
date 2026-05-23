@@ -160,9 +160,20 @@ grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"), quie
 
 # Add a check to standardize the ID column name. The raw shapefile might use
 # 'id' (lowercase) instead of 'ID'. This makes the script more robust.
-if (!"ID" %in% names(grid_raw) && "id" %in% names(grid_raw)) {
-  message("Standardizing ID column: renaming 'id' to 'ID'.")
-  grid_raw <- dplyr::rename(grid_raw, ID = id)
+id_candidates <- c("ID", "id", "fid", "FID") # Common names for unique identifiers
+found_id_col <- NULL
+for (col in id_candidates) {
+    if (col %in% names(grid_raw)) {
+        found_id_col <- col
+        break
+    }
+}
+
+if (is.null(found_id_col)) {
+    stop("Could not find a suitable ID column in the raw grid. Looked for: ", paste(id_candidates, collapse = ", "))
+} else if (found_id_col != "ID") {
+    message(glue::glue("Standardizing ID column: renaming '{found_id_col}' to 'ID'."))
+    grid_raw <- dplyr::rename(grid_raw, ID = all_of(found_id_col))
 }
 
 corr_path <- file.path(data_dir(), "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
