@@ -176,8 +176,15 @@ grid_attrs <- grid_pts %>%
   st_join(st_transform(land_polys, st_crs(grid_pts)) %>% select(any_of(c("iso3", "nev_name", "country", "region_wb", "income_grp", "continent", "region_un", "subregion")))) %>%
   st_join(st_transform(biome_sf, st_crs(grid_pts)) %>% select(WWF_biome)) %>%
   st_drop_geometry() %>%
-  # Standardize country name column to 'nev_name'
-  rename_with(~"nev_name", any_of("country")) %>%
+  # Conditionally rename 'country' to 'nev_name' if 'nev_name' doesn't already exist.
+  # This is a robust way to handle variations in the source data column names.
+  {
+    df <- .
+    if (!"nev_name" %in% names(df) && "country" %in% names(df)) {
+      df <- dplyr::rename(df, nev_name = country)
+    }
+    df
+  } %>%
   select(fid = ID, any_of(c("iso3", "nev_name", "region_wb", "income_grp", "continent", "region_un", "subregion", "WWF_biome"))) %>%
   distinct(fid, .keep_all = TRUE) # Ensure one row per grid cell
 
