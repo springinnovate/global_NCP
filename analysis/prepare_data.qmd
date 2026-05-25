@@ -173,25 +173,27 @@ message("Attaching attributes via spatial join...")
 grid_pts <- st_point_on_surface(grid_land)
 
 grid_attrs <- grid_pts %>%
-  st_join(st_transform(land_polys, st_crs(grid_pts)) %>% select(iso3, nev_name, region_wb, income_grp, continent, region_un, subregion)) %>%
+  st_join(st_transform(land_polys, st_crs(grid_pts)) %>% select(any_of(c("iso3", "nev_name", "country", "region_wb", "income_grp", "continent", "region_un", "subregion")))) %>%
   st_join(st_transform(biome_sf, st_crs(grid_pts)) %>% select(WWF_biome)) %>%
   st_drop_geometry() %>%
-  select(fid = ID, iso3, nev_name, region_wb, income_grp, continent, region_un, subregion, WWF_biome) %>%
+  # Standardize country name column to 'nev_name'
+  rename_with(~"nev_name", any_of("country")) %>%
+  select(fid = ID, any_of(c("iso3", "nev_name", "region_wb", "income_grp", "continent", "region_un", "subregion", "WWF_biome"))) %>%
   distinct(fid, .keep_all = TRUE) # Ensure one row per grid cell
 
 grid_land_attrs <- grid_land %>%
   select(fid = ID) %>%
   left_join(grid_attrs, by = "fid")
 
-message("Fixing dateline wraparound artifact...")
-grid_clean <- st_wrap_dateline(grid_land_attrs, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
+message("Reprojecting to EPSG:4326 before dateline wrap...")
+grid_4326 <- st_transform(grid_land_attrs, "EPSG:4326")
 
-message("Reprojecting to EPSG:4326 for final output...")
-grid_4326 <- st_transform(grid_clean, "EPSG:4326")
+message("Fixing dateline wraparound artifact...")
+grid_clean <- st_wrap_dateline(grid_4326, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
 
 out_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
 message("Writing final clean grid to: ", out_path)
-st_write(grid_4326, out_path, delete_dsn = TRUE)
+st_write(grid_clean, out_path, delete_dsn = TRUE)
 
 message("Base grid preparation complete.")
 ```
