@@ -1,5 +1,17 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-05-26
+*   **Data Pipeline Crisis & Strategic Pivot:**
+    *   **Root Cause Re-confirmed:** The Python pipeline (`summary_pipeline_landgrid.py`) consistently fails with a `GEOSException: Invalid number of points in LinearRing` when reading the master grid GeoPackage (`AOOGrid_10x10km_land_4326_clean.gpkg`). This indicates a subtle geometry validity issue created by the R `sf` package that Python's `geopandas/shapely` cannot tolerate.
+    *   **Failed Repair Attempts:** A standalone patch script (`patch_fix_grid_geom.R`) using `st_buffer(dist = 0)` was created to aggressively repair the geometries. However, this process proved to be unacceptably slow, running for over 4.5 hours without completion, making it an unviable solution.
+    *   **New Strategy: Hybrid Raster-Vector Workflow:** A new, more robust strategy has been adopted to permanently solve this issue.
+        1.  **Create Zone Raster:** A new script (`create_zone_raster.R`) was created to perform a fast, one-time conversion of the vector grid into a "zone raster" where each pixel's value is its corresponding `fid`.
+        2.  **Raster-Based Zonal Stats:** A new Python script (`summary_pipeline_rasterzones.py`) will perform the zonal statistics using the new zone raster and the service rasters. This completely bypasses the need for Python to read the problematic vector file, eliminating the geometry errors.
+        3.  **Attribute Join in R:** The main R script (`process_data.qmd`) will be updated to read the simple CSV output from the new Python script and join it back to the canonical vector grid, which contains all the rich attribute data (country, biome, etc.).
+    *   This new hybrid approach is faster, more robust, and preserves the methodological integrity of the analysis by separating the geometry-heavy processing from the statistical calculation.
+
+---
+
 ### 2026-05-22
 *   **Major Data Pipeline Overhaul & Rerun:**
     *   **Root Cause Identified:** The critical `orig_fid not found` error in `process_data.qmd` was traced back to a stale base grid file (`AOOGrid_10x10km_land_4326_clean.gpkg`). This old grid was missing key attributes (like country names) and contained geometric artifacts (dateline wraparound), which were causing cascading failures in the Python pipeline.

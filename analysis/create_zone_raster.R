@@ -44,6 +44,9 @@ message("Loading reference raster to create a template...")
 template_raster <- terra::rast(reference_raster_path)
 
 message(glue::glue("Rasterizing {nrow(grid_sf)} features... This may take a few minutes."))
+# The `touches = TRUE` argument is critical. It ensures that any pixel that is
+# even partially covered by a vector polygon will be assigned that polygon's
+# 'fid' value, preserving the full extent of the land-intersecting grid.
 zone_raster <- terra::rasterize(grid_sf, template_raster, field = "fid", touches = TRUE)
 
 message("Writing output zone raster to: ", out_raster_path)
