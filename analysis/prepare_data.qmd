@@ -198,6 +198,18 @@ grid_4326 <- st_transform(grid_land_attrs, "EPSG:4326")
 message("Fixing dateline wraparound artifact...")
 grid_clean <- st_wrap_dateline(grid_4326, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
 
+message("Validating and cleaning geometries post-processing...")
+invalid_geoms <- !sf::st_is_valid(grid_clean)
+if (any(invalid_geoms)) {
+  message(glue::glue("Found {sum(invalid_geoms)} invalid geometries. Attempting to repair..."))
+  grid_clean <- sf::st_make_valid(grid_clean)
+}
+empty_geoms <- sf::st_is_empty(grid_clean)
+if (any(empty_geoms)) {
+    message(glue::glue("Found and removed {sum(empty_geoms)} empty geometries."))
+    grid_clean <- grid_clean[!empty_geoms, ]
+}
+
 out_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
 message("Writing final clean grid to: ", out_path)
 st_write(grid_clean, out_path, delete_dsn = TRUE)
