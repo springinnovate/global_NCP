@@ -29,6 +29,7 @@ library(here)
 library(stringr)
 library(tidytext)
 library(rlang)
+library(parallel)
 library(tidyr)
 library(forcats)
 library(scales)
@@ -155,8 +156,11 @@ subregional aggregation (country/continent/region/biome).
 library(sf)
 library(dplyr)
 
+message("--- Running New Proposed Workflow ---")
 message("Loading raw data sources...")
 grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"), quiet = TRUE)
+message("1. Making raw grid valid...")
+grid_raw <- st_make_valid(grid_raw)
 
 corr_path <- file.path(data_dir(), "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
 land_polys <- st_read(corr_path, quiet = TRUE)
@@ -164,20 +168,25 @@ land_polys <- st_read(corr_path, quiet = TRUE)
 biome_path <- file.path(data_dir(), "vector_basedata", "Biome.gpkg")
 biome_sf <- st_read(biome_path, quiet = TRUE)
 
-message("Filtering grid to land areas...")
+message("2. Filtering grid to land areas by intersection...")
 grid_land <- st_filter(grid_raw, st_transform(land_polys, st_crs(grid_raw)), .predicate = st_intersects) %>%
   mutate(ID = row_number()) # Create a new, stable ID after filtering to land.
 
-message("Attaching attributes via spatial join...")
+message("3. Reprojecting to EPSG:4326...")
+grid_4326 <- st_transform(grid_land, "EPSG:4326")
+
+message("4. Fixing dateline wraparound artifact...")
+grid_clean <- st_wrap_dateline(grid_4326, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
+
+message("5. Attaching attributes via spatial join (post-dateline wrap)...")
 # Use point-on-surface for a robust join that avoids duplicating grid cells that touch multiple polygons
-grid_pts <- st_point_on_surface(grid_land)
+grid_pts <- st_point_on_surface(grid_clean)
 
 grid_attrs <- grid_pts %>%
   st_join(st_transform(land_polys, st_crs(grid_pts)) %>% select(any_of(c("iso3", "nev_name", "country", "region_wb", "income_grp", "continent", "region_un", "subregion")))) %>%
   st_join(st_transform(biome_sf, st_crs(grid_pts)) %>% select(WWF_biome)) %>%
   st_drop_geometry() %>%
   # Conditionally rename 'country' to 'nev_name' if 'nev_name' doesn't already exist.
-  # This is a robust way to handle variations in the source data column names.
   {
     df <- .
     if (!"nev_name" %in% names(df) && "country" %in% names(df)) {
@@ -188,33 +197,42 @@ grid_attrs <- grid_pts %>%
   select(fid = ID, any_of(c("iso3", "nev_name", "region_wb", "income_grp", "continent", "region_un", "subregion", "WWF_biome"))) %>%
   distinct(fid, .keep_all = TRUE) # Ensure one row per grid cell
 
-grid_land_attrs <- grid_land %>%
+grid_final <- grid_clean %>%
   select(fid = ID) %>%
   left_join(grid_attrs, by = "fid")
 
-message("Reprojecting to EPSG:4326 before dateline wrap...")
-grid_4326 <- st_transform(grid_land_attrs, "EPSG:4326")
-
-message("Fixing dateline wraparound artifact...")
-grid_clean <- st_wrap_dateline(grid_4326, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
-
-message("Validating and cleaning geometries post-processing...")
+message("6. Final validation and aggressive geometry cleaning...")
 invalid_geoms <- !sf::st_is_valid(grid_clean)
 if (any(invalid_geoms)) {
   message(glue::glue("Found {sum(invalid_geoms)} invalid geometries. Attempting to repair..."))
-  grid_clean <- sf::st_make_valid(grid_clean)
-  # Add a zero-buffer to rebuild geometries, which can fix more stubborn issues
-  grid_clean <- sf::st_buffer(grid_clean, dist = 0)
+  grid_final <- sf::st_make_valid(grid_final) # First pass with st_make_valid
+
+  # Add a parallelized zero-buffer to rebuild geometries, which can fix more stubborn issues
+  message("Applying parallelized zero-buffer to fix complex geometry errors...")
+  n_cores <- parallel::detectCores() - 2
+  if (is.na(n_cores) || n_cores < 1) n_cores <- 1
+
+  message(glue::glue("Splitting data into {n_cores} chunks for parallel processing..."))
+  row_indices <- 1:nrow(grid_final)
+  chunks <- split(row_indices, cut(row_indices, n_cores, labels = FALSE))
+  grid_chunks <- lapply(chunks, function(idx) grid_final[idx, ])
+
+  processed_chunks <- parallel::mclapply(grid_chunks, function(chunk) {
+    sf::st_buffer(chunk, dist = 0)
+  }, mc.cores = n_cores)
+
+  message("Recombining parallel chunks...")
+  grid_final <- do.call(rbind, processed_chunks)
 }
-empty_geoms <- sf::st_is_empty(grid_clean)
+empty_geoms <- sf::st_is_empty(grid_final)
 if (any(empty_geoms)) {
     message(glue::glue("Found and removed {sum(empty_geoms)} empty geometries."))
-    grid_clean <- grid_clean[!empty_geoms, ]
+    grid_final <- grid_final[!empty_geoms, ]
 }
 
 out_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
 message("Writing final clean grid to: ", out_path)
-st_write(grid_clean, out_path, delete_dsn = TRUE)
+st_write(grid_final, out_path, delete_dsn = TRUE)
 
 message("Base grid preparation complete.")
 ```
