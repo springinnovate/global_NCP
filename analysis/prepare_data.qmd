@@ -203,6 +203,8 @@ invalid_geoms <- !sf::st_is_valid(grid_clean)
 if (any(invalid_geoms)) {
   message(glue::glue("Found {sum(invalid_geoms)} invalid geometries. Attempting to repair..."))
   grid_clean <- sf::st_make_valid(grid_clean)
+  # Add a zero-buffer to rebuild geometries, which can fix more stubborn issues
+  grid_clean <- sf::st_buffer(grid_clean, dist = 0)
 }
 empty_geoms <- sf::st_is_empty(grid_clean)
 if (any(empty_geoms)) {
