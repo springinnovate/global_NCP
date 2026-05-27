@@ -1,5 +1,16 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-05-27 (cont. 5)
+*   **Python Pipeline Failure (`GEOSException`):** The pipeline is now running past the `FileNotFoundError` but fails during zonal statistics with a `shapely.errors.GEOSException: IllegalArgumentException: Points of LinearRing do not form a closed linestring`.
+*   **Root Cause Analysis:**
+    1.  This error occurs during the `gdf.to_crs()` reprojection step inside the `zonal_stats` function.
+    2.  This is a classic geometry validity issue. Although the `main()` function performs extensive cleaning (`buffer(0)`, `make_valid()`) before writing a temporary GeoPackage, this error indicates that either the cleaning was insufficient, or that the file I/O cycle and/or the reprojection operation itself is re-introducing or exposing subtle invalidities.
+    3.  The history of this project (`WORKLOG.md`) shows a recurring theme of geometry issues when passing data from R's `sf` package to Python's `geopandas`.
+*   **Resolution:**
+    1.  **Pipeline Hardening:** A patch has been applied to `summary_pipeline_landgrid.py`. The `zonal_stats` function will now re-apply the `gdf.geometry.buffer(0)` cleaning trick immediately after reading the vector data. This ensures that any geometry issues are fixed just-in-time before the reprojection is attempted, making the process more robust against these recurring data integrity problems.
+
+---
+
 ### 2026-05-27 (cont. 4)
 *   **Recurring Python Pipeline Failure (`RasterioIOError`):** The pipeline failed again with a `No such file or directory` error, this time for `n_retention_ratio_2020.tif`.
 *   **Root Cause Analysis:**

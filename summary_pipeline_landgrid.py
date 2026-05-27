@@ -126,7 +126,13 @@ def zonal_stats(raster_path_band_dict, op_stats, vector_path):
         per polygon, identified by 'fid' and columns for each calculated
         statistic named from `op_stats`.
     """
-    gdf = gpd.read_file(vector_path)
+    # Use on_invalid="ignore" to be robust against minor geometry errors on read.
+    gdf = gpd.read_file(vector_path, on_invalid="ignore")
+
+    # The buffer(0) trick is a robust way to fix geometry validity issues
+    # that can arise after file I/O or during reprojection. This ensures
+    # geometries are clean immediately before the to_crs() call.
+    gdf.geometry = gdf.geometry.buffer(0)
 
     # reproject if necessary
     with rasterio.open(raster_path_band_dict["path"]) as src:
