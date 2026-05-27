@@ -7,85 +7,102 @@ from rasterio.transform import from_bounds
 import numpy as np
 import os
 
-def main(input_gpkg, output_dir, resolution=10000):
+def rasterize_hotspots(input_gpkg, output_dir, variant_name):
     """
-    Rasterizes a fixed list of canonical service hotspot columns from a GeoPackage.
-
-    This is a simplified, high-performance version of the script that targets
-    a specific, hardcoded list of columns for rasterization.
+    Rasterizes hotspot_count and binary service columns from a GeoPackage.
 
     Args:
         input_gpkg (str): Path to the input GeoPackage file.
         output_dir (str): Path to the output directory for GeoTIFFs.
-        resolution (int): The resolution of the output raster in meters.
+        variant_name (str): Either 'abs' or 'pct' for naming output files.
     """
-    # --- Configuration: Hardcoded list of columns to rasterize ---
-    # This script is now specialized to rasterize only the 'hotspot_count' column.
-    columns_to_rasterize = ["hotspot_count"]
-    print(f"Target column for rasterization: {columns_to_rasterize[0]}")
+    # Columns to rasterize
+    service_columns = [
+        "Nature_Access",
+        "Sed_Ret_Ratio",
+        "Pollination",
+        "C_Risk",
+        "C_Risk_Red_Ratio",
+        "N_export",
+        "N_Ret_Ratio",
+        "Sed_export"
+    ]
 
-    print(f"Reading vector data from: {input_gpkg}")
-    gdf = gpd.read_file(input_gpkg)
-    print("Vector data loaded.")
+    columns_to_rasterize = ["hotspot_count"] + service_columns
 
-    print("Reprojecting to Equal Earth (EPSG:8857) for rasterization...")
-    # Use an equal-area projection suitable for global analysis
+    print(f"\n{'='*60}")
+    print(f"Processing: {variant_name.upper()} - {os.path.basename(input_gpkg)}")
+    print(f"{'='*60}")
+    print(f"Target columns: {columns_to_rasterize}")
+
+    # Load data
+    print(f"\nReading vector data from: {input_gpkg}")
+    gdf = gpd.read_file(input_gpkg, on_invalid="ignore")
+    print(f"Total features loaded: {len(gdf)}")
+
+    # Remove invalid geometries
+    invalid_count = (~gdf.geometry.is_valid).sum()
+    if invalid_count > 0:
+        print(f"WARNING: Found {invalid_count} invalid geometries. Removing them.")
+        gdf = gdf[gdf.geometry.is_valid]
+    print(f"Using {len(gdf)} valid features for rasterization.")
+
+    # Reproject to Equal Earth
+    print("\nReprojecting to Equal Earth (EPSG:8857)...")
     target_crs = "EPSG:8857"
     gdf = gdf.to_crs(target_crs)
-    print("Reprojection complete.")
 
-    # --- Raster Metadata Calculation (once for all columns) ---
+    # Calculate raster metadata once
     xmin, ymin, xmax, ymax = gdf.total_bounds
+    actual_cell_area = np.median(gdf.geometry.area)
+    actual_cell_size = np.sqrt(actual_cell_area)
+    print(f"Detected cell size: {actual_cell_size:.1f} meters ({actual_cell_area/1e6:.2f} km²)")
 
-    # Calculate output dimensions
-    width = int(np.ceil((xmax - xmin) / resolution))
-    height = int(np.ceil((ymax - ymin) / resolution))
-
-    # Create the affine transform
+    width = int(np.ceil((xmax - xmin) / actual_cell_size))
+    height = int(np.ceil((ymax - ymin) / actual_cell_size))
     transform = from_bounds(xmin, ymin, xmax, ymax, width, height)
 
     print(f"Output raster dimensions: {width} x {height}")
     os.makedirs(output_dir, exist_ok=True)
 
-    # --- Main Processing Loop ---
+    # Process each column
     for column in columns_to_rasterize:
         print(f"\n--- Processing column: {column} ---")
 
         if column not in gdf.columns:
-            print(f"!!! WARNING: Column '{column}' not found in GeoPackage. Skipping. !!!")
-            print(f"Available columns are: {', '.join(gdf.columns)}")
+            print(f"!!! WARNING: Column '{column}' not found. Skipping. !!!")
+            print(f"Available columns: {', '.join(gdf.columns)}")
             continue
 
-        # Ensure the column is numeric. Using uint8 as hotspot_count is a small integer (0-8).
-        print(f"Preparing column '{column}' for rasterization...")
-        # Using .loc to avoid SettingWithCopyWarning
-        gdf.loc[:, column] = pd.to_numeric(gdf[column], errors='coerce').fillna(0).astype(np.uint8)
+        # Prepare data
+        gdf_temp = gdf.copy()
+        gdf_temp[column] = pd.to_numeric(gdf_temp[column], errors='coerce').fillna(0).astype(np.uint8)
 
-        # --- DIAGNOSTIC STEP ---
-        # Check what unique values the script is actually seeing before rasterizing.
-        unique_values = gdf[column].unique()
-        print(f"--> DIAGNOSTIC: Found unique values in '{column}' to be burned: {unique_values}")
-        if len(unique_values) < 2:
-            print("--> WARNING: Only one unique value found. The raster should be uniform.")
+        # Check unique values
+        unique_values = gdf_temp[column].unique()
+        print(f"Unique values: {unique_values}")
 
-        print(f"Rasterizing '{column}' attribute...")
-        shapes = ((geom, value) for geom, value in zip(gdf.geometry, gdf[column]))
-
+        # Rasterize
+        shapes = ((geom, value) for geom, value in zip(gdf_temp.geometry, gdf_temp[column]))
         rasterized_data = rasterize(
             shapes=shapes,
             out_shape=(height, width),
             transform=transform,
-            fill=0,  # Use 0 as the fill/nodata value
-            dtype=rasterio.uint8,
-            all_touched=True
+            fill=255,  # fill value for areas not covered by geometries
+            dtype=rasterio.uint8
         )
 
-        # --- Write Output ---
-        # For hotspot_count, setting nodata=0 means only cells with >0 hotspots are visible.
+        # Convert 0s to nodata (255)
+        rasterized_data[rasterized_data == 0] = 255
+
+        # Output filename
+        output_raster = os.path.join(output_dir, f"{column}_{variant_name}.tif")
+        print(f"Writing to: {output_raster}")
+
         profile = {
             'driver': 'GTiff',
             'dtype': rasterio.uint8,
-            'nodata': 0,
+            'nodata': 255,  # 255 is marked as nodata/NA
             'width': width,
             'height': height,
             'count': 1,
@@ -94,22 +111,29 @@ def main(input_gpkg, output_dir, resolution=10000):
             'compress': 'lzw'
         }
 
-        output_raster = os.path.join(output_dir, f"{column}.tif")
-        print(f"Writing output raster to: {output_raster}")
-
         with rasterio.open(output_raster, 'w', **profile) as dst:
             dst.write(rasterized_data, 1)
+        print(f"✓ Saved {column} raster")
 
-    print("\nProcess complete.")
+def main():
+    # Define inputs
+    inputs = [
+        ("C:/projects/global_NCP/data/processed/hotspots/abs/global/hotspots_global_abs.gpkg", "abs"),
+        ("C:/projects/global_NCP/data/processed/hotspots/pct/global/hotspots_global_pct.gpkg", "pct"),
+    ]
+
+    output_dir = "C:/projects/global_NCP/data/processed/hotspots/rasters/"
+
+    # Process both files
+    for input_gpkg, variant in inputs:
+        if os.path.exists(input_gpkg):
+            rasterize_hotspots(input_gpkg, output_dir, variant)
+        else:
+            print(f"\n!!! ERROR: File not found: {input_gpkg}")
+
+    print(f"\n{'='*60}")
+    print("✓ All rasterization complete!")
+    print(f"{'='*60}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Rasterizes a predefined set of service hotspot columns from a GeoPackage."
-    )
-    parser.add_argument("input_gpkg", help="Path to the input GeoPackage file (e.g., hotspots_global_pct.gpkg).")
-    parser.add_argument("output_dir", help="Path to the directory where output GeoTIFFs will be saved.")
-    parser.add_argument("--resolution", type=int, default=10000, help="Output raster resolution in meters (default: 10000).")
-
-    args = parser.parse_args()
-
-    main(args.input_gpkg, args.output_dir, args.resolution)
+    main()

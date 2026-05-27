@@ -157,7 +157,7 @@ library(dplyr)
 
 grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"))
 land_polys <- st_read(
-  data_vectors("cartographic_ee_ee_r264_correspondence.gpkg"),
+  data_vectors("cartographic_ee_r264_correspondence.gpkg"),
   layer = "ee_r264_correspondence"
 )
 
@@ -173,7 +173,8 @@ grid_land <- st_filter(grid_raw, land_polys, .predicate = st_intersects)
 # was silently ignoring it, which is why this chunk was stable.
 GROUPING_VARS <- c("nev_name", "region_wb", "income_grp")
 
-# Attach attributes for aggregation (spatial join or fid-based join)
+# Attach country/regional attributes
+message("Attaching country and regional attributes...")
 land_attrs <- land_polys |>
   dplyr::select(any_of(GROUPING_VARS))
 grid_land <- st_join(grid_land, land_attrs, join = st_intersects, left = TRUE)

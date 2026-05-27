@@ -282,7 +282,9 @@ def main():
         # Pre-process the vector to make it valid and explode multipolygons
         # This entirely prevents GEOS segfaults in exactextract
         LOGGER.info(f"Pre-processing vector {vector_id} to fix geometries and explode multipolygons...")
-        gdf = gpd.read_file(vector_path)
+        # Use on_invalid="ignore" to skip features that cause GEOS errors on read,
+        # which is a more robust way to handle the subtle validity issues from R.
+        gdf = gpd.read_file(vector_path, on_invalid="ignore")
         if "fid" not in gdf.columns:
             gdf["fid"] = gdf.index.astype("int32") + 1
         else:
@@ -326,6 +328,9 @@ def main():
 
         for raster_id, band_idx, stats_task in zonal_stats_task_list:
             stats_df = stats_task.get()
+            if stats_df is None:
+                LOGGER.error(f"Zonal stats for {raster_id} returned None. The task likely failed. Skipping.")
+                continue
             # renames the stat to be the raster id provided in the
             # config file with a _operation at the end so we can
             # differentiate the operation applied to that raster

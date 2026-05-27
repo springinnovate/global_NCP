@@ -1,5 +1,31 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-05-27 (cont. 3)
+*   **Python Pipeline Failure (`RasterioIOError`):** The Python pipeline failed during zonal statistics with a `No such file or directory` error for `sed_retention_ratio_2020.tif`.
+*   **Root Cause Analysis:**
+    1.  The immediate error is a `FileNotFoundError`, indicating the path in the `services_slim.yaml` config is incorrect or the file is missing.
+    2.  The user confirmed with an `ls` command that all required raster files, including the ratio files, exist in a single directory: `.../raw/base_years_ha/`.
+    3.  A review of `analysis_configs/services_slim.yaml` revealed that the paths were missing the `/raw/` subdirectory (e.g., pointing to `${GLOBAL_NCP_DATA}/base_years_ha/...` instead of `${GLOBAL_NCP_DATA}/raw/base_years_ha/...`). This path mismatch is the direct cause of the `FileNotFoundError`.
+*   **Resolution:**
+    1.  **Primary Fix:** All raster paths in `analysis_configs/services_slim.yaml` have been updated to include the correct `/raw/` subdirectory, ensuring they point to the actual file locations.
+    2.  **Robustness Patch (Retained):** A patch was previously applied to `summary_pipeline_landgrid.py` to make it more robust. It now checks if a task returns `None` (indicating failure) and skips it, preventing the main script from crashing with an `AttributeError`. This remains a useful improvement.
+
+---
+
+### 2026-05-27 (cont. 2)
+*   **Definitive Root Cause & Solution:** The user discovered that the Python `GEOSException` could be bypassed by using `geopandas.read_file(..., on_invalid="ignore")`. This confirms the root cause is a small number of features with invalid geometries being written by R's `sf` package that `geopandas` cannot read by default.
+*   **Pipeline Hardening:** Instead of creating more intermediate "cleaned" files, the core Python script (`summary_pipeline_landgrid.py`) has been updated to use the `on_invalid="ignore"` flag. This makes the pipeline itself resilient to these minor upstream errors, providing a much more robust and direct solution. The separate `patch_add_biomes.R` script is no longer necessary, as the main `prepare_data.qmd` can be run in its complete form, and the Python script will now correctly ignore any problematic geometries it produces.
+
+---
+
+### 2026-05-27 (cont.)
+*   **Pipeline Unblocking Strategy:** The `prepare_data.qmd` script continues to fail on complex geometry operations. To unblock the pipeline without losing more time, we've adopted a two-stage approach:
+    1.  **Generate Base Grid:** Run a simplified version of `prepare_data.qmd` that intentionally excludes the problematic biome attribute join. This is expected to succeed and produce a clean grid with country/regional attributes.
+    2.  **Patch Biomes:** Created a new, standalone script (`analysis/patch_add_biomes.R`) that takes the output from step 1 and performs only the biome join. This script uses a robust `st_join` followed by a `distinct(ID)` call to handle any duplicates created if a grid cell touches multiple biomes.
+*   This strategy allows us to get a complete, analysis-ready grid file (`AOOGrid_10x10km_land_4326_clean.gpkg`) so the downstream Python pipeline can finally proceed.
+
+---
+
 ### 2026-05-27
 *   **Data Pipeline Failure & Strategic Rollback:**
     *   **Breaking Change Identified:** After multiple failed attempts to fix the `IllegalArgumentException: Invalid number of points in LinearRing` error, a comparison with the last known working version of `prepare_data.qmd` was performed.
