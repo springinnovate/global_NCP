@@ -178,6 +178,13 @@ grid_4326 <- st_transform(grid_land, "EPSG:4326")
 message("4. Fixing dateline wraparound artifact...")
 grid_clean <- st_wrap_dateline(grid_4326, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
 
+message("--- Immediate post-wrap validation to fix invalid LinearRings ---")
+# st_wrap_dateline can produce invalid geometries (e.g., 2-point LinearRings).
+# st_point_on_surface will fail on these. We must repair them immediately.
+invalid_pre_join <- !sf::st_is_valid(grid_clean)
+message(glue::glue("Found {sum(invalid_pre_join)} invalid geometries before spatial join. Repairing..."))
+grid_clean <- sf::st_make_valid(grid_clean)
+
 message("5. Attaching attributes via spatial join (post-dateline wrap)...")
 # Use point-on-surface for a robust join that avoids duplicating grid cells that touch multiple polygons
 grid_pts <- st_point_on_surface(grid_clean)
@@ -202,10 +209,10 @@ grid_final <- grid_clean %>%
   left_join(grid_attrs, by = "fid")
 
 message("6. Final validation and aggressive geometry cleaning...")
-invalid_geoms <- !sf::st_is_valid(grid_clean)
+invalid_geoms <- !sf::st_is_valid(grid_final)
 if (any(invalid_geoms)) {
   message(glue::glue("Found {sum(invalid_geoms)} invalid geometries. Attempting to repair..."))
-  grid_final <- sf::st_make_valid(grid_final) # First pass with st_make_valid
+  grid_final <- sf::st_make_valid(grid_final)
 
   # Add a parallelized zero-buffer to rebuild geometries, which can fix more stubborn issues
   message("Applying parallelized zero-buffer to fix complex geometry errors...")
