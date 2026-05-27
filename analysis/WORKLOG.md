@@ -1,5 +1,16 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-05-27 (cont. 6)
+*   **Python Pipeline Failure (`GEOSException` Persists):** The `closed linestring` error continues to occur in the `zonal_stats` worker process during reprojection, even after the `buffer(0)` patch was applied.
+*   **Root Cause Analysis:**
+    1.  This confirms that this dataset contains exceptionally stubborn geometry invalidities.
+    2.  The file I/O cycle where the main process writes a temporary GeoPackage and the worker process reads it is the most likely source of re-introducing these subtle errors.
+    3.  The single `buffer(0)` call in the worker is insufficient. It may even be creating empty or invalid sliver polygons from highly malformed inputs, which are not being filtered out before the `to_crs()` call.
+*   **Resolution:**
+    1.  **Aggressive Just-in-Time Cleaning:** The `zonal_stats` function in `summary_pipeline_landgrid.py` has been patched with a much more robust cleaning sequence. It now performs a `buffer(0).make_valid()` and then explicitly filters out any empty or near-zero-area geometries that may have been created. This mirrors the extensive cleaning performed in the main process and ensures the data is as clean as possible immediately before the sensitive reprojection step. This should finally resolve the recurring geometry exceptions.
+
+---
+
 ### 2026-05-27 (cont. 5)
 *   **Python Pipeline Failure (`GEOSException`):** The pipeline is now running past the `FileNotFoundError` but fails during zonal statistics with a `shapely.errors.GEOSException: IllegalArgumentException: Points of LinearRing do not form a closed linestring`.
 *   **Root Cause Analysis:**

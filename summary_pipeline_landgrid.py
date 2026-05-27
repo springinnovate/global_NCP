@@ -132,7 +132,17 @@ def zonal_stats(raster_path_band_dict, op_stats, vector_path):
     # The buffer(0) trick is a robust way to fix geometry validity issues
     # that can arise after file I/O or during reprojection. This ensures
     # geometries are clean immediately before the to_crs() call.
-    gdf.geometry = gdf.geometry.buffer(0)
+    # This dataset has proven to have extremely stubborn geometry errors.
+    # We apply a more aggressive cleaning suite here, mirroring main(),
+    # to handle geometries that become invalid after the file read.
+    gdf.geometry = gdf.geometry.buffer(0).make_valid()
+    gdf = gdf[~gdf.geometry.is_empty]
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        # A tiny area threshold can filter out invalid sliver polygons
+        # that can be created by buffer(0) on malformed inputs.
+        gdf = gdf[gdf.geometry.area > 1e-12].reset_index(drop=True)
 
     # reproject if necessary
     with rasterio.open(raster_path_band_dict["path"]) as src:

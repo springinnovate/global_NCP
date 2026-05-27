@@ -160,7 +160,7 @@ make_country_multi_plot <- function(df) {
 # 🌍 Hotspot Intensity (WHERE)
 
 ::: columns
-::: {.column width="100%"}
+::: {.column width="60%"}
 ### Disproportionate Burden (Relative Intensity)
 
 ::: {.panel-tabset}
@@ -181,14 +181,14 @@ make_intensity_plot(area_stats, "income_grp")
 
 #### Biome
 ```{r}
-#| fig-height: 8
+#| fig-height: 16
 #| fig-width: 12
 make_intensity_plot(area_stats, "WWF_biome")
 ```
 
 :::
 :::
-::: {.column width="100%"}
+::: {.column width="40%"}
 ### Compound Risk: Multi-service Overlap
 
 ::: {.panel-tabset}
@@ -216,13 +216,10 @@ make_multi_plot(multiservice_stats, "WWF_biome")
 
 :::
 
-:::
-:::
-
 # 🗺️ Country Profiles (All)
 
 ::: columns
-::: {.column width="100%"}
+::: {.column width="60%"}
 #### Disproportionate Burden (All Countries)
 ```{r}
 #| fig-height: 90
@@ -230,7 +227,7 @@ make_multi_plot(multiservice_stats, "WWF_biome")
 make_country_intensity_plot(area_stats)
 ```
 :::
-::: {.column width="100%"}
+::: {.column width="40%"}
 #### Compound Risk (All Countries)
 ```{r}
 #| fig-height: 90
@@ -242,8 +239,6 @@ make_country_multi_plot(multiservice_stats)
 
 # 👥 Population Exposure (WHO)
 
-::: columns
-::: {.column width="100%"}
 ### Absolute Population Exposure by Income Group
 ```{r}
 #| fig-height: 10
@@ -270,8 +265,7 @@ if(nrow(pop_exposure) > 0 && "income_grp" %in% names(pop_exposure)) {
   "Data not available."
 }
 ```
-:::
-::: {.column width="100%"}
+
 ### Absolute Population Exposure by HDI Bin
 ```{r}
 #| fig-height: 10
@@ -294,13 +288,9 @@ if(nrow(pop_exposure) > 0 && "hdi_bin" %in% names(pop_exposure)) {
   "Data not available."
 }
 ```
-:::
-:::
 
 # 📊 Socioeconomic Drivers (KS Tests)
 
-::: columns
-::: {.column width="100%"}
 ### Directionality (Cliff's Delta)
 ```{r}
 #| fig-height: 12
@@ -320,8 +310,7 @@ if(nrow(ks_res) > 0 && "cliffs_delta" %in% names(ks_res)) {
   "Data not available."
 }
 ```
-:::
-::: {.column width="100%"}
+
 ### Statistical Results Table
 ```{r}
 if(nrow(ks_res) > 0) {
@@ -339,13 +328,9 @@ if(nrow(ks_res) > 0) {
   "Data not available."
 }
 ```
-:::
-:::
 
 # 🌲 LCC Attribution (WHY)
 
-::: columns
-::: {.column width="100%"}
 ### The Attribution Gap: Drivers of Ecosystem Service Decline
 ```{r}
 #| fig-height: 12
@@ -367,5 +352,3 @@ if(nrow(lcc_stats) > 0) {
   "Data not available."
 }
 ```
-:::
-:::
