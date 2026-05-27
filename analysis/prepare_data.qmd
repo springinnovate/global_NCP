@@ -175,19 +175,9 @@ grid_land <- st_filter(grid_raw, st_transform(land_polys, st_crs(grid_raw)), .pr
 message("3. Reprojecting to EPSG:4326...")
 grid_4326 <- st_transform(grid_land, "EPSG:4326")
 
-message("4. Fixing dateline wraparound artifact...")
-grid_clean <- st_wrap_dateline(grid_4326, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
-
-message("--- Immediate post-wrap validation to fix invalid LinearRings ---")
-# st_wrap_dateline can produce invalid geometries (e.g., 2-point LinearRings).
-# st_point_on_surface will fail on these. We must repair them immediately.
-invalid_pre_join <- !sf::st_is_valid(grid_clean)
-message(glue::glue("Found {sum(invalid_pre_join)} invalid geometries before spatial join. Repairing..."))
-grid_clean <- sf::st_make_valid(grid_clean)
-
-message("5. Attaching attributes via spatial join (post-dateline wrap)...")
+message("4. Attaching attributes via spatial join...")
 # Use point-on-surface for a robust join that avoids duplicating grid cells that touch multiple polygons
-grid_pts <- st_point_on_surface(grid_clean)
+grid_pts <- st_point_on_surface(grid_4326)
 
 grid_attrs <- grid_pts %>%
   st_join(st_transform(land_polys, st_crs(grid_pts)) %>% select(any_of(c("iso3", "nev_name", "country", "region_wb", "income_grp", "continent", "region_un", "subregion")))) %>%
@@ -204,11 +194,11 @@ grid_attrs <- grid_pts %>%
   select(fid = ID, any_of(c("iso3", "nev_name", "region_wb", "income_grp", "continent", "region_un", "subregion", "WWF_biome"))) %>%
   distinct(fid, .keep_all = TRUE) # Ensure one row per grid cell
 
-grid_final <- grid_clean %>%
+grid_final <- grid_4326 %>%
   select(fid = ID) %>%
   left_join(grid_attrs, by = "fid")
 
-message("6. Final validation and aggressive geometry cleaning...")
+message("5. Final validation and aggressive geometry cleaning...")
 invalid_geoms <- !sf::st_is_valid(grid_final)
 if (any(invalid_geoms)) {
   message(glue::glue("Found {sum(invalid_geoms)} invalid geometries. Attempting to repair..."))
