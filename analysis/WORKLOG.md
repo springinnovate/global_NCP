@@ -1,5 +1,14 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-05-27
+*   **Data Pipeline Failure & Final Fix Attempt:**
+    *   **Root Cause Pinpointed:** The `prepare_data.qmd` script failed again, this time *within R* before ever getting to Python. The error `IllegalArgumentException: Invalid number of points in LinearRing found 2` occurred during the `st_point_on_surface(grid_4326)` call.
+    *   **Diagnosis:** This definitively proves that the geometry errors are being introduced during the R-based data preparation, specifically by the `st_transform()` function. Even with valid input, reprojection can create a small number of invalid geometries (like 2-point lines masquerading as polygons) that downstream functions cannot handle. Previous attempts to remove the dateline wrapping were a red herring; the core issue is the lack of validation immediately after reprojection.
+    *   **Definitive Solution:** A final fix has been implemented in `prepare_data.qmd`. An `st_make_valid()` call is now performed *immediately* after `st_transform()` and *before* `st_point_on_surface()`. This ensures that any errors introduced by the reprojection are repaired at the source, making the rest of the pipeline robust.
+    *   This is the last attempt to fix the vector-based pipeline. If this fails, we will pivot to the raster-based workflow (`create_zone_raster.R`).
+
+---
+
 ### 2026-05-26
 *   **Data Pipeline Crisis & Strategic Pivot:**
     *   **Root Cause Re-confirmed:** The Python pipeline (`summary_pipeline_landgrid.py`) consistently fails with a `GEOSException: Invalid number of points in LinearRing` when reading the master grid GeoPackage (`AOOGrid_10x10km_land_4326_clean.gpkg`). This indicates a subtle geometry validity issue created by the R `sf` package that Python's `geopandas/shapely` cannot tolerate.

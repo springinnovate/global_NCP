@@ -175,6 +175,13 @@ grid_land <- st_filter(grid_raw, st_transform(land_polys, st_crs(grid_raw)), .pr
 message("3. Reprojecting to EPSG:4326...")
 grid_4326 <- st_transform(grid_land, "EPSG:4326")
 
+message("--- Immediate post-transform validation ---")
+# st_transform() can introduce small geometric errors (e.g., 2-point LinearRings)
+# that cause st_point_on_surface() to fail. We must repair them immediately.
+invalid_geoms_after_transform <- !sf::st_is_valid(grid_4326)
+message(glue::glue("Found {sum(invalid_geoms_after_transform)} invalid geometries after reprojection. Repairing..."))
+grid_4326 <- sf::st_make_valid(grid_4326)
+
 message("4. Attaching attributes via spatial join...")
 # Use point-on-surface for a robust join that avoids duplicating grid cells that touch multiple polygons
 grid_pts <- st_point_on_surface(grid_4326)
