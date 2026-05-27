@@ -152,91 +152,35 @@ subregional aggregation (country/continent/region/biome).
 # 4. Reprojects the final grid to EPSG:4326 for compatibility with raster extraction tools.
 #
 # Run this chunk only if you need to regenerate the base grid from scratch.
-
 library(sf)
 library(dplyr)
 
-message("--- Running New Proposed Workflow ---")
-message("Loading raw data sources...")
-grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"), quiet = TRUE)
-message("1. Making raw grid valid...")
-grid_raw <- st_make_valid(grid_raw)
+grid_raw <- st_read(data_vectors("AOOGrid_10x10kmShp/AOOGrid_10x10km.shp"))
+land_polys <- st_read(
+  data_vectors("cartographic_ee_ee_r264_correspondence.gpkg"),
+  layer = "ee_r264_correspondence"
+)
 
-corr_path <- file.path(data_dir(), "vector_basedata", "cartographic_ee_r264_correspondence.gpkg")
-land_polys <- st_read(corr_path, quiet = TRUE)
-
-biome_path <- file.path(data_dir(), "vector_basedata", "Biome.gpkg")
-biome_sf <- st_read(biome_path, quiet = TRUE)
-
-message("2. Filtering grid to land areas by intersection...")
-grid_land <- st_filter(grid_raw, st_transform(land_polys, st_crs(grid_raw)), .predicate = st_intersects) %>%
-  mutate(ID = row_number()) # Create a new, stable ID after filtering to land.
-
-message("3. Reprojecting to EPSG:4326...")
-grid_4326 <- st_transform(grid_land, "EPSG:4326")
-
-message("--- Immediate post-transform validation ---")
-# st_transform() can introduce small geometric errors (e.g., 2-point LinearRings)
-# that cause st_point_on_surface() to fail. We must repair them immediately.
-invalid_geoms_after_transform <- !sf::st_is_valid(grid_4326)
-message(glue::glue("Found {sum(invalid_geoms_after_transform)} invalid geometries after reprojection. Repairing..."))
-grid_4326 <- sf::st_make_valid(grid_4326)
-
-message("4. Attaching attributes via spatial join...")
-# Use point-on-surface for a robust join that avoids duplicating grid cells that touch multiple polygons
-grid_pts <- st_point_on_surface(grid_4326)
-
-grid_attrs <- grid_pts %>%
-  st_join(st_transform(land_polys, st_crs(grid_pts)) %>% select(any_of(c("iso3", "nev_name", "country", "region_wb", "income_grp", "continent", "region_un", "subregion")))) %>%
-  st_join(st_transform(biome_sf, st_crs(grid_pts)) %>% select(WWF_biome)) %>%
-  st_drop_geometry() %>%
-  # Conditionally rename 'country' to 'nev_name' if 'nev_name' doesn't already exist.
-  {
-    df <- .
-    if (!"nev_name" %in% names(df) && "country" %in% names(df)) {
-      df <- dplyr::rename(df, nev_name = country)
-    }
-    df
-  } %>%
-  select(fid = ID, any_of(c("iso3", "nev_name", "region_wb", "income_grp", "continent", "region_un", "subregion", "WWF_biome"))) %>%
-  distinct(fid, .keep_all = TRUE) # Ensure one row per grid cell
-
-grid_final <- grid_4326 %>%
-  select(fid = ID) %>%
-  left_join(grid_attrs, by = "fid")
-
-message("5. Final validation and aggressive geometry cleaning...")
-invalid_geoms <- !sf::st_is_valid(grid_final)
-if (any(invalid_geoms)) {
-  message(glue::glue("Found {sum(invalid_geoms)} invalid geometries. Attempting to repair..."))
-  grid_final <- sf::st_make_valid(grid_final)
-
-  # Add a parallelized zero-buffer to rebuild geometries, which can fix more stubborn issues
-  message("Applying parallelized zero-buffer to fix complex geometry errors...")
-  n_cores <- parallel::detectCores() - 2
-  if (is.na(n_cores) || n_cores < 1) n_cores <- 1
-
-  message(glue::glue("Splitting data into {n_cores} chunks for parallel processing..."))
-  row_indices <- 1:nrow(grid_final)
-  chunks <- split(row_indices, cut(row_indices, n_cores, labels = FALSE))
-  grid_chunks <- lapply(chunks, function(idx) grid_final[idx, ])
-
-  processed_chunks <- parallel::mclapply(grid_chunks, function(chunk) {
-    sf::st_buffer(chunk, dist = 0)
-  }, mc.cores = n_cores)
-
-  message("Recombining parallel chunks...")
-  grid_final <- do.call(rbind, processed_chunks)
+if (st_crs(grid_raw) != st_crs(land_polys)) {
+  land_polys <- st_transform(land_polys, st_crs(grid_raw))
 }
-empty_geoms <- sf::st_is_empty(grid_final)
-if (any(empty_geoms)) {
-    message(glue::glue("Found and removed {sum(empty_geoms)} empty geometries."))
-    grid_final <- grid_final[!empty_geoms, ]
-}
+
+# Keep grid cells that intersect any land polygon
+grid_land <- st_filter(grid_raw, land_polys, .predicate = st_intersects)
+
+# Define grouping variables to attach from the correspondence file.
+# NOTE: We are temporarily excluding `WWF_biome` here. The `any_of()` selector
+# was silently ignoring it, which is why this chunk was stable.
+GROUPING_VARS <- c("nev_name", "region_wb", "income_grp")
+
+# Attach attributes for aggregation (spatial join or fid-based join)
+land_attrs <- land_polys |>
+  dplyr::select(any_of(GROUPING_VARS))
+grid_land <- st_join(grid_land, land_attrs, join = st_intersects, left = TRUE)
 
 out_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
 message("Writing final clean grid to: ", out_path)
-st_write(grid_final, out_path, delete_dsn = TRUE)
+st_write(grid_land, out_path, delete_dsn = TRUE)
 
 message("Base grid preparation complete.")
 ```

@@ -1,11 +1,10 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
 ### 2026-05-27
-*   **Data Pipeline Failure & Final Fix Attempt:**
-    *   **Root Cause Pinpointed:** The `prepare_data.qmd` script failed again, this time *within R* before ever getting to Python. The error `IllegalArgumentException: Invalid number of points in LinearRing found 2` occurred during the `st_point_on_surface(grid_4326)` call.
-    *   **Diagnosis:** This definitively proves that the geometry errors are being introduced during the R-based data preparation, specifically by the `st_transform()` function. Even with valid input, reprojection can create a small number of invalid geometries (like 2-point lines masquerading as polygons) that downstream functions cannot handle. Previous attempts to remove the dateline wrapping were a red herring; the core issue is the lack of validation immediately after reprojection.
-    *   **Definitive Solution:** A final fix has been implemented in `prepare_data.qmd`. An `st_make_valid()` call is now performed *immediately* after `st_transform()` and *before* `st_point_on_surface()`. This ensures that any errors introduced by the reprojection are repaired at the source, making the rest of the pipeline robust.
-    *   This is the last attempt to fix the vector-based pipeline. If this fails, we will pivot to the raster-based workflow (`create_zone_raster.R`).
+*   **Data Pipeline Failure & Strategic Rollback:**
+    *   **Breaking Change Identified:** After multiple failed attempts to fix the `IllegalArgumentException: Invalid number of points in LinearRing` error, a comparison with the last known working version of `prepare_data.qmd` was performed.
+    *   **Root Cause:** The error was introduced when the data preparation logic was changed to accommodate biome attributes. The original, working script used a direct `st_join` on polygons. The new, failing script introduced a call to `st_point_on_surface()` before joining, which is much less tolerant of minor geometric invalidities created during the `st_transform()` reprojection step.
+    *   **Resolution:** The `prep-grid-aoo-land` chunk in `prepare_data.qmd` has been reverted to the simpler, more robust logic from the last working version. This removes the dependency on `st_point_on_surface` and the complex, multi-source attribute join, which was the source of the instability. The pipeline should now be able to generate the base grid successfully, as it did before these changes. The addition of biome data will be re-evaluated in a separate, more robust manner after the core pipeline is restored.
 
 ---
 
