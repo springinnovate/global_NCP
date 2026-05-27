@@ -1,5 +1,17 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-05-27 (cont. 4)
+*   **Recurring Python Pipeline Failure (`RasterioIOError`):** The pipeline failed again with a `No such file or directory` error, this time for `n_retention_ratio_2020.tif`.
+*   **Root Cause Analysis:**
+    1.  The error message (`/data/base_years_ha/n_retention_ratio_2020.tif: No such file or directory`) is identical in nature to the previous failure. It indicates the Python script is looking for a file in a path that is missing the `/raw/` subdirectory.
+    2.  The fix applied in the previous step (updating all paths in `analysis_configs/services_slim.yaml` to include `/raw/`) correctly resolves this issue for all raster layers.
+    3.  The fact that the pipeline failed again on a *different* file but with the *same* path issue strongly indicates that the pipeline was executed using the original, un-patched YAML configuration file.
+*   **Resolution:**
+    1.  **Action Required:** The user must ensure they are running the Python pipeline using the version of `analysis_configs/services_slim.yaml` that was corrected in the previous step. No new code or configuration changes are needed.
+    2.  The `summary_pipeline_landgrid.py` script remains robust enough to handle individual task failures if the YAML is partially correct, but the root cause of the `FileNotFoundError` must be addressed by using the fully corrected configuration file.
+
+---
+
 ### 2026-05-27 (cont. 3)
 *   **Python Pipeline Failure (`RasterioIOError`):** The Python pipeline failed during zonal statistics with a `No such file or directory` error for `sed_retention_ratio_2020.tif`.
 *   **Root Cause Analysis:**
