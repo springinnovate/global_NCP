@@ -10,10 +10,10 @@ import sys
 import time
 import yaml
 from pathlib import Path
-
 from ecoshard import taskgraph
-from exactextract import exact_extract
 import pandas as pd
+import numpy as np
+import rasterio
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,22 +27,68 @@ LOGGER = logging.getLogger(__name__)
 
 def zonal_stats_raster(value_raster_path, zone_raster_path, op_stats):
     """Calculate zonal stats using a value raster and a zone raster."""
-    LOGGER.info(f"Starting zonal stats for {Path(value_raster_path).name} using zones from {Path(zone_raster_path).name}")
+    LOGGER.info(f"Starting block-by-block zonal stats for {Path(value_raster_path).name}")
 
-    # exact_extract can take a raster as the 'vec' input.
-    # The values of the zone raster are used as the feature IDs.
-    stats_df = exact_extract(
-        value_raster_path,
-        zone_raster_path,
-        ops=op_stats,
-        output="pandas",
-        include_cols=["value"] # 'value' is the default name for the zone raster pixel values
-    )
+    fid_stats = {}
 
-    # Rename the 'value' column to 'fid' to match our project's ID system
-    stats_df.rename(columns={"value": "fid"}, inplace=True)
+    with rasterio.open(zone_raster_path) as z_src, rasterio.open(value_raster_path) as v_src:
+        if z_src.shape != v_src.shape:
+            LOGGER.warning(f"Shape mismatch: Zones {z_src.shape} vs Values {v_src.shape}")
 
-    return stats_df
+        z_nodata = z_src.nodata
+        v_nodata = v_src.nodata
+
+        # Iterate through raster blocks to avoid loading massive global grids entirely into RAM
+        for _, window in z_src.block_windows(1):
+            zones = z_src.read(1, window=window)
+            vals = v_src.read(1, window=window)
+
+            mask = np.ones(zones.shape, dtype=bool)
+            
+            if z_nodata is not None:
+                if np.isnan(z_nodata): mask &= ~np.isnan(zones)
+                else: mask &= (zones != z_nodata)
+                
+            if np.issubdtype(vals.dtype, np.floating):
+                mask &= ~np.isnan(vals)
+                
+            if v_nodata is not None and not np.isnan(v_nodata):
+                mask &= (vals != v_nodata)
+
+            valid_zones = zones[mask].astype(int)
+            valid_vals = vals[mask]
+
+            if valid_zones.size == 0:
+                continue
+
+            # Grouping via pandas is fast and clean
+            df = pd.DataFrame({'fid': valid_zones, 'value': valid_vals})
+            chunk_agg = df.groupby('fid')['value'].agg(['sum', 'count', 'max', 'min'])
+
+            for fid, row in chunk_agg.iterrows():
+                if fid not in fid_stats:
+                    fid_stats[fid] = {'sum': 0.0, 'count': 0, 'max': float('-inf'), 'min': float('inf')}
+                
+                stat = fid_stats[fid]
+                stat['sum'] += row['sum']
+                stat['count'] += row['count']
+                stat['max'] = max(stat['max'], row['max'])
+                stat['min'] = min(stat['min'], row['min'])
+
+    results = []
+    for fid, stat in fid_stats.items():
+        row = {'fid': fid}
+        if 'mean' in op_stats:
+            row['mean'] = stat['sum'] / stat['count'] if stat['count'] > 0 else np.nan
+        if 'sum' in op_stats:
+            row['sum'] = stat['sum']
+        if 'max' in op_stats:
+            row['max'] = stat['max']
+        if 'min' in op_stats:
+            row['min'] = stat['min']
+        results.append(row)
+
+    return pd.DataFrame(results)
 
 def main():
     parser = argparse.ArgumentParser(description="Raster-based zonal stats pipeline.")
