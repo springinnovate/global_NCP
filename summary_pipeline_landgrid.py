@@ -102,6 +102,26 @@ def create_progress_logger(update_rate, task_id):
 
     return _process_logger
 
+def fix_geometries(gdf, name=""):
+    """
+    Aggressively validate and fix invalid geometries in a GeoDataFrame.
+    This is applied in the worker process just-in-time before reprojection.
+    """
+    LOGGER.info(f"Validating and fixing geometries in {name}...")
+    original_len = len(gdf)
+    
+    # The buffer(0) trick is a common way to fix simple invalidities.
+    # .make_valid() handles more complex cases like self-intersections.
+    # We chain them and remove any empty geometries that might be created.
+    gdf.geometry = gdf.geometry.buffer(0).make_valid()
+    gdf = gdf[~gdf.geometry.is_empty].copy()
+    
+    fixed_len = len(gdf)
+    if original_len != fixed_len:
+        LOGGER.warning(f"  Removed {original_len - fixed_len} invalid/empty geometries from {name}.")
+    LOGGER.info(f"  ✓ {fixed_len} valid geometries remaining in {name}")
+    return gdf
+
 
 def zonal_stats(raster_path_band_dict, op_stats, vector_path):
     """Calculate zonal statistics for vector file over a given raster.
@@ -128,6 +148,10 @@ def zonal_stats(raster_path_band_dict, op_stats, vector_path):
     """
     # Use on_invalid="ignore" to be robust against minor geometry errors on read.
     gdf = gpd.read_file(vector_path, on_invalid="ignore")
+
+    # Aggressive just-in-time cleaning before reprojection, as this is where
+    # the GEOSException occurs. This mirrors the logic from enrich_grid.py.
+    gdf = fix_geometries(gdf, f"worker for {Path(vector_path).stem}")
 
     # reproject if necessary
     with rasterio.open(raster_path_band_dict["path"]) as src:
