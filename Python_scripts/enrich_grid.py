@@ -121,8 +121,17 @@ def main():
 
     LOGGER.info("  Performing spatial join with Correspondence layer (using centroids for performance)...")
     # The `enriched_grid` currently has point geometries, so this join will also be fast.
+
+    # Capture the original feature ID of the correspondence layer for future tabular joins
+    if 'fid' in correspondence.columns:
+        correspondence['c_fid'] = correspondence['fid']
+    elif 'id' in correspondence.columns:
+        correspondence['c_fid'] = correspondence['id']
+    else:
+        correspondence['c_fid'] = correspondence.index
+
     # Select columns to join
-    cols_to_join = ['nev_name', 'continent', 'region_un', 'region_wb', 'subregion', 'income_grp', 'geometry']
+    cols_to_join = ['c_fid', 'nev_name', 'continent', 'region_un', 'region_wb', 'subregion', 'income_grp', 'geometry']
     enriched_grid = gpd.sjoin(enriched_grid, correspondence[cols_to_join], how="left", predicate="within")
     enriched_grid = enriched_grid[~enriched_grid.index.duplicated(keep='first')]
     LOGGER.info(f"  ✓ Grid now has {len(enriched_grid)} cells after correspondence join.")
@@ -139,8 +148,12 @@ def main():
     # At this point, `enriched_grid` has all the attributes, but POINT geometries.
     # We drop the point geometry and merge the attributes back to the original `grid`
     # which still has the correct POLYGON geometries. The index is preserved.
+
+    # Identify only the newly added columns to prevent _x and _y duplicate artifacts
+    new_cols = [c for c in enriched_grid.columns if c not in grid.columns and c != 'index_right']
+
     enriched_grid = grid.merge(
-        enriched_grid.drop(columns='geometry'), left_index=True, right_index=True, how="left"
+        enriched_grid[new_cols], left_index=True, right_index=True, how="left"
     )
     enriched_grid = fix_geometries(enriched_grid, "Grid after Correspondence Join")
 
