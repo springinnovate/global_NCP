@@ -115,6 +115,24 @@ A common source of confusion in global-scale GIS analysis is the visual and geom
 *   **Area is the Invariant:** The critical property preserved by an equal-area projection is the **area**. A dedicated validation script (`Python_scripts/verify_grid_area.py`) was developed to measure the true geometric area of the reprojected grid cells.
 *   **Validation Outcome:** This analysis definitively confirmed that each grid cell in the reprojected analysis files (e.g., `..._epsg8857.gpkg`) has an area of **100 km²** (10km x 10km), within a very small tolerance. This validates the integrity of the project's spatial foundation and ensures that all area-based calculations are correct.
 
+## Data Preparation: Canonical Master Grid Generation
+
+Due to severe performance and geometry-validity bottlenecks encountered when performing massive spatial joins natively in R (the `sf` package), the creation of the canonical 10km master grid was migrated to a hybrid QGIS-Python workflow.
+
+1.  **Landmass Masking (QGIS):**
+    *   The original global `AOOGrid` was loaded into QGIS.
+    *   The WWF Biomes layer was dissolved to create a single global landmass polygon.
+    *   A "Select by Location" operation isolated all 10km grid cells intersecting the landmass.
+    *   The selection was exported as `landgrid_1.gpkg`.
+2.  **Geometry Cleaning:**
+    *   To resolve minor topological errors (e.g., self-intersecting rings caused by clipping at coastlines and the dateline), the geometries were validated and cleaned, resulting in `landgrid_1_clean.gpkg`.
+3.  **Attribute Enrichment (Python):**
+    *   The final stage is handled by `Python_scripts/enrich_grid.py`.
+    *   This script performs a highly optimized, centroid-based spatial join to map WWF Biomes, Country, UN/World Bank Regions, and Income Group attributes (from the `ee_correspondence` dataset) onto the grid.
+    *   It inherently handles geometry validation (`buffer(0).make_valid()`) and deduplication, outputting the final, analysis-ready `landgrid_1_clean_enriched.gpkg`.
+    
+*Note: The legacy R script `analysis/prepare_data.qmd` and standalone cleaning utilities like `clean_grid.py` were fully deprecated in v1.3.4 in favor of this robust Python workflow.*
+
 ## Key Analysis Parameters
 
 -   **Hotspot Threshold:** The threshold for identifying hotspots is defined in `analysis/hotspot_extraction.qmd`. It is configured in an R object named `HOTS_CFG` with the parameter `pct_cutoff = 0.05`, representing the top/bottom 5% of SPC values.
