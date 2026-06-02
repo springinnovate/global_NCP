@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Jerónimo Rodríguez Escobar">
+<meta name="author" content="Becky Chaplin-Kramer">
+<meta name="author" content="Richard P. Sharp">
+<meta name="dcterms.date" content="2023-12-31">
+
+<title>Global Ecosystem Service Hotspots: A Spatiotemporal Analysis of Change, Exposure, and Attribution</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="paper_draft_files/libs/clipboard/clipboard.min.js"></script>
+<script src="paper_draft_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="paper_draft_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="paper_draft_files/libs/quarto-html/popper.min.js"></script>
+<script src="paper_draft_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="paper_draft_files/libs/quarto-html/anchor.min.js"></script>
+<link href="paper_draft_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="paper_draft_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="paper_draft_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="paper_draft_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="paper_draft_files/libs/bootstrap/bootstrap-67270d1595a62d14f123c043d4fb2f18.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul class="collapse">
+  <li><a href="#abstract" id="toc-abstract" class="nav-link active" data-scroll-target="#abstract"><span class="header-section-number">1</span> Abstract</a></li>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link" data-scroll-target="#introduction"><span class="header-section-number">2</span> 1. Introduction</a></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods"><span class="header-section-number">3</span> 2. Methods</a></li>
+  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results"><span class="header-section-number">4</span> 3. Results</a></li>
+  <li><a href="#discussion" id="toc-discussion" class="nav-link" data-scroll-target="#discussion"><span class="header-section-number">5</span> 4. Discussion</a></li>
+  <li><a href="#conclusions" id="toc-conclusions" class="nav-link" data-scroll-target="#conclusions"><span class="header-section-number">6</span> 5. Conclusions</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references"><span class="header-section-number">7</span> References</a></li>
+  <li><a href="#appendix-a-supplementary-methods" id="toc-appendix-a-supplementary-methods" class="nav-link" data-scroll-target="#appendix-a-supplementary-methods"><span class="header-section-number">8</span> Appendix A: Supplementary Methods</a>
+  <ul class="collapse">
+  <li><a href="#a1.-hotspot-definition-rationale" id="toc-a1.-hotspot-definition-rationale" class="nav-link" data-scroll-target="#a1.-hotspot-definition-rationale"><span class="header-section-number">8.1</span> A1. Hotspot Definition Rationale</a></li>
+  <li><a href="#a2.-spc-formula-derivation" id="toc-a2.-spc-formula-derivation" class="nav-link" data-scroll-target="#a2.-spc-formula-derivation"><span class="header-section-number">8.2</span> A2. SPC Formula Derivation</a></li>
+  </ul></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Global Ecosystem Service Hotspots: A Spatiotemporal Analysis of Change, Exposure, and Attribution</h1>
+<p class="subtitle lead">Collaborative Draft for Advisor Feedback</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Authors</div>
+    <div class="quarto-title-meta-contents">
+             <p>Jerónimo Rodríguez Escobar </p>
+             <p>Becky Chaplin-Kramer </p>
+             <p>Richard P. Sharp </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">December 31, 2023</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="abstract" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Abstract</h1>
+<p>Ecosystem services are declining globally, but the spatial concentration, affected populations, and underlying mechanisms remain poorly understood. We analyze changes in seven ecosystem services across 1.7 million 10-km grid cells worldwide from 1992 to 2020 using biophysical models (InVEST), satellite data (ESA CCI land cover), and socioeconomic covariates. We identify 75,271 ecosystem service hotspots (top/bottom 5% of change distribution per service) and find: (1) <strong>geographic clustering</strong> predominantly in Sub-Saharan Africa, Latin America, and Southeast Asia; (2) <strong>differential exposure</strong> across income groups and land-use contexts, with low-income regions experiencing 2.2× higher hotspot intensity; (3) <strong>attribution complexity</strong> where ~60-70% of hotspots show limited overlap with detected land cover conversion, suggesting in-situ degradation exceeds conversion in driving service decline. These findings support targeted conservation strategies that account for geographic concentration, socioeconomic vulnerability, and region-specific management drivers.</p>
+<p><strong>Keywords:</strong> Ecosystem services, hotspots, land-use change, socioeconomic profiling, global assessment</p>
+<hr>
+</section>
+<section id="introduction" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> 1. Introduction</h1>
+<section id="ecosystem-services-at-risk" class="level3" data-number="2.0.1">
+<h3 data-number="2.0.1" class="anchored" data-anchor-id="ecosystem-services-at-risk"><span class="header-section-number">2.0.1</span> 1.1 Ecosystem Services at Risk</h3>
+<p>Ecosystem services—the benefits humans derive from nature—are fundamental to human wellbeing. Yet services including pollination, water purification, coastal protection, and biodiversity support are declining globally due to land-use change, climate variation, and ecosystem degradation (Millennium Ecosystem Assessment, 2005; IPBES, 2019). An estimated 1.1 billion people depend directly on ecosystem services for livelihoods, yet the geographic patterns and affected populations remain incompletely characterized.</p>
+</section>
+<section id="the-prioritization-challenge" class="level3" data-number="2.0.2">
+<h3 data-number="2.0.2" class="anchored" data-anchor-id="the-prioritization-challenge"><span class="header-section-number">2.0.2</span> 1.2 The Prioritization Challenge</h3>
+<p>Conservation resources are limited. Decision-makers lack spatially explicit, globally consistent information on where ecosystem service decline is most acute (WHERE), who is affected (WHO), and what mechanisms drive observed changes (WHY). This information gap hampers equitable prioritization and effective allocation of adaptation and conservation investments.</p>
+</section>
+<section id="research-objectives" class="level3" data-number="2.0.3">
+<h3 data-number="2.0.3" class="anchored" data-anchor-id="research-objectives"><span class="header-section-number">2.0.3</span> 1.3 Research Objectives</h3>
+<p>This study addresses three linked research questions:</p>
+<ol type="1">
+<li><strong>WHERE</strong> are ecosystem service hotspots (regions of extreme change) geographically concentrated?</li>
+<li><strong>WHO</strong> is exposed to ecosystem service decline, and how do affected populations vary across socioeconomic profiles?</li>
+<li><strong>WHY</strong> are services declining—are changes driven by land cover conversion or in-situ degradation?</li>
+</ol>
+<p>We provide a global, reproducible assessment using open-source models, satellite data, and socioeconomic layers.</p>
+<hr>
+</section>
+</section>
+<section id="methods" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> 2. Methods</h1>
+<section id="data-sources-and-study-design" class="level3" data-number="3.0.1">
+<h3 data-number="3.0.1" class="anchored" data-anchor-id="data-sources-and-study-design"><span class="header-section-number">3.0.1</span> 2.1 Data Sources and Study Design</h3>
+<p><strong>Temporal Scope:</strong> 1992 and 2020 (two snapshots; intermediate dynamics not captured) <strong>Spatial Scope:</strong> All land on Earth; 10-km grid cells (n=1,689,609)</p>
+<section id="ecosystem-services" class="level4" data-number="3.0.1.1">
+<h4 data-number="3.0.1.1" class="anchored" data-anchor-id="ecosystem-services"><span class="header-section-number">3.0.1.1</span> 2.1.1 Ecosystem Services</h4>
+<p>We model seven ecosystem services using InVEST (Natural Capital Project) at 360-m resolution:</p>
+<ul>
+<li><strong>Nature Access</strong> (proximity to natural habitat)</li>
+<li><strong>Pollination</strong> (habitat suitability for wild pollinators)</li>
+<li><strong>Coastal Protection</strong> (wave energy attenuation)</li>
+<li><strong>Nitrogen Export</strong> (N loading to waterways)</li>
+<li><strong>Nitrogen Retention Ratio</strong> (N filtering efficiency)</li>
+<li><strong>Sediment Export</strong> (sediment yield to waterways)</li>
+<li><strong>Sediment Retention Ratio</strong> (sediment trapping efficiency)</li>
+</ul>
+</section>
+<section id="ancillary-data" class="level4" data-number="3.0.1.2">
+<h4 data-number="3.0.1.2" class="anchored" data-anchor-id="ancillary-data"><span class="header-section-number">3.0.1.2</span> 2.1.2 Ancillary Data</h4>
+<ul>
+<li><strong>Land Cover:</strong> ESA CCI Land Cover (300m); reclassified as Transformed vs.&nbsp;Natural</li>
+<li><strong>Spatial Framework:</strong> IUCN Areas of Occupancy grid (10km cells; ~1.7M cells globally)</li>
+<li><strong>Socioeconomic Covariates:</strong> Population (GHSL), GDP (World Bank), HDI (UNDP), Built-up area (GHSL), Agricultural intensity</li>
+</ul>
+</section>
+</section>
+<section id="analysis-pipeline" class="level3" data-number="3.0.2">
+<h3 data-number="3.0.2" class="anchored" data-anchor-id="analysis-pipeline"><span class="header-section-number">3.0.2</span> 2.2 Analysis Pipeline</h3>
+<section id="zonal-summary-grid-level-change" class="level4" data-number="3.0.2.1">
+<h4 data-number="3.0.2.1" class="anchored" data-anchor-id="zonal-summary-grid-level-change"><span class="header-section-number">3.0.2.1</span> 2.2.1 Zonal Summary &amp; Grid-Level Change</h4>
+<ol type="1">
+<li>Aggregate InVEST rasters to 10-km grid cells (zonal statistics) for 1992 and 2020</li>
+<li>Calculate per-cell change metrics:
+<ul>
+<li><strong>Absolute Change:</strong> <span class="math inline">\(\Delta S = S_{2020} - S_{1992}\)</span></li>
+<li><strong>Symmetric Percentage Change (SPC):</strong> <span class="math inline">\(SPC = \frac{S_{2020} - S_{1992}}{(|S_{2020}| + |S_{1992}|)/2} \times 100\)</span></li>
+</ul></li>
+</ol>
+<p>SPC is preferred because it treats increases/decreases symmetrically and avoids scale bias (Pontius &amp; Santacruz, 2014).</p>
+</section>
+<section id="hotspot-identification" class="level4" data-number="3.0.2.2">
+<h4 data-number="3.0.2.2" class="anchored" data-anchor-id="hotspot-identification"><span class="header-section-number">3.0.2.2</span> 2.2.2 Hotspot Identification</h4>
+<p>Define <strong>ecosystem service hotspots</strong> as cells in the extreme 5th percentile (bottom 5% for loss services; top 5% for gain services) of the SPC distribution per service.</p>
+<p><strong>Rationale:</strong> Relative extremes (percentiles) rather than absolute thresholds enable comparison across services with different units and scales.</p>
+</section>
+<section id="spatial-aggregation" class="level4" data-number="3.0.2.3">
+<h4 data-number="3.0.2.3" class="anchored" data-anchor-id="spatial-aggregation"><span class="header-section-number">3.0.2.3</span> 2.2.3 Spatial Aggregation</h4>
+<p>Aggregate hotspots to: - World Bank regions (n=7) - Income groups (n=4: High, Upper-Middle, Lower-Middle, Low) - WWF biomes (n=14) - Countries (n=195)</p>
+<p>Calculate per-region: - <strong>Hotspot Count &amp; Coverage:</strong> Number and area of cells flagged as hotspots - <strong>Relative Intensity:</strong> (Regional hotspot % area) / (Expected share if random) = enrichment score</p>
+</section>
+<section id="socioeconomic-profiling-kolmogorov-smirnov-tests" class="level4" data-number="3.0.2.4">
+<h4 data-number="3.0.2.4" class="anchored" data-anchor-id="socioeconomic-profiling-kolmogorov-smirnov-tests"><span class="header-section-number">3.0.2.4</span> 2.2.4 Socioeconomic Profiling: Kolmogorov-Smirnov Tests</h4>
+<p>Compare distributions of socioeconomic covariates in hotspot vs.&nbsp;non-hotspot cells using two-sample KS tests:</p>
+<p><span class="math display">\[D = \max_x |F_{\text{hotspot}}(x) - F_{\text{non-hotspot}}(x)|\]</span></p>
+<p><strong>Variables tested:</strong> Population density, built-up area %, GDP per capita, HDI, field size, agricultural intensity</p>
+<p><strong>Effect Size:</strong> Cliff’s Delta (δ) to quantify magnitude and direction of difference</p>
+<p><strong>Multiple Testing Correction:</strong> False Discovery Rate (FDR) adjustment for p-values</p>
+</section>
+</section>
+<section id="attribution-analysis" class="level3" data-number="3.0.3">
+<h3 data-number="3.0.3" class="anchored" data-anchor-id="attribution-analysis"><span class="header-section-number">3.0.3</span> 2.3 Attribution Analysis</h3>
+<p>Quantify overlap between ecosystem service hotspots and detected land cover change (drivers): - Forest Loss, Cropland Expansion, Grassland Loss/Gain, Urban Expansion, etc.</p>
+<p>Calculate <strong>Attribution Gap</strong> = (ES hotspots with no LCC overlap) / (Total ES hotspots)</p>
+<p>High attribution gaps suggest in-situ degradation mechanisms not captured by land cover detection.</p>
+</section>
+<section id="data-limitations" class="level3" data-number="3.0.4">
+<h3 data-number="3.0.4" class="anchored" data-anchor-id="data-limitations"><span class="header-section-number">3.0.4</span> 2.4 Data Limitations</h3>
+<ul>
+<li><strong>Temporal resolution:</strong> Two snapshots; intermediate dynamics missed</li>
+<li><strong>InVEST models:</strong> Do not explicitly include climate drivers; validation ongoing</li>
+<li><strong>Land cover:</strong> 300-m resolution may miss sub-pixel changes</li>
+<li><strong>Attribution gap:</strong> Inferred degradation signal, not directly measured</li>
+<li><strong>Biomes &amp; income groups:</strong> Classifications inherently coarse; within-group heterogeneity substantial</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="results" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> 3. Results</h1>
+<section id="global-hotspot-distribution" class="level3" data-number="4.0.1">
+<h3 data-number="4.0.1" class="anchored" data-anchor-id="global-hotspot-distribution"><span class="header-section-number">4.0.1</span> 3.1 Global Hotspot Distribution</h3>
+<p>Across seven ecosystem services, we identified <strong>75,271 ecosystem service hotspots</strong> (4.45% of 1.69M grid cells). Hotspots are <strong>highly geographically concentrated</strong>:</p>
+<ul>
+<li><strong>Sub-Saharan Africa:</strong> 2.34× enrichment (hotspots disproportionately concentrated)</li>
+<li><strong>Europe &amp; Central Asia:</strong> 1.24× enrichment</li>
+<li><strong>North America:</strong> 1.16× enrichment</li>
+<li><strong>Latin America &amp; Caribbean:</strong> 1.13× enrichment</li>
+<li><strong>East Asia &amp; Pacific:</strong> 0.94× enrichment (fewer hotspots than expected by chance)</li>
+</ul>
+</section>
+<section id="socioeconomic-profiling-ks-test-results" class="level3" data-number="4.0.2">
+<h3 data-number="4.0.2" class="anchored" data-anchor-id="socioeconomic-profiling-ks-test-results"><span class="header-section-number">4.0.2</span> 3.2 Socioeconomic Profiling: KS Test Results</h3>
+<p>KS tests reveal <strong>47 out of 48 service × variable combinations</strong> (97.9%) show statistically significant differences between hotspot and non-hotspot populations (p &lt; 0.05 after FDR correction).</p>
+<p><strong>Key Patterns:</strong></p>
+<p><strong>Urban-Associated Services</strong> (Nature Access, Coastal Protection, Sediment Retention): - Hotspots have <strong>higher</strong> population density, built-up area, GDP - Interpretation: Decline driven by urbanization and infrastructure development</p>
+<p><strong>Agricultural-Associated Services</strong> (Pollination, Nitrogen/Sediment Export): - Hotspots have <strong>lower</strong> population density, <strong>higher</strong> agricultural intensity - Interpretation: Decline driven by agricultural intensification</p>
+</section>
+<section id="population-exposure" class="level3" data-number="4.0.3">
+<h3 data-number="4.0.3" class="anchored" data-anchor-id="population-exposure"><span class="header-section-number">4.0.3</span> 3.3 Population Exposure</h3>
+<p><strong>~7.9 billion people</strong> live in or depend on ecosystem service hotspots globally.</p>
+<p><strong>By income group:</strong> - Upper-Middle Income: Largest absolute numbers exposed - Lower-Middle Income: Second largest - Low Income: 4.2% of exposed population (but relative intensity 2.2× higher than OECD)</p>
+</section>
+<section id="attribution-gap-conversion-vs.-degradation" class="level3" data-number="4.0.4">
+<h3 data-number="4.0.4" class="anchored" data-anchor-id="attribution-gap-conversion-vs.-degradation"><span class="header-section-number">4.0.4</span> 3.4 Attribution Gap: Conversion vs.&nbsp;Degradation</h3>
+<p>Land cover change explains only <strong>~30-40%</strong> of ecosystem service hotspots on average. Most hotspots (<strong>~60-70%</strong>) show minimal overlap with detected land cover conversion, suggesting <strong>in-situ degradation is the primary mechanism</strong> of service decline.</p>
+<p><strong>Top drivers (by overlap %):</strong> - Forest Loss: 19.8% - Cropland Expansion: 19.0% - Grassland Loss: 7.7%</p>
+<p><strong>Interpretation:</strong> Majority of service decline occurs WITHOUT detected conversion, implying: - Forest quality declining (logging, understory loss) - Agricultural intensification without land-cover expansion (fertilizer use, monoculture) - Hydrological/edaphic changes not detectable via satellite land cover</p>
+<hr>
+</section>
+</section>
+<section id="discussion" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> 4. Discussion</h1>
+<section id="geographic-clustering-enables-prioritization" class="level3" data-number="5.0.1">
+<h3 data-number="5.0.1" class="anchored" data-anchor-id="geographic-clustering-enables-prioritization"><span class="header-section-number">5.0.1</span> 4.1 Geographic Clustering Enables Prioritization</h3>
+<p>The strong geographic clustering of hotspots (Sub-Saharan Africa, Latin America, Southeast Asia) suggests conservation resources can be efficiently allocated to epicenters of highest impact. A small number of countries account for majority of global hotspots, enabling targeted strategies.</p>
+<p><strong>However:</strong> Clustering patterns vary by service, requiring service-specific, not generic, approaches.</p>
+</section>
+<section id="differentiated-vulnerability" class="level3" data-number="5.0.2">
+<h3 data-number="5.0.2" class="anchored" data-anchor-id="differentiated-vulnerability"><span class="header-section-number">5.0.2</span> 4.2 Differentiated Vulnerability</h3>
+<p>Socioeconomic profiling reveals ecosystem service decline affects different populations differently:</p>
+<ul>
+<li><strong>Urbanized poor</strong> face nature access and coastal protection decline</li>
+<li><strong>Rural farmers</strong> face pollination and water quality decline</li>
+</ul>
+<p>This differentiation argues against one-size-fits-all conservation policy. Interventions must be tailored to local socioeconomic context and service-specific drivers.</p>
+</section>
+<section id="attribution-complexity-degradation-conversion" class="level3" data-number="5.0.3">
+<h3 data-number="5.0.3" class="anchored" data-anchor-id="attribution-complexity-degradation-conversion"><span class="header-section-number">5.0.3</span> 4.3 Attribution Complexity: Degradation ≥ Conversion</h3>
+<p>The large attribution gap (~60-70%) challenges simplistic narratives that land cover conversion drives all ecosystem service decline. In-situ degradation appears equally or more important, with several implications:</p>
+<ol type="1">
+<li><strong>Protected area strategies alone insufficient</strong> — existing habitat must be actively managed, not just protected from conversion</li>
+<li><strong>Monitoring needs refinement</strong> — satellite land cover detection misses key degradation signals</li>
+<li><strong>Climate integration needed</strong> — unexplained decline may partly reflect climate-driven changes, not captured in current analysis</li>
+</ol>
+</section>
+<section id="limitations-uncertainties" class="level3" data-number="5.0.4">
+<h3 data-number="5.0.4" class="anchored" data-anchor-id="limitations-uncertainties"><span class="header-section-number">5.0.4</span> 4.4 Limitations &amp; Uncertainties</h3>
+<p><strong>Data limitations:</strong> Two temporal snapshots mask intermediate dynamics; InVEST models do not explicitly include climate; land cover resolution (300m) may miss fine-scale changes.</p>
+<p><strong>Interpretation limitations:</strong> Attribution gap inferred from land cover mismatch, not direct degradation measurement; within-group heterogeneity (e.g., “Sub-Saharan Africa”) substantial.</p>
+<p><strong>Model validation:</strong> InVEST model predictions require field-based validation; high priority in high-impact regions.</p>
+<hr>
+</section>
+</section>
+<section id="conclusions" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> 5. Conclusions</h1>
+<p>This global assessment identifies ecosystem service hotspots, quantifies affected populations, and characterizes underlying drivers. Three main conclusions:</p>
+<ol type="1">
+<li><p><strong>Ecosystem service decline is geographically concentrated</strong>, enabling targeted conservation prioritization to Sub-Saharan Africa, Latin America, and Southeast Asia.</p></li>
+<li><p><strong>Vulnerability is socioeconomically differentiated</strong>, requiring context-specific interventions for urban vs.&nbsp;rural populations and different service-stakeholder groups.</p></li>
+<li><p><strong>Degradation mechanisms dominate</strong>, suggesting that conversion prevention alone is insufficient; ecosystem management within remaining habitat is equally critical.</p></li>
+</ol>
+<p><strong>Recommendations for future work:</strong> - Field validation of InVEST models in high-priority regions - Integration of climate drivers - Fine-scale (1-km) mapping in priority hotspots - Co-production with affected communities and land managers</p>
+<hr>
+</section>
+<section id="references" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> References</h1>
+<p><em>[Note: Bibliography to be populated with full citations during final manuscript preparation]</em></p>
+<p><strong>Key references to include:</strong> - Millennium Ecosystem Assessment (2005) - IPBES Global Assessment (2019) - Sharp et al.&nbsp;InVEST publications - Pontius &amp; Santacruz (2014) - SPC methodology - ESA CCI Land Cover documentation - World Bank regional classifications - UNDP HDI methodology</p>
+<hr>
+</section>
+<section id="appendix-a-supplementary-methods" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Appendix A: Supplementary Methods</h1>
+<section id="a1.-hotspot-definition-rationale" class="level2" data-number="8.1">
+<h2 data-number="8.1" class="anchored" data-anchor-id="a1.-hotspot-definition-rationale"><span class="header-section-number">8.1</span> A1. Hotspot Definition Rationale</h2>
+<p>We define hotspots as relative extremes (5th percentile) rather than absolute thresholds because:</p>
+<ol type="1">
+<li><strong>Comparability:</strong> Services measured in different units (kg/year, %), cannot be directly compared on absolute scale</li>
+<li><strong>Attention:</strong> Policy focus typically directed to “outlier” regions, not absolute magnitude</li>
+<li><strong>Actionability:</strong> Top/bottom 5% creates tractable (~1.69M cells × 0.05 = ~85k hotspots per service type) analysis units</li>
+</ol>
+</section>
+<section id="a2.-spc-formula-derivation" class="level2" data-number="8.2">
+<h2 data-number="8.2" class="anchored" data-anchor-id="a2.-spc-formula-derivation"><span class="header-section-number">8.2</span> A2. SPC Formula Derivation</h2>
+<p>Standard percent change <span class="math inline">\(((V_2 - V_1) / V_1 \times 100)\)</span> fails when <span class="math inline">\(V_1 \approx 0\)</span>. SPC addresses this:</p>
+<p><span class="math display">\[SPC = \frac{V_2 - V_1}{(|V_2| + |V_1|) / 2} \times 100\]</span></p>
+<p>This ensures: - Symmetric treatment of increases/decreases - Defined even when baseline is near-zero - Scale-independent comparison across services</p>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

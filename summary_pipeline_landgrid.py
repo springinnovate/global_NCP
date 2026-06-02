@@ -129,21 +129,6 @@ def zonal_stats(raster_path_band_dict, op_stats, vector_path):
     # Use on_invalid="ignore" to be robust against minor geometry errors on read.
     gdf = gpd.read_file(vector_path, on_invalid="ignore")
 
-    # The buffer(0) trick is a robust way to fix geometry validity issues
-    # that can arise after file I/O or during reprojection. This ensures
-    # geometries are clean immediately before the to_crs() call.
-    # This dataset has proven to have extremely stubborn geometry errors.
-    # We apply a more aggressive cleaning suite here, mirroring main(),
-    # to handle geometries that become invalid after the file read.
-    gdf.geometry = gdf.geometry.buffer(0).make_valid()
-    gdf = gdf[~gdf.geometry.is_empty]
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", UserWarning)
-        # A tiny area threshold can filter out invalid sliver polygons
-        # that can be created by buffer(0) on malformed inputs.
-        gdf = gdf[gdf.geometry.area > 1e-12].reset_index(drop=True)
-
     # reproject if necessary
     with rasterio.open(raster_path_band_dict["path"]) as src:
         raster_crs = src.crs
@@ -295,30 +280,15 @@ def main():
         zonal_stats_task_list = []
         vector_path = vector_config["path"]
 
-        # Pre-process the vector to make it valid and explode multipolygons
-        # This entirely prevents GEOS segfaults in exactextract
-        LOGGER.info(f"Pre-processing vector {vector_id} to fix geometries and explode multipolygons...")
-        # Use on_invalid="ignore" to skip features that cause GEOS errors on read,
-        # which is a more robust way to handle the subtle validity issues from R.
+        LOGGER.info(f"Pre-processing vector {vector_id} to explode multipolygons...")
         gdf = gpd.read_file(vector_path, on_invalid="ignore")
         if "fid" not in gdf.columns:
             gdf["fid"] = gdf.index.astype("int32") + 1
         else:
             gdf["fid"] = gdf["fid"].astype("int32")
 
-        # Repair geometries: buffer(0) is a robust way to fix GEOS topological errors
-        gdf["geometry"] = gdf.geometry.buffer(0)
-        gdf["geometry"] = gdf.geometry.make_valid()
+        # Explode multipolygons into single polygons for exactextract
         gdf = gdf.explode(ignore_index=True)
-
-        # Keep only valid, non-empty Polygons with a measurable area to prevent 'Never get here' crashes
-        gdf = gdf[~gdf.geometry.isna()]
-        gdf = gdf[gdf.geometry.geom_type.isin(['Polygon', 'MultiPolygon'])]
-        gdf = gdf[~gdf.geometry.is_empty]
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", UserWarning)
-            gdf = gdf[gdf.geometry.area > 1e-10].reset_index(drop=True)
 
         gdf["frag_id"] = gdf.index.astype("int32")
 

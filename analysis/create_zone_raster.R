@@ -12,7 +12,7 @@ library(glue)
 grid_path <- file.path(
   Sys.getenv("GLOBAL_NCP_DATA", unset = "~/data/global_ncp"),
   "vector_basedata",
-  "AOOGrid_10x10km_land_4326_clean.gpkg"
+  "AOOGrid_10x10km_land_4326_python_clean.gpkg"
 )
 
 # We need a reference raster to define the exact grid (resolution, extent, CRS)

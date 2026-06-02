@@ -20,23 +20,40 @@ By identifying areas of rapid change or high importance, this pipeline supports 
 - R (4.0+) with required packages (see `/environment.yml` for conda environment)
 - Access to global_ncp data directory (external; set `GLOBAL_NCP_DATA` environment variable)
 
-### Running the Python Stage (Zonal Statistics)
+### Data Preparation (One-Time Setup)
+
+The analysis pipelines require a clean, canonical 10km grid file. The original method used an R script (`analysis/prepare_data.qmd`), but this has been a source of persistent geometry errors.
+
+A more robust, pure-Python alternative is now provided and is the recommended approach.
+
+#### Grid Preparation using Python (Recommended)
+
+This script creates a clean grid file guaranteed to be compatible with the downstream Python pipelines. Run this from your terminal, providing the path to your data directory.
+
+```bash
+# Replace `/path/to/global_ncp/data` with the actual path to your data
+python analysis/prepare_grid_python.py --data-root /path/to/global_ncp/data
+```
+
+### Running the Python Stage (Raster-based Zonal Statistics)
 
 ```bash
 # Pull Docker image
 docker pull therealspring/global_ncp-computational-environment:latest
 
-# Run inside Docker container
+# First, generate the zone raster (one-time setup) from an R console:
+# Rscript analysis/create_zone_raster.R
+
+# Then, run the raster-based zonal stats pipeline inside the Docker container:
 docker run -it --rm \
   -v $(pwd):/workspace \
   -v /path/to/global_ncp/data:/data \
   -w /workspace \
   therealspring/global_ncp-computational-environment:latest /bin/bash
 
-# Inside container, execute zonal summaries:
-python summary_pipeline_landgrid.py --data-root /data analysis_configs/services_slim.yaml
-python summary_pipeline_landgrid.py --data-root /data analysis_configs/beneficiaries_slim.yaml
-python summary_pipeline_landgrid.py --data-root /data analysis_configs/c_protection_synth.yaml
+# Inside container, execute raster-based zonal summaries:
+python summary_pipeline_rasterzones.py --data-root /data analysis_configs/services_raster.yaml
+# python summary_pipeline_rasterzones.py --data-root /data analysis_configs/beneficiaries_raster.yaml
 ```
 
 ### Running the R/Quarto Analysis Chain

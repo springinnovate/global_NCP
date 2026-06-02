@@ -1,5 +1,26 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-06-02
+*   **Vector Data Enrichment Pipeline Stabilized:** After being blocked for over a week by intractable geometry and performance issues in the R-based `prepare_data.qmd` script, a robust Python-based solution has been successfully developed and executed.
+*   **Problem:** The original R script was unacceptably slow and consistently failed with obscure `GEOSException` errors when performing spatial joins on the 1.5M-cell grid.
+*   **Solution:** A new script, `Python_scripts/enrich_grid.py`, was created to handle this critical data preparation step.
+    1.  **Performance:** The initial polygon-intersection approach was too slow. The script was re-engineered to use a much faster and more stable **centroid-based spatial join**. This reduced processing time from hours to minutes.
+    2.  **Robustness:** Iteratively debugged a series of `KeyError` and `ValueError` exceptions related to inconsistent column names (`WWF_BIOME` vs. `WWF_biome`, `country` vs. `nev_name`) and internal `geopandas` state (`index_right` conflicts).
+    3.  **Final Output:** The script successfully produced `landgrid_1_clean_enriched.gpkg`, a clean, attribute-rich vector grid containing all necessary biome and country/regional information. This file now serves as the canonical input for the main zonal statistics pipeline, unblocking all downstream analysis.
+
+---
+
+### 2026-05-27 (cont. 7)
+*   **Final Strategic Pivot & Course Correction:** The `GEOSException: ...closed linestring` error continues to be completely intractable in the vector-based Python pipeline (`summary_pipeline_landgrid.py`), even with multiple aggressive cleaning patches. This confirms that the vector file's geometry issues are too severe to be reliably fixed on-the-fly in a multiprocessing environment.
+*   **Definitive Solution:** The project is now fully reverting to the **hybrid raster-vector workflow** that was prototyped on 2026-05-26. This is the only robust path forward.
+    1.  **Deprecate Vector Pipeline:** The `summary_pipeline_landgrid.py` script and its associated vector-based logic are now considered deprecated. All efforts will focus on the raster-based workflow.
+    2.  **Create Zone Raster:** The `analysis/create_zone_raster.R` script provides the stable "zone" input needed for Python.
+    3.  **Implement Raster Pipeline:** A new configuration (`analysis_configs/services_raster.yaml`) has been created to drive `summary_pipeline_rasterzones.py`. This script performs all zonal statistics using the zone raster, completely avoiding vector geometry processing in Python and thus eliminating the `GEOSException`.
+    4.  **Simplify R Consolidation:** The `analysis/process_data.qmd` script has been overhauled. It no longer needs to perform complex spatial joins or aggregations to fix "exploded" fragments. It now reads the clean CSV output from the raster pipeline and performs a simple, fast `left_join` by `fid` against the master grid.
+*   This new workflow is not only more robust and error-free but also significantly simpler and faster. The `README.md` has been updated to reflect this as the new canonical procedure.
+
+---
+
 ### 2026-05-27 (cont. 6)
 *   **Python Pipeline Failure (`GEOSException` Persists):** The `closed linestring` error continues to occur in the `zonal_stats` worker process during reprojection, even after the `buffer(0)` patch was applied.
 *   **Root Cause Analysis:**

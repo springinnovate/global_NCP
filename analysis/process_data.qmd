@@ -49,6 +49,7 @@ use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 # Centralize data roots (set GLOBAL_NCP_DATA in ~/.Renviron)
 data_root <- data_dir()
 interim_dir <- data_interim()
+interim_raster_dir <- file.path(data_dir(), "interim_raster")
 processed_dir <- data_processed()
 
 processed_tables_dir <- file.path(processed_dir, "tables")
@@ -60,28 +61,18 @@ source(here::here("R", "utils_hotspot.R"))
 # This maps raw column names from synth outputs to canonical names.
 rename_list <- list(
   c(
-    usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean",
-    usle_2020_mean = "global_usle_marine_mod_ESA_2020_mean",
-    nature_access_1992_mean = "nature_access_lspop2019_ESA1992_mean",
-    nature_access_2020_mean = "nature_access_lspop2019_ESA2020_mean",
-    n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean",
-    n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
-    sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean",
-    sed_ret_ratio_2020_mean = "Sed_ret_ratio_2020_mean",
-    c_risk_1992_mean = "C_Risk_1992_mean",
-    c_risk_2020_mean = "C_Risk_2020_mean",
-    c_risk_red_ratio_1992_mean = "C_Risk_Red_Ratio_1992_mean",
-    c_risk_red_ratio_2020_mean = "C_Risk_Red_Ratio_2020_mean"
+    usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean", usle_2020_mean = "global_usle_marine_mod_ESA_2020_mean",
+    nature_access_1992_mean = "nature_access_lspop2019_ESA1992_mean", nature_access_2020_mean = "nature_access_lspop2019_ESA2020_mean",
+    n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean", n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
+    sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean", sed_ret_ratio_2020_mean = "Sed_ret_ratio_2020_mean",
+    c_risk_1992_mean = "C_Risk_1992_mean", c_risk_2020_mean = "C_Risk_2020_mean",
+    c_risk_red_ratio_1992_mean = "C_Risk_Red_Ratio_1992_mean", c_risk_red_ratio_2020_mean = "C_Risk_Red_Ratio_2020_mean"
   ),
   c(
-    n_export_1992_sum = "global_n_export_tnc_esa1992_sum",
-    n_export_2020_sum = "global_n_export_tnc_esa2020_sum",
-    n_retention_1992_sum = "global_n_retention_ESAmar_1992_fertilizer_sum",
-    n_retention_2020_sum = "global_n_retention_ESAmar_2020_fertilizer_sum",
-    sed_export_1992_sum = "global_sed_export_marine_mod_ESA_1992_sum",
-    sed_export_2020_sum = "global_sed_export_marine_mod_ESA_2020_sum",
-    pollination_1992_sum = "realized_polllination_on_ag_ESA1992_sum",
-    pollination_2020_sum = "realized_polllination_on_ag_ESA2020_sum"
+    n_export_1992_sum = "global_n_export_tnc_esa1992_sum", n_export_2020_sum = "global_n_export_tnc_esa2020_sum",
+    n_retention_1992_sum = "global_n_retention_ESAmar_1992_fertilizer_sum", n_retention_2020_sum = "global_n_retention_ESAmar_2020_fertilizer_sum",
+    sed_export_1992_sum = "global_sed_export_marine_mod_ESA_1992_sum", sed_export_2020_sum = "global_sed_export_marine_mod_ESA_2020_sum",
+    pollination_1992_sum = "realized_polllination_on_ag_ESA1992_sum", pollination_2020_sum = "realized_polllination_on_ag_ESA2020_sum"
   )
 )
 ```
@@ -96,107 +87,35 @@ Assemble the final gridded Change/Beneficiary dataset by joining the interim syn
 #| label: assemble-final-grid
 #| eval: true
 #| include: false
-source(here::here("R", "paths.R"))
-interim_dir <- data_interim()
-processed_dir <- data_processed()
+library(readr)
 
-latest_interim <- function(pattern) {
-  files <- list.files(interim_dir, pattern = pattern, full.names = TRUE)
+latest_raster_summary <- function(pattern) {
+  files <- list.files(interim_raster_dir, pattern = pattern, full.names = TRUE)
   if (!length(files)) stop("No interim files match pattern: ", pattern)
   files[which.max(file.mtime(files))]
 }
 
-inpath <- processed_dir
-# Optional: export name indexes to CSV
-write_index <- FALSE
 write_base_synth <- FALSE
 
-# New workflow: means + sums are in the same synth output.
-serv_path  <- latest_interim("^10k_grid_services_base\\.gpkg$")
-ben_path   <- latest_interim("^10k_grid_benef(.*)?\\.gpkg$")
+# The new, robust workflow reads a clean CSV from the raster-based Python
+# pipeline (`summary_pipeline_rasterzones.py`). This completely bypasses all
+# vector geometry issues and the complex fragment aggregation logic that was
+# previously required when using the old `summary_pipeline_landgrid.py`.
+summary_csv_path <- latest_raster_summary("^raster_zonal_summary.*\\.csv$")
+summary_df <- read_csv(summary_csv_path, show_col_types = FALSE)
 
-S <- st_read(serv_path)
-B <- st_read(ben_path)
-
-# We MUST resolve the fragment explosion caused by upstream Python (1.67M fragments vs 1.5M grid cells).
-# We use an R-tree spatial intersection to drop every fragment's centroid into the pristine master grid,
-# and then re-aggregate them mathematically to prevent duplicate hotspot counts and coordinate striping.
-#
-# TODO (v1.4.0 Refactor): Python now preserves the pre-explosion grid ID as `orig_fid`.
-# This entire spatial join and group_by block should be ripped out and replaced with a simple
-# tabular `left_join(by = "orig_fid")` once the new python extractions are fully cached.
-master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
+# The master grid already has all attributes. Join by `fid`.
+master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_python_clean.gpkg")
 if (!file.exists(master_path)) stop("Master grid not found!")
 master_grid <- sf::st_read(master_path, quiet = TRUE)
 
-message("Loading master grid. Attributes are assumed to be pre-joined and clean.")
 if ("ID" %in% names(master_grid) && !"fid" %in% names(master_grid)) {
   master_grid <- dplyr::rename(master_grid, fid = ID)
 }
-if (!"fid" %in% names(master_grid)) {
-  stop("Master grid is missing the 'fid' column.")
-}
 
-# Normalize grouping column names to canonical forms (handle casing issues)
-expected_attrs <- c(
-  "iso3", "continent", "region_un", "subregion", "nev_name",
-  "region_wb", "income_grp", "WWF_biome"
-)
-
-message("Bypassing slow spatial join by using `orig_fid` for fast tabular aggregation...")
-S_df <- sf::st_drop_geometry(S)
-B_df <- sf::st_drop_geometry(B)
-
-if (!"orig_fid" %in% names(S_df) || !"orig_fid" %in% names(B_df)) {
-  stop(paste(
-    "CRITICAL: `orig_fid` not found in service/beneficiary fragments.",
-    "Cannot perform fast tabular join, which is why the script is taking hours.",
-    "Please re-run the upstream Python extraction to include `orig_fid`."
-  ))
-}
-
-# Rename `orig_fid` to `true_fid` to match the existing aggregation logic.
-S_df <- S_df %>% dplyr::rename(true_fid = orig_fid) %>% dplyr::filter(!is.na(true_fid))
-B_df <- B_df %>% dplyr::rename(true_fid = orig_fid) %>% dplyr::filter(!is.na(true_fid))
-message("Re-aggregating fragments into canonical 10km grid cells using `orig_fid`...")
-
-safe_sum <- function(x) { if(all(is.na(x))) NA_real_ else sum(x, na.rm = TRUE) }
-safe_mean <- function(x) { if(all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE) }
-
-sum_cols_S <- grep("_sum$", names(S_df), value = TRUE)
-mean_cols_S <- grep("_mean$", names(S_df), value = TRUE)
-group_cols_S <- intersect(names(S_df), c("true_fid", expected_attrs))
-
-S_agg <- S_df %>%
-  dplyr::group_by(dplyr::across(dplyr::all_of(group_cols_S))) %>%
-  dplyr::summarise(
-    dplyr::across(dplyr::all_of(sum_cols_S), safe_sum),
-    dplyr::across(dplyr::all_of(mean_cols_S), safe_mean),
-    .groups = "drop"
-  )
-
-sum_cols_B <- grep("_sum$", names(B_df), value = TRUE)
-mean_cols_B <- grep("_mean$", names(B_df), value = TRUE)
-
-B_agg <- B_df %>%
-  dplyr::group_by(true_fid) %>%
-  dplyr::summarise(
-    dplyr::across(dplyr::all_of(sum_cols_B), safe_sum),
-    dplyr::across(dplyr::all_of(mean_cols_B), safe_mean),
-    .groups = "drop"
-  )
-
-message("Joining Services, Beneficiaries, and restoring Master Geometry...")
-joined_tbl <- S_agg %>%
-  dplyr::left_join(B_agg, by = "true_fid") %>%
-  dplyr::rename(fid = true_fid)
-
-sf_f <- master_grid %>%
-  dplyr::select(fid) %>%
-  dplyr::left_join(joined_tbl, by = "fid")
-
-# CLEAN UP: Remove duplicate .x / .y columns that crash GPKG export
-sf_f <- sf_f %>% dplyr::select(-dplyr::matches("\\.x$|\\.y$"))
+# Perform a simple, non-spatial join by the feature ID. This is much faster
+# and more reliable than the previous spatial join operations.
+sf_f <- master_grid %>% dplyr::left_join(summary_df, by = "fid")
 
 # Canonical renaming: safely apply only for existing columns
 rename_map <- c(rename_list[[1]], rename_list[[2]])
