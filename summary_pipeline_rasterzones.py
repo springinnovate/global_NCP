@@ -50,6 +50,9 @@ def main():
     parser.add_argument("--data-root", type=Path, default=os.getenv("GLOBAL_NCP_DATA", ""))
     args = parser.parse_args()
 
+    if str(args.data_root):
+        os.environ["GLOBAL_NCP_DATA"] = str(args.data_root)
+
     with args.config_yaml_path.open("r") as f:
         pipeline_config = yaml.safe_load(f)
 
