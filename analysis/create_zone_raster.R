@@ -12,7 +12,7 @@ library(glue)
 grid_path <- file.path(
   Sys.getenv("GLOBAL_NCP_DATA", unset = "~/data/global_ncp"),
   "vector_basedata",
-  "AOOGrid_10x10km_land_4326_python_clean.gpkg"
+  "landgrid_1_clean_enriched.gpkg"
 )
 
 # We need a reference raster to define the exact grid (resolution, extent, CRS)
@@ -38,7 +38,15 @@ dir.create(dirname(out_raster_path), recursive = TRUE, showWarnings = FALSE)
 
 message("Loading source vector grid: ", basename(grid_path))
 grid_sf <- sf::st_read(grid_path, quiet = TRUE)
-if (!"fid" %in% names(grid_sf) || !is.numeric(grid_sf$fid)) stop("Grid must have a numeric 'fid' column.")
+
+if ("orig_fid" %in% names(grid_sf) && !"fid" %in% names(grid_sf)) names(grid_sf)[names(grid_sf) == "orig_fid"] <- "fid"
+if ("grid_fid" %in% names(grid_sf) && !"fid" %in% names(grid_sf)) names(grid_sf)[names(grid_sf) == "grid_fid"] <- "fid"
+if ("id" %in% names(grid_sf) && !"fid" %in% names(grid_sf)) names(grid_sf)[names(grid_sf) == "id"] <- "fid"
+
+if (!"fid" %in% names(grid_sf)) {
+  message("No 'fid' column found, generating sequential IDs...")
+  grid_sf$fid <- seq_len(nrow(grid_sf))
+}
 
 message("Loading reference raster to create a template...")
 template_raster <- terra::rast(reference_raster_path)
