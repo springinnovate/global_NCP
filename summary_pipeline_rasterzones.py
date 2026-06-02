@@ -39,9 +39,18 @@ def zonal_stats_raster(value_raster_path, zone_raster_path, op_stats):
         v_nodata = v_src.nodata
 
         # Iterate through raster blocks to avoid loading massive global grids entirely into RAM
-        for _, window in z_src.block_windows(1):
-            zones = z_src.read(1, window=window)
-            vals = v_src.read(1, window=window)
+        for _, z_window in z_src.block_windows(1):
+            zones = z_src.read(1, window=z_window)
+
+            # Dynamically compute the corresponding window in the value raster
+            # by getting the spatial bounding box of the current zone block.
+            # This perfectly aligns datasets with different extents/crops.
+            bounds = z_src.window_bounds(z_window)
+            v_window = v_src.window(*bounds)
+
+            # boundless=True safely pads areas outside the value raster's extent with nodata.
+            # out_shape forces the returned array to exactly match the zone block's shape, preventing broadcast errors.
+            vals = v_src.read(1, window=v_window, boundless=True, out_shape=zones.shape)
 
             mask = np.ones(zones.shape, dtype=bool)
             
