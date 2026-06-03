@@ -19,6 +19,7 @@ execute:
 ---
 
 ```{r setup, message=FALSE, warning=FALSE}
+#| eval: true
 library(terra)
 library(sf)
 library(dplyr)
@@ -118,7 +119,7 @@ if (!"fid" %in% names(run2)) run2$fid <- seq_len(nrow(run2))
 
 # Combine them. Both have the exact same 'fid' foundation from build_master_grid.py!
 cols_to_join <- c("fid", setdiff(names(run2), names(run1)))
-sf_f <- run1 %>% dplyr::left_join(run2[cols_to_join], by = "fid")
+  sf_f <- run1 %>% dplyr::left_join(sf::st_drop_geometry(run2)[cols_to_join], by = "fid")
 
 # Canonical renaming: safely apply only for existing columns
 rename_map <- c(rename_list[[1]], rename_list[[2]])
