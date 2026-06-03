@@ -97,25 +97,28 @@ latest_raster_summary <- function(pattern) {
 
 write_base_synth <- FALSE
 
-# The new, robust workflow reads a clean CSV from the raster-based Python
-# pipeline (`summary_pipeline_rasterzones.py`). This completely bypasses all
-# vector geometry issues and the complex fragment aggregation logic that was
-# previously required when using the old `summary_pipeline_landgrid.py`.
-summary_csv_path <- latest_raster_summary("^raster_zonal_summary.*\\.csv$")
-summary_df <- read_csv(summary_csv_path, show_col_types = FALSE)
+# The new, robust Python pipeline (`summary_pipeline_landgrid.py`) now outputs 
+# mathematically sound GPKGs without geometry errors or fragment explosions.
+# We just need to load the two most recent runs (services and beneficiaries) and merge them.
+workspace_dir <- here::here("summary_pipeline_workspace_ha")
+gpkg_files <- list.files(workspace_dir, pattern = "^grid_10km_land_synth_zonal_.*\\.gpkg$", full.names = TRUE)
+gpkg_files <- gpkg_files[order(file.mtime(gpkg_files), decreasing = TRUE)]
 
-# The master grid already has all attributes. Join by `fid`.
-master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_python_clean.gpkg")
-if (!file.exists(master_path)) stop("Master grid not found!")
-master_grid <- sf::st_read(master_path, quiet = TRUE)
-
-if ("ID" %in% names(master_grid) && !"fid" %in% names(master_grid)) {
-  master_grid <- dplyr::rename(master_grid, fid = ID)
+if (length(gpkg_files) < 2) {
+  stop("Could not find both services and beneficiaries GPKGs in the workspace!")
 }
 
-# Perform a simple, non-spatial join by the feature ID. This is much faster
-# and more reliable than the previous spatial join operations.
-sf_f <- master_grid %>% dplyr::left_join(summary_df, by = "fid")
+message("Loading Run 1 (Most Recent): ", basename(gpkg_files[1]))
+run1 <- sf::st_read(gpkg_files[1], quiet = TRUE)
+if (!"fid" %in% names(run1)) run1$fid <- seq_len(nrow(run1))
+
+message("Loading Run 2: ", basename(gpkg_files[2]))
+run2 <- sf::st_read(gpkg_files[2], quiet = TRUE) %>% sf::st_drop_geometry()
+if (!"fid" %in% names(run2)) run2$fid <- seq_len(nrow(run2))
+
+# Combine them. Both have the exact same 'fid' foundation from build_master_grid.py!
+cols_to_join <- c("fid", setdiff(names(run2), names(run1)))
+sf_f <- run1 %>% dplyr::left_join(run2[cols_to_join], by = "fid")
 
 # Canonical renaming: safely apply only for existing columns
 rename_map <- c(rename_list[[1]], rename_list[[2]])
