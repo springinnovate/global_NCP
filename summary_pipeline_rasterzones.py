@@ -97,7 +97,10 @@ def zonal_stats_raster(value_raster_path, zone_raster_path, op_stats):
             row['min'] = stat['min']
         results.append(row)
 
-    return pd.DataFrame(results)
+    df = pd.DataFrame(results)
+    if df.empty and 'fid' not in df.columns:
+        df = pd.DataFrame(columns=['fid'] + op_stats)
+    return df
 
 def main():
     parser = argparse.ArgumentParser(description="Raster-based zonal stats pipeline.")
@@ -142,6 +145,10 @@ def main():
     final_df = None
     for raster_id, stats_task in results:
         stats_df = stats_task.get()
+
+        # Safely handle cached empty dataframes from previous runs that lacked 'fid'
+        if stats_df.empty and 'fid' not in stats_df.columns:
+            stats_df = pd.DataFrame(columns=['fid'] + op_stats)
 
         # Rename stat columns to be specific to the raster layer
         rename_map = {op: f"{raster_id}_{op}" for op in op_stats}
