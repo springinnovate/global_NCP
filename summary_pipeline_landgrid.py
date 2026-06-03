@@ -304,20 +304,12 @@ def main():
         zonal_stats_task_list = []
         vector_path = vector_config["path"]
 
-        LOGGER.info(f"Pre-processing vector {vector_id} to explode multipolygons...")
+        LOGGER.info(f"Pre-processing vector {vector_id}...")
         gdf = gpd.read_file(vector_path, on_invalid="ignore")
         if "fid" not in gdf.columns:
             gdf["fid"] = gdf.index.astype("int32") + 1
         else:
             gdf["fid"] = gdf["fid"].astype("int32")
-
-        # Explode multipolygons into single polygons for exactextract
-        gdf = gdf.explode(ignore_index=True)
-
-        gdf["frag_id"] = gdf.index.astype("int32")
-
-        # Rename fid to orig_fid to prevent GPKG driver UNIQUE constraint failures on duplicated fids
-        gdf.rename(columns={"fid": "orig_fid"}, inplace=True)
 
         exploded_vector_path = os.path.join(workspace_dir, f"_exploded_{vector_id}.gpkg")
         gdf.to_file(exploded_vector_path, driver="GPKG")
@@ -346,7 +338,7 @@ def main():
             # differentiate the operation applied to that raster
             rename_map = {op: f"{raster_id}_{op}" for op in op_stats}
             stats_df.rename(columns=rename_map, inplace=True)
-            gdf = gdf.merge(stats_df, on="frag_id")
+            gdf = gdf.merge(stats_df, on="fid")
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         out_vector_path = os.path.join(
             workspace_dir, f"{vector_id}_synth_zonal_{timestamp}.gpkg"
