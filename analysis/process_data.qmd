@@ -113,7 +113,6 @@ run1 <- sf::st_read(gpkg_files[1], quiet = TRUE)
 if (!"fid" %in% names(run1)) run1$fid <- seq_len(nrow(run1))
 
 message("Loading Run 2: ", basename(gpkg_files[2]))
-run2 <- sf::st_read(gpkg_files[2], quiet = TRUE) %>% sf::st_drop_geometry()
 if (!"fid" %in% names(run2)) run2$fid <- seq_len(nrow(run2))
 
 # Combine them. Both have the exact same 'fid' foundation from build_master_grid.py!

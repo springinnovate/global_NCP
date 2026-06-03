@@ -1,5 +1,13 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-06-03
+*   **Geometry Crashes Finally Conquered:** After a grueling two-week struggle involving `GEOSException` crashes, memory leaks, and exploded geometries, we have finally established a mathematically sound and highly performant vector-extraction workflow.
+*   **The Breakthrough:** The root cause of the crashes in Python/GEOS was isolated to a small number of malformed "poison polygons" during the C-level EPSG:4326 reprojection phase.
+*   **Solution Implementation:** We consolidated the grid creation into a single, robust Python script (`build_master_grid.py`). It uses chunked reprojection (processing the 1.5M cell grid in blocks of ~7500). If a chunk fails the fast C-level reprojection, the script falls back to an isolated row-by-row projection, safely discarding the few mathematically impossible geometries while preserving the rest.
+*   **Pipeline Success:** `summary_pipeline_landgrid.py` was successfully run against this new master grid (`landgrid_1_clean_enriched_4326.gpkg`) for both the 1992/2020 Services and the Socioeconomic Beneficiaries. The pipeline finished in ~13 minutes with zero crashes and zero duplicated/exploded fragments.
+*   **Housekeeping:** Deleted redundant scratch scripts (e.g., `clean_grid_4326.py`, deprecated in favor of `build_master_grid.py`).
+*   **R Consolidation:** `process_data.qmd` was overhauled to simply merge the pristine output GPKGs from the Python workspace based on the reliable `fid`.
+
 ### 2026-06-02
 *   **Vector Data Enrichment Pipeline Stabilized:** After being blocked for over a week by intractable geometry and performance issues in the R-based `prepare_data.qmd` script, a robust Python-based solution has been successfully developed and executed.
 *   **Problem:** The original R script was unacceptably slow and consistently failed with obscure `GEOSException` errors when performing spatial joins on the 1.5M-cell grid.
