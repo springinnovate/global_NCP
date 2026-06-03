@@ -105,21 +105,24 @@ workspace_dir <- here::here("summary_pipeline_workspace_ha")
 gpkg_files <- list.files(workspace_dir, pattern = "^grid_10km_land_synth_zonal_.*\\.gpkg$", full.names = TRUE)
 gpkg_files <- gpkg_files[order(file.mtime(gpkg_files), decreasing = TRUE)]
 
-if (length(gpkg_files) < 2) {
-  stop("Could not find both services and beneficiaries GPKGs in the workspace!")
+if (length(gpkg_files) < 3) {
+  warning("Found fewer than 3 GPKGs. Expected Services, Beneficiaries, and Coastal runs.")
 }
 
-message("Loading Run 1 (Most Recent): ", basename(gpkg_files[1]))
-run1 <- sf::st_read(gpkg_files[1], quiet = TRUE)
-if (!"fid" %in% names(run1)) run1$fid <- seq_len(nrow(run1))
+# Take up to 3 most recent files
+files_to_load <- head(gpkg_files, 3)
 
-message("Loading Run 2: ", basename(gpkg_files[2]))
-  run2 <- sf::st_read(gpkg_files[2], quiet = TRUE)
-if (!"fid" %in% names(run2)) run2$fid <- seq_len(nrow(run2))
+message("Loading Base Run: ", basename(files_to_load[1]))
+sf_f <- sf::st_read(files_to_load[1], quiet = TRUE)
+if (!"fid" %in% names(sf_f)) sf_f$fid <- seq_len(nrow(sf_f))
 
-# Combine them. Both have the exact same 'fid' foundation from build_master_grid.py!
-cols_to_join <- c("fid", setdiff(names(run2), names(run1)))
-  sf_f <- run1 %>% dplyr::left_join(sf::st_drop_geometry(run2)[cols_to_join], by = "fid")
+for (i in 2:length(files_to_load)) {
+  message("Joining Run ", i, ": ", basename(files_to_load[i]))
+  run_i <- sf::st_read(files_to_load[i], quiet = TRUE)
+  if (!"fid" %in% names(run_i)) run_i$fid <- seq_len(nrow(run_i))
+  cols_to_join <- c("fid", setdiff(names(run_i), names(sf_f)))
+  sf_f <- sf_f %>% dplyr::left_join(sf::st_drop_geometry(run_i)[cols_to_join], by = "fid")
+}
 
 # Canonical renaming: safely apply only for existing columns
 rename_map <- c(rename_list[[1]], rename_list[[2]])
@@ -322,7 +325,7 @@ chg_cols <- intersect(chg_cols, canonical_change)
 
 benef_keep <- intersect(
   c(
-    paste0(c("fields_mehrabi_2017", "GHS_BUILT_S_E2020", "hdi_raster_predictions_2020", "rast_adm1_gini_disp_2020"), "_mean"),
+    paste0(c("fields_mehrabi_2017", "GHS_BUILT_S_E2020", "NEW_HDI_COLUMN_NAME", "rast_adm1_gini_disp_2020"), "_mean"),
     paste0(c("GHS_POP_E2020_GLOBE", "GlobPOP_Count_30arc_2020", "rast_gdpTot_1990_2020_30arcsec_2020"), "_sum")
   ),
   names(sf_f)
