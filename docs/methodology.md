@@ -20,7 +20,7 @@ This path is designed to generate summary statistics (e.g., Mean, Max, Min) base
 1.  **Pixel-wise Difference:** The script `Python_scripts/batch_raster_diff.py` takes the 1992 and 2020 rasters for a given service and calculates the difference (`T2020 - T1992`) for each corresponding pixel.
 2.  **Output:** The result is a new set of "difference rasters" that represent the absolute change at the native resolution of the data.
 
-**Use Case:** This path is used when a straightforward, non-aggregated summary of the overall change across the landscape is required.
+**Use Case:** This path is used when a straightforward, non-aggregated summary of the overall change across the landscape is required. **We use the outputs of this path (via the Python `zonal_stats_toolkit`) for the main text's regional trajectory charts ("WHAT" section) to provide the clearest narrative of total volume change without spatial aggregation artifacts.**
 
 ### Path B: Grid-Level Change Calculation (The Hotspot Path)
 
@@ -32,7 +32,7 @@ This is the primary pathway for the main analysis, including hotspot identificat
 2.  **Grid-Level Differencing:** The Quarto notebook `analysis/process_data.qmd` ingests the aggregated table from the previous step. It then calculates the absolute and Symmetric Percentage Change (SPC) between the 1992 and 2020 columns for each grid cell.
 3.  **Hotspot Identification:** The notebook `analysis/hotspot_extraction.qmd` takes the final grid-level change data and identifies hotspots.
 
-**Use Case:** This path underpins all hotspot maps, regional summaries, and relative intensity analyses.
+**Use Case:** This path underpins all hotspot detection, hotspot intensity, and socioeconomic exposure analyses (the "WHERE", "WHY", and "WHO"). Its regional summaries of change (the 10km grid averages) are reserved for the **Annex** due to the complex aggregation artifacts described below.
 
 ### Clarification: Rasterizing the Grid vs. Resampling the Difference
 
@@ -190,6 +190,11 @@ During regional aggregation, it is possible to observe a "sign flip"—where reg
 *   **Mean Symmetric Percentage Change** captures the **Local Landscape Shift**. Because percentage change treats every 10km community (grid cell) equally regardless of its baseline volume, it highlights widespread but low-intensity dynamics.
 
 A sign flip reveals a specific geographic narrative: The *total volume* of the service in the region is decreasing (driven by heavy localized losses), but the *spatial footprint* of minor expansions or local service gains is spreading across a large number of low-baseline cells.
+
+**Communication Strategy (Main Text vs. Annex):**
+Explaining Simpson’s Paradox and spatial aggregation artifacts (MAUP) in the main text of a paper can severely distract from the core ecological findings. For this reason:
+*   **Main Text:** We use **Path A** (raster-based regional zonal statistics via the `zonal_stats_toolkit`) to report the top-level regional changes. This path calculates total absolute change directly from the pixels, completely avoiding the MAUP/Simpson's paradox sign-flip issue, providing a clear and unambiguous "WHAT" narrative.
+*   **Annex:** The regional trajectory charts derived from **Path B** (the 10km grid averages, which exhibit these sign flips) are included in the Methodological Annex. Path B remains the mathematically robust and required foundation for detecting local extremes (Hotspots), but its region-level averages are separated from the main text to preserve narrative clarity.
 
 ## Aggregation Logic: Sum vs. Mean
 

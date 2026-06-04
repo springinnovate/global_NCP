@@ -45,7 +45,7 @@ library(httpgd)
 load_all()
 
 # set venv for Python
-use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
+# use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 
 # Centralize data roots (set GLOBAL_NCP_DATA in ~/.Renviron)
 data_root <- data_dir()
@@ -143,6 +143,11 @@ for (new_name in names(rename_map)) {
 # Ensure c_fid is present (critical for downstream hotspot extraction)
 if (!"c_fid" %in% names(sf_f)) {
   sf_f$c_fid <- sf_f$fid
+}
+
+# Ensure canonical country column name is used so it isn't dropped
+if ("country" %in% names(sf_f) && !"nev_name" %in% names(sf_f)) {
+  sf_f <- dplyr::rename(sf_f, nev_name = country)
 }
 
 # Optional: save the base synthesis (raw 1992/2020 + beneficiaries + coastal)

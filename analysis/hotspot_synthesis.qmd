@@ -177,10 +177,10 @@ grid_df <- sf::st_read(gpkg_grid, quiet = TRUE) %>% sf::st_drop_geometry()
 
 # Standardize key columns that might have legacy names.
 grid_df <- standardize_col_name(grid_df, "fid", c("fid", "orig_fid", "grid_fid", "id"))
-grid_df <- standardize_col_name(grid_df, "country", c("country", "nev_name"))
+grid_df <- standardize_col_name(grid_df, "nev_name", c("nev_name", "country"))
 
 # Validate that essential columns are present.
-expected_cols <- c("fid", "country", "income_grp", "region_wb", "WWF_biome")
+expected_cols <- c("fid", "nev_name", "income_grp", "region_wb", "WWF_biome")
 missing_cols <- setdiff(expected_cols, names(grid_df))
 if (length(missing_cols) > 0) {
   stop("The input grid is missing essential columns: ", paste(missing_cols, collapse = ", "), 
@@ -226,7 +226,7 @@ HOTS_CFG <- list(
   rule_mode       = "vectors",
   loss = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
   gain = c("Sed_export","N_export","C_Risk"),
-  groupings = c("income_grp", "region_wb", "WWF_biome", "country"),
+  groupings = c("income_grp", "region_wb", "WWF_biome", "nev_name"),
   combos = list(
     deg_combo = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
     rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")

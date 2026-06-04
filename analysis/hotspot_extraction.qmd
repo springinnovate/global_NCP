@@ -26,6 +26,8 @@ params:
   output_suffix: "" # e.g., "_v2"
   force_export: true
   run_hotspot_export: true
+execute:
+  cache: false
 ---
 
 ## Overview
@@ -101,7 +103,7 @@ invisible(lapply(list.files(here::here("R"), pattern = "\\.R$", full.names = TRU
 
 # ---- Python (enable when needed) ----------------------------------------
 library(reticulate)
-use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
+# use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 
 ```
 
@@ -811,6 +813,7 @@ cat(paste0(
 
 ```{r}
 #| label: ensure-plt-long-loaded
+#| cache: false
 #| echo: false
 if (!exists("plt_long")) {
   rds_path <- file.path(data_dir(), "processed", paste0("plt_long", params$output_suffix, ".rds"))
@@ -1134,6 +1137,7 @@ if (length(pngs)) {
 
 ```{r}
 #| label: load-cached-plt-long
+#| cache: false
 #| echo: false
 #| message: true
 
