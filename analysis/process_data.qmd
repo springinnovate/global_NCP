@@ -147,7 +147,7 @@ if (!"c_fid" %in% names(sf_f)) {
 
 # Ensure canonical country column name is used so it isn't dropped
 if ("country" %in% names(sf_f) && !"nev_name" %in% names(sf_f)) {
-  sf_f <- dplyr::rename(sf_f, nev_name = country)
+  names(sf_f)[names(sf_f) == "country"] <- "nev_name"
 }
 
 # Optional: save the base synthesis (raw 1992/2020 + beneficiaries + coastal)
