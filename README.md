@@ -321,6 +321,16 @@ ogr2ogr -wrapdateline -datelineoffset 180 \
 
 # Naming convention: synthesis outputs start with "10k_"
 ```
+### Adding New Data (Variables, Years, Services)
+
+The pipeline is designed to be highly modular and extensible. To add new continuous raster data to the analysis in the future:
+1. **Add to Config:** Add the new raster path to the appropriate YAML config (or create a new one).
+2. **Run Python Extraction:** Run `python summary_pipeline_landgrid.py` with your config. This drops a new spatial GPKG into the workspace.
+3. **R Consolidation:** Run `analysis/process_data.qmd`. It will automatically grab the latest extractions from the workspace, strip their geometries, and seamlessly `left_join` them to the canonical grid using the stable `fid` row identifier. 
+
+**Important Manual Steps in `process_data.qmd`:**
+- **New Variables:** Add new Python output column names to the `rename_list` (for services) or `benef_keep` list (for socioeconomics) so they are retained. Look for the `[MANUAL UPDATE REQUIRED]` blocks in the script.
+- **Multiple Years:** The pipeline performs a bi-temporal comparison by automatically finding the minimum (T0) and maximum (T1) years in your columns. If you have 3+ years (e.g., 1992, 2015, 2020) and want to compare 2015 to 2020, you must explicitly drop the 1992 columns in `process_data.qmd` before the `compute_change` function is called.
 
 # Active R Analysis Workflow
 

@@ -44,6 +44,19 @@ A crucial methodological distinction exists between the output of Path B and ano
 
 As noted below, these two paths are not always mathematically identical. This project has officially chosen **Path B** as the canonical method for the hotspot analysis. Therefore, the rasterization performed by `vector_to_raster.py` on the final GeoPackage is the correct and validated approach for this analysis.
 
+### Modular Extraction and the `fid` Backbone
+
+A key design feature of Path B is its modularity. The Python extraction pipeline (`summary_pipeline_landgrid.py`) can be run multiple times independently (e.g., once for Ecosystem Services, once for Beneficiaries, once for Coastal Risk). Each run generates a separate GeoPackage in the workspace.
+
+Because every extraction is performed against the exact same canonical master grid (`landgrid_1_clean_enriched_4326.gpkg`), every output shares an identical, stable `fid` (Feature ID) backbone. 
+
+To add new variables (e.g., a new year, a new modeled service, or a new socioeconomic raster) in the future:
+1. Run the Python extraction for the new rasters.
+2. The R consolidation script (`analysis/process_data.qmd`) automatically loads the most recent extraction runs.
+3. It performs a rapid, geometry-free tabular `left_join` across all tables using the `fid`.
+
+This architecture completely prevents the need to re-run heavy, memory-intensive spatial joins or re-extract existing data when expanding the analysis.
+
 ---
 
 ## Why Might Results from Path A and Path B Differ?
@@ -132,6 +145,18 @@ Due to severe performance and geometry-validity bottlenecks encountered when per
     *   It inherently handles geometry validation (`buffer(0).make_valid()`) and deduplication, outputting the final, analysis-ready `landgrid_1_clean_enriched.gpkg`.
     
 *Note: The legacy R script `analysis/prepare_data.qmd` and standalone cleaning utilities like `clean_grid.py` were fully deprecated in v1.3.4 in favor of this robust Python workflow.*
+
+## Data Preparation: Coastal Risk & Protection
+
+Unlike the other ecosystem services which were natively provided as continuous global rasters, the Coastal Risk and Protection datasets were originally provided as high-resolution vector point/line geometries representing discrete coastal segments. 
+
+Attempting vector-on-vector intersections between these intricate coastal lines and the 1.5-million cell master grid caused severe performance bottlenecks and `GEOSException` geometry crashes (due to the creation of microscopic sliver polygons). To ensure mathematical robustness and compatibility with the main pipeline, a specialized pre-processing workflow was utilized:
+
+1. **Vector Joining & Ratio Calculation:** The script `Python_scripts/coastal_protection_join.py` merges the 1992 and 2020 coastal point layers based on their exact spatial locations (WKB geometries). It calculates the absolute differences and proportional risk reduction ratios (`Rt_ratio`) natively in the vector domain to prevent floating-point interpolation errors.
+2. **Rasterization:** The script `Python_scripts/rasterize_coastal.py` safely "burns" these pre-calculated point values into high-resolution continuous rasters (e.g., `Rt_1992.tif`, `Rt_ratio_2020.tif`). This uses tiled processing to handle the massive global coastline without memory exhaustion.
+3. **Grid Extraction:** The resulting coastal rasters are seamlessly ingested by the standard `exactextract` pipeline (`summary_pipeline_landgrid.py` via `c_protection_synth.yaml`). This safely calculates the mean coastal risk metrics for each 10km grid cell strictly through raster-vector overlap, completely bypassing C-level geometric intersection crashes.
+
+By performing the ratio math on the vectors, but the spatial aggregation on the rasters, we maintain perfect data fidelity without sacrificing pipeline stability.
 
 ## Key Analysis Parameters
 

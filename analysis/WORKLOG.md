@@ -1,5 +1,11 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-06-04
+*   **Pipeline Robustness & Zombie Data Fix:** Identified and resolved a critical bug where `process_data.qmd` ingested a stale, misaligned coastal GPKG because the file loading was hardcoded to grab the top 3 files by date. Updated the script to dynamically load *all* GPKGs present in `summary_pipeline_workspace_ha`.
+*   **Coastal Extraction Canonical Path:** Restored `analysis_configs/c_protection_synth.yaml` to point to the archived coastal risk rasters (`Rt_1992.tif`, etc.). Confirmed that calculating ratios natively on vectors and *then* rasterizing them is the only stable path, bypassing C-level crashes.
+*   **Dateline Artifact Resolution:** Added `sf::st_wrap_dateline()` with `DATELINEOFFSET=180` to the final export step of `process_data.qmd` to prevent horizontal tearing artifacts when rendering the EPSG:4326 output in QGIS.
+*   **Future-Proofing the Pipeline:** Refactored year-detection regex from hardcoded `"1992|2020"` to dynamic `"[0-9]{4}"`. Added prominent `[MANUAL UPDATE REQUIRED]` templates directly into the `process_data.qmd` script to guide future users on exactly how to drop specific years (for multi-year comparisons) or add new variables without breaking the analysis.
+
 ### 2026-06-03
 *   **Geometry Crashes Finally Conquered:** After a grueling two-week struggle involving `GEOSException` crashes, memory leaks, and exploded geometries, we have finally established a mathematically sound and highly performant vector-extraction workflow.
 *   **The Breakthrough:** The root cause of the crashes in Python/GEOS was isolated to a small number of malformed "poison polygons" during the C-level EPSG:4326 reprojection phase.

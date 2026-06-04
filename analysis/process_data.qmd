@@ -59,6 +59,12 @@ processed_hotspots_dir <- file.path(processed_dir, "hotspots")
 # Source unified hotspot/change helpers
 source(here::here("R", "utils_hotspot.R"))
 
+# ============================================================================
+# [MANUAL UPDATE REQUIRED IF ADDING NEW VARIABLES OR YEARS]
+# Map raw column names from Python (synth outputs) to canonical names.
+# If you add a new year (e.g., 2015) or new service, add its exact Python 
+# output name here and assign it your desired canonical name.
+# ============================================================================
 # This maps raw column names from synth outputs to canonical names.
 rename_list <- list(
   c(
@@ -105,12 +111,12 @@ workspace_dir <- here::here("summary_pipeline_workspace_ha")
 gpkg_files <- list.files(workspace_dir, pattern = "^grid_10km_land_synth_zonal_.*\\.gpkg$", full.names = TRUE)
 gpkg_files <- gpkg_files[order(file.mtime(gpkg_files), decreasing = TRUE)]
 
-if (length(gpkg_files) < 3) {
-  warning("Found fewer than 3 GPKGs. Expected Services, Beneficiaries, and Coastal runs.")
+if (length(gpkg_files) == 0) {
+  stop("No GPKG files found in the workspace!")
 }
 
-# Take up to 3 most recent files
-files_to_load <- head(gpkg_files, 3)
+# Load ALL GPKG files currently present in the workspace
+files_to_load <- gpkg_files
 
 message("Loading Base Run: ", basename(files_to_load[1]))
 sf_f <- sf::st_read(files_to_load[1], quiet = TRUE)
@@ -182,6 +188,18 @@ if (!exists("sf_f")) {
 # Division by zero yields Inf/NaN in standard pct change; symmetric change handles this by bounding at +/-200%.
 # However, if any Inf values persist (e.g. appearing from 0), we clamp them to the max symmetric range (+/- 200%).
 # Use pct_mode = "symm" to avoid counter-intuitive sign flips and handle zero baselines.
+
+# ============================================================================
+# [MANUAL UPDATE REQUIRED IF ADDING MULTIPLE YEARS]
+# The pipeline is currently designed for a BI-TEMPORAL comparison (T0 vs T1).
+# `compute_change` automatically finds the MIN year (T0) and MAX year (T1).
+# If you add an intermediate year (e.g. 2015) and want to compare 2015 vs 2020, 
+# you MUST manually drop the 1992 columns from `sf_f` BEFORE this step!
+#
+# Example: To drop all 1992 columns so 2015 becomes T0, uncomment the line below:
+# sf_f <- sf_f %>% dplyr::select(-matches("_1992_"))
+#
+# ============================================================================
 t0_change <- Sys.time()
 gc_before <- gc()
 
@@ -269,7 +287,7 @@ benef_pattern <- "^(GHS_|GlobPOP_|hdi_|rast_gdpTot_|rast_adm1_gini_|fields_mehra
 
 # Drop raw/base-year service columns; we only keep change metrics here.
 message("Dropping raw year columns to reduce memory footprint...")
-year_cols <- grep("1992|2020", names(sf_f), value = TRUE)
+year_cols <- grep("[0-9]{4}", names(sf_f), value = TRUE)
 benef_cols <- grep(benef_pattern, names(sf_f), value = TRUE)
 drop_year_cols <- setdiff(year_cols, benef_cols)
 
@@ -315,7 +333,7 @@ if (!"c_fid" %in% names(sf_f)) {
 
 # Define canonical services and beneficiaries to keep
 svc_cols <- names(c(rename_list[[1]], rename_list[[2]]))
-svc_base <- unique(stringr::str_replace(svc_cols, "_(1992|2020)_", "_"))
+svc_base <- unique(stringr::str_replace(svc_cols, "_[0-9]{4}_", "_"))
 
 canonical_change <- unique(c(
   paste0(svc_base, "_abs_chg"),
@@ -323,6 +341,11 @@ canonical_change <- unique(c(
 ))
 chg_cols <- intersect(chg_cols, canonical_change)
 
+# ============================================================================
+# [MANUAL UPDATE REQUIRED IF ADDING NEW SOCIOECONOMIC DATA]
+# Define canonical beneficiaries to KEEP (preventing them from being dropped).
+# If you add a new continuous raster (like GDP, Pop, new HDI), add it here.
+# ============================================================================
 benef_keep <- intersect(
   c(
     paste0(c("fields_mehrabi_2017", "GHS_BUILT_S_E2020", "NEW_HDI_COLUMN_NAME", "rast_adm1_gini_disp_2020"), "_mean"),
@@ -406,6 +429,11 @@ if ("fid" %in% names(sf_to_write)) {
   if ("grid_fid" %in% names(sf_to_write)) sf_to_write <- dplyr::select(sf_to_write, -grid_fid)
   sf_to_write <- dplyr::rename(sf_to_write, grid_fid = fid)
 }
+
+# Fix Dateline Artifact before export
+message("Wrapping dateline to prevent QGIS rendering artifacts...")
+sf_to_write <- sf::st_wrap_dateline(sf_to_write, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
+
 tryCatch({
   st_write(
     sf_to_write,
