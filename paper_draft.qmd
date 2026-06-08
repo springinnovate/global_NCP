@@ -5,13 +5,17 @@ author:
   - "Jerónimo Rodríguez Escobar"
   - "Becky Chaplin-Kramer"
   - "Richard P. Sharp"
-date: "2024"
+  - "[Additional Authors]"
+date: "June 2026"
 format:
   html:
     toc: true
     toc-depth: 2
     number-sections: true
     theme: cosmo
+  docx:
+    toc: true
+    number-sections: true
 execute:
   echo: false
   warning: false
@@ -20,220 +24,145 @@ execute:
 
 # Abstract
 
-Ecosystem services are declining globally, but the spatial concentration, affected populations, and underlying mechanisms remain poorly understood. We analyze changes in seven ecosystem services across 1.7 million 10-km grid cells worldwide from 1992 to 2020 using biophysical models (InVEST), satellite data (ESA CCI land cover), and socioeconomic covariates. We identify 75,271 ecosystem service hotspots (top/bottom 5% of change distribution per service) and find: (1) **geographic clustering** predominantly in Sub-Saharan Africa, Latin America, and Southeast Asia; (2) **differential exposure** across income groups and land-use contexts, with low-income regions experiencing 2.2× higher hotspot intensity; (3) **attribution complexity** where ~60-70% of hotspots show limited overlap with detected land cover conversion, suggesting in-situ degradation exceeds conversion in driving service decline. These findings support targeted conservation strategies that account for geographic concentration, socioeconomic vulnerability, and region-specific management drivers.
+Ecosystem services are declining globally, but the spatial concentration, affected populations, and underlying mechanisms remain poorly understood. We analyze overarching regional trajectories and localized changes in eight ecosystem services across 1.7 million 100 sq km equal-area grid cells worldwide between 1992 and 2020 integrating biophysical models (InVEST), satellite data (ESA CCI land cover), and socioeconomic covariates. We identify approximately 250,000 unique grid cells experiencing at least one ecosystem service hotspot (defined as the extreme 5% of relative change values, calculated via Symmetric Percentage Change, per service) and find: (1) geographic clustering predominantly in Latin America and East Asia; (2) differential exposure across income groups and land-use contexts, with lower-middle income regions experiencing ~1.6× higher hotspot intensity than high-income nations; and (3) attribution complexity where ~76% of hotspots show limited overlap with detected land cover conversion, suggesting in-situ degradation may vastly exceed conversion in driving service decline. These findings highlight the need for targeted conservation strategies that account for geographic concentration, socioeconomic vulnerability, and region-specific management drivers.
 
-**Keywords:** Ecosystem services, hotspots, land-use change, socioeconomic profiling, global assessment
+Keywords: Ecosystem services, hotspots, land-use change, socioeconomic profiling, global assessment
 
 ---
 
-# 1. Introduction
+# Introduction
 
-### 1.1 Ecosystem Services at Risk
+### Ecosystem Services at Risk
 
 Ecosystem services—the benefits humans derive from nature—are fundamental to human wellbeing. Yet services including pollination, water purification, coastal protection, and biodiversity support are declining globally due to land-use change, climate variation, and ecosystem degradation (Millennium Ecosystem Assessment, 2005; IPBES, 2019). An estimated 1.1 billion people depend directly on ecosystem services for livelihoods, yet the geographic patterns and affected populations remain incompletely characterized.
 
-### 1.2 The Prioritization Challenge
+### The Prioritization Challenge
 
-Conservation resources are limited. Decision-makers lack spatially explicit, globally consistent information on where ecosystem service decline is most acute (WHERE), who is affected (WHO), and what mechanisms drive observed changes (WHY). This information gap hampers equitable prioritization and effective allocation of adaptation and conservation investments.
+Conservation resources are limited. Decision-makers lack spatially explicit, globally consistent information on where ecosystem service decline is most acute (WHERE), who is affected (WHO), and what mechanisms drive observed changes (WHY). This information gap hampers equitable prioritization and effective allocation of adaptation and conservation investments. A global, reproducible assessment of ecosystem service change, exposure, and attribution is urgently needed to inform policy and practice.
 
-### 1.3 Research Objectives
+### Research Objectives
 
-This study addresses three linked research questions:
-
-1. **WHERE** are ecosystem service hotspots (regions of extreme change) geographically concentrated?
-2. **WHO** is exposed to ecosystem service decline, and how do affected populations vary across socioeconomic profiles?
-3. **WHY** are services declining—are changes driven by land cover conversion or in-situ degradation?
-
-We provide a global, reproducible assessment using open-source models, satellite data, and socioeconomic layers.
+This study addresses four linked research questions. First, what are the overarching global and regional trajectories of ecosystem service change? Second, where are ecosystem service hotspots (regions of extreme change) geographically concentrated? Third, who is exposed to ecosystem service decline, and how do affected populations vary across socioeconomic profiles? Fourth, why are services declining—are changes driven by land cover conversion or in-situ degradation? We provide a global, reproducible assessment using open-source models, satellite data, and socioeconomic layers to explore these dynamics.
 
 ---
 
-# 2. Methods
+# Methods
 
-### 2.1 Data Sources and Study Design
+### Data Sources and Study Design
 
-**Temporal Scope:** 1992 and 2020 (two snapshots; intermediate dynamics not captured)
-**Spatial Scope:** All land on Earth; 10-km grid cells (n=1,689,609)
+The analysis covers a temporal scope from 1992 to 2020, relying on two snapshots that do not capture intermediate dynamics. The spatial scope encompasses all terrestrial areas on Earth, aggregated into 100 sq km equal-area grid cells (n=1,689,609).
 
-#### 2.1.1 Ecosystem Services
+#### Ecosystem Services
 
-We model seven ecosystem services using InVEST (Natural Capital Project) at 360-m resolution:
+We modeled eight ecosystem services using InVEST (Natural Capital Project) at 360-m resolution: nature access (proximity to natural habitat), pollination (habitat suitability for wild pollinators), coastal protection (wave energy attenuation), coastal risk reduction ratio (proportional risk mitigated by habitats), nitrogen export (N loading to waterways), nitrogen retention ratio (N filtering efficiency), sediment export (sediment yield to waterways), and sediment retention ratio (sediment trapping efficiency).
 
-- **Nature Access** (proximity to natural habitat)
-- **Pollination** (habitat suitability for wild pollinators)
-- **Coastal Protection** (wave energy attenuation)
-- **Nitrogen Export** (N loading to waterways)
-- **Nitrogen Retention Ratio** (N filtering efficiency)
-- **Sediment Export** (sediment yield to waterways)
-- **Sediment Retention Ratio** (sediment trapping efficiency)
+#### Ancillary Data
 
-#### 2.1.2 Ancillary Data
+Ancillary data included ESA CCI Land Cover (300m) processed to track specific land cover transitions—such as forest loss, cropland expansion, and grassland dynamics—using an approach based on square contingency matrices (Pontius and Santacruz, 2014) to accurately attribute drivers of change. The IUCN Areas of Occupancy grid (100 sq km cells) was used for spatial aggregation, alongside socioeconomic covariates including population (GHSL), GDP (World Bank), HDI (UNDP), built-up area (GHSL), and agricultural plot area (Mehrabi).
 
-- **Land Cover:** ESA CCI Land Cover (300m); reclassified as Transformed vs. Natural
-- **Spatial Framework:** IUCN Areas of Occupancy grid (10km cells; ~1.7M cells globally)
-- **Socioeconomic Covariates:** Population (GHSL), GDP (World Bank), HDI (UNDP), Built-up area (GHSL), Agricultural intensity
+### Analysis Pipeline
 
-### 2.2 Analysis Pipeline
+#### Regional Trajectories vs. Grid-Level Hotspots
 
-#### 2.2.1 Zonal Summary & Grid-Level Change
+We utilized a dual-pathway analytical structure. To assess overarching regional trajectories (the "WHAT"), we calculated pixel-by-pixel changes and aggregated these absolute and relative differences directly to broad geographic regions (e.g., biomes, income groups). To identify localized extremes, or "hotspots" (the "WHERE"), we aggregated baseline and future data to the 10-km grid prior to calculating the per-cell difference. This approach captures both the systemic volumetric shifts and the highly localized intensity of ecosystem service decline.
 
-1. Aggregate InVEST rasters to 10-km grid cells (zonal statistics) for 1992 and 2020
-2. Calculate per-cell change metrics:
-   - **Absolute Change:** $\Delta S = S_{2020} - S_{1992}$
-   - **Symmetric Percentage Change (SPC):** $SPC = \frac{S_{2020} - S_{1992}}{(|S_{2020}| + |S_{1992}|)/2} \times 100$
+#### Zonal Summary & Grid-Level Change
 
-SPC is preferred because it treats increases/decreases symmetrically and avoids scale bias (Pontius & Santacruz, 2014).
+We aggregated InVEST rasters to 100 sq km equal-area grid cells using zonal statistics for 1992 and 2020. We then calculated per-cell change metrics, including absolute change:
 
-#### 2.2.2 Hotspot Identification
+$$ \Delta S = S_{2020} - S_{1992} $$
 
-Define **ecosystem service hotspots** as cells in the extreme 5th percentile (bottom 5% for loss services; top 5% for gain services) of the SPC distribution per service.
+and Symmetric Percentage Change (SPC):
 
-**Rationale:** Relative extremes (percentiles) rather than absolute thresholds enable comparison across services with different units and scales.
+$$ SPC = \frac{S_{2020} - S_{1992}}{(|S_{2020}| + |S_{1992}|)/2} \times 100 $$
 
-#### 2.2.3 Spatial Aggregation
+SPC is generally preferred for this analysis because it treats increases and decreases symmetrically and avoids scale bias when dealing with near-zero baselines (Pontius & Santacruz, 2014).
 
-Aggregate hotspots to:
-- World Bank regions (n=7)
-- Income groups (n=4: High, Upper-Middle, Lower-Middle, Low)
-- WWF biomes (n=14)
-- Countries (n=195)
+#### Hotspot Identification
 
-Calculate per-region:
-- **Hotspot Count & Coverage:** Number and area of cells flagged as hotspots
-- **Relative Intensity:** (Regional hotspot % area) / (Expected share if random) = enrichment score
+We define ecosystem service hotspots as cells falling into the extreme 5% of relative change values (using the SPC metric) per service. For services where an increase represents damage (e.g., Nitrogen Export), the top 5% is used. For services where a decrease is damage (e.g., Pollination), the bottom 5% is used. Relative extremes (percentiles) rather than absolute thresholds enable comparison across services with different units and scales.
 
-#### 2.2.4 Socioeconomic Profiling: Kolmogorov-Smirnov Tests
+#### Spatial Aggregation
 
-Compare distributions of socioeconomic covariates in hotspot vs. non-hotspot cells using two-sample KS tests:
+We aggregated hotspots to World Bank regions (n=7), income groups (n=4), WWF biomes (n=14), and countries (n=195). For each region, we calculated the hotspot count and coverage (the number and area of cells flagged as hotspots), as well as a relative intensity metric, defined as the regional hotspot percentage area divided by the expected share if randomly distributed.
 
-$$D = \max_x |F_{\text{hotspot}}(x) - F_{\text{non-hotspot}}(x)|$$
+#### Socioeconomic Profiling: Kolmogorov-Smirnov Tests
 
-**Variables tested:** Population density, built-up area %, GDP per capita, HDI, field size, agricultural intensity
+We compared the distributions of socioeconomic covariates in hotspot versus non-hotspot cells using two-sample Kolmogorov-Smirnov (KS) tests, taking the form:
 
-**Effect Size:** Cliff's Delta (δ) to quantify magnitude and direction of difference
+$$ D = \max_x |F_{\text{hotspot}}(x) - F_{\text{non-hotspot}}(x)| $$
 
-**Multiple Testing Correction:** False Discovery Rate (FDR) adjustment for p-values
+Variables tested included population density, built-up area percentage, GDP per capita, HDI, field size, and agricultural intensity. We used Cliff's Delta ($\delta$) to quantify the magnitude and direction of differences, and applied a False Discovery Rate (FDR) adjustment for p-values to correct for multiple testing.
 
-### 2.3 Attribution Analysis
+### Attribution Analysis
 
-Quantify overlap between ecosystem service hotspots and detected land cover change (drivers):
-- Forest Loss, Cropland Expansion, Grassland Loss/Gain, Urban Expansion, etc.
+To explore underlying mechanisms, we quantified the overlap between ecosystem service hotspots and detected land cover change drivers, such as forest loss, cropland expansion, grassland transition, and urban expansion. We calculated the "attribution gap" as the proportion of ecosystem service hotspots that showed no spatial overlap with major land cover conversions. High attribution gaps suggest that in-situ degradation mechanisms, not fully captured by satellite land cover detection, may play a significant role.
 
-Calculate **Attribution Gap** = (ES hotspots with no LCC overlap) / (Total ES hotspots)
+### Data Limitations
 
-High attribution gaps suggest in-situ degradation mechanisms not captured by land cover detection.
-
-### 2.4 Data Limitations
-
-- **Temporal resolution:** Two snapshots; intermediate dynamics missed
-- **InVEST models:** Do not explicitly include climate drivers; validation ongoing
-- **Land cover:** 300-m resolution may miss sub-pixel changes
-- **Attribution gap:** Inferred degradation signal, not directly measured
-- **Biomes & income groups:** Classifications inherently coarse; within-group heterogeneity substantial
+This approach acknowledges several data limitations. The temporal resolution relies on two snapshots, potentially masking intermediate dynamics. InVEST models do not explicitly separate climate drivers from land-use impacts, and broad-scale validation is ongoing. Furthermore, the 300-m resolution of the land cover data may miss sub-pixel changes. Finally, the attribution gap provides an inferred degradation signal rather than a direct measurement, and broad classifications like biomes and income groups inherently contain substantial internal heterogeneity.
 
 ---
 
-# 3. Results
+# Results
 
-### 3.1 Global Hotspot Distribution
+### Global and Regional Trajectories
 
-Across seven ecosystem services, we identified **75,271 ecosystem service hotspots** (4.45% of 1.69M grid cells). Hotspots are **highly geographically concentrated**:
+Before isolating localized extremes, we assessed the overarching trajectories of ecosystem service change. Evaluating regional aggregates reveals complex dynamics where certain macro-regions experience net volumetric declines in service provision despite localized areas of recovery. Absolute volume changes are heavily influenced by the presence of large baseline ecosystems (such as massive absolute losses in tropical forest biomes), whereas evaluating percentage changes across broad geographic areas reveals the widespread systemic shifts in global landscape functions over the 28-year study period.
 
-- **Sub-Saharan Africa:** 2.34× enrichment (hotspots disproportionately concentrated)
-- **Europe & Central Asia:** 1.24× enrichment
-- **North America:** 1.16× enrichment
-- **Latin America & Caribbean:** 1.13× enrichment
-- **East Asia & Pacific:** 0.94× enrichment (fewer hotspots than expected by chance)
+![Absolute Change in Ecosystem Services by World Bank Region.](outputs/plots/signed_bars/bars_signed_region_wb_abs.png){#fig-abs-wb}
 
-### 3.2 Socioeconomic Profiling: KS Test Results
+![Absolute Change in Ecosystem Services by Income Group.](outputs/plots/signed_bars/bars_signed_income_grp_abs.png){#fig-abs-income}
 
-KS tests reveal **47 out of 48 service × variable combinations** (97.9%) show statistically significant differences between hotspot and non-hotspot populations (p < 0.05 after FDR correction).
+### Global Hotspot Distribution
 
-**Key Patterns:**
+Across the eight modeled ecosystem services, we identified approximately 250,000 unique grid cells experiencing at least one extreme ecosystem service decline. These hotspots demonstrate notable geographic concentration. For example, Latin America and the Caribbean show a 1.40× enrichment score, indicating that hotspots are disproportionately concentrated relative to the total land area. East Asia and the Pacific show a 1.30× enrichment. In contrast, South Asia and Sub-Saharan Africa exhibit approximately 0.78-0.80× enrichment (fewer hotspots than expected by chance), while regions in the Global North, including Europe, Central Asia, and North America, exhibit the lowest relative intensity with <0.65× enrichment.
 
-**Urban-Associated Services** (Nature Access, Coastal Protection, Sediment Retention):
-- Hotspots have **higher** population density, built-up area, GDP
-- Interpretation: Decline driven by urbanization and infrastructure development
+![Global Compound Risk (Hotness) Map. Displays the count of overlapping ecosystem service decline hotspots per 100 sq km grid cell.](outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png){#fig-hotspot-map}
 
-**Agricultural-Associated Services** (Pollination, Nitrogen/Sediment Export):
-- Hotspots have **lower** population density, **higher** agricultural intensity
-- Interpretation: Decline driven by agricultural intensification
+### Socioeconomic Profiling: KS Test Results
 
-### 3.3 Population Exposure
+KS tests reveal that 47 out of 48 service-by-variable combinations (97.9%) show statistically significant differences between hotspot and non-hotspot populations (p < 0.05 after FDR correction). For urban-associated services such as nature access, coastal protection, and sediment retention, hotspots generally exhibit higher population density, built-up area, and GDP, suggesting that decline may be linked to urbanization and infrastructure development. Conversely, for agricultural-associated services like pollination and nutrient export, hotspots often feature lower population density and higher agricultural intensity.
 
-**~7.9 billion people** live in or depend on ecosystem service hotspots globally.
+![Kolmogorov-Smirnov (KS) Statistic Heatmap. Highlights the socioeconomic variables that most strongly distinguish hotspot cells from the background landscape.](outputs/plots/ks/ks_heatmap.png){#fig-ks-heatmap}
 
-**By income group:**
-- Upper-Middle Income: Largest absolute numbers exposed
-- Lower-Middle Income: Second largest
-- Low Income: 4.2% of exposed population (but relative intensity 2.2× higher than OECD)
+### Population Exposure
 
-### 3.4 Attribution Gap: Conversion vs. Degradation
+We estimate that approximately 7.9 billion people globally live in or depend on ecosystem service hotspots. When segmented by income group, upper-middle-income countries contain the largest absolute numbers of exposed individuals. Lower-middle-income countries contain the second largest absolute exposure but experience the highest relative hotspot intensity, roughly 1.6 times higher than OECD nations. Low-income countries account for approximately 4.2% of the total exposed population.
 
-Land cover change explains only **~30-40%** of ecosystem service hotspots on average. Most hotspots (**~60-70%**) show minimal overlap with detected land cover conversion, suggesting **in-situ degradation is the primary mechanism** of service decline.
+![Absolute Population Exposure in Hotspots by World Bank Income Group.](outputs/plots/pop_exposure_income.png){#fig-pop-exposure}
 
-**Top drivers (by overlap %):**
-- Forest Loss: 19.8%
-- Cropland Expansion: 19.0%
-- Grassland Loss: 7.7%
+### Attribution Gap: Conversion vs. Degradation
 
-**Interpretation:** Majority of service decline occurs WITHOUT detected conversion, implying:
-- Forest quality declining (logging, understory loss)
-- Agricultural intensification without land-cover expansion (fertilizer use, monoculture)
-- Hydrological/edaphic changes not detectable via satellite land cover
+Land cover change overlaps with only ~24% of ecosystem service hotspots on average. The majority of hotspots (~76%) show minimal overlap with detected major land cover conversions, suggesting that in-situ degradation may be a primary mechanism of service decline. The top specific drivers by overlap percentage are forest loss (19.8%), cropland expansion (19.0%), and grassland loss (7.7%). This substantial attribution gap implies that a large portion of service decline occurs without easily detected land cover conversion. This may point to declining habitat quality (such as selective logging or understory loss), agricultural intensification without spatial expansion (such as increased fertilizer use or monoculture transitions), or broader hydrological and edaphic changes not readily captured via standard satellite classifications.
+
+![Attribution Gap Heatmap. Shows the percentage of ecosystem service hotspots that geographically overlap with extreme land cover change drivers.](outputs/plots/drivers/heatmap_driver_overlap_pct.png){#fig-attribution}
 
 ---
 
-# 4. Discussion
+# Discussion
 
-### 4.1 Geographic Clustering Enables Prioritization
+### Geographic Clustering Enables Prioritization
 
-The strong geographic clustering of hotspots (Sub-Saharan Africa, Latin America, Southeast Asia) suggests conservation resources can be efficiently allocated to epicenters of highest impact. A small number of countries account for majority of global hotspots, enabling targeted strategies.
+The geographic clustering of hotspots in Latin America and the East Asia-Pacific region suggests that conservation interventions could potentially be allocated to areas of concentrated impact. Certain nations, such as South Korea, Malaysia, Guatemala, and Jamaica, exhibit high relative intensities. However, because clustering patterns vary by service, effective approaches will likely need to be tailored rather than generic.
 
-**However:** Clustering patterns vary by service, requiring service-specific, not generic, approaches.
+### Differentiated Vulnerability
 
-### 4.2 Differentiated Vulnerability
+The socioeconomic profiling indicates that ecosystem service decline affects different populations in varied ways. For instance, urbanized populations appear more vulnerable to declines in nature access and coastal protection, while rural agricultural communities face greater exposure to pollination and water quality declines. This differentiation suggests that conservation policies should carefully consider local socioeconomic contexts and service-specific drivers, rather than relying on uniform interventions.
 
-Socioeconomic profiling reveals ecosystem service decline affects different populations differently:
+### Attribution Complexity: Degradation ≥ Conversion
 
-- **Urbanized poor** face nature access and coastal protection decline
-- **Rural farmers** face pollination and water quality decline
+The large attribution gap (~76%) introduces complexity to the assumption that explicit land cover conversion drives all ecosystem service decline. The prominence of potential in-situ degradation implies that protected area strategies alone may be insufficient if existing habitats are not actively managed. Furthermore, this gap suggests a need for refined monitoring, as current land cover datasets may miss critical degradation signals, and highlights the potential role of climate-driven changes that were not captured in this analysis.
 
-This differentiation argues against one-size-fits-all conservation policy. Interventions must be tailored to local socioeconomic context and service-specific drivers.
+### Limitations & Uncertainties
 
-### 4.3 Attribution Complexity: Degradation ≥ Conversion
-
-The large attribution gap (~60-70%) challenges simplistic narratives that land cover conversion drives all ecosystem service decline. In-situ degradation appears equally or more important, with several implications:
-
-1. **Protected area strategies alone insufficient** — existing habitat must be actively managed, not just protected from conversion
-2. **Monitoring needs refinement** — satellite land cover detection misses key degradation signals
-3. **Climate integration needed** — unexplained decline may partly reflect climate-driven changes, not captured in current analysis
-
-### 4.4 Limitations & Uncertainties
-
-**Data limitations:** Two temporal snapshots mask intermediate dynamics; InVEST models do not explicitly include climate; land cover resolution (300m) may miss fine-scale changes.
-
-**Interpretation limitations:** Attribution gap inferred from land cover mismatch, not direct degradation measurement; within-group heterogeneity (e.g., "Sub-Saharan Africa") substantial.
-
-**Model validation:** InVEST model predictions require field-based validation; high priority in high-impact regions.
+The data limitations of this study must be acknowledged. Using only two temporal snapshots masks intermediate dynamics, and the InVEST models utilized do not explicitly separate climate variables from land-use impacts. Additionally, the 300-m resolution of the land cover data may miss fine-scale changes. Interpretations of the attribution gap are inferred from land cover mismatches rather than direct degradation measurements, and there remains substantial heterogeneity within large groupings like "Sub-Saharan Africa." Finally, the biophysical predictions of the InVEST models require ongoing field-based validation, particularly in high-impact regions.
 
 ---
 
-# 5. Conclusions
+# Conclusions
 
-This global assessment identifies ecosystem service hotspots, quantifies affected populations, and characterizes underlying drivers. Three main conclusions:
-
-1. **Ecosystem service decline is geographically concentrated**, enabling targeted conservation prioritization to Sub-Saharan Africa, Latin America, and Southeast Asia.
-
-2. **Vulnerability is socioeconomically differentiated**, requiring context-specific interventions for urban vs. rural populations and different service-stakeholder groups.
-
-3. **Degradation mechanisms dominate**, suggesting that conversion prevention alone is insufficient; ecosystem management within remaining habitat is equally critical.
-
-**Recommendations for future work:**
-- Field validation of InVEST models in high-priority regions
-- Integration of climate drivers
-- Fine-scale (1-km) mapping in priority hotspots
-- Co-production with affected communities and land managers
+This global assessment evaluates overarching regional trajectories, identifies ecosystem service hotspots, quantifies affected populations, and characterizes potential underlying drivers. The findings suggest that ecosystem service decline is geographically concentrated, which could help target conservation prioritization in regions like Latin America and East Asia. Furthermore, socioeconomic vulnerability appears differentiated, highlighting the importance of context-specific interventions for urban and rural populations. Finally, the apparent dominance of degradation-related mechanisms over explicit land conversion suggests that preventing land conversion alone may be insufficient for maintaining ecosystem services. Future work should prioritize the field validation of biophysical models in high-impact regions, the integration of climate drivers, finer-scale mapping in priority hotspots, and the co-production of knowledge with affected communities and land managers.
 
 ---
 
@@ -254,22 +183,18 @@ This global assessment identifies ecosystem service hotspots, quantifies affecte
 
 # Appendix A: Supplementary Methods
 
-## A1. Hotspot Definition Rationale
+## Hotspot Definition Rationale
 
-We define hotspots as relative extremes (5th percentile) rather than absolute thresholds because:
+We defined hotspots as relative extremes (the 5th percentile) rather than using absolute thresholds for several reasons. First, this approach provides comparability across services that are measured in different units (e.g., kg/year versus percentages), which cannot be directly compared on an absolute scale. Second, policy focus is typically directed to outlier regions experiencing the most rapid changes rather than simply those with the largest absolute magnitude. Finally, selecting the top and bottom 5% creates a tractable number of analysis units for global assessment (approximately 85,000 hotspots out of 1.69 million cells per service type).
 
-1. **Comparability:** Services measured in different units (kg/year, %), cannot be directly compared on absolute scale
-2. **Attention:** Policy focus typically directed to "outlier" regions, not absolute magnitude
-3. **Actionability:** Top/bottom 5% creates tractable (~1.69M cells × 0.05 = ~85k hotspots per service type) analysis units
+## SPC Formula Derivation
 
-## A2. SPC Formula Derivation
+Standard percent change calculations, taking the form:
 
-Standard percent change $((V_2 - V_1) / V_1 \times 100)$ fails when $V_1 \approx 0$. SPC addresses this:
+$$ \text{Percent Change} = \frac{V_2 - V_1}{V_1} \times 100 $$
+
+often fail when the baseline $V_1$ is at or near zero. Symmetric Percentage Change (SPC) addresses this limitation:
 
 $$SPC = \frac{V_2 - V_1}{(|V_2| + |V_1|) / 2} \times 100$$
 
-This ensures:
-- Symmetric treatment of increases/decreases
-- Defined even when baseline is near-zero
-- Scale-independent comparison across services
-
+This formulation ensures symmetric treatment of increases and decreases, remains mathematically defined even when the baseline is near-zero, and allows for scale-independent comparisons across diverse ecosystem services.

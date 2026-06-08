@@ -1,191 +1,106 @@
----
-title: "Where Are Hotspots Concentrated?"
-subtitle: "Geographic distribution of ecosystem service decline"
----
+# Geographic Analysis (WHERE) {#sec-where}
 
-```{r setup}
+Having established the global trajectories in the previous chapter, we now shift our focus to local extremes. Where is ecosystem service provision changing the most rapidly relative to local baselines?
+
+We identify **Hotspots** as the top and bottom 5% of all 10km grid cells globally for each service, based on the Symmetric Percentage Change (SPC) metric. This approach normalizes for the vastly different baseline sizes of ecosystems across the globe, allowing us to highlight the most intense local landscape shifts.
+
+## The Hotspot Landscape
+
+The following maps provide a "first look" at the global distribution of these extreme changes.
+
+### First Look: Absolute Hotspots
+*(Where the largest total volumes of services were lost or gained)*
+
+![Global Distribution of Absolute Hotspots](../outputs/plots/maps/first_look_map_abs.png){#fig-map-abs width=100%}
+
+### First Look: Percentage Hotspots (Intensity)
+*(Where the most intense changes occurred relative to local baselines)*
+
+![Global Distribution of Percentage Hotspots](../outputs/plots/maps/first_look_map_pct.png){#fig-map-pct width=100%}
+
+## Hotspot Coverage and Relative Intensity
+
+How much of each region's land area is experiencing an ecosystem service hotspot? And is that region disproportionately burdened compared to the global average?
+
+### Hotspot Coverage by Income Group
+
+![Area of Hotspots by Income Group](../outputs/plots/intensity/hotspot_coverage_income_grp.png){#fig-cov-income width=100%}
+
+### Hotspot Relative Intensity by Income Group
+*(Values > 1 indicate a region has more hotspot area than expected given its total size)*
+
+![Relative Intensity of Hotspots by Income Group](../outputs/plots/intensity/hotspot_relative_intensity_income_grp.png){#fig-rel-income width=100%}
+
+## Compound Risk: Multi-Service Hotspots ("Hotness")
+
+A single declining service is a concern; multiple co-occurring declines represent severe compound risk. We refer to the count of overlapping negative hotspots in a single 10km cell as its "Hotness".
+
+### Compound Risk Map
+
+![Global Compound Risk (Hotness) Map](../outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png){#fig-hotness-map width=100%}
+
+### Hotness Distribution by World Bank Region
+
+![Distribution of Overlapping Hotspots by Region](../outputs/plots/hotness_dist_region_wb.png){#fig-hotness-wb width=100%}
+
+### Hotness Distribution by WWF Biome
+
+![Distribution of Overlapping Hotspots by Biome](../outputs/plots/hotness_dist_wwf_biome.png){#fig-hotness-biome width=100%}
+
+## Hotspot Distribution Details (Boxplots)
+
+To understand the spread of extreme values within these hotspots, we look at their distribution across different regions.
+
+### Volumetric Services by Income Group
+
+![Boxplots of Percentage Hotspots (Volumetric Services) by Income Group](../outputs/plots/boxplots_unified/income_grp/boxplots_volumetric_pct.png){#fig-box-vol width=100%}
+
+### Coastal & Ratio Services by Income Group
+
+![Boxplots of Percentage Hotspots (Coastal) by Income Group](../outputs/plots/boxplots_unified/income_grp/boxplots_coastal_pct.png){#fig-box-coastal width=100%}
+
+![Boxplots of Percentage Hotspots (Ratios) by Income Group](../outputs/plots/boxplots_unified/income_grp/boxplots_ratios_pct.png){#fig-box-ratio width=100%}
+
+## Summary Statistics
+
+The following tables provide the exact numerical breakdown of the hotspot spatial extraction.
+
+```{r load-tables}
 #| include: false
-library(dplyr)
-library(ggplot2)
 library(readr)
 library(here)
-
-has_dt <- requireNamespace("DT", quietly = TRUE)
-if(has_dt) library(DT)
-
-knitr::opts_knit$set(root.dir = here::here())
+library(knitr)
 source(here::here("R", "paths.R"))
-source(here::here("R", "plotting_functions.R"))
 
-# Load data
+# Load the area stats (intensity)
 area_stats <- read_csv(
   file.path(data_dir(), "processed", "tables", "hotspot_area_stats.csv"),
   show_col_types = FALSE
 )
 
-multiservice_stats <- read_csv(
+# Load the multiservice stats (hotness)
+hotness_stats <- read_csv(
   file.path(data_dir(), "processed", "tables", "hotspot_multiservice_stats.csv"),
   show_col_types = FALSE
 )
 ```
 
-## Overview
+### Hotspot Area Statistics
 
-This chapter answers the fundamental question: **Where are ecosystem service hotspots concentrated?** We analyze geographic patterns across three key groupings:
-
-1. **World Bank Regions** – Continental/regional patterns of change
-2. **Income Groups** – How hotspots correlate with economic development
-3. **WWF Biomes** – Ecological/ecosystem-type patterns
-
-We also examine **compound risk**—areas where multiple ecosystem services are declining simultaneously, creating cascading impacts on dependent populations.
-
-## Relative Intensity: Disproportionate Burden
-
-Our primary metric is **relative intensity**, which measures whether a region bears a disproportionate share of global hotspots:
-
-$$\text{Relative Intensity} = \frac{\text{% of Global Hotspots in Region}}{\text{% of Total Area in Region}}$$
-
-- **Relative Intensity > 1**: Region has more hotspots than expected by area alone (disproportionately affected)
-- **Relative Intensity = 1**: Region's hotspot share matches its area share (expected by chance)
-- **Relative Intensity < 1**: Region has fewer hotspots than expected (relatively spared)
-
-### Region (World Bank Classification)
-
-```{r intensity-region}
-#| fig-cap: "Relative intensity of hotspots by World Bank region. Red bars indicate disproportionate burden (>1.0). Services are shown in separate facets to allow comparison across regions."
-#| fig-height: 8
-#| fig-width: 12
-
-make_intensity_plot(area_stats, "region_wb")
+```{r}
+#| label: tbl-area
+#| echo: false
+kable(head(area_stats, 10), caption = "Hotspot Area Coverage (Top 10 Rows)")
 ```
 
-**Key Regional Patterns:**
-- **Sub-Saharan Africa**: Particularly high disproportionate burden across multiple services
-- **Latin America & Caribbean**: Strong hotspot concentration, especially in water-quality services
-- **East Asia & Pacific**: Mixed patterns; some services elevated, others near global average
-- **Europe & Central Asia**: Generally below-average intensity (services more stable)
-- **Middle East & North Africa**: Highly variable by service
+### Hotness Overview
 
-### Income Group Analysis
-
-```{r intensity-income}
-#| fig-cap: "Relative intensity of hotspots by income group. Lower-income countries show notably higher disproportionate burden across most services."
-#| fig-height: 8
-#| fig-width: 12
-
-make_intensity_plot(area_stats, "income_grp")
+```{r}
+#| label: tbl-hotness
+#| echo: false
+kable(head(hotness_stats, 10), caption = "Compound Risk Summary (Top 10 Rows)")
 ```
 
-**Socioeconomic Disparity:**
-- **Low-income countries**: 1.8–2.2× disproportionate burden (highest vulnerability)
-- **Lower-middle income**: 1.0–1.2× burden (near-average intensity)
-- **Upper-middle & high-income**: Often <1.0 (relative stability)
+## Key Takeaways
 
-**Interpretation**: Ecosystem service decline is not evenly distributed. Low-income regions bear a disproportionate share of the burden, raising equity concerns and implications for poverty reduction.
-
-### Biome Patterns
-
-```{r intensity-biome}
-#| fig-cap: "Relative intensity of hotspots by WWF biome. Tropical forests and grasslands show particularly high concentrations of ecosystem service decline."
-#| fig-height: 10
-#| fig-width: 12
-
-make_intensity_plot(area_stats, "WWF_biome")
-```
-
-**Biome-Specific Insights:**
-- **Tropical & Subtropical Forests**: High intensity for water-quality services (nitrogen/sediment retention)
-- **Grasslands & Savannas**: Elevated pollination hotspots (sensitivity to habitat loss)
-- **Boreal/Taiga**: Relatively low intensity (climate buffering, lower conversion pressure)
-- **Mediterranean**: Mixed; some services showing recovery, others declining
-
-## Compound Risk: Multi-Service Overlap
-
-Areas where multiple ecosystem services are declining simultaneously face **compounding vulnerability**. We quantify this as the average number of overlapping hotspots per 10-km grid cell.
-
-### Multi-Service Overlap by Region
-
-```{r multi-region}
-#| fig-cap: "Average number of overlapping hotspots per grid cell by region. Higher values indicate compound risk zones where multiple services are failing simultaneously."
-#| fig-height: 6
-#| fig-width: 10
-
-make_multi_plot(multiservice_stats, "region_wb")
-```
-
-### Multi-Service Overlap by Income Group
-
-```{r multi-income}
-#| fig-cap: "Compound risk by income group. Low-income countries not only experience more hotspots overall but face higher compounding effects."
-#| fig-height: 6
-#| fig-width: 10
-
-make_multi_plot(multiservice_stats, "income_grp")
-```
-
-**Compound Risk Implications:**
-- Areas with 3+ overlapping service hotspots face **cascading ecosystem failure**
-- Low-income regions show highest compound risk (avg. 2–3 overlapping services per cell)
-- These zones require integrated, multi-service management approaches
-
-## Country-Level Hotspot Rankings
-
-Below is an interactive table of country-level relative intensity. Sort, filter, and explore to identify specific hotspots of concern.
-
-```{r country-ranking}
-#| fig-cap: "Country-level relative intensity rankings. Use the search/sort functions to explore specific regions or services."
-
-country_data <- area_stats %>%
-  filter(grouping_var == "country") %>%
-  select(service, group, relative_intensity, pct_area, n_hot) %>%
-  arrange(desc(relative_intensity)) %>%
-  rename(
-    Service = service,
-    Country = group,
-    "Relative Intensity" = relative_intensity,
-    "% of Area (Hotspots)" = pct_area,
-    "Hotspot Cells" = n_hot
-  )
-
-if(has_dt) {
-  DT::datatable(
-    country_data,
-    filter = "top",
-    options = list(
-      pageLength = 20,
-      columnDefs = list(
-        list(targets = 2:4, render = JS("function(data) {return data.toFixed(2);}")),
-        list(targets = 4, render = JS("function(data) {return Math.round(data);}")))
-    ),
-    caption = "Country-Level Hotspot Relative Intensity"
-  )
-} else {
-  knitr::kable(country_data, caption = "Country-Level Hotspot Relative Intensity")
-}
-```
-
-## Policy Implications
-
-**For conservation prioritization:**
-1. **Focus on Sub-Saharan Africa and Latin America** – Highest concentrations of hotspots
-2. **Target low-income regions** – Greatest disproportionate burden and vulnerability
-3. **Address compound risk zones** – Areas with 3+ overlapping service hotspots need integrated management
-4. **Regional strategies** – Tailor interventions to dominant biomes and services in each region
-
-**For stakeholders:**
-- International donors: Consider geographic/income-weighted allocation of conservation resources
-- National governments: Prioritize hotspot regions in environmental policy and land-use planning
-- NGOs: Focus monitoring and capacity-building efforts on high-burden regions
-
-## Data Limitations
-
-- Analysis based on 1992–2020 comparison; recent trends may differ
-- 10-km resolution may mask fine-scale variation
-- Services modeled with varying data quality (see Technical Appendix for validation)
-- Attribution to human vs. natural drivers addressed in Chapter 7
-
-## Next Steps
-
-- **Chapter 7** provides deeper regional profiles and country-specific deep-dives
-- **Chapter 6** explains WHO is affected (socioeconomic profiling of populations in hotspots)
-- **Chapter 7** addresses WHY services are declining (land cover drivers)
+*(This section is reserved for the final interpretation phase. It will synthesize the core findings from the spatial distribution, intensity, and compound risk charts above.)*

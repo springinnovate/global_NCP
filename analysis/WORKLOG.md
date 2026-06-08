@@ -1,5 +1,11 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-06-08
+*   **Ground-Truth Narrative Audit:** Conducted a comprehensive, data-driven audit of all high-level claims in the synthesis chapters and manuscript draft using exact values from `hotspot_area_stats.csv` and the attribution scripts.
+*   **Narrative Corrections:** Purged several "echo chamber" inaccuracies in the text. Verified that Lower-Middle Income countries face the highest relative intensity (1.19x absolute, 1.6x OECD), Latin America and East Asia are the true regional epicenters, and Mangroves are the most severely impacted biome (nearly 5x expected intensity). Excluded micro-states (area < 10,000 sq km) from country-level rankings, revealing South Korea, Jamaica, Malaysia, and Guatemala as top intensity spots.
+*   **Hotspot Definition Refinement:** Clarified manuscript language to explicitly define hotspots based on the "extreme 5% of relative change values (Symmetric Percentage Change)", correctly identifying approx. 250,000 unique cells with at least one hotspot.
+*   **Output Audit Artifact:** Established a permanent logging mechanism (`outputs/audit_summary.txt`) to maintain a paper trail of the core ground-truth statistics for peer review and manuscript defense.
+
 ### 2026-06-04
 *   **Pipeline Robustness & Zombie Data Fix:** Identified and resolved a critical bug where `process_data.qmd` ingested a stale, misaligned coastal GPKG because the file loading was hardcoded to grab the top 3 files by date. Updated the script to dynamically load *all* GPKGs present in `summary_pipeline_workspace_ha`.
 *   **Coastal Extraction Canonical Path:** Restored `analysis_configs/c_protection_synth.yaml` to point to the archived coastal risk rasters (`Rt_1992.tif`, etc.). Confirmed that calculating ratios natively on vectors and *then* rasterizing them is the only stable path, bypassing C-level crashes.
