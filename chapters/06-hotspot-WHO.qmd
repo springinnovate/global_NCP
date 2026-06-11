@@ -28,6 +28,52 @@ How many people are directly living within the top 5% areas of ecosystem service
 
 ![Absolute Population Exposure by HDI](../outputs/plots/pop_exposure_hdi.png){width=100%}
 
+## In-Situ vs. Downstream Exposure (Servicesheds)
+
+For compound hotspots (areas experiencing overlapping ecosystem service declines), the impact extends beyond the immediate grid cell. We calculated the "multiplier effect" of these hotspots by comparing the local (in-situ) population with the total population exposed downstream within the serviceshed. 
+
+Incorporating downstream populations increases the exposed population by several orders of magnitude. For instance, while approximately 8.6 million people live directly within areas experiencing declines in 2 or more services, over 6.0 billion people reside downstream and are potentially affected—a multiplier effect of nearly 700x. For areas with 3 or more overlapping declines, the multiplier effect grows to over 1700x.
+
+![Multiplier Effect: Downstream vs. Local Population Exposure](../outputs/plots/multiplier_effect.png){width=100%}
+
+## The Multiplier Effect: Absolute Population Exposure
+
+While socioeconomic profiling reveals the *relative characteristics* of hotspot areas, we must also quantify the *absolute number* of people who benefit from them. Our previous analysis (`hotspot_pop_exposure.csv`) showed that **{{pop_exp_total}}M people** live directly within hotspot grid cells.
+
+However, the benefits of nature extend far beyond the cell in which they are generated. Using a new, high-performance extraction pipeline, we analyzed two distinct beneficiary pathways for all 250,000 hotspot cells combined:
+
+1.  **Hydrological Beneficiaries:** People living downstream within the same watershed.
+2.  **Access-Based Beneficiaries:** People who can reach the hotspot within a defined travel time.
+
+Our analysis reveals that **{{pop_combined}}M people** benefit from these hotspots through at least one of these pathways. Crucially, the population that can access these critical natural assets is **{{multiplier_effect}} times larger** than the population that depends on them for direct hydrological services.
+
+::: {.callout-note title="Methodology Note: Modeling Exposure Pathways"}
+**[PLACEHOLDER FOR CO-AUTHORS / BECKY]** 
+To calculate the true beneficiary footprint, we moved beyond simple grid-cell population counts. We generated two specific spatial models for every ecosystem service hotspot:
+
+1.  **Hydrological Beneficiaries (`downstream_50k`):** Computed using [INSERT DEM OR ROUTING MODEL DETAILS HERE, e.g., HydroSHEDS]. This model captures all populations living directly downstream within a 50km flow path of a degraded hotspot cell.
+2.  **Access-Based Beneficiaries (`within_travel_time`):** Computed using [INSERT ACCESSIBILITY/FRICTION SURFACE DETAILS HERE, e.g., the MAP algorithm or similar friction surface]. This model delineates the spatial footprint of populations capable of physically accessing the hotspot within [X]-hours of travel time, reflecting cultural, recreational, and non-timber provisioning services.
+:::
+
+This "multiplier effect" varies significantly by region, as shown below.
+
+```{r exposure-multiplier-plot-region, fig.cap="The Multiplier Effect by World Bank Region"}
+# This code assumes you have run `analysis/plot_multiplier_effect.R`
+knitr::include_graphics(here::here("outputs", "plots", "exposure_multiplier_dumbbell_region_wb.png"))
+```
+
+### Disparities by Income Group and Biome
+
+The multiplier effect is highly sensitive to the socioeconomic and ecological context.
+
+```{r exposure-multiplier-plot-income, fig.cap="The Multiplier Effect by Income Group"}
+knitr::include_graphics(here::here("outputs", "plots", "exposure_multiplier_dumbbell_income_grp.png"))
+```
+
+```{r exposure-multiplier-plot-biome, fig.cap="The Multiplier Effect by WWF Biome"}
+knitr::include_graphics(here::here("outputs", "plots", "exposure_multiplier_dumbbell_WWF_biome.png"))
+```
+
 ## Relative Socioeconomic Shift
 
 We perform two-sample Kolmogorov-Smirnov (KS) tests to determine if the socioeconomic profiles of ecosystem service "hotspots" are statistically different from the background landscape. 

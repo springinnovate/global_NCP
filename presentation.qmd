@@ -61,12 +61,10 @@ execute:
 :::
 
 ::: {.notes}
-- **The Attribution Gap**: This is the most surprising finding. You might expect hotspots to align with deforestation or urban expansion.
-- But the heatmap shows: Most ES hotspots have LOW overlap with detected land cover change (~20-40% at most).
-- Interpretation: ~60-70% of hotspots show NO significant land cover change = **degradation is happening WITHOUT conversion**.
-- Think: forests still standing but quality declining (logging, understory loss), farms intensifying without expanding (fertilizer use, monoculture).
-- This changes the policy response: You can't just protect existing forests; you need to improve management within them.
-- ~2 minutes
+- **The Challenge**: Ecosystem service loss is geographically uneven.
+- Some regions face catastrophic loss while others remain stable.
+- The burden often falls on populations least able to adapt.
+- We need geographically explicit, actionable priorities to direct limited conservation funds.
 :::
 
 ---
@@ -97,12 +95,10 @@ Understand drivers—what physical mechanisms (land use, degradation, urbanizati
 :::
 
 ::: {.notes}
-- **The Attribution Gap**: This is the most surprising finding. You might expect hotspots to align with deforestation or urban expansion.
-- But the heatmap shows: Most ES hotspots have LOW overlap with detected land cover change (~20-40% at most).
-- Interpretation: ~60-70% of hotspots show NO significant land cover change = **degradation is happening WITHOUT conversion**.
-- Think: forests still standing but quality declining (logging, understory loss), farms intensifying without expanding (fertilizer use, monoculture).
-- This changes the policy response: You can't just protect existing forests; you need to improve management within them.
-- ~2 minutes
+- **Our Framework**: We structured the entire analysis around three pillars.
+- WHERE: Identifying the physical locations of extreme decline.
+- WHO: Profiling the communities exposed to this decline.
+- WHY: Unpacking the physical drivers (like land conversion vs degradation).
 :::
 
 ---
@@ -160,12 +156,9 @@ Understand drivers—what physical mechanisms (land use, degradation, urbanizati
 :::
 
 ::: {.notes}
-- **The Attribution Gap**: This is the most surprising finding. You might expect hotspots to align with deforestation or urban expansion.
-- But the heatmap shows: Most ES hotspots have LOW overlap with detected land cover change (~20-40% at most).
-- Interpretation: ~60-70% of hotspots show NO significant land cover change = **degradation is happening WITHOUT conversion**.
-- Think: forests still standing but quality declining (logging, understory loss), farms intensifying without expanding (fertilizer use, monoculture).
-- This changes the policy response: You can't just protect existing forests; you need to improve management within them.
-- ~2 minutes
+- **Data Integration**: The core innovation here is combining disparate global datasets into a single, unified 10km equal-area grid.
+- We bring 300m biophysical models (InVEST) together with World Bank demographics and ESA land cover.
+- This allows us to perform rapid, cross-dimensional queries.
 :::
 
 ---
@@ -215,12 +208,9 @@ Why aggregation *then* differencing? Because Path B produces the "difference of 
 :::
 
 ::: {.notes}
-- **The Attribution Gap**: This is the most surprising finding. You might expect hotspots to align with deforestation or urban expansion.
-- But the heatmap shows: Most ES hotspots have LOW overlap with detected land cover change (~20-40% at most).
-- Interpretation: ~60-70% of hotspots show NO significant land cover change = **degradation is happening WITHOUT conversion**.
-- Think: forests still standing but quality declining (logging, understory loss), farms intensifying without expanding (fertilizer use, monoculture).
-- This changes the policy response: You can't just protect existing forests; you need to improve management within them.
-- ~2 minutes
+- **Symmetric Percentage Change**: Why not just absolute change? 
+- Absolute change is heavily biased by the size of the baseline ecosystem. 
+- SPC normalizes this scale effect, isolating the *intensity* of the ecological shock relative to the local baseline.
 :::
 
 ---
@@ -255,12 +245,9 @@ Test variables:
 :::
 
 ::: {.notes}
-- **The Attribution Gap**: This is the most surprising finding. You might expect hotspots to align with deforestation or urban expansion.
-- But the heatmap shows: Most ES hotspots have LOW overlap with detected land cover change (~20-40% at most).
-- Interpretation: ~60-70% of hotspots show NO significant land cover change = **degradation is happening WITHOUT conversion**.
-- Think: forests still standing but quality declining (logging, understory loss), farms intensifying without expanding (fertilizer use, monoculture).
-- This changes the policy response: You can't just protect existing forests; you need to improve management within them.
-- ~2 minutes
+- **Socioeconomic Profiling**: We don't just want to know *where* hotspots are, but *who* lives there.
+- We use KS tests to compare the hotspot populations against the 'business-as-usual' median 5% of the landscape.
+- This isolates the specific socioeconomic profile of extreme decline against typical, stable baseline conditions.
 :::
 
 ---
@@ -446,6 +433,38 @@ flowchart TD
 
 ---
 
+## Key Finding 5: The Multiplier Effect
+
+### Beyond the Grid Cell: Servicesheds & Access
+
+![](../outputs/plots/exposure_multiplier_dumbbell.png){width="100%"}
+
+::: {.columns}
+::: {.column width="50%"}
+
+### In-Situ vs. Downstream
+- Populations directly *inside* a hotspot grid cell are only a fraction of those affected.
+- **Hydrological Beneficiaries**: People living directly downstream.
+
+:::
+
+::: {.column width="50%"}
+
+### Access-Based Exposure
+- **Travel-Time Beneficiaries**: People who rely on travel access to these critical nature assets.
+- **The Multiplier**: The true beneficiary base is hundreds of times larger than the in-situ population.
+
+:::
+:::
+
+::: {.notes}
+- **The Multiplier Effect**: This is our latest analysis using the new extraction pipeline.
+- While only a few million people might live *directly* inside a degraded grid cell, billions benefit from those cells downstream or via travel access.
+- The dumbbell plot shows the massive disparity between local hydrological exposure and broader travel-footprint exposure across different World Bank regions.
+:::
+
+---
+
 ## Synthesis: The Four Pillars
 
 | Pillar | Finding | Implication |
@@ -497,4 +516,3 @@ For technical details, methodology, and code:
 - `/R/`: Core reusable functions
 - `/scripts/`: Utility scripts (mapping, monitoring)
 - `/docs/`: Detailed technical documentation
-

@@ -1,5 +1,10 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-06-11
+*   **Methodological Optimization (Population Exposure Extraction):** Bypassed the single-attribute limitation of `zonal_stats_toolkit` for the multi-level hotspot beneficiaries analysis. 
+*   **Multi-Dimensional Slicing:** By extracting raw population data directly to the 1.5 million 10km grid cells (`landgrid_1_clean_enriched_4326.gpkg`) using `exactextract` (with `strategy="raster-sequential"` to prevent GEOS C++ crashes) and subsequently grouping in Pandas by `['country', 'region_wb', 'income_grp', 'WWF_biome']` simultaneously, we squash millions of rows into a lightweight, highly flexible CSV.
+*   **Analytical Power Unlocked:** This structural decision allows downstream R scripts to effortlessly filter and cross-tabulate complex intersections (e.g., "Exposure in Low-Income countries within Sub-Saharan Africa") on the fly, without needing to re-run expensive spatial intersections.
+
 ### 2026-06-08
 *   **Ground-Truth Narrative Audit:** Conducted a comprehensive, data-driven audit of all high-level claims in the synthesis chapters and manuscript draft using exact values from `hotspot_area_stats.csv` and the attribution scripts.
 *   **Narrative Corrections:** Purged several "echo chamber" inaccuracies in the text. Verified that Lower-Middle Income countries face the highest relative intensity (1.19x absolute, 1.6x OECD), Latin America and East Asia are the true regional epicenters, and Mangroves are the most severely impacted biome (nearly 5x expected intensity). Excluded micro-states (area < 10,000 sq km) from country-level rankings, revealing South Korea, Jamaica, Malaysia, and Guatemala as top intensity spots.

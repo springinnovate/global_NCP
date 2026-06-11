@@ -1,141 +1,28 @@
-# Methodology: The Two-Path Analysis Structure
+# Methodology & Analytical Framework
 
-This document clarifies the dual-pathway approach used in the Global NCP project to analyze changes in ecosystem services between 1992 and 2020. Understanding this structure is crucial for interpreting the results, as summary statistics and hotspot analyses are derived from two distinct computational paths.
-
-## The Two Paths
-
-The analysis is split into two parallel workflows:
-
-1.  **Path A (Pixel-Level Change):** For raw change summaries.
-2.  **Path B (Grid-Level Change):** For hotspot identification and regional synthesis.
+This document details the overarching methodology, spatial framework, and computational architecture used in the Global NCP project to analyze changes in ecosystem service provision between 1992 and 2020.
 
 ---
 
-### Path A: Pixel-Level Change Calculation
+## 1. Data Preparation & Spatial Foundations
 
-This path is designed to generate summary statistics (e.g., Mean, Max, Min) based on the most granular change possible.
+Before calculating any changes or identifying hotspots, the underlying spatial and thematic data must be standardized.
 
-**Workflow:**
+### Unit Standardization (Per Hectare)
+To ensure that comparisons of ecosystem service provision are meaningful across the globe, all volumetric services (e.g., Nitrogen Export, Sediment Export) are standardized to a **per-hectare** basis. This step corrects for the geometric distortion of raster pixels in unprojected coordinate systems.
 
-1.  **Pixel-wise Difference:** The script `Python_scripts/batch_raster_diff.py` takes the 1992 and 2020 rasters for a given service and calculates the difference (`T2020 - T1992`) for each corresponding pixel.
-2.  **Output:** The result is a new set of "difference rasters" that represent the absolute change at the native resolution of the data.
-
-**Use Case:** This path is used when a straightforward, non-aggregated summary of the overall change across the landscape is required. **We use the outputs of this path (via the Python `zonal_stats_toolkit`) for the main text's regional trajectory charts ("WHAT" section) to provide the clearest narrative of total volume change without spatial aggregation artifacts.**
-
-### Path B: Grid-Level Change Calculation (The Hotspot Path)
-
-This is the primary pathway for the main analysis, including hotspot identification and regional aggregation. The key distinction is that **aggregation precedes differencing**.
-
-**Workflow:**
-
-1.  **Independent Aggregation:** The script `summary_pipeline_landgrid.py` takes the raw 1992 and 2020 rasters and independently calculates zonal statistics for each of them against the canonical 10km grid. The output is a single table containing separate columns for the 1992 and 2020 values (e.g., `service_1992_mean`, `service_2020_mean`).
-2.  **Grid-Level Differencing:** The Quarto notebook `analysis/process_data.qmd` ingests the aggregated table from the previous step. It then calculates the absolute and Symmetric Percentage Change (SPC) between the 1992 and 2020 columns for each grid cell.
-3.  **Hotspot Identification:** The notebook `analysis/hotspot_extraction.qmd` takes the final grid-level change data and identifies hotspots based on the 100 sq km grid.
-
-**Use Case:** This path underpins all hotspot detection, hotspot intensity, and socioeconomic exposure analyses (the "WHERE", "WHY", and "WHO"). Its regional summaries of change (the 10km grid averages) are reserved for the **Annex** due to the complex aggregation artifacts described below.
-
-### Clarification: Rasterizing the Grid vs. Resampling the Difference
-
-A crucial methodological distinction exists between the output of Path B and another potential approach.
-
-*   **Rasterizing the Vector Grid (This Project's Method - Path B):** We first aggregate the 1992 and 2020 high-resolution data to the 10km vector grid, and *then* calculate the difference for each grid cell. The final rasters are created by "burning" the attribute values from this final vector file (`10k_change_calc.gpkg`) into a GeoTIFF. This is the **"difference of the aggregates."**
-
-*   **Resampling the Difference Raster (Path A):** This would involve taking the original high-resolution rasters, calculating the pixel-by-pixel difference first (creating a "difference raster"), and then aggregating that result to a 10km grid (e.g., by resampling or zonal statistics). This would be the **"aggregate of the differences."**
-
-As noted below, these two paths are not always mathematically identical. This project has officially chosen **Path B** as the canonical method for the hotspot analysis. Therefore, the rasterization performed by `vector_to_raster.py` on the final GeoPackage is the correct and validated approach for this analysis.
-
-### Modular Extraction and the `fid` Backbone
-
-A key design feature of Path B is its modularity. The Python extraction pipeline (`summary_pipeline_landgrid.py`) can be run multiple times independently (e.g., once for Ecosystem Services, once for Beneficiaries, once for Coastal Risk). Each run generates a separate GeoPackage in the workspace.
-
-Because every extraction is performed against the exact same canonical master grid (`landgrid_1_clean_enriched_4326.gpkg`), every output shares an identical, stable `fid` (Feature ID) backbone. 
-
-To add new variables (e.g., a new year, a new modeled service, or a new socioeconomic raster) in the future:
-1. Run the Python extraction for the new rasters.
-2. The R consolidation script (`analysis/process_data.qmd`) automatically loads the most recent extraction runs.
-3. It performs a rapid, geometry-free tabular `left_join` across all tables using the `fid`.
-
-This architecture completely prevents the need to re-run heavy, memory-intensive spatial joins or re-extract existing data when expanding the analysis.
-
----
-
-## Why Might Results from Path A and Path B Differ?
-
-The two paths may produce slightly different summary statistics due to a fundamental difference in the order of operations:
-
--   **Path A** calculates the **aggregate of the differences**.
--   **Path B** calculates the **difference of the aggregates**.
-
-These are not always mathematically identical, especially when dealing with non-linear metrics or complex spatial distributions. The grid-based approach (Path B) is considered the canonical method for the hotspot analysis.
-
-## Validation Analysis: Quantifying Methodological Differences with Path C
-
-To explicitly quantify the difference between the two methodologies and validate the pipeline, a third analytical path ("Path C") was implemented. This path served as a bridge, creating a spatially explicit grid based on the pixel-level differences.
-
-**Workflow:**
-
-1.  **Start with Path A Output:** Used the pixel-level "difference rasters" generated by `Python_scripts/batch_raster_diff.py`.
-2.  **Aggregate the Difference:** Using a zonal statistics process, calculated statistics (e.g., `mean`, `sd`) for the pixel values from the difference raster within each 10km grid cell.
-2.  **Aggregate the Difference:** Using a zonal statistics process, calculated statistics (e.g., `mean`, `sd`) for the pixel values from the difference raster within each 100 sq km grid cell.
-**Validation Outcome:**
-
--   **Aggregate Consistency:** This validation confirmed that the results are persistent and mathematically consistent between both paths at the aggregate level. The grid of the "aggregate of the differences" aligns with the Path B grid ("difference of the aggregates"), confirming the robustness of the primary grid-level hotspot methodology.
--   **Sub-Cell Variability:** By calculating the standard deviation (`sd`) in the aggregation step, we were also able to quantify the variability of change *within* each 10km cell. This allows us to identify areas of homogenous vs. heterogeneous change, adding valuable richness to the interpretation.
-
-This approach provided the spatial representation of the pixel-based method while remaining computationally manageable, successfully proving the robustness of the core methodologies before proceeding with the final hotspot extractions.
-
-## Architectural Decision: Spatial Extraction Strategies
-
-Through extensive testing and methodological validation, a distinct performance and stability divergence was identified between different zonal statistics engines based on spatial scale and geometry complexity. The project now officially employs a hybrid extraction strategy:
-
-1.  **For Large Regional Groupings (Complex Multipolygons): `zonal_stats_toolkit` (Rasterized)**
-    *   **Use Case:** Aggregating global data by World Bank Regions, Income Groups, or WWF Biomes.
-    *   **Rationale:** These groupings form sprawling, highly complex multipolygons containing thousands of islands, jagged edges, and vertices. Using precise fractional extraction tools (`exactextract` / C++ GEOS) on these shapes causes memory leaks and segmentation faults, as the engine attempts to evaluate massive geometric intersections. While exploding these polygons into tens of thousands of simpler fragments (e.g., 85,000+ pieces) prevents crashes, the sheer volume of separate extraction loop operations destroys any speed advantage. By rasterizing the polygons first (the `zonal_stats_toolkit` approach), we completely bypass C++ geometry bottlenecks and reduce the problem to highly efficient matrix math.
-
-2.  **For High-Resolution Grids (Simple Polygons): `exactextract` (Exact Fractional)**
-    *   **Use Case:** Aggregating global data into the IUCN 10km equal-area grid (millions of cells).
-    *   **Rationale:** The 10km grid consists of completely uniform, simple square geometries. `exactextract` is the undisputed champion here, chewing through millions of simple shapes almost instantly without ever hitting geometry complexity limits.
-
-This "Best of Both Worlds" architecture ensures stability and speed regardless of the spatial target.
-
-*Note: The `zonal_stats_toolkit` is currently managed alongside the main pipeline in a multi-root VS Code workspace. Future updates will fully integrate this toolkit's codebase into the `global_NCP` repository to unify version control.*
-
-## Spatial Alignment and The Fragment Bug
-
-A major challenge in multi-stage spatial pipelines is maintaining exact 1:1 row integrity between extracted statistics and the canonical master grid.
-
-*   **The Fragment Bug:** To bypass C++ GEOS bottlenecks during Python zonal statistics extraction, complex master grid cells were exploded into simpler fragments (e.g., `gdf.explode()` resulting in ~1.67M fragments for a 1.5M cell grid). If joined directly to downstream datasets, this causes severe data duplication (e.g., impossible overlapping hotspot counts per cell) and geographic striping.
-*   **The Re-aggregation Solution (v1.3.1):** The R pipeline (`process_data.qmd`) implements a mathematically rigorous recovery step. It uses an `st_intersects` spatial join (mapping fragment centroids to the master grid) to trace every fragment back to its pristine 100 sq km parent cell. It then performs a re-aggregation (`group_by %>% summarise`), collapsing the fragments back together. This ensures perfect geometric alignment with the canonical grid and strictly bounds the data.
-
-
-## Unit Standardization (Per Hectare)
-
-To ensure that comparisons of ecosystem service provision are meaningful across the globe, all volumetric services (e.g., Nitrogen Export, Sediment Export) are standardized to a **per-hectare** basis. This crucial step corrects for the geometric distortion of raster pixels in unprojected coordinate systems, where pixel area decreases significantly with increasing latitude. Without this correction, high-latitude regions would be disproportionately represented in any analysis based on per-pixel values.
-
-*   **Volumetric Variables:** Converted to `Unit / ha` by dividing the raw pixel value by a corresponding pixel area raster (`esa_pixel_area_ha_...`). This calculation is performed *before* the zonal statistics aggregation.
+*   **Volumetric Variables:** Converted to `Unit / ha` by dividing the raw pixel value by a corresponding pixel area raster (`esa_pixel_area_ha_...`). This calculation is performed *before* any zonal statistics or spatial aggregation occurs.
 *   **Ratios & Indices:** Left in their native units (e.g., 0-1 ratios, unitless indices) as area normalization does not apply.
 
-This ensures that the zonal statistics (Mean/Sum) reflect physical densities comparable across regions.
+This ensures that all downstream zonal statistics reflect physical densities that are comparable across regions.
 
-This per-hectare normalization is a key methodological improvement (v1.2.1) and is applied to the base year rasters that form the foundation of **Path B (Grid-Level Change)**.
-
-## Grid Geometry & Reprojection Effects
-
-A common source of confusion in global-scale GIS analysis is the visual and geometric distortion that occurs during reprojection. This section clarifies why the project's 100 sq km grid cells may not appear as perfect squares and confirms the validity of their size.
-
-*   **Geographic vs. Projected Grids:** The original analysis grid is defined in a geographic coordinate system (WGS 84, EPSG:4326), where cells are defined by degrees of latitude and longitude. When this grid is reprojected into an equal-area system (like Equal Earth, EPSG:8857) for analysis, the shapes of the cells are necessarily distorted (stretched and tilted) to preserve their area on a flat map.
-*   **Bounding Box vs. True Area:** As a result of this distortion, measuring the `width` and `height` of a reprojected grid cell's bounding box will **not** yield 10km x 10km. These dimensions will vary depending on the cell's latitude.
-*   **Area is the Invariant:** The critical property preserved by an equal-area projection is the **area**. A dedicated validation script (`Python_scripts/verify_grid_area.py`) was developed to measure the true geometric area of the reprojected grid cells.
-*   **Validation Outcome:** This analysis definitively confirmed that each grid cell in the reprojected analysis files (e.g., `..._epsg8857.gpkg`) has an area of **100 km²** (10km x 10km), within a very small tolerance. This validates the integrity of the project's spatial foundation and ensures that all area-based calculations are correct.
-
-## Data Preparation: Canonical Master Grid Generation
-
+### Canonical Master Grid Generation
 Due to severe performance and geometry-validity bottlenecks encountered when performing massive spatial joins natively in R (the `sf` package), the creation of the canonical 100 sq km master grid was migrated to a hybrid QGIS-Python workflow.
 
-1.  **Landmass Masking (QGIS):**
-    *   The original global `AOOGrid` was loaded into QGIS.
+1.  **Landmass Masking:**
+    *   The original global `AOOGrid` and Biomes layer were loaded into a desktop GIS (QGIS).
     *   The WWF Biomes layer was dissolved to create a single global landmass polygon.
-    *   A "Select by Location" operation isolated all 100 sq km grid cells intersecting the landmass.
+    *   A "Select by Location" operation isolated all grid cells intersecting the landmass.
     *   The selection was exported as `landgrid_1.gpkg`.
 2.  **Geometry Cleaning:**
     *   To resolve minor topological errors (e.g., self-intersecting rings caused by clipping at coastlines and the dateline), the geometries were validated and cleaned, resulting in `landgrid_1_clean.gpkg`.
@@ -144,88 +31,159 @@ Due to severe performance and geometry-validity bottlenecks encountered when per
     *   This script performs a highly optimized, centroid-based spatial join to map WWF Biomes, Country, UN/World Bank Regions, and Income Group attributes (from the `ee_correspondence` dataset) onto the grid.
     *   It inherently handles geometry validation (`buffer(0).make_valid()`) and deduplication, outputting the final, analysis-ready `landgrid_1_clean_enriched.gpkg`.
     
-*Note: The legacy R script `analysis/prepare_data.qmd` and standalone cleaning utilities like `clean_grid.py` were fully deprecated in v1.3.4 in favor of this robust Python workflow.*
+*Note: The legacy R script `analysis/prepare_data.qmd` and standalone cleaning utilities like `clean_grid.py` were fully deprecated in v1.3.4 in favor of this Python workflow.*
 
-## Data Preparation: Coastal Risk & Protection
+### Grid Geometry & Reprojection Effects
 
-Unlike the other ecosystem services which were natively provided as continuous global rasters, the Coastal Risk and Protection datasets were originally provided as high-resolution vector point/line geometries representing discrete coastal segments. 
+*   **Geographic vs. Projected Grids:** The original analysis grid is defined in a geographic coordinate system (WGS 84, EPSG:4326). When reprojected into an equal-area system (like Equal Earth, EPSG:8857) for analysis, the shapes of the cells stretch and tilt to preserve their area on a flat map.
+*   **Bounding Box vs. True Area:** As a result, measuring the `width` and `height` of a reprojected grid cell's bounding box will **not** yield 10km x 10km. 
+*   **Area is the Invariant:** A validation script (`Python_scripts/verify_grid_area.py`) measured the true geometric area of the reprojected grid cells, definitively confirming that each cell has an area of **100 km²** (10km x 10km).
 
-Attempting vector-on-vector intersections between these intricate coastal lines and the 1.5-million cell master grid caused severe performance bottlenecks and `GEOSException` geometry crashes (due to the creation of microscopic sliver polygons). To ensure mathematical robustness and compatibility with the main pipeline, a specialized pre-processing workflow was utilized:
+### Data Preparation: Coastal Risk & Protection
+The Coastal Risk and Protection datasets are originally provided as high-resolution vector line geometries representing discrete coastal locations. 
 
-1. **Vector Joining & Ratio Calculation:** The script `Python_scripts/coastal_protection_join.py` merges the 1992 and 2020 coastal point layers based on their exact spatial locations (WKB geometries). It calculates the absolute differences and proportional risk reduction ratios (`Rt_ratio`) natively in the vector domain to prevent floating-point interpolation errors.
-2. **Rasterization:** The script `Python_scripts/rasterize_coastal.py` safely "burns" these pre-calculated point values into high-resolution continuous rasters (e.g., `Rt_1992.tif`, `Rt_ratio_2020.tif`). This uses tiled processing to handle the massive global coastline without memory exhaustion.
-3.  **Grid Extraction:** The resulting coastal rasters are seamlessly ingested by the standard `exactextract` pipeline (`summary_pipeline_landgrid.py` via `c_protection_synth.yaml`). This safely calculates the mean coastal risk metrics for each 100 sq km grid cell strictly through raster-vector overlap, completely bypassing C-level geometric intersection crashes.
+To ensure mathematical robustness, a specialized pre-processing workflow was utilized:
 
-By performing the ratio math on the vectors, but the spatial aggregation on the rasters, we maintain perfect data fidelity without sacrificing pipeline stability.
+1. **Vector Joining & Ratio Calculation:** The script `Python_scripts/coastal_protection_join.py` merges the 1992 and 2020 coastal point layers based on their exact spatial locations. It calculates the absolute differences and proportional risk reduction ratios natively in the vector domain to prevent floating-point interpolation errors.
+2. **Rasterization:** The script `Python_scripts/rasterize_coastal.py` safely "burns" these pre-calculated point values into high-resolution continuous rasters.
+3. **Grid Extraction:** The resulting coastal rasters are ingested by the standard pipeline. This calculates the mean coastal risk metrics for each 100 sq km grid cell strictly through raster-vector overlap, completely bypassing C-level geometric intersection crashes.
 
-## Key Analysis Parameters
+---
 
--   **Hotspot Threshold:** The threshold for identifying hotspots is defined in `analysis/hotspot_extraction.qmd`. It is configured in an R object named `HOTS_CFG` with the parameter `pct_cutoff = 0.05`, representing the top/bottom 5% of SPC values.
+## 2. The Dual-Pathway Analysis Structure
 
-**What a "Hotspot" Means in This Context:**
-*   **Relative Extreme:** We call a cell a "hotspot" because its change sits in the most extreme 5% *within that specific service's own distribution*. It is a ranking label, not an absolute physical threshold. A cell can enter or leave the top 5% even if its raw change isn't huge in absolute terms, simply because it is relative to the rest of the globe.
+Global spatial analysis often suffers from scale artifacts (like the Modifiable Areal Unit Problem). To accurately answer both "What happened globally?" and "Where are the local hotspots?", this project splits the analysis into two parallel workflows.
+
+### Path A: True Regional Trajectories (The "WHAT")
+This path is designed to generate summary statistics for large macro-regions (e.g., Biomes, World Bank Regions) bypassing the 100 sq km grid entirely.
+
+*   **Workflow:** The `zonal_stats_toolkit` extracts the base year (1992) and future year (2020) rasters directly to the large regional polygons.
+*   **Metrics:** Once the total regional volume/mean is established for both years, we calculate the Absolute Change and Symmetric Percentage Change (SPC) directly from those regional totals.
+*   **Why this matters:** It is mathematically impossible to calculate percentage change from a "difference raster." By extracting the true regional baselines first, we ensure our regional percentage changes are sound. We use the outputs of this path for the main text's regional trajectory charts (the "WHAT" section).
+
+### Path B: Grid-Level Change Calculation (The Hotspot Path)
+This is the canonical pathway for identifying localized extremes (hotspots) and assessing population exposure. The key distinction here is that **spatial aggregation to the grid precedes differencing**.
+
+*   **Workflow:** 
+    1. **Independent Aggregation:** The Python pipeline aggregates the raw 1992 and 2020 rasters to the 100 sq km grid cells independently.
+    2. **Grid-Level Differencing:** `analysis/process_data.qmd` computes Absolute and Symmetric Percentage Change (SPC) between the 1992 and 2020 columns for each grid cell.
+    3. **Hotspot Extraction:** `analysis/hotspot_extraction.qmd` identifies hotspots (extreme 5% of change) based on these grid cells.
+    4. **Synthesis:** `analysis/hotspot_synthesis.qmd` aggregates these localized hotspots to calculate regional enrichment scores, coverage, and affected populations.
+*   **Use Case:** This path answers the "WHERE", "WHY", and "WHO". Its regional averages are reserved for the **Annex** due to MAUP/Simpson's paradox artifacts (explained below).
+
+### Addressing Aggregation Divergence (Simpson's Paradox)
+Imn some cases, when averaging the grid-level changes (Path B) up to a broad region, a "sign flip" can occur, where regional bar plots display a negative *Absolute Change* but a positive *Symmetric Percentage Change* (SPC) for the same service. This is related to Simpson's Paradox and the Modifiable Areal Unit Problem (MAUP):
+
+*   **Mean Absolute Change** captures the **Systemic Shift**. It is heavily weighted by a few high-volume grid cells. 
+*   **Mean Symmetric Percentage Change** captures the **Local Landscape Shift**. Because percentage change treats every 100 sq km community equally regardless of its baseline volume, it highlights widespread but low-intensity dynamics.
+
+A sign flip reveals a specific geographic narrative: The *total volume* of the service in the region is decreasing, but the *spatial footprint* of minor expansions or gains is spreading across a large number of low-baseline cells. This is why we use **Path A** to report the definitive top-level volumetric changes in the main text.
+
+### Validation Analysis: Path C (The Difference Rasters)
+To explicitly quantify the difference between the two methodologies, a validation path ("Path C") was implemented. **This path was used strictly for validation to check how much the results differ, not for the final analysis or hotspot extraction.**
+*   We used `Python_scripts/batch_raster_diff.py` to create pixel-level "difference rasters" ($T_{2020} - T_{1992}$). 
+*   We aggregated these differences to the 100 sq km grid. This confirmed that the results are mathematically consistent at the aggregate level with Path B ("difference of the aggregates"), while allowing us to calculate sub-cell standard deviations. 
+
+---
+
+## 3. Spatial Extraction Architecture
+
+### Architectural Decision: `exactextract` vs `zonal_stats_toolkit`
+Through testing and methodological validation, a distinct performance and stability divergence was identified between different zonal statistics engines based on spatial scale and geometry complexity. The project employs a hybrid extraction strategy:
+
+1.  **For Large Regional Groupings (Complex Multipolygons): `zonal_stats_toolkit` (Rasterized)**
+    *   **Use Case:** Path A (aggregating global data by World Bank Regions, Income Groups, or Biomes).
+    *   **Rationale:** These groupings form sprawling, highly complex multipolygons. Precise fractional extraction tools (`exactextract` / C++ GEOS) cause memory leaks and segmentation faults on these complex geometric intersections. Rasterizing the polygons first (the `zonal_stats_toolkit` approach) bypasses C++ geometry bottlenecks and reduces the problem to highly efficient matrix math.
+
+2.  **For High-Resolution Grids (Simple Polygons): `exactextract` (Exact Fractional)**
+    *   **Use Case:** Path B (aggregating global data into the 1.5 million 100 sq km grid cells).
+    *   **Rationale:** The grid consists of uniform, simple square geometries. `exactextract` is preferred here, processing through millions of simple shapes without hitting geometry complexity limits.
+
+### Multi-Level Grouping via the 10km Grid (The "Squash" Strategy)
+Standard zonal statistics tools typically aggregate by a single geographic boundary attribute at a time (e.g., only by Region, or only by Biome). Running independent extractions for every demographic boundary requires multiple heavy, time-consuming raster passes.
+
+To achieve high analytical flexibility for population exposure without re-running spatial overlays, we use a "Pandas Squash" strategy:
+1. We use `exactextract` on the 10km canonical master grid (`landgrid_1_clean_enriched_4326.gpkg`). Because this grid comprises 1.5 million simple squares, it completely avoids the C++ GEOS memory leaks associated with complex multipolygons.
+2. The extraction returns a massive dataframe mapping pixels to their parent grid cells, which is instantly grouped in Pandas by multiple spatial attributes simultaneously (`['country', 'region_wb', 'income_grp', 'WWF_biome']`).
+3. This instantly "squashes" millions of spatial records down into a single, lightweight CSV containing all possible dimensional intersections. 
+
+**Analytical Advantage:** This allows downstream visualization and reporting scripts to perform complex cross-tabulations on the fly (e.g., isolating "Hotspot Exposure in Low-Income countries within Sub-Saharan Africa") instantly via tabular filtering, delivering a highly responsive analytical tool for stakeholders.
+
+### Modular Extraction and the `fid` Backbone
+Because every Path B extraction is performed against the exact same canonical master grid (`landgrid_1_clean_enriched_4326.gpkg`), every output shares an identical, stable `fid` (Feature ID) backbone. 
+
+To add new variables (e.g., a new year, a new modeled service, or a new socioeconomic raster) in the future:
+1. Run the Python extraction for the new rasters.
+2. The R consolidation script (`analysis/process_data.qmd`) automatically loads the most recent extraction runs.
+3. It performs a rapid, geometry-free tabular `left_join` across all tables using the `fid`.
+
+This architecture completely prevents the need to re-run heavy, memory-intensive spatial joins when expanding the analysis.
+
+#### Application: Multi-Level Hotspot Beneficiary Analysis
+
+A key application of this "squash" strategy is the analysis of populations benefiting from ecosystem service hotspots. Standard zonal statistics would require separate, time-consuming runs for every demographic grouping (e.g., by country, then by income group, then by region). The `Python_scripts/extraction_script.py` bypasses this limitation entirely.
+
+1.  **Dual Exposure Pathways:** The script processes two distinct types of population exposure rasters for each hotspot category:
+    *   **Hydrological Exposure:** Populations living directly downstream of hotspots (`...downstream_50k_population.tif`).
+    *   **Access-Based Exposure:** Populations living within a defined travel time of hotspots (`...within_travel_time_population.tif`).
+
+2.  **Grid-Based Extraction:** For each of these population rasters, `exactextract` is run against the canonical `landgrid_1_clean_enriched_4326.gpkg`. This is highly efficient because the grid contains simple, uniform geometries, avoiding the C++ crashes that occur with complex multipolygons.
+
+3.  **Multi-Dimensional Grouping:** The script is configured to include multiple attribute columns from the grid (`country`, `region_wb`, `income_grp`, `WWF_biome`) in the extraction output.
+
+4.  **Instantaneous Aggregation:** Immediately after extraction, a `pandas.groupby()` operation aggregates the total population sums across all dimensions simultaneously.
+
+This produces a single, lightweight CSV (`exposure_comparison_compiled.csv`) that contains the total exposed population for every possible intersection of hotspot category, exposure type, country, region, income group, and biome. This file is the direct input for the "Multiplier Effect" dumbbell plots and summary tables, allowing for rapid, on-the-fly filtering without ever re-running a spatial process.
+
+### Spatial Alignment and The Fragment Bug
+A challenge in multi-stage spatial pipelines is maintaining exact 1:1 row integrity between extracted statistics and the canonical master grid.
+
+*   **The Fragment Bug:** To bypass C++ GEOS bottlenecks during Python zonal statistics extraction, complex master grid cells were exploded into simpler fragments (e.g., `gdf.explode()`). If joined directly to downstream datasets, this causes severe data duplication (e.g., impossible overlapping hotspot counts per cell) and geographic striping.
+*   **The Re-aggregation Solution (v1.3.1):** The R pipeline (`process_data.qmd`) implements a recovery step. It uses an `st_intersects` spatial join to trace every fragment back to its original 100 sq km parent cell. It then performs a re-aggregation (`group_by %>% summarise`), collapsing the fragments back together. 
+
+---
+
+## 4. Change Metrics & Hotspot Definition
+
+### Key Analysis Parameters (What is a Hotspot?)
+The threshold for identifying hotspots is defined centrally in `HOTS_CFG` (`analysis/hotspot_extraction.qmd`) using the parameter `pct_cutoff = 0.05`.
+
+*   **Relative Extreme:** A cell is cosndierd a "hotspot" if its change sits in the most extreme 5% *within that specific service's own distribution*. It is a ranking label, not an absolute physical threshold. A cell can enter or leave the top 5% even if its raw change isn't huge in absolute terms, simply because it is relative to the rest of the globe.
 *   **Comparability:** Comparisons are strictly within-service. A top 5% decline in Service A isn't necessarily comparable in absolute magnitude to a top 5% decline in Service B.
-*   **Not Evidence of Cause:** Being a hotspot flags that "this cell's change is unusually large (relative to peers)," but it does not inherently prove *why* the value is extreme. Hotspots are starting points for explanation, not conclusions. To discuss drivers, we use additional robust analyses (like LCC attribution and KS socioeconomic profiling).
-*   **Quick Analogy:** Top 5% finishers in two different marathons are both "elite," but their finishing times (absolute performance) and the reasons they're fast (training, course, weather) can differ. Similarly, hotspots are elite by rank, not necessarily a proof of shared cause or identical absolute loss.
+*   **Not Evidence of Cause:** Being a hotspot flags that "this cell's change is unusually large," but it does not inherently prove *why* the value is extreme. To discuss drivers, we use additional robust analyses (LCC attribution and KS profiling).
 
-
-## Symmetric Percentage Change
-
+### Symmetric Percentage Change (SPC)
 To address mathematical artifacts where the sign of percentage change differs from absolute change (common when baselines are negative or near-zero), this analysis uses a **symmetric percentage change** calculation (`pct_mode="symm"`). This ensures that the direction of the percentage change always aligns with the absolute difference ($t_1 - t_0$).
 
 **Distribution Limits:** The Symmetric Percentage Change (SPC) metric is bounded between **-200%** (Total Loss) and **+200%** (New Emergence). Consequently, extreme values and clustering at these boundaries, as well as bi-modal distributions (e.g., in Sediment Export), are expected features of the metric rather than data artifacts.
 
-### Why SPC over Absolute Change for Attribution?
-When assessing the relationship between Land Cover drivers and Ecosystem Service declines (e.g., scatterplots of Forest Loss vs. ES Change), **Symmetric Percentage Change (SPC)** is strictly preferred over Absolute Change.
+#### Why SPC over Absolute Change for Attribution?
+When assessing the relationship between Land Cover drivers and Ecosystem Service declines, **Symmetric Percentage Change (SPC)** is strictly preferred over Absolute Change.
 
-*   **Absolute Change** is inherently biased by the *baseline size* of the local ecosystem. A massive, dense forest that loses just 5% of its area might show a huge absolute drop in Carbon simply because of its initial size. Conversely, a small patch of forest that is 100% destroyed would show a tiny absolute drop. Analyzing Absolute Change creates highly skewed, heteroskedastic outputs that largely just map "where the largest baseline ecosystems are."
+*   **Absolute Change** is inherently biased by the *baseline size* of the local ecosystem. For exsample a large , dense forest that loses just 5% of its area might show a huge absolute drop in Carbon simply because of its initial size. Conversely, a small patch of forest that is 100% destroyed would show a tiny absolute drop. Analyzing Absolute Change creates highly skewed, heteroskedastic outputs that largely just map "where the largest baseline ecosystems are."
 *   **Symmetric Percentage Change** normalizes this scale effect. It isolates the *intensity of the ecological shock* relative to the local baseline. This ensures that a severe multi-service decline in a small grid cell is properly recognized as a severe impact, making it mathematically appropriate for correlating against land cover conversion percentages.
 
+### Aggregation Logic: Sum vs. Mean
+A question regarding Path B is the comparability of variables aggregated via **sum** (extensive variables like Nitrogen Export) versus those aggregated via **mean** (intensive variables like Risk Indices).
 
-## Addressing Aggregation Divergence (Simpson's Paradox)
-
-During regional aggregation, it is possible to observe a "sign flip"—where regional bar plots display a negative *Absolute Change* but a positive *Symmetric Percentage Change* (SPC) for the same service. This is not a calculation error or a bug; it is a fundamental feature of aggregating spatial data, related to Simpson's Paradox and the Modifiable Areal Unit Problem (MAUP).
-
-*   **Mean Absolute Change** captures the **Systemic Shift**. Because it averages total physical units, it is heavily weighted by a few high-volume grid cells (e.g., massive, dense forests). If those highly productive cells lose a large volume of a service, the regional absolute average turns negative.
-*   **Mean Symmetric Percentage Change** captures the **Local Landscape Shift**. Because percentage change treats every 100 sq km community (grid cell) equally regardless of its baseline volume, it highlights widespread but low-intensity dynamics.
-
-A sign flip reveals a specific geographic narrative: The *total volume* of the service in the region is decreasing (driven by heavy localized losses), but the *spatial footprint* of minor expansions or local service gains is spreading across a large number of low-baseline cells.
-
-**Communication Strategy (Main Text vs. Annex):**
-Explaining Simpson’s Paradox and spatial aggregation artifacts (MAUP) in the main text of a paper can severely distract from the core ecological findings. For this reason:
-*   **Main Text:** We use **Path A** (raster-based regional zonal statistics via the `zonal_stats_toolkit`) to report the top-level regional changes. This path calculates total absolute change directly from the pixels, completely avoiding the MAUP/Simpson's paradox sign-flip issue, providing a clear and unambiguous "WHAT" narrative.
-*   **Annex:** The regional trajectory charts derived from **Path B** (the 100 sq km grid averages, which exhibit these sign flips) are included in the Methodological Annex. Path B remains the mathematically robust and required foundation for detecting local extremes (Hotspots), but its region-level averages are separated from the main text to preserve narrative clarity.
-
-## Aggregation Logic: Sum vs. Mean
-
-A common question regarding Path B is the comparability of variables aggregated via **sum** (extensive variables like Nitrogen Export) versus those aggregated via **mean** (intensive variables like Risk Indices).
-
-**Why this approach is robust:**
-
+**Justification:**
 1.  **Physical Correctness:** It is physically correct to sum total loads and average representative conditions.
 2.  **Equal-Area Grid:** The analysis uses the IUCN equal-area grid. Since cell area is constant, $Sum$ and $Mean$ are perfectly proportional ($Sum = Mean \times Area$).
 3.  **Mathematical Identity:** For relative metrics used in this analysis (percent change, percentile rankings, KS test statistics), the results are identical regardless of whether sum or mean is used.
 4.  **Comparability:** Comparing relative magnitudes of change (e.g., percentage change) strips away the units, allowing valid comparisons between total loads and average indices.
 
-## Visualization Semantic Rules (Maps)
+---
 
-To maintain a consistent narrative across all presentations and figures, spatial maps of Ecosystem Service change adhere to a strict semantic color rule:
+## 5. Analytical Modules
 
-*   **Universal Diverging Scale:** All maps use a diverging color ramp anchored at zero (`midpoint = 0`).
-*   **Semantic Meaning:** Red always indicates ecological or social damage (loss of a good service, or increase in a detrimental risk). Green always indicates improvement or healthy service provision.
-*   **Sequential vs. Diverging Data:** Even if a regional dataset does not cross zero (e.g., all regions experience a decline), the diverging scale is maintained to preserve the semantic meaning of the colors. For example, an entirely negative map for a 'good' service will simply use the Red-to-White half of the scale, avoiding the confusion of introducing sequential palettes (like viridis) that break the "Red=Bad" cognitive mapping.
-
-## Socioeconomic Profiling (KS Tests)
-
+### Socioeconomic Profiling (KS Tests)
 To understand the socioeconomic context of ecosystem service hotspots (e.g., Population, GDP, HDI), we utilize two-sample Kolmogorov-Smirnov (KS) tests.
 
 **Balanced Sampling Methodology:**
 A direct comparison of hotspots (the top/bottom 5% of pixels) against the entire non-hotspot background (the remaining 95%) suffers from severe sample size imbalance and includes pixels undergoing extreme changes in the *opposite* direction. To ensure a fair and stable statistical comparison, the pipeline implements a "median background" sampling strategy:
 * Hotspots are compared strictly against the "business-as-usual" median 5% of the landscape (the 47.5th to 52.5th percentiles of change). This isolates the specific socioeconomic profile of extreme decline against typical, stable baseline conditions.
 
-
-## Land Cover Change Attribution
-
+### Land Cover Change Attribution
 To explain *why* hotspots occur, we integrate Land Cover Change (LCC) metrics derived from ESA CCI (1992) and C3S (2020) maps.
 
 **Methodology:**
@@ -234,13 +192,12 @@ Instead of simple "Net Change" (which masks simultaneous loss and gain), we use 
 *   **Gross Gain:** The area of natural land recovered.
 *   **Exchange:** Shifts that don't affect the net total but represent dynamic turnover.
 
-These metrics are aggregated to the 100 sq km grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation). The analysis produces both a single, global attribution map showing the overall footprint of degradation, as well as a series of detailed maps breaking down the specific drivers for each of the 8 individual ecosystem service hotspots.
+These metrics are aggregated to the 100 sq km master grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation). The analysis produces both a single, global attribution map showing the overall footprint of degradation, as well as a series of detailed maps breaking down the specific drivers for each of the 8 individual ecosystem service hotspots.
 
 **Granular Models:**
 To move beyond binary "Natural vs. Transformed" analysis, we implement two specific driver models:
-
 1.  **Forest Loss Model:**
-    *   **Reclassification:** Maps ESA classes to **Forest** vs. **Non-Forest**. Crucially, Flooded Trees (classes 160, 170) are mapped to Forest to capture mangrove/swamp forest dynamics.
+    *   **Reclassification:** Maps ESA classes to **Forest** vs. **Non-Forest**. Flooded Trees (classes 160, 170) are mapped to Forest to capture mangrove/swamp forest dynamics.
     *   **Metric:** Tracks Gross Loss of Forest cover.
 2.  **Expansion Model:**
     *   **Reclassification:** Maps ESA classes to **Urban**, **Cropland**, and **Other**.
@@ -248,12 +205,26 @@ To move beyond binary "Natural vs. Transformed" analysis, we implement two speci
 
 **Note on Rangelands:** Logic is updated to explicitly track Forest-to-Grassland transitions as a loss of primary natural cover. Categorizing Grasslands/Shrublands as `Transformed (Rangeland/Pasture)` prevents these critical conversions from being masked as 'Natural-to-Natural' exchange.
 
-## Output Directory Structure
+---
 
+## 6. Outputs & Visualization
+
+### Output Directory Structure
 The project's graphical outputs are organized into specialized subdirectories within `outputs/plots/` (e.g., `maps/`, `drivers/`, `ks/`, `boxplots_unified/`, `signed_bars/`). 
-
-While nested, this file structure is an intentional architectural choice designed to handle the immense volume of visualizations generated by the pipeline:
 
 1. **Thematic Modularity:** Plots are strictly grouped by the analytical phase that generated them. For example, all Kolmogorov-Smirnov distribution testing plots live in `ks/`, while spatial attribution heatmaps live in `drivers/`.
 2. **Scalability:** Because the analysis crosses 8 ecosystem services, 2 change metrics (Absolute and Symmetric Percentage Change), and 4 geographic grouping levels, a flat directory would result in hundreds of indistinguishable files. 
 3. **Asset Portability:** This modular categorization allows researchers to easily isolate and package specific visual assets (e.g., extracting "just the spatial maps" or "just the socioeconomic profiles") for stakeholders and presentations without sifting through unrelated charts.
+
+### Visualization Semantic Rules (Maps)
+To maintain a consistent narrative across all presentations and figures, spatial maps of Ecosystem Service change adhere to a strict semantic color rule:
+*   **Universal Diverging Scale:** All maps use a diverging color ramp anchored at zero (`midpoint = 0`).
+*   **Semantic Meaning:** Red always indicates ecological or social damage (loss of a good service, or increase in a detrimental risk). Green always indicates improvement or healthy service provision.
+*   **Sequential vs. Diverging Data:** Even if a regional dataset does not cross zero (e.g., all regions experience a decline), the diverging scale is maintained to preserve the semantic meaning of the colors. 
+
+### Hotspot Rasterization Workflow
+While the primary outputs of the hotspot extraction pipeline are compact vector GeoPackages, certain downstream analyses and external visualizations require these hotspots in a continuous raster format.
+
+To ensure perfect 1:1 geometric alignment and leverage C-level performance, the project relies on a native GDAL workflow documented in `scripts/gdal_rasterize_hotspots.sh`.
+1. **Reprojection:** The vector file is first reprojected to Equal Earth (EPSG:8857) via `ogr2ogr` to guarantee metric 10km x 10km geometries.
+2. **Rasterization:** `gdal_rasterize` is then used to burn the specific attributes into a 10km resolution GeoTIFF using LZW compression.

@@ -14,6 +14,7 @@ data_root = Path("data/processed/tables")
 # Load all the data
 hotspot_area = pd.read_csv(data_root / "hotspot_area_stats.csv")
 hotspot_pop = pd.read_csv(data_root / "hotspot_pop_exposure.csv")
+exposure_detail = pd.read_csv(data_root / "exposure_comparison_compiled.csv")
 ks_results = pd.read_csv(data_root / "ks_results_hot_vs_non.csv")
 lcc_abs = pd.read_csv(data_root / "lcc_es_hotspot_overlap_abs.csv")
 lcc_pct = pd.read_csv(data_root / "lcc_es_hotspot_overlap_pct.csv")
@@ -79,6 +80,21 @@ ks_total = len(ks_results)
 print(f"\nKS test results:")
 print(f"  Significant differences: {ks_sig_count}/{ks_total} ({(ks_sig_count/ks_total)*100:.1f}%)")
 
+# 9. NEW: POPULATION EXPOSURE MULTIPLIER (All Hotspots)
+exp_all = exposure_detail[exposure_detail['overlap_category'] == 'all hotspots'].copy()
+global_exp = exp_all[exp_all['region_wb'] == 'Global']
+
+pop_hydro = global_exp[global_exp['exposure_type'] == 'hydrological']['population'].sum() / 1e6
+pop_travel = global_exp[global_exp['exposure_type'] == 'travel_footprint']['population'].sum() / 1e6
+pop_combined = global_exp[global_exp['exposure_type'] == 'combined_total']['population'].sum() / 1e6
+multiplier_effect = pop_travel / pop_hydro if pop_hydro > 0 else 0
+
+print(f"\nPopulation Exposure (All Hotspots):")
+print(f"  Hydrological (Downstream): {pop_hydro:.1f}M")
+print(f"  Travel Footprint (Access): {pop_travel:.1f}M")
+print(f"  Combined (Union): {pop_combined:.1f}M")
+print(f"  Multiplier Effect (Travel vs. Hydro): {multiplier_effect:.2f}x")
+
 # ============================================================================
 # GENERATE MARKDOWN OUTPUT
 # ============================================================================
@@ -111,7 +127,12 @@ Auto-generated from analysis outputs. Use these values to fill X/Y placeholders 
 
 ### 05-hotspot-WHO.qmd
 - Low-income populations: {pop_pct_low_income:.1f}% of people affected
+- **Total Population in Hotspot Beneficiary Areas**: {pop_combined:.1f}M people
 - Population in hotspots: {pop_exp_total:.1f}M people
+- **Hydrological Beneficiaries**: {pop_hydro:.1f}M people
+- **Access-Based Beneficiaries**: {pop_travel:.1f}M people
+- **The Multiplier Effect**: Populations with access to hotspots are **{multiplier_effect:.2f} times larger** than populations living directly downstream.
+
 
 ### 06-drivers-WHY.qmd
 *Top drivers of ecosystem service decline:*
