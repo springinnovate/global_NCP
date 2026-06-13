@@ -1,5 +1,9 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-06-12
+*   **Population Exposure Milestone:** Calculated the total 2020 GHSL population captured across the 1.3 million evaluated 10km grid cells (7,855,519,292 people).
+*   **Near-Universal Exposure:** Verified that the 7.6 Billion "Connected Beneficiaries" represent **96.7%** of the evaluated global population. This massive share confirms that almost the entire global population is connected to at least one ecosystem service loss hotspot via downstream hydrological pathways or travel-access footprints.
+
 ### 2026-06-11
 *   **Methodological Optimization (Population Exposure Extraction):** Bypassed the single-attribute limitation of `zonal_stats_toolkit` for the multi-level hotspot beneficiaries analysis. 
 *   **Multi-Dimensional Slicing:** By extracting raw population data directly to the 1.5 million 10km grid cells (`landgrid_1_clean_enriched_4326.gpkg`) using `exactextract` (with `strategy="raster-sequential"` to prevent GEOS C++ crashes) and subsequently grouping in Pandas by `['country', 'region_wb', 'income_grp', 'WWF_biome']` simultaneously, we squash millions of rows into a lightweight, highly flexible CSV.

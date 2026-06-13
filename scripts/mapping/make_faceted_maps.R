@@ -278,7 +278,7 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
   }
 
   # 1. World Bank Region
-  sf_wb <- load_and_clean(groupings_files$World_Bank_Region)
+  sf_wb <- load_and_clean(groupings_files$region_wb)
   sf_wb$region_wb[is.na(sf_wb$region_wb) | sf_wb$region_wb == "Antarctica"] <- NA
   p_wb <- ggplot(sf_wb) +
     geom_sf(aes(fill = region_wb), color = "gray50", linewidth = 0.1) +
@@ -291,7 +291,7 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
     guides(fill = guide_legend(ncol = 3))
 
   # 2. Income Group
-  sf_inc <- load_and_clean(groupings_files$Income_Group)
+  sf_inc <- load_and_clean(groupings_files$income_grp)
   sf_inc$income_grp[is.na(sf_inc$income_grp) | sf_inc$income_grp %in% c("Not classified", "Unclassified")] <- NA
   p_inc <- ggplot(sf_inc) +
     geom_sf(aes(fill = income_grp), color = "gray50", linewidth = 0.1) +
@@ -304,7 +304,7 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
     guides(fill = guide_legend(ncol = 2))
 
   # 3. Biome
-  sf_bio <- load_and_clean(groupings_files$Biome)
+  sf_bio <- load_and_clean(groupings_files$biome)
   sf_bio$WWF_biome[is.na(sf_bio$WWF_biome) | sf_bio$WWF_biome %in% c("Lakes", "Rock & Ice")] <- NA
   p_bio <- ggplot(sf_bio) +
     geom_sf(aes(fill = WWF_biome), color = "gray50", linewidth = 0.1) +
@@ -317,7 +317,7 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
     guides(fill = guide_legend(ncol = 3))
 
   # 4. Country
-  sf_ctry <- load_and_clean(groupings_files$Country)
+  sf_ctry <- load_and_clean(groupings_files$country)
   p_ctry <- ggplot(sf_ctry) +
     geom_sf(fill = "#E0E0E0", color = "gray40", linewidth = 0.15) +
     labs(title = "National Boundaries") +
@@ -339,7 +339,7 @@ generate_context_groupings_map <- function(groupings_files, out_dir = "outputs/p
 
 source(here::here("R", "paths.R"))
 
-out_maps_dir <- file.path("outputs", "plots", "maps")
+out_maps_dir <- here::here("outputs", "maps")
 dir.create(out_maps_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Wipe out old maps before generating new ones to ensure clean state
@@ -351,27 +351,24 @@ if (length(old_maps) > 0) {
 
 # Define your groupings and their corresponding GPKG file paths
 groupings_files <- list(
-  "World_Bank_Region" = file.path(data_dir(), "processed", "output_maps", "region_wb_change_map.gpkg"),
-  "Income_Group"      = file.path(data_dir(), "processed", "output_maps", "income_grp_change_map.gpkg"),
-  "Biome"             = file.path(data_dir(), "processed", "output_maps", "biome_change_map.gpkg"),
-  "Country"           = file.path(data_dir(), "processed", "output_maps", "country_change_map.gpkg")
+  "region_wb"  = here::here("outputs", "maps", "region_wb_change_map.gpkg"),
+  "income_grp" = here::here("outputs", "maps", "income_grp_change_map.gpkg"),
+  "biome"      = here::here("outputs", "maps", "biome_change_map.gpkg"),
+  "country"    = here::here("outputs", "maps", "country_change_map.gpkg")
 )
 
 # 1. Generate First Look Overview Maps
-gpkg_global_pct <- "home/jeronimo/data/global_ncp/processed/hotspots/pct/global/hotspots_global_pct.gpkg"
-gpkg_global_abs <- "home/jeronimo/data/global_ncp/processed/hotspots/abs/global/hotspots_global_abs.gpkg"
+gpkg_global_pct <- here::here("data", "processed", "hotspots", "pct", "global", "hotspots_global_pct.gpkg")
+gpkg_global_abs <- here::here("data", "processed", "hotspots", "abs", "global", "hotspots_global_abs.gpkg")
 
 generate_first_look_map(gpkg_global_pct, file.path(out_maps_dir, "first_look_map_pct.png"))
 generate_first_look_map(gpkg_global_abs, file.path(out_maps_dir, "first_look_map_abs.png"))
 
 # Run the loop for percentage change maps
-iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "pct"))
 iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "pct", out_dir = out_maps_dir))
 
 # Run the loop for absolute change maps
-iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "abs"))
 iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "abs", out_dir = out_maps_dir))
 
 # Generate the contextual groupings map
-generate_context_groupings_map(groupings_files)
 generate_context_groupings_map(groupings_files, out_dir = out_maps_dir)

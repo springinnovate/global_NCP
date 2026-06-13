@@ -3,9 +3,9 @@
 Auto-generated from analysis outputs. Use these values to fill X/Y placeholders in chapters.
 
 ## GLOBAL SUMMARY
-- **Total grid cells**: 1,689,609
-- **Hotspot cells (≥1 service)**: 75,271
-- **Hotspot coverage**: 4.45%
+- **Total grid cells**: 1,302,099
+- **Hotspot cells (≥1 service)**: 252,215
+- **Hotspot coverage**: 19.37%
 
 ## CHAPTER-SPECIFIC FILLS
 
@@ -13,33 +13,39 @@ Auto-generated from analysis outputs. Use these values to fill X/Y placeholders 
 *No numerical placeholders - narrative only*
 
 ### 03-global-patterns.qmd
-- X = 75,271 (total hotspot cells)
-- Y = 4.45% (global area)
+- X = 252,215 (total hotspot cells)
+- Y = 19.37% (global area)
 
 ### 04-hotspot-WHERE.qmd
 *Regional intensity table:*
 ```
 | Region | Relative Intensity |
 |--------|-------------------|
-| Sub-Saharan Africa | 2.34x |
-| Europe & Central Asia | 1.24x |
-| North America | 1.16x |
-| Latin America & Caribbean | 1.13x |
-| East Asia & Pacific | 0.94x |
+| Latin America & Caribbean | 1.40x |
+| East Asia & Pacific | 1.30x |
+| South Asia | 0.80x |
+| Sub-Saharan Africa | 0.78x |
+| Europe & Central Asia | 0.65x |
 ```
 
 ### 05-hotspot-WHO.qmd
-- Low-income populations: 4.2% of people affected
-- Population in hotspots: 7936.4M people
+- Low-income populations: 12.4% of people affected
+- **Total Baseline Population (GHSL 2020)**: 7855.5M people
+- **Total Population in Hotspot Beneficiary Areas**: 7596.0M people (96.7% of baseline)
+- Population in hotspots: 5286.2M people
+- **Hydrological Beneficiaries**: 6420.1M people
+- **Access-Based Beneficiaries**: 7401.2M people
+- **The Multiplier Effect**: Populations with access to hotspots are **1.15 times larger** than populations living directly downstream.
+
 
 ### 06-drivers-WHY.qmd
 *Top drivers of ecosystem service decline:*
 ```
 | Driver | % Overlap |
 |--------|----------|
-| Forest_Loss | 19.8% |
-| Crop_Exp | 19.0% |
-| Grassland_Loss | 7.7% |
+| Forest_Loss | 3.7% |
+| Grassland_Gain | 2.7% |
+| Grassland_Loss | 2.5% |
 ```
 
 ### 07-regional-profiles.qmd
@@ -47,9 +53,9 @@ Auto-generated from analysis outputs. Use these values to fill X/Y placeholders 
 [To be filled with specific regional data from hotspot_pop_exposure.csv]
 
 ### 08-conclusions.qmd
-- Hotspot coverage: 4.45%
-- Low-income hotspot intensity: 2.18x (vs 1.12x for OECD)
-- Significant socioeconomic differences: 47/48 tests (p<0.05)
+- Hotspot coverage: 19.37%
+- Low-income hotspot intensity: 0.84x (vs 0.74x for OECD)
+- Significant socioeconomic differences: 39/40 tests (p<0.05)
 
 ---
 
@@ -63,12 +69,12 @@ See: `data/processed/tables/hotspot_area_stats.csv`
 
 ### Population Exposure
 See: `data/processed/tables/hotspot_pop_exposure.csv`
-- Total global population in hotspots: 7936.4M
-- By income group: High income: 1399.7M, Low income: 334.7M, Lower middle income: 1953.9M, Upper middle income: 4248.1M
+- Total global population in hotspots: 5286.2M
+- By income group: High income: 703.1M, Low income: 656.7M, Lower middle income: 1635.0M, Upper middle income: 2291.4M
 
 ### KS Test Results
 See: `data/processed/tables/ks_results_hot_vs_non.csv`
-- 47 out of 48 service×variable pairs show significant differences
+- 39 out of 40 service×variable pairs show significant differences
 - Hotspots have significantly different socioeconomic profiles from background
 
 ### Driver Attribution

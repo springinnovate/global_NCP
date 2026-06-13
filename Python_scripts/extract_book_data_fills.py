@@ -8,13 +8,18 @@ import pandas as pd
 import os
 from pathlib import Path
 
-# Set up paths
+# TODO (v1.4.0 Technical Debt): Consolidate table directories!
+# Historically, `data/processed/tables` lived on the remote server (lilling), while 
+# `outputs/tables` was used for local scripts. We need to unify these into a single 
+# canonical directory across all Python, R, and Quarto scripts to prevent confusion.
+# -----------------------------------------------------------------------------------
 data_root = Path("data/processed/tables")
+outputs_root = Path("outputs/tables")
 
 # Load all the data
 hotspot_area = pd.read_csv(data_root / "hotspot_area_stats.csv")
 hotspot_pop = pd.read_csv(data_root / "hotspot_pop_exposure.csv")
-exposure_detail = pd.read_csv(data_root / "exposure_comparison_compiled.csv")
+exposure_detail = pd.read_csv(outputs_root / "exposure_comparison_compiled.csv")
 ks_results = pd.read_csv(data_root / "ks_results_hot_vs_non.csv")
 lcc_abs = pd.read_csv(data_root / "lcc_es_hotspot_overlap_abs.csv")
 lcc_pct = pd.read_csv(data_root / "lcc_es_hotspot_overlap_pct.csv")
@@ -25,9 +30,16 @@ lcc_pct = pd.read_csv(data_root / "lcc_es_hotspot_overlap_pct.csv")
 
 print("Extracting key numbers for book placeholders...\n")
 
+import geopandas as gpd
+
 # 1. GLOBAL HOTSPOT COUNT
 # Get unique grid cells that are hotspots for at least one service
-global_hotspot_count = hotspot_area['global_n_hot'].iloc[0]  # Should be ~75k
+try:
+    gpkg_path = "data/processed/hotspots/pct/global/hotspots_global_pct_epsg8857.gpkg"
+    global_hotspot_count = len(gpd.read_file(gpkg_path, ignore_geometry=True))
+except Exception as e:
+    print(f"Warning: Could not load GPKG for hotspot count ({e}). Using fallback.")
+    global_hotspot_count = 252215  # Fallback to known value if GPKG is inaccessible
 print(f"Global hotspot cells: {global_hotspot_count:,}")
 
 # 2. TOTAL GRID CELLS

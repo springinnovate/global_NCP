@@ -108,32 +108,32 @@ flowchart LR
     %% Input Layer
     subgraph INPUTS [" "]
         direction TB
-        RawES["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Global InVEST ES Models&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;300m Rasters &lt;i&gt;(1992 & 2020)&lt;/i&gt;&lt;/span&gt;"]
-        RawGrid["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;IUCN AOO 10km Master Grid&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;&lt;i&gt;Vector with Subregional Attributes&lt;/i&gt;&lt;/span&gt;"]
-        RawLC["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;ESA CCI Land Cover&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;300m Rasters &lt;i&gt;(1992 & 2020)&lt;/i&gt;&lt;/span&gt;"]
-        RawSoc["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Socioeconomic Data&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;Rasters &lt;i&gt;(Pop, GDP, HDI)&lt;/i&gt;&lt;/span&gt;"]
+        RawES["<span style='font-size: 38px;'><b>Global InVEST ES Models</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 and 2020)</i></span>"]
+        RawGrid["<span style='font-size: 38px;'><b>IUCN AOO 10km Master Grid</b></span> <br/> <span style='font-size: 32px;'><i>Vector with Subregional Attributes</i></span>"]
+        RawLC["<span style='font-size: 38px;'><b>ESA CCI Land Cover</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 and 2020)</i></span>"]
+        RawSoc["<span style='font-size: 38px;'><b>Socioeconomic Data</b></span> <br/> <span style='font-size: 32px;'>Rasters <i>(Pop, GDP, HDI)</i></span>"]
     end
 
     %% Processing Layer
     subgraph PROCESSING [" "]
         direction TB
-        IntA["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path A: Global Trajectories&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;Zonal Summaries &lt;i&gt;(1992 & 2020)&lt;/i&gt;&lt;/span&gt;"]
-        MathA["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path A Metrics&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;SPC & Absolute Difference&lt;/span&gt;"]
+        IntA["<span style='font-size: 38px;'><b>Path A: Global Trajectories</b></span> <br/> <span style='font-size: 32px;'>Zonal Summaries <i>(1992 and 2020)</i></span>"]
+        MathA["<span style='font-size: 38px;'><b>Path A Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC and Absolute Difference</span>"]
 
-        IntB["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path B: Grid Analysis&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;10km Zonal Summaries &lt;i&gt;(1992 & 2020)&lt;/i&gt;&lt;/span&gt;"]
-        MathB["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path B Metrics&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;SPC & Absolute Difference&lt;/span&gt;"]
+        IntB["<span style='font-size: 38px;'><b>Path B: Grid Analysis</b></span> <br/> <span style='font-size: 32px;'>10km Zonal Summaries <i>(1992 and 2020)</i></span>"]
+        MathB["<span style='font-size: 38px;'><b>Path B Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC and Absolute Difference</span>"]
 
-        MathLC["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Land Cover Transitions&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;Reclassified LC Contingency &lt;br/&gt; Matrices per 10km Gridcell&lt;/span&gt;"]
-        MathSoc["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Socioeconomic Stats & KS Tests&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;10km Grid Aggregation &lt;br/&gt; & Statistical Profiling&lt;/span&gt;"]
+        MathLC["<span style='font-size: 38px;'><b>Land Cover Transitions</b></span> <br/> <span style='font-size: 32px;'>Reclassified LC Contingency <br/> Matrices per 10km Gridcell</span>"]
+        MathSoc["<span style='font-size: 38px;'><b>Socioeconomic Stats and KS Tests</b></span> <br/> <span style='font-size: 32px;'>10km Grid Aggregation <br/> and Statistical Profiling</span>"]
     end
 
     %% Outputs Layer
     subgraph OUTPUTS [" "]
         direction TB
-        P1["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHAT: Global Trajectories&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;Bar Charts, Summary Tables, &lt;br/&gt; & Cartographies (GPKGs)&lt;/i&gt;"]
-        P2["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHERE: Hotspot Detection (Top/Bottom 5%)&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;Abs & SPC GPKGs, Synthesis Maps, &lt;br/&gt; & Distribution Plots&lt;/i&gt;"]
-        P3["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHY: Attribution Gap&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;LCC Overlap CSVs, Heatmaps, &lt;br/&gt; Scatterplots, & Driver Maps&lt;/i&gt;"]
-        P4["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHO: Equity & Exposure&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;KS Test Plots & &lt;br/&gt; Population Exposure CSVs&lt;/i&gt;"]
+        P1["<span style='font-size: 38px;'><b>WHAT: Global Trajectories</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Bar Charts, Summary Tables, <br/> and Cartographies (GPKGs)</i>"]
+        P2["<span style='font-size: 38px;'><b>WHERE: Hotspot Detection (Top/Bottom 5%)</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Abs and SPC GPKGs, Synthesis Maps, <br/> and Distribution Plots</i>"]
+        P3["<span style='font-size: 38px;'><b>WHY: Attribution Gap</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>LCC Overlap CSVs, Heatmaps, <br/> Scatterplots, and Driver Maps</i>"]
+        P4["<span style='font-size: 38px;'><b>WHO: Equity and Exposure</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>KS Test Plots and <br/> Population Exposure CSVs</i>"]
     end
 
     %% Logical Connections
@@ -174,6 +174,7 @@ flowchart LR
     class RawGrid,IntB,MathB,P2 c_where;
     class RawLC,MathLC,P3 c_why;
     class RawSoc,MathSoc,P4 c_who;
+```
 ```
 
 ## Repository Structure

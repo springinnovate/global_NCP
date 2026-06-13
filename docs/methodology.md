@@ -30,7 +30,14 @@ Due to severe performance and geometry-validity bottlenecks encountered when per
     *   The final stage is handled by `Python_scripts/enrich_grid.py`.
     *   This script performs a highly optimized, centroid-based spatial join to map WWF Biomes, Country, UN/World Bank Regions, and Income Group attributes (from the `ee_correspondence` dataset) onto the grid.
     *   It inherently handles geometry validation (`buffer(0).make_valid()`) and deduplication, outputting the final, analysis-ready `landgrid_1_clean_enriched.gpkg`.
-    
+
+#### Grid Cell Attrition (1.5M to 1.3M cells)
+While the canonical master grid initially contains 1,522,073 terrestrial cells, the final number of evaluated cells in the hotspot pipeline drops to approximately 1,302,099. This ~14% reduction is intentional and expected. During the spatial extraction phase, any grid cells that lack complete underlying raster data coverage across all baseline variables (for both 1992 and 2020) are systematically dropped when calculating temporal changes. Common causes for this lack of data include:
+*   **Coastal Mismatch:** Raster boundaries from different sources (e.g., ESA CCI vs InVEST models) often handle complex coastlines and small island archipelagos differently, leading to NoData (`NA`) values in those cells.
+*   **High Latitude Extents:** Some rasters do not cover extreme polar latitudes.
+*   **Modeling Constraints:** Certain biophysical models may fail to resolve valid outputs in edge-case topographies.
+By dropping these cells, we guarantee that the final analysis compares a mathematically sound, 1-to-1 footprint of cells that contain complete, valid, non-NA data for all required services across both time periods.
+
 *Note: The legacy R script `analysis/prepare_data.qmd` and standalone cleaning utilities like `clean_grid.py` were fully deprecated in v1.3.4 in favor of this Python workflow.*
 
 ### Grid Geometry & Reprojection Effects
@@ -182,6 +189,19 @@ To understand the socioeconomic context of ecosystem service hotspots (e.g., Pop
 **Balanced Sampling Methodology:**
 A direct comparison of hotspots (the top/bottom 5% of pixels) against the entire non-hotspot background (the remaining 95%) suffers from severe sample size imbalance and includes pixels undergoing extreme changes in the *opposite* direction. To ensure a fair and stable statistical comparison, the pipeline implements a "median background" sampling strategy:
 * Hotspots are compared strictly against the "business-as-usual" median 5% of the landscape (the 47.5th to 52.5th percentiles of change). This isolates the specific socioeconomic profile of extreme decline against typical, stable baseline conditions.
+
+### Population Exposure and the Serviceshed Multiplier Effect
+To assess the human impact of ecosystem service hotspots, the pipeline quantifies both direct and indirect population exposure, establishing a "Serviceshed Multiplier Effect."
+
+**Methodology:**
+1. **Baseline In-Situ Exposure (Local Residents):** We extract the total 2020 population (from GHSL-POP) residing directly within the 100 sq km grid cells identified as ecosystem service decline hotspots.
+2. **Connected Beneficiaries (The Multiplier):** We trace exposure beyond the immediate degraded zone using two specialized geospatial delivery pathways:
+   * **Hydrological Footprint:** Populations living down-gradient that rely on the upstream landscape for water purification, sediment retention, and flow regulation.
+   * **Access-Based Travel Footprint:** Populations living within physical travel distances that rely on local nature for recreation, wild pollination, and access to natural capital.
+3. **Compound Risk Analysis:** To evaluate how this exposure behaves under escalating ecological failure, populations are grouped by their localized **Compound Risk**—the number of simultaneous overlapping hotspots in a single cell (ranging from $\ge 1$ to $\ge 4$). 
+
+**Analytical Purpose:** 
+This framework allows us to test whether intense, compounding environmental crises remain geographically contained. By plotting the exposed populations on a logarithmic scale across escalating compound risk tiers, we measure the multiplier gap between *Local Residents* and total *Connected Beneficiaries*. This mathematically tracks how highly localized environmental degradation cascades into systemic regional vulnerabilities.
 
 ### Land Cover Change Attribution
 To explain *why* hotspots occur, we integrate Land Cover Change (LCC) metrics derived from ESA CCI (1992) and C3S (2020) maps.
