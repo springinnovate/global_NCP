@@ -90,6 +90,26 @@ This document provides detailed definitions for the key CSV output tables genera
 
 ---
 
+## Serviceshed Multiplier & Exposure Tables (`outputs/tables/`)
+
+These tables are the final consolidated datasets quantifying population exposure and the serviceshed multiplier effect across different demographic scales and risk levels.
+
+### `exposure_comparison_compiled.csv`
+*   **Purpose**: A massive "squashed" dataset containing the total exposed population for every possible intersection of hotspot category, exposure type, and demographic grouping. This is the master file for all Multiplier Effect analysis.
+*   **Columns Include**: `hotness_tier` (compound risk level), `exposure_type` (Local Residents, Downstream Beneficiaries, or Travel Access), `country`, `region_wb`, `income_grp`, `WWF_biome`, and `exposed_population`.
+
+### `multiplier_summary_[grouping].csv`
+*   **Purpose**: These files (e.g., `multiplier_summary_country.csv`, `multiplier_summary_region_wb.csv`) summarize the base multiplier effect for specific geographic groupings, comparing in-situ residents to connected beneficiaries.
+*   **Columns Include**: The grouping variable name, `Local Residents`, `Connected Beneficiaries`, and `Multiplier` (the ratio of connected beneficiaries to local residents).
+
+### `exposure_comparison.csv` and `regional_pop_exposure.csv`
+*   **Purpose**: Top-level summary files detailing the aggregated global and regional population exposure statistics presented in the main text.
+
+### `lcc_reclassification_table.csv`
+*   **Purpose**: The correspondence table used to group ESA CCI raw land cover classes into canonical driver categories (e.g., Forest, Cropland, Urban) for attribution analysis.
+
+---
+
 ## Granular Land Cover Change Metrics
 
 *   **Source**: `analysis/LC_change_granular.qmd`

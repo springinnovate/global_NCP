@@ -1,7 +1,7 @@
 ---
 title: "Relative Socioeconomic Shift"
-subtitle: "v1.3.3"
-analysis_version: "v1.3.3"
+subtitle: "v1.3.4"
+analysis_version: "v1.3.4"
 date: now
 date-format: "YYYY-MM-DD HH:mm zzz"
 format:
@@ -180,7 +180,7 @@ KS_CFG <- list(
     "GHS_POP_E2020_GLOBE_sum",
     "fields_mehrabi_2017_mean",
     "hdi_raster_predictions_2020_mean",
-    "rast_adm1_gini_disp_2020_mean",
+    "rast_adm1_gini_disp_2020_mean"
   ),
   sampling          = "match_hot",  # none | match_hot | cap_nonhot
   comparison_mode   = "median",     # "random" (all non-hotspots) | "median" (middle 5% of change)
@@ -194,7 +194,7 @@ KS_CFG <- list(
   transform_default = "auto",
   transform_by_var = c(
     "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "log1p",
-    "GHS_POP_E2020_GLOBE_sum"                 = "log1p",
+    "GHS_POP_E2020_GLOBE_sum"                 = "log1p"
   ),
   ecdf_top_k              = 8,
   ecdf_service_selection  = "top_k",  # top_k | all | custom
@@ -202,7 +202,7 @@ KS_CFG <- list(
   mountain_var            = "rast_gdpTot_1990_2020_30arcsec_2020_sum",
   mountain_transform      = "log1p",
   # outputs
-  out_table  = file.path(data_dir(), "processed", "tables", paste0("ks_results_hot_vs_non", params$output_suffix, ".csv")),
+  out_table  = file.path(data_dir(), "processed", "tables", paste0("ks_results_hot_vs_non", params$output_suffix, ".csv")), # Ensure this writes to the 'tables' subdirectory
   out_dir    = out_plots(paste0("ks", params$output_suffix)),
   service_suffix_pattern = "_(mean|sum)$"
 )

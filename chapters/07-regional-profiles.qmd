@@ -1,0 +1,218 @@
+# Regional & Geographic Deep-Dives
+*Country profiles and detailed breakdowns*
+
+```{r setup}
+#| include: false
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(here)
+
+has_dt <- requireNamespace("DT", quietly = TRUE)
+if(has_dt) library(DT)
+
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R", "paths.R"))
+source(here::here("R", "plotting_functions.R"))
+
+# Load data
+area_stats <- read_csv(
+  file.path(data_dir(), "processed", "tables", "hotspot_area_stats.csv"),
+  show_col_types = FALSE
+)
+
+pop_exposure <- read_csv(
+  file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv"),
+  show_col_types = FALSE
+)
+```
+
+## Overview
+
+This chapter provides detailed geographic deep-dives. You can explore patterns by:
+
+- **World Bank Region** – Continental/regional hotspot patterns
+- **Income Group** – Socioeconomic clustering of hotspots
+- **Biome** – Ecosystem-specific service change patterns
+- **Country** – Specific country-level priorities
+
+Use the tabs below to drill into specific geographies of interest.
+
+## Hotspot Intensity by Region
+
+```{r intensity-region-detail}
+#| fig-cap: "Detailed regional hotspot intensity. Explore which services are most affected in each region."
+#| fig-height: 8
+#| fig-width: 12
+
+make_intensity_plot(area_stats, "region_wb")
+```
+
+## Country-Level Rankings
+
+```{r country-rank}
+#| fig-cap: "Top countries by hotspot relative intensity, faceted by service. Countries above the dashed line have disproportionately high hotspot concentration."
+#| fig-height: 12
+#| fig-width: 14
+
+# Filter out micro-states (<10,000 sq km) to prevent skewed relative intensities
+filtered_area_stats <- area_stats %>%
+  filter(!(grepl("countr|nev_name|admin", grouping_var, ignore.case = TRUE) & as.numeric(n_total) < 100))
+
+make_country_intensity_plot(filtered_area_stats)
+```
+
+## Interactive Country Profiles
+
+Explore country-specific hotspot statistics. Filter by service, country, or intensity to find regions of interest:
+
+```{r country-table}
+#| fig-cap: "Interactive table of country-level hotspot statistics. Click column headers to sort; use the search box to filter."
+
+country_data <- area_stats %>%
+  filter(grouping_var == "country") %>%
+  select(service, group, n_hot, pct_area, relative_intensity) %>%
+  arrange(desc(relative_intensity)) %>%
+  rename(
+    Service = service,
+    Country = group,
+    "Hotspot Cells" = n_hot,
+    "% of Country Area" = pct_area,
+    "Relative Intensity" = relative_intensity
+  ) %>%
+  mutate(
+    "% of Country Area" = round(`% of Country Area`, 2),
+    "Relative Intensity" = round(`Relative Intensity`, 2)
+  )
+
+if(has_dt) {
+  DT::datatable(
+    country_data,
+    filter = "top",
+    options = list(
+      pageLength = 30,
+      columnDefs = list(
+        list(targets = 2, render = JS("function(data) {return Math.round(data);}"))
+      )
+    ),
+    rownames = FALSE,
+    caption = "Country-Level Hotspot Statistics"
+  )
+} else {
+  knitr::kable(country_data, caption = "Country-Level Hotspot Statistics")
+}
+```
+
+## Compound Risk by Geography
+
+```{r compound-by-region}
+#| fig-cap: "Countries ranked by compound risk (average overlapping hotspots per cell). High values indicate areas where multiple services are failing simultaneously."
+#| fig-height: 8
+#| fig-width: 10
+
+multiservice_stats <- read_csv(
+  file.path(data_dir(), "processed", "tables", "hotspot_multiservice_stats.csv"),
+  show_col_types = FALSE
+)
+
+if (nrow(multiservice_stats) > 0 && "grouping" %in% names(multiservice_stats)) {
+  make_country_multi_plot(multiservice_stats)
+} else {
+  ggplot() + theme_void() + ggtitle("Multi-service data not available")
+}
+```
+
+## Population Exposure by Country
+
+Below is an interactive breakdown of population exposure to hotspots at the country level:
+
+```{r pop-exposure-country}
+#| fig-cap: "Population exposure to hotspots by country. Shows absolute numbers of people affected by ecosystem service decline."
+
+if (nrow(pop_exposure) > 0) {
+  # Identify the geographic column dynamically
+  geo_col <- if("country" %in% names(pop_exposure)) "country" else if("group" %in% names(pop_exposure)) "group" else "service"
+  
+  pop_filtered <- pop_exposure
+  if("grouping_var" %in% names(pop_exposure)) {
+    pop_filtered <- pop_filtered %>% filter(grouping_var == "country")
+  }
+  
+  pop_by_geo <- pop_filtered %>%
+    filter(!is.na(.data[[geo_col]])) %>%
+    group_by(.data[[geo_col]]) %>%
+    summarise(total_exposed = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
+    arrange(desc(total_exposed)) %>%
+    rename(
+      Geography = !!geo_col,
+      "Exposed Population" = total_exposed
+    ) %>%
+    mutate("Exposed Population (Millions)" = `Exposed Population` / 1e6)
+
+  if(has_dt) {
+    DT::datatable(
+      pop_by_geo %>% select(Geography, "Exposed Population (Millions)"),
+      rownames = FALSE,
+      options = list(pageLength = 10),
+      caption = "Total Population Exposed to Ecosystem Service Declines"
+    )
+  } else {
+    knitr::kable(head(pop_by_geo %>% select(Geography, "Exposed Population (Millions)"), 15), caption = "Total Population Exposed to Ecosystem Service Declines (Top 15)")
+  }
+} else {
+  cat("Population exposure data not available")
+}
+```
+
+## Regional Policy Priorities
+
+### Sub-Saharan Africa
+- **Hotspot Services**: Pollination, N/Sed export
+- **Key Countries**: Nigeria, DRC, Ethiopia, Tanzania
+- **Priority**: Agricultural sustainability; soil conservation; crop diversification
+- **Vulnerable Population**: ~X million rural farmers
+
+### Latin America & Caribbean
+- **Hotspot Services**: Water quality (N/Sed), Nature Access
+- **Key Countries**: Brazil, Colombia, Mexico, Bolivia
+- **Priority**: Upstream protection; riparian restoration; sustainable agriculture
+- **Vulnerable Population**: ~580 million depending on water/food
+
+### East Asia & Pacific
+- **Hotspot Services**: Mixed (varies by service)
+- **Key Countries**: Indonesia, Philippines, Vietnam, China
+- **Priority**: Forest protection; wetland restoration; coastal management
+- **Vulnerable Population**: ~X million in coastal and agricultural zones
+
+### South Asia
+- **Hotspot Services**: Water quality; pollination
+- **Key Countries**: India, Bangladesh, Pakistan
+- **Priority**: Fertilizer management; groundwater protection; crop diversity
+- **Vulnerable Population**: ~1,450 million smallholder farmers
+
+### Europe & Central Asia
+- **Hotspot Services**: Fewer/lower intensity than Global South
+- **Notable Pattern**: Greater ecosystem stability despite development
+- **Mechanisms**: Protected area systems; ecosystem recovery in post-industrial areas
+- **Lesson for Others**: Green infrastructure can restore ecosystem function
+
+## How to Use This Chapter
+
+**For policymakers**: Locate your country/region and check which services are most at-risk; cross-reference with Chapter 6 for driver-specific interventions.
+
+**For conservation organizations**: Use country rankings to allocate resources to highest-burden regions; use population exposure data to identify vulnerable communities.
+
+**For researchers**: Detailed geographic data enables hypothesis testing; compound risk patterns may reveal ecological principles about multi-service failure.
+
+## Data Caveats
+
+- Country-level data aggregated from 10km grid cells; within-country variation may be substantial
+- Population exposure estimates based on grid-cell-level socioeconomic data; local variations not captured
+- Historical data (1992-2020); recent trends may differ
+- Services modeled with varying data quality (see Technical Appendix)
+
+## Next Steps
+
+- **Chapter 8** synthesizes geographic, socioeconomic, and driver patterns into policy recommendations
+*(Detailed regional breakdown to be added).*
+

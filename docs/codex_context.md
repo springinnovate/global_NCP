@@ -28,8 +28,8 @@ This document captures the full project context for assistants (e.g., Codex in V
 1. Processed 10‑km grid with subregional tags (`processed/10k_change_calc.gpkg`).
 2. Hotspot feature layers (global and per‑group) as compact GPKGs under `processed/hotspots/` plus an index CSV.
 3. Reusable tidy table `plt_long` (cell × service with `abs_chg`/`pct_chg`).
-4. **Intensity & Relative Intensity**: Metrics quantifying hotspot coverage and disproportionate concentration per region (`hotspot_area_stats.csv`).
-5. Figures: trimmed **barplots** of magnitudes (all cells), **violins** of hotspot distributions, **faceted maps**, and **KS** tables/plots.
+4.  **Intensity & Relative Intensity**: Metrics quantifying hotspot coverage and disproportionate concentration per region (`hotspot_area_stats.csv`).
+5.  Figures: trimmed **barplots** of magnitudes (all cells), **boxplots** of hotspot distributions, **faceted maps**, and **KS** tables/plots.
 
 ---
 
@@ -196,14 +196,14 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 * Visual cue: if `include_global = TRUE`, draw a distinct **Global** bar (different fill or a black outline) and place it **last** within each facet.
 * Output: `outputs/plots/{abs|pct}/<group_col>/bars_<group_col>_{abs|pct}.png`.
 
-### 4.6 Violins (hotspots only)
+### 4.6 Boxplots (hotspots only)
 
 * Purpose: compare the **distribution** of hotspot magnitudes across subregions.
 * Inputs: hotspot rows only (from the wrapper or by filtering `hotspots_df`), keeping only canonical services.
 * Trimming: remove `NA/0`, then per‑service trim to [0.1%, 99.9%] (configurable via `cut_q`).
 * Sampling: optionally sample up to `plot_n` rows for speed.
 * Scales: `facet_wrap(~service, ncol = 3, scales = "free_y")`.
-* Output: `outputs/plots/violins/<group_col>/*_{abs|pct}_change_violins.png`.
+* Output: `outputs/plots/boxplots/<group_col>/*_{abs|pct}_change_boxplots.png`.
 * Make background **white** (e.g., device `ragg_png()` and `theme_minimal()`; avoid transparent PNGs in dark UIs).
 
 ### 4.7 KS tests (Implemented)
@@ -212,7 +212,7 @@ A thin runner `run_one_hotset()` applies the config and writes artifacts for glo
 * Provide both the **statistic** and **adjusted p‑values** (e.g., BH FDR) across services and metrics.
 * **Visuals**: Heatmaps of KS statistics, ECDF overlays, and **Cliff's Delta** (directionality) bar plots.
 * **Transformations**: Signed power transformations used to visualize small but significant effects.
-* Clarify in text that bars (magnitude plots) are **direction‑agnostic** (absolute size of change), while violins + KS can be run on **absolute** or **percent** changes depending on the question.
+* Clarify in text that bars (magnitude plots) are **direction‑agnostic** (absolute size of change), while boxplots + KS can be run on **absolute** or **percent** changes depending on the question.
 
 ### 4.8 Hotspot Intensity & Multi-service
 
@@ -386,12 +386,10 @@ for (gc in groupings) {
   * `data/processed/hotspots/abs/global/hotspots_global_abs.gpkg`
   * `data/processed/hotspots/pct/global/hotspots_global_pct.gpkg`
 * **Grouped layers** (pattern):
-
   * `data/processed/hotspots/{abs|pct}/<group_col>/hotspots_<group_col>_<slug(group_val)>_{abs|pct}.gpkg`
 * **Figures**:
-
   * Bars: `outputs/plots/{abs|pct}/<group_col>/bars_<group_col>_{abs|pct}.png`
-  * Violins: `outputs/plots/violins/<group_col>/*_{abs|pct}_change_violins.png`
+  * Boxplots: `outputs/plots/boxplots/<group_col>/*_{abs|pct}_change_boxplots.png`
     * Maps: `outputs/plots/maps/map_<group_col>_{abs|pct}.png`
 
 ---

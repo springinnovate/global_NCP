@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Jerónimo Rodríguez Escobar">
+<meta name="author" content="Becky Chaplin-Kramer">
+<meta name="author" content="Richard P. Sharp">
+<meta name="author" content="[Additional Authors]">
+<meta name="dcterms.date" content="2026-06-13">
+
+<title>Global Ecosystem Service Time Series: A Spatiotemporal Analysis of Change, Exposure, and Attribution</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="paper_draft_files/libs/clipboard/clipboard.min.js"></script>
+<script src="paper_draft_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="paper_draft_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="paper_draft_files/libs/quarto-html/popper.min.js"></script>
+<script src="paper_draft_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="paper_draft_files/libs/quarto-html/anchor.min.js"></script>
+<link href="paper_draft_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="paper_draft_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="paper_draft_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="paper_draft_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="paper_draft_files/libs/bootstrap/bootstrap-67270d1595a62d14f123c043d4fb2f18.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="paper_draft_files/libs/quarto-diagram/mermaid.min.js"></script>
+<script src="paper_draft_files/libs/quarto-diagram/mermaid-init.js"></script>
+<link href="paper_draft_files/libs/quarto-diagram/mermaid.css" rel="stylesheet">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#abstract" id="toc-abstract" class="nav-link active" data-scroll-target="#abstract"><span class="header-section-number">1</span> Abstract</a></li>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link" data-scroll-target="#introduction"><span class="header-section-number">2</span> Introduction</a>
+  <ul class="collapse">
+  <li><a href="#ecosystem-services-at-risk" id="toc-ecosystem-services-at-risk" class="nav-link" data-scroll-target="#ecosystem-services-at-risk"><span class="header-section-number">2.1</span> Ecosystem Services at Risk</a></li>
+  <li><a href="#spatial-prioritization-challenge" id="toc-spatial-prioritization-challenge" class="nav-link" data-scroll-target="#spatial-prioritization-challenge"><span class="header-section-number">2.2</span> Spatial Prioritization Challenge</a></li>
+  <li><a href="#research-objectives" id="toc-research-objectives" class="nav-link" data-scroll-target="#research-objectives"><span class="header-section-number">2.3</span> Research Objectives</a></li>
+  </ul></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods"><span class="header-section-number">3</span> Methods</a>
+  <ul class="collapse">
+  <li><a href="#data-sources-and-study-design" id="toc-data-sources-and-study-design" class="nav-link" data-scroll-target="#data-sources-and-study-design"><span class="header-section-number">3.1</span> Data Sources and Study Design</a>
+  <ul class="collapse">
+  <li><a href="#biophysical-modeling-of-ecosystem-services" id="toc-biophysical-modeling-of-ecosystem-services" class="nav-link" data-scroll-target="#biophysical-modeling-of-ecosystem-services"><span class="header-section-number">3.1.1</span> Biophysical Modeling of Ecosystem Services</a></li>
+  <li><a href="#ancillary-datasets-and-harmonization" id="toc-ancillary-datasets-and-harmonization" class="nav-link" data-scroll-target="#ancillary-datasets-and-harmonization"><span class="header-section-number">3.1.2</span> Ancillary Datasets and Harmonization</a></li>
+  </ul></li>
+  <li><a href="#analysis-pipeline" id="toc-analysis-pipeline" class="nav-link" data-scroll-target="#analysis-pipeline"><span class="header-section-number">3.2</span> Analysis Pipeline</a>
+  <ul class="collapse">
+  <li><a href="#regional-trajectories-versus-grid-level-hotspots" id="toc-regional-trajectories-versus-grid-level-hotspots" class="nav-link" data-scroll-target="#regional-trajectories-versus-grid-level-hotspots"><span class="header-section-number">3.2.1</span> Regional Trajectories versus Grid-Level Hotspots</a></li>
+  <li><a href="#zonal-summaries-and-symmetric-percentage-change-spc" id="toc-zonal-summaries-and-symmetric-percentage-change-spc" class="nav-link" data-scroll-target="#zonal-summaries-and-symmetric-percentage-change-spc"><span class="header-section-number">3.2.2</span> Zonal Summaries and Symmetric Percentage Change (SPC)</a></li>
+  <li><a href="#hotspot-identification" id="toc-hotspot-identification" class="nav-link" data-scroll-target="#hotspot-identification"><span class="header-section-number">3.2.3</span> Hotspot Identification</a></li>
+  <li><a href="#socioeconomic-profiling-and-spatial-statistics" id="toc-socioeconomic-profiling-and-spatial-statistics" class="nav-link" data-scroll-target="#socioeconomic-profiling-and-spatial-statistics"><span class="header-section-number">3.2.4</span> Socioeconomic Profiling and Spatial Statistics</a></li>
+  <li><a href="#spatial-attribution-analysis" id="toc-spatial-attribution-analysis" class="nav-link" data-scroll-target="#spatial-attribution-analysis"><span class="header-section-number">3.2.5</span> Spatial Attribution Analysis</a></li>
+  </ul></li>
+  </ul></li>
+  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results"><span class="header-section-number">4</span> Results</a>
+  <ul class="collapse">
+  <li><a href="#global-and-regional-trajectories" id="toc-global-and-regional-trajectories" class="nav-link" data-scroll-target="#global-and-regional-trajectories"><span class="header-section-number">4.1</span> Global and Regional Trajectories</a>
+  <ul class="collapse">
+  <li><a href="#geographic-distribution-by-biome" id="toc-geographic-distribution-by-biome" class="nav-link" data-scroll-target="#geographic-distribution-by-biome"><span class="header-section-number">4.1.1</span> Geographic Distribution by Biome</a></li>
+  </ul></li>
+  <li><a href="#global-hotspot-distribution" id="toc-global-hotspot-distribution" class="nav-link" data-scroll-target="#global-hotspot-distribution"><span class="header-section-number">4.2</span> Global Hotspot Distribution</a>
+  <ul class="collapse">
+  <li><a href="#hotspot-magnitude-by-biome" id="toc-hotspot-magnitude-by-biome" class="nav-link" data-scroll-target="#hotspot-magnitude-by-biome"><span class="header-section-number">4.2.1</span> Hotspot Magnitude by Biome</a></li>
+  </ul></li>
+  <li><a href="#socioeconomic-profiling-ks-diagnostics" id="toc-socioeconomic-profiling-ks-diagnostics" class="nav-link" data-scroll-target="#socioeconomic-profiling-ks-diagnostics"><span class="header-section-number">4.3</span> Socioeconomic Profiling: KS Diagnostics</a></li>
+  <li><a href="#population-exposure-and-the-serviceshed-multiplier-effect" id="toc-population-exposure-and-the-serviceshed-multiplier-effect" class="nav-link" data-scroll-target="#population-exposure-and-the-serviceshed-multiplier-effect"><span class="header-section-number">4.4</span> Population Exposure and the Serviceshed Multiplier Effect</a></li>
+  <li><a href="#the-spatial-attribution-gap" id="toc-the-spatial-attribution-gap" class="nav-link" data-scroll-target="#the-spatial-attribution-gap"><span class="header-section-number">4.5</span> The Spatial Attribution Gap</a></li>
+  </ul></li>
+  <li><a href="#discussion" id="toc-discussion" class="nav-link" data-scroll-target="#discussion"><span class="header-section-number">5</span> Discussion</a>
+  <ul class="collapse">
+  <li><a href="#geographic-clustering-enables-prioritization" id="toc-geographic-clustering-enables-prioritization" class="nav-link" data-scroll-target="#geographic-clustering-enables-prioritization"><span class="header-section-number">5.1</span> Geographic Clustering Enables Prioritization</a></li>
+  <li><a href="#differentiated-vulnerability-tiers" id="toc-differentiated-vulnerability-tiers" class="nav-link" data-scroll-target="#differentiated-vulnerability-tiers"><span class="header-section-number">5.2</span> Differentiated Vulnerability Tiers</a></li>
+  <li><a href="#attribution-complexity-the-degradation-dominance" id="toc-attribution-complexity-the-degradation-dominance" class="nav-link" data-scroll-target="#attribution-complexity-the-degradation-dominance"><span class="header-section-number">5.3</span> Attribution Complexity: The Degradation Dominance</a></li>
+  <li><a href="#pipeline-limitations-and-analytical-uncertainties" id="toc-pipeline-limitations-and-analytical-uncertainties" class="nav-link" data-scroll-target="#pipeline-limitations-and-analytical-uncertainties"><span class="header-section-number">5.4</span> Pipeline Limitations and Analytical Uncertainties</a></li>
+  </ul></li>
+  <li><a href="#conclusions" id="toc-conclusions" class="nav-link" data-scroll-target="#conclusions"><span class="header-section-number">6</span> Conclusions</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references"><span class="header-section-number">7</span> References</a></li>
+  <li><a href="#annex-supplemental-figures" id="toc-annex-supplemental-figures" class="nav-link" data-scroll-target="#annex-supplemental-figures"><span class="header-section-number">8</span> Annex: Supplemental Figures</a>
+  <ul class="collapse">
+  <li><a href="#regional-trajectories-by-world-bank-region" id="toc-regional-trajectories-by-world-bank-region" class="nav-link" data-scroll-target="#regional-trajectories-by-world-bank-region"><span class="header-section-number">8.1</span> Regional Trajectories by World Bank Region</a></li>
+  <li><a href="#regional-trajectories-by-income-group" id="toc-regional-trajectories-by-income-group" class="nav-link" data-scroll-target="#regional-trajectories-by-income-group"><span class="header-section-number">8.2</span> Regional Trajectories by Income Group</a></li>
+  <li><a href="#geographic-distribution-by-country" id="toc-geographic-distribution-by-country" class="nav-link" data-scroll-target="#geographic-distribution-by-country"><span class="header-section-number">8.3</span> Geographic Distribution by Country</a></li>
+  <li><a href="#serviceshed-multiplier-effect-breakdowns" id="toc-serviceshed-multiplier-effect-breakdowns" class="nav-link" data-scroll-target="#serviceshed-multiplier-effect-breakdowns"><span class="header-section-number">8.4</span> Serviceshed Multiplier Effect Breakdowns</a></li>
+  </ul></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Global Ecosystem Service Time Series: A Spatiotemporal Analysis of Change, Exposure, and Attribution</h1>
+<p class="subtitle lead">Collaborative Draft for Advisor Feedback</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Authors</div>
+    <div class="quarto-title-meta-contents">
+             <p>Jerónimo Rodríguez Escobar </p>
+             <p>Becky Chaplin-Kramer </p>
+             <p>Richard P. Sharp </p>
+             <p>[Additional Authors] </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 13, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="abstract" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Abstract</h1>
+<p>Ecosystem services—the ecological processes and structural configurations through which natural ecosystems sustain and fulfill human life—are declining globally, but their spatial concentration, affected populations, and underlying driving mechanisms remain poorly understood. We analyze overarching regional trajectories and localized changes for eight distinct biophysical service variables across 1.30 million 100 <span class="math inline">\(\text{km}^2\)</span> equal-area grid cells worldwide between 1992 and 2020. Integrating the Integrated Valuation of Ecosystem Services and Tradeoffs (InVEST) modeling framework, European Space Agency Climate Change Initiative (ESA CCI) land cover records, and gridded socioeconomic covariates, we identify 252,215 unique grid cells experiencing at least one extreme ecosystem service decline hotspot (defined as the extreme 5% of relative change values calculated via Symmetric Percentage Change per service).</p>
+<p>Our spatial analysis reveals three primary systemic trends: (1) marked geographic clustering of multi-service hotspots predominantly within Latin America and the East Asia-Pacific regions; (2) a profound “multiplier effect” in human exposure, where highly localized declines cascade to affect over 7.6 billion connected beneficiaries (96.7% of the evaluated global population) via downstream and travel-access dependencies, with lower-middle-income nations experiencing 1.6 times higher localized intensity than high-income countries; and (3) a massive spatial attribution gap wherein approximately 76% of identified hotspots exhibit zero intersection with macro-scale land cover conversion. This attribution complexity strongly implies that sub-pixel, in-situ ecosystem degradation vastly outpaces outright land conversion as a primary driver of global nature futures decline. These findings highlight an urgent need for targeted, context-specific conservation and landscape management strategies that explicitly account for spatial concentration, compounding downstream demographic exposure, and non-conversion degradation pathways.</p>
+<p><strong>Keywords:</strong> Ecosystem services, Spatial hotspots, Land-use change, Socioeconomic profiling, Nature futures, Global assessment</p>
+<hr>
+</section>
+<section id="introduction" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Introduction</h1>
+<section id="ecosystem-services-at-risk" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="ecosystem-services-at-risk"><span class="header-section-number">2.1</span> Ecosystem Services at Risk</h2>
+<p>Ecosystem services represent the structural components, biophysical functions, and ecological processes through which natural landscapes generate direct and indirect benefits for human societies (Daily et al., 2009). Despite their foundational role in supporting global economic stability, food security, and climate resilience, critical landscape functions—including wild pollination, hydrological regulation, and coastal risk mitigation—are undergoing unprecedented systemic declines worldwide (Millennium Ecosystem Assessment, 2005; IPBES, 2019). Current estimates indicate that upwards of 1.1 billion vulnerable individuals rely directly on local ecosystem configurations for their immediate subsistence and natural resource-based livelihoods (Chaplin-Kramer et al., 2019; Fedele et al., 2021). However, the highly localized geographic configurations of these changes, alongside the precise demographic identities of vulnerable populations, remain starkly under-characterized at the global scale.</p>
+</section>
+<section id="spatial-prioritization-challenge" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="spatial-prioritization-challenge"><span class="header-section-number">2.2</span> Spatial Prioritization Challenge</h2>
+<p>Developing effective mitigation frameworks is fundamentally constrained by a compounding set of resource, institutional, and informational bottlenecks (Daily et al., 2009; Chaplin-Kramer et al., 2019). Conservation investments and climate adaptation funds are inherently finite and must be optimally allocated; however, the challenge extends beyond financial scarcity. Decision-makers lack access to spatially explicit, globally consistent, and computationally reproducible metrics capable of diagnosing where ecosystem service capacity is declining most acutely (WHERE), which specific segments of human society are most vulnerable (WHO), and what precise biophysical or anthropogenic mechanisms drive observed losses (WHY).</p>
+<p>This diagnostic gap can result in misallocated resource flows, as broad national or continental aggregations can mask local vulnerabilities and exacerbate systemic environmental injustices (Bullard, 1990). Without a standardized, high-resolution baseline tracking changes through time, implementing effective landscape-level interventions remains challenging. A reproducible global assessment that structurally links biophysical service models with satellite observations and fine-scale demographic grids is required to shift landscape management, conservation finance, and international policy from reactive remediation to targeted spatial prioritization. Crucially, this highly localized approach directly supports the derivation of Gross Ecosystem Product (GEP) metrics within the Natural Capital Project framework and provides actionable spatial intelligence for international biodiversity platforms such as IPBES.</p>
+</section>
+<section id="research-objectives" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="research-objectives"><span class="header-section-number">2.3</span> Research Objectives</h2>
+<p>This study addresses four structurally linked research questions:</p>
+<ol type="1">
+<li>What are the overarching global and macro-regional trajectories of absolute and relative ecosystem service change?</li>
+<li>Where are the localized hotspots of extreme ecosystem service decline geographically concentrated?</li>
+<li>Who is directly exposed to these localized declines, and how does human vulnerability scale when transitioning from local in-situ populations to connected downstream serviceshed beneficiaries?</li>
+<li>What proportion of localized ecosystem service decline can be explicitly attributed to satellite-detected land cover conversion, and to what extent does the remaining variance suggest the influence of sub-pixel, in-situ habitat degradation?</li>
+</ol>
+<hr>
+</section>
+</section>
+<section id="methods" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Methods</h1>
+<section id="data-sources-and-study-design" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="data-sources-and-study-design"><span class="header-section-number">3.1</span> Data Sources and Study Design</h2>
+<p>To evaluate global ecosystem dynamics, we established a 28-year temporal scope spanning between 1992 and 2020. This specific window was selected to leverage the maximum continuous historical baseline provided by the European Space Agency Climate Change Initiative (ESA CCI) land cover time series (ESA, 2017), allowing us to capture long-term landscape trajectories preceding and following the transition into the Sustainable Development Goal (SDG) era. The spatial scope encompasses all terrestrial landmasses, initially partitioned into a standardized equal-area master grid of 1,522,073 cells (<span class="math inline">\(100\text{ km}^2\)</span> each), utilizing the IUCN Area of Occupancy (Murray, 2017) structural backbone grid. During the spatial data extraction pipeline, grid cells that lacked complete underlying raster data coverage (e.g., due to raster extents not fully covering coastal margins, small islands, or specific regions across all 1992 and 2020 baseline variables) were systematically dropped when calculating temporal changes. This exclusion ensured that our analysis only compared cells with consistent, non-NA biophysical data across both time periods, resulting in a final evaluated sample of 1,302,099 viable cells out of the original 1.52 million.</p>
+<section id="biophysical-modeling-of-ecosystem-services" class="level3" data-number="3.1.1">
+<h3 data-number="3.1.1" class="anchored" data-anchor-id="biophysical-modeling-of-ecosystem-services"><span class="header-section-number">3.1.1</span> Biophysical Modeling of Ecosystem Services</h3>
+<p>We used eight simulated continuous ecosystem service variables modeled at a native 300-meter spatial resolution using the InVEST (Integrated Valuation of Ecosystem Services and Tradeoffs) biophysical software suite (Sharp et al., 2020). To ensure comparisons of volumetric ecosystem services (those expressed in absolute physical units such as kilograms of nutrient or tons of sediment) remain physically meaningful across latitudes, we standardized all extensive variables to a per-hectare basis prior to grid aggregation. Intensive variables (e.g., risk and retention ratios) were retained in their native dimensionless index units. Additionally, coastal risk indices were calculated natively in the vector domain before rasterization to prevent floating-point interpolation errors along complex shorelines. The modeled suite targets three core thematic areas of human-nature interdependence:</p>
+<ol type="1">
+<li><strong>Local &amp; Habitat Services:</strong> <em>Nature access</em> (modeled as a spatial proxy of human proximity to intact natural habitat matrices) and <em>pollination</em> (evaluated as landscape-level habitat suitability and foraging range support for wild pollinator guilds).</li>
+<li><strong>Coastal Risk Mitigation:</strong> <em>Coastal protection</em> (simulated as absolute open-ocean wave energy attenuation by marine and coastal vegetative barriers) and the <em>coastal risk reduction ratio</em> (the proportional reduction in socio-ecological vulnerability directly mitigated by the presence of protective coastal habitats).</li>
+<li><strong>Hydrological Regulation:</strong> <em>Nitrogen export</em> (total annual nutrient loading delivered to surface waterways), <em>nitrogen retention ratio</em> (the relative landscape efficiency in trapping and filtering overland nutrient flows), <em>sediment export</em> (total annual sediment yield reaching stream networks), and the <em>sediment retention ratio</em> (the structural capacity of the landscape matrix to intercept and retain upslope soil erosion). Ratios were included to normalize for varying baseline precipitation and topographical loads, allowing for a standardized assessment of the landscape’s internal regulatory capacity independent of external climatic forcing.</li>
+</ol>
+</section>
+<section id="ancillary-datasets-and-harmonization" class="level3" data-number="3.1.2">
+<h3 data-number="3.1.2" class="anchored" data-anchor-id="ancillary-datasets-and-harmonization"><span class="header-section-number">3.1.2</span> Ancillary Datasets and Harmonization</h3>
+<p>To cross-examine biophysical changes with external socioeconomic and land-use drivers, we compiled and harmonized a suite of global gridded covariates to the 10-km IUCN grid template. Population exposure was extracted from the Global Human Settlement Layer (GHSL-POP), localized urban footprints from GHSL-BUILT, gross domestic product from the World Bank gridded economic layers, human development metrics from the United Nations Development Programme (UNDP-HDI), and agricultural landscape metrics from Mehrabi et al.&nbsp;(2022).</p>
+<p>The 300-meter ESA CCI land cover dataset serves a dual role within this pipeline; as a primary input driving the underlying InVEST biophysical models and as the baseline for the downstream spatial attribution analysis. To systematically isolate land-use trajectories across the 28-year window, land cover transitions were cross-tabulated into square contingency matrices tracking change metrics gross loss, gross gain, and exchange (Pontius, 2022; Pontius &amp; Santacruz, 2014). National boundaries, sub-national administrative units, and cross-cutting global biomes were subsequently integrated via an expert-reviewed correspondence table (<code>ee_correspondence</code>). Because the biophysical simulations natively rely on these categorical land cover classes to assign static loading and retention coefficients, the attribution step is structurally linked to the initial modeling inputs. This shared baseline functions as an intentional, constraint on the attribution pipeline, and establishing an expected outcome in which service changes should strongly align with the mapped land-use transitions.</p>
+</section>
+</section>
+<section id="analysis-pipeline" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="analysis-pipeline"><span class="header-section-number">3.2</span> Analysis Pipeline</h2>
+<section id="regional-trajectories-versus-grid-level-hotspots" class="level3" data-number="3.2.1">
+<h3 data-number="3.2.1" class="anchored" data-anchor-id="regional-trajectories-versus-grid-level-hotspots"><span class="header-section-number">3.2.1</span> Regional Trajectories versus Grid-Level Hotspots</h3>
+<p>The analytical workflow implements a dual-pathway structure designed to assess distinct scales of landscape modification. To evaluate broad, systemic macro-regional trajectories (the “WHAT”), we computed pixel-by-pixel modifications across the native 300-meter modeled rasters, aggregating the differences to different geographic groupings (global biomes, World Bank income classes and regions as well as individual countries ), extracting large-scale trends across major earth systems.</p>
+<p>To isolate localized intensities of severe environmental decline (the “WHERE”), baseline (1992) and future (2020) biophysical rasters were spatially aggregated via zonal statistics to the 10-km equal-area grid <em>prior</em> to executing per-cell change calculations. This dual framework ensures that extreme localized declines are not erased or muted by broad regional averaging.</p>
+<div class="cell" data-layout-align="default">
+<div class="cell-output-display">
+<div id="fig-workflow" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div>
+<pre class="mermaid mermaid-js" data-label="fig-workflow">%%{init: {'flowchart': {'rankSpacing': 300, 'nodeSpacing': 30}}}%%
+flowchart LR
+    %% Subgraph Styling
+    style INPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+    style PROCESSING fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+    style OUTPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+
+    %% Input Layer
+    subgraph INPUTS [" "]
+        direction TB
+        RawES["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Global InVEST ES Models&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;300m Rasters &lt;i&gt;(1992 and 2020)&lt;/i&gt;&lt;/span&gt;"]
+        RawGrid["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;IUCN AOO 10km Master Grid&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;&lt;i&gt;Vector with Subregional Attributes&lt;/i&gt;&lt;/span&gt;"]
+        RawLC["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;ESA CCI Land Cover&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;300m Rasters &lt;i&gt;(1992 and 2020)&lt;/i&gt;&lt;/span&gt;"]
+        RawSoc["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Socioeconomic Data&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;Rasters &lt;i&gt;(Pop, GDP, HDI)&lt;/i&gt;&lt;/span&gt;"]
+    end
+
+    %% Processing Layer
+    subgraph PROCESSING [" "]
+        direction TB
+        IntA["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path A: Global Trajectories&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;Zonal Summaries &lt;i&gt;(1992 and 2020)&lt;/i&gt;&lt;/span&gt;"]
+        MathA["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path A Metrics&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;SPC and Absolute Difference&lt;/span&gt;"]
+
+        IntB["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path B: Grid Analysis&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;10km Zonal Summaries &lt;i&gt;(1992 and 2020)&lt;/i&gt;&lt;/span&gt;"]
+        MathB["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Path B Metrics&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;SPC and Absolute Difference&lt;/span&gt;"]
+
+        MathLC["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Land Cover Transitions&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;Reclassified LC Contingency &lt;br/&gt; Matrices per 10km Gridcell&lt;/span&gt;"]
+        MathSoc["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;Socioeconomic Stats and KS Tests&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;span style='font-size: 32px;'&gt;10km Grid Aggregation &lt;br/&gt; and Statistical Profiling&lt;/span&gt;"]
+    end
+
+    %% Outputs Layer
+    subgraph OUTPUTS [" "]
+        direction TB
+        P1["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHAT: Global Trajectories&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;Bar Charts, Summary Tables, &lt;br/&gt; and Cartographies (GPKGs)&lt;/i&gt;"]
+        P2["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHERE: Hotspot Detection (Top/Bottom 5%)&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;Abs and SPC GPKGs, Synthesis Maps, &lt;br/&gt; and Distribution Plots&lt;/i&gt;"]
+        P3["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHY: Attribution Gap&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;LCC Overlap CSVs, Heatmaps, &lt;br/&gt; Scatterplots, and Driver Maps&lt;/i&gt;"]
+        P4["&lt;span style='font-size: 38px;'&gt;&lt;b&gt;WHO: Equity and Exposure&lt;/b&gt;&lt;/span&gt; &lt;br/&gt; &lt;i style='font-size: 32px; font-weight: normal;'&gt;KS Test Plots and &lt;br/&gt; Population Exposure CSVs&lt;/i&gt;"]
+    end
+
+    %% Logical Connections
+    RawGrid ==&gt; IntB
+    RawGrid ==&gt; MathLC
+    RawGrid ==&gt; MathSoc
+
+    RawES ==&gt; IntA
+    RawES ==&gt; IntB
+
+    IntA ==&gt; MathA
+    IntB ==&gt; MathB
+
+    MathA ==&gt; P1
+    MathB ==&gt; P2
+
+    %% Downstream Analysis from Hotspots (P2)
+    P2 ==&gt; P3
+    RawLC ==&gt; MathLC
+    MathLC ==&gt; P3
+
+    P2 ==&gt; P4
+    RawSoc ==&gt; MathSoc
+    MathSoc ==&gt; P4
+
+    %% Layout Guides
+    RawSoc ~~~ MathSoc
+    IntA ~~~ P1
+
+    %% CANONICAL COLOR CLASSES (Matching Circular Diagram)
+    classDef c_what fill:#007930,stroke:#004D1E,stroke-width:3px,color:#FFF;
+    classDef c_where fill:#7B8327,stroke:#515619,stroke-width:3px,color:#FFF;
+    classDef c_why fill:#F07D00,stroke:#A85700,stroke-width:3px,color:#FFF;
+    classDef c_who fill:#F5D200,stroke:#B39900,stroke-width:3px,color:#333;
+
+    %% Pillar Assignments
+    class RawES,IntA,MathA,P1 c_what;
+    class RawGrid,IntB,MathB,P2 c_where;
+    class RawLC,MathLC,P3 c_why;
+    class RawSoc,MathSoc,P4 c_who;
+</pre>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-workflow-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: The dual-pathway analytical workflow. Path A calculates global and regional trajectories from pixel-level differences, addressing the ‘WHAT’ question. Path B aggregates data to a 10-km grid to identify and analyze localized hotspots, addressing the ‘WHERE’, ‘WHO’, and ‘WHY’ questions.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<p>```</p>
+</section>
+<section id="zonal-summaries-and-symmetric-percentage-change-spc" class="level3" data-number="3.2.2">
+<h3 data-number="3.2.2" class="anchored" data-anchor-id="zonal-summaries-and-symmetric-percentage-change-spc"><span class="header-section-number">3.2.2</span> Zonal Summaries and Symmetric Percentage Change (SPC)</h3>
+<p>Per-cell absolute changes within the 10-km grid were computed as:</p>
+<p><span class="math display">\[\Delta S = S_{2020} - S_{1992}\]</span></p>
+<p>To calculate relative changes through time without introducing severe scale errors or mathematical inflation near zero-baselines, we utilized Symmetric Percentage Change (SPC):</p>
+<p><span class="math display">\[SPC = \frac{S_{2020} - S_{1992}}{(|S_{2020}| + |S_{1992}|) / 2} \times 100\]</span></p>
+<p>SPC treats gains and losses symmetrically and bounds all resulting outputs strictly between <span class="math inline">\(-200\%\)</span> and <span class="math inline">\(+200\%\)</span>. This mathematical bound effectively dampens the artificial distortions and division-by-zero errors that standard relative change equations generate when baseline landscape capacities (<span class="math inline">\(S_{1992}\)</span>) approach zero (Berry &amp; Ayers, 2006).</p>
+</section>
+<section id="hotspot-identification" class="level3" data-number="3.2.3">
+<h3 data-number="3.2.3" class="anchored" data-anchor-id="hotspot-identification"><span class="header-section-number">3.2.3</span> Hotspot Identification</h3>
+<p>Ecosystem service change hotspots are defined as grid cells falling within the extreme 5th percentile of relative change (SPC) values per service type over the 28-year period. Directionality was customized to match environmental degradation across distinct service architectures: for services where an increase denotes landscape damage (e.g., <em>Nitrogen Export</em>, <em>Sediment Export</em>), the upper 5% of the SPC distribution was extracted; for services where a decrease signifies loss of function (e.g., <em>Pollination</em>, <em>Nature Access</em>, <em>Retention Ratios</em>), the lower 5% was utilized. Utilizing percentiles rather than rigid, arbitrary absolute thresholds guarantees complete comparability across disparate biophysical variables measured in fundamentally different units (e.g., kilograms of exported nutrient versus dimensionless protection ratios), ensuring that hotspots represent the most extreme local deviations regardless of the underlying metric scale (Berry &amp; Ayers, 2006).</p>
+</section>
+<section id="socioeconomic-profiling-and-spatial-statistics" class="level3" data-number="3.2.4">
+<h3 data-number="3.2.4" class="anchored" data-anchor-id="socioeconomic-profiling-and-spatial-statistics"><span class="header-section-number">3.2.4</span> Socioeconomic Profiling and Spatial Statistics</h3>
+<p>To statistically isolate the human dimensions of these hotspots, we compared the underlying distributions of socioeconomic covariates inside hotspot cells against a balanced background landscape utilizing two-sample Kolmogorov-Smirnov (KS) tests:</p>
+<p><span class="math display">\[D = \max_x |F_{\text{hotspot}}(x) - F_{\text{non-hotspot}}(x)|\]</span></p>
+<p>Given the very large sample size of our global grid (<span class="math inline">\(n \approx 1.5\text{ million}\)</span> cells), which artificially inflates standard <span class="math inline">\(p\)</span>-values and overstates trivial statistical differences (Lin et al., 2013), we utilized Cliff’s Delta (<span class="math inline">\(\delta\)</span>) non-parametric effect-size metrics to evaluate the true practical magnitude and direction of the socioeconomic distributions (Cliff, 1993). To mitigate sample size imbalances and interference from regions experiencing extreme opposite trajectories (i.e., substantial service gains), hotspots were compared strictly against a matched counterfactual background representing the “business-as-usual” median landscape (the 47.5th to 52.5th percentiles of continuous change), adapting geographic control selection frameworks designed for large spatial observations (Andam et al., 2008). All <span class="math inline">\(p\)</span>-values were subsequently adjusted using a Benjamini-Hochberg False Discovery Rate (FDR) correction to strictly control Type I error propagation across multiple simultaneous testing dimensions (Benjamini &amp; Hochberg, 1995).</p>
+</section>
+<section id="spatial-attribution-analysis" class="level3" data-number="3.2.5">
+<h3 data-number="3.2.5" class="anchored" data-anchor-id="spatial-attribution-analysis"><span class="header-section-number">3.2.5</span> Spatial Attribution Analysis</h3>
+<p>To isolate the operational drivers of decline, we executed a spatial overlay analysis between the finalized hotspot grids and areas of land cover conversion. Through specific land cover transitions, we explored distinct direct drivers such as forest loss, agricultural expansion, and grassland loss. We calculated the <em>attribution gap</em> as the total proportion of biophysical ecosystem service hotspots that exhibited zero spatial overlap with any major land-use transition at the 300-meter scale. A high attribution gap serves as a strong, spatially explicit proxy suggesting that sub-pixel, in-situ habitat degradation (e.g., understory thinning, selective canopy removal, chemical intensification) represents the dominant mechanism driving loss of service, bypassing traditional satellite land-use detection.</p>
+<hr>
+</section>
+</section>
+</section>
+<section id="results" class="level1" data-number="4">
+<h1 data-number="4"><span class="header-section-number">4</span> Results</h1>
+<section id="global-and-regional-trajectories" class="level2" data-number="4.1">
+<h2 data-number="4.1" class="anchored" data-anchor-id="global-and-regional-trajectories"><span class="header-section-number">4.1</span> Global and Regional Trajectories</h2>
+<p>The aggregated regional analysis shows a decoupling between absolute volumetric changes and relative functional shifts. Continental summaries show large absolute volume losses concentrated within expansive, high-baseline tropical forest biomes, representing a systemic drawdown of global ecological capital. Concurrently, evaluating percentage changes across intermediate or arid biomes reveals widespread, low-magnitude landscape transitions that point to a generalized destabilization of global landscape regulation functions over the 28-year window.</p>
+<div id="fig-regional-trajectories" class="quarto-figure-center quarto-float quarto-figure anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-regional-trajectories-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="outputs/plots/output_plots_diff/biome_combined_diffs.png" class="quarto-figure-center img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-regional-trajectories-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Absolute and relative change in ecosystem services by Biome, calculated via the ‘aggregate of differences’ (Path A) to preserve true volumetric trends.
+</figcaption>
+</figure>
+</div>
+<section id="geographic-distribution-by-biome" class="level3" data-number="4.1.1">
+<h3 data-number="4.1.1" class="anchored" data-anchor-id="geographic-distribution-by-biome"><span class="header-section-number">4.1.1</span> Geographic Distribution by Biome</h3>
+<p>The maps below illustrate the spatial distribution of these trajectories across global biomes, highlighting relative shifts in ecosystem service provision alongside absolute volumetric change.</p>
+<div id="fig-faceted-biome-pct" class="quarto-figure-center quarto-float quarto-figure anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-faceted-biome-pct-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="outputs/maps/map_biome_pct.png" class="quarto-figure-center img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-faceted-biome-pct-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Faceted maps showing percentage ecosystem service change by WWF Biome.
+</figcaption>
+</figure>
+</div>
+<div id="fig-faceted-biome-abs" class="quarto-figure-center quarto-float quarto-figure anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-faceted-biome-abs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="outputs/maps/map_biome_abs.png" class="quarto-figure-center img-fluid figure-img" style="width:100.0%">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-faceted-biome-abs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Faceted maps showing absolute ecosystem service change by WWF Biome.
+</figcaption>
+</figure>
+</div>
+</section>
+</section>
+<section id="global-hotspot-distribution" class="level2" data-number="4.2">
+<h2 data-number="4.2" class="anchored" data-anchor-id="global-hotspot-distribution"><span class="header-section-number">4.2</span> Global Hotspot Distribution</h2>
+<p>At the grid scale, we identified 252,215 unique cells experiencing at least one extreme ecosystem service hotspot (19.37% of evaluated cells). These zones exhibit intense geographic clustering. When evaluated across ecological contexts, Mangroves stand out as the most severely impacted biome, experiencing nearly 5× the expected hotspot intensity relative to their global area. (Detailed geographic breakdowns of these epicenters by World Bank Region—where Latin America and East Asia dominate—and by Income Group are provided in the Annex).</p>
+<div id="fig-hotspot-dist" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-hotspot-dist-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Global distribution of multi-service hotspots (“Hotness”).</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/intensity/hotspot_relative_intensity_wwf_biome.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Relative intensity of hotspots by WWF Biome. Values &gt; 1 indicate a biome has more hotspot area than expected given its total size.</figcaption>
+</figure>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-hotspot-dist-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: Global Compound Risk (Hotness) and Relative Intensity. The map (top) shows the count of overlapping negative hotspots in a single 10km cell. The bar chart (bottom) shows the disproportionate burden of hotspots relative to a biome’s global area.
+</figcaption>
+</figure>
+</div>
+<section id="hotspot-magnitude-by-biome" class="level3" data-number="4.2.1">
+<h3 data-number="4.2.1" class="anchored" data-anchor-id="hotspot-magnitude-by-biome"><span class="header-section-number">4.2.1</span> Hotspot Magnitude by Biome</h3>
+<p>Beyond identifying where hotspots are, we analyze the magnitude of change within them. The Symmetric Percentage Change (SPC) show significant variation across both ecosystem services and biophysical contexts. The variation highlights how different ecological foundations experience relative extremes. (Analysis of magnitude variation across socioeconomic strata is available in the Annex).</p>
+<div id="fig-boxplots-biome" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-boxplots-biome-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/boxplots_unified/wwf_biome/boxplots_volumetric_pct.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Distribution of percentage change values within hotspots for volumetric services, faceted by WWF Biome.</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/boxplots_unified/wwf_biome/boxplots_coastal_pct.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Distribution of percentage change values within hotspots for coastal and ratio-based services, faceted by WWF Biome.</figcaption>
+</figure>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-boxplots-biome-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Distribution of Hotspot Magnitudes. The boxplots show the distribution of Symmetric Percentage Change (SPC) values for cells identified as hotspots, broken down by biome. This highlights how the intensity of change within hotspots varies across different ecological contexts.
+</figcaption>
+</figure>
+</div>
+</section>
+</section>
+<section id="socioeconomic-profiling-ks-diagnostics" class="level2" data-number="4.3">
+<h2 data-number="4.3" class="anchored" data-anchor-id="socioeconomic-profiling-ks-diagnostics"><span class="header-section-number">4.3</span> Socioeconomic Profiling: KS Diagnostics</h2>
+<div id="fig-socioeconomic-context" class="quarto-figure-center quarto-float quarto-figure anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-socioeconomic-context-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="outputs/plots/maps/global_socioeconomic_context_map.png" class="quarto-figure-center img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-socioeconomic-context-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;7: Global distribution of key socioeconomic context variables (Population, GDP, HDI, and GINI).
+</figcaption>
+</figure>
+</div>
+<p>The spatial KS tests reveal that 47 out of 48 service-by-covariate combinations (97.9%) show highly significant distributional differences between hotspot and background populations (<span class="math inline">\(p &lt; 0.05\)</span> after strict FDR correction). Cliff’s Delta metrics cleanly separate these dynamics into two distinct socioeconomic typologies: * <strong>Infrastructure-Driven Typologies:</strong> Hotspots tracking declines in <em>Nature Access</em>, <em>Coastal Protection</em>, and <em>Sediment Retention</em> are heavily associated with high baseline population densities, expanding built-up footprints, and high localized GDP profiles,possibly related with urban infrastructural expansion. * <strong>Agricultural-Driven Typologies:</strong> Hotspots tracking <em>Pollination</em> losses and accelerated <em>Nitrogen Export</em> are strongly coupled with low population densities and elevated agricultural plot intensity, isolating crop intensification as the primary driver of rural landscape decline.</p>
+<div id="fig-ks-diagnostics" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-ks-diagnostics-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/ks/ks_heatmap.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Heatmap of Kolmogorov-Smirnov (KS) statistic (D), indicating the distance between the socioeconomic distributions of hotspot vs.&nbsp;background populations. Brighter colors indicate greater statistical separation.</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/ks/directionality_cliffs_delta.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Directionality of socioeconomic effects in hotspots, measured by Cliff’s Delta. Positive values indicate hotspots are associated with higher values of the covariate (e.g., higher population), while negative values indicate the opposite.</figcaption>
+</figure>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-ks-diagnostics-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;8: Socioeconomic profiling of hotspots. The KS statistic heatmap (top) quantifies the magnitude of difference between hotspot and background populations, while the Cliff’s Delta plot (bottom) shows the direction of that difference.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="population-exposure-and-the-serviceshed-multiplier-effect" class="level2" data-number="4.4">
+<h2 data-number="4.4" class="anchored" data-anchor-id="population-exposure-and-the-serviceshed-multiplier-effect"><span class="header-section-number">4.4</span> Population Exposure and the Serviceshed Multiplier Effect</h2>
+<p>We estimate that approximately 7.6 billion people (7,596.0 million)—representing roughly 97% of the global population in 2020—live within, or depend directly upon, the spatial footprint of these hotspots or their connected servicesheds. While upper-middle-income countries encompass the largest absolute volume of exposed citizens, lower-middle-income countries experience the highest relative hotspot intensity—experiencing an exposure profile roughly 1.6 times more severe than OECD nations. Low-income populations account for approximately 12.4% of the total affected people.</p>
+<p>Crucially, when expanding our analysis from Local Residents (5,286.2 million people living directly within hotspots) to Connected Beneficiaries further away, we observe variations depending on the pathway of service delivery. By tracing down-gradient hydrological flow paths, we identify 6,420.1 million downstream beneficiaries reliant on these affected upstream locations. When evaluating the access-based travel footprint (populations relying on nature access and wild pollination within reachable distances), the reliant population expands to 7,401.2 million individuals. This reveals a profound Multiplier Effect: the vulnerable population balloons by nearly 1.4x when accounting for physical access, and is 1.15 times larger globally than populations living directly downstream. This multiplier underscores how highly localized environmental degradation cascades into extensive regional vulnerabilities, extending far beyond the immediate demographic footprint (Brauman et al., 2007; Keeler et al., 2012).</p>
+<p>To evaluate how this multiplier behaves under escalating ecological failure, we grouped the populations by their localized <strong>Compound Risk</strong>—ranging from cells experiencing at least one service decline up to those facing catastrophic, simultaneous failure of four or more services. The purpose of this aggregated analysis is to test whether intense, overlapping environmental crises remain geographically contained.</p>
+<p>The resulting Compound Risk dumbbell chart (plotted on a logarithmic scale) unequivocally demonstrates that they do not. Even in the rarest, most severely degraded landscapes (<span class="math inline">\(\ge 4\)</span> overlapping hotspots), the number of Connected Beneficiaries remains logarithmically larger than the in-situ Local Residents. The persistent multiplier gap across all risk tiers proves that compounding environmental collapse projects systemic vulnerabilities far down-gradient and across broader travel networks, threatening populations that do not even reside within the degraded zones.</p>
+<div id="fig-multiplier-compound" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-multiplier-compound-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/downstream_exposure_dumbbell_compound.png" class="img-fluid figure-img" style="width:100.0%"></p>
+<figcaption>Multiplier Effect across Compound Risk Levels. The dumbbell chart illustrates the expansion of exposed populations from Local Residents directly inside hotspots, to Total Connected Beneficiaries relying on them via downstream flow or travel access.</figcaption>
+</figure>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-multiplier-compound-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;9: Serviceshed Multiplier Effect by Compound Risk. The chart tracks how population exposure scales logarithmically across locations experiencing 1, 2, 3, or 4+ simultaneous ecosystem service declines. (Detailed multiplier breakdowns faceted by Biome and Income Group are available in the Annex).
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="the-spatial-attribution-gap" class="level2" data-number="4.5">
+<h2 data-number="4.5" class="anchored" data-anchor-id="the-spatial-attribution-gap"><span class="header-section-number">4.5</span> The Spatial Attribution Gap</h2>
+<p>Our spatial overlay analysis reveals that major land cover transitions intersect with an average of only 24% of identified ecosystem service hotspots. The remaining <strong>76% of hotspots constitute a profound spatial attribution gap</strong>, exhibiting zero intersection with satellite-detected categorical land-use change. Among the explicitly captured transitions, the dominant contributors are forest conversion (19.8%), cropland expansion (19.0%), and grassland loss (7.7%).</p>
+<p>The magnitude of this 76% gap confirms that standard macro-scale satellite classifications are largely blind to the primary drivers of environmental decline. This strong analytical signal indicates that global ecosystem service loss is fundamentally driven by sub-pixel, in-situ landscape degradation—including selective logging, understory clearance, heavy fertilizer application, and localized edaphic degradation—which structurally compromises biophysical flow capacities while leaving the macro-level vegetation classification completely unchanged.</p>
+<div class="cell">
+<div id="tbl-attribution-drivers" class="cell quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-attribution-drivers-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;1: Dominant Land Cover Transitions Intersecting Ecosystem Service Hotspots
+</figcaption>
+<div aria-describedby="tbl-attribution-drivers-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="cell-output-display">
+<table class="cell caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Land Cover Transition</th>
+<th style="text-align: right;">Overlap with Hotspots</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Forest Conversion</td>
+<td style="text-align: right;">19.8%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Cropland Expansion</td>
+<td style="text-align: right;">19.0%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Grassland Loss</td>
+<td style="text-align: right;">7.7%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Attribution Gap (Unmapped Degradation)</td>
+<td style="text-align: right;">76.0%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</figure>
+</div>
+</div>
+<div id="fig-attribution-gap" class="quarto-figure-center quarto-float quarto-figure anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-attribution-gap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="outputs/plots/drivers/heatmap_driver_overlap_pct.png" class="quarto-figure-center img-fluid figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-attribution-gap-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;10: Heatmap showing the percentage of ecosystem service hotspots that geographically overlap with hotspots of land cover conversion. The large proportion of low values highlights the “attribution gap.”
+</figcaption>
+</figure>
+</div>
+<hr>
+</section>
+</section>
+<section id="discussion" class="level1" data-number="5">
+<h1 data-number="5"><span class="header-section-number">5</span> Discussion</h1>
+<section id="geographic-clustering-enables-prioritization" class="level2" data-number="5.1">
+<h2 data-number="5.1" class="anchored" data-anchor-id="geographic-clustering-enables-prioritization"><span class="header-section-number">5.1</span> Geographic Clustering Enables Prioritization</h2>
+<p>The intense geographic concentration of hotspots within specific sub-regions of Latin America and East Asia proves that global environmental decline is highly non-uniform, opening clear pathways for optimized resource deployment. Targeted interventions within high-intensity nations—such as South Korea, Malaysia, Guatemala, and Jamaica—can maximize conservation return on investment. However, because the precise spatial configurations of these hotspots vary significantly by service type, executing blanket, generalized conservation frameworks will likely fail; interventions must transition toward multi-tier spatial management plans tailored to localized biophysical outputs.</p>
+</section>
+<section id="differentiated-vulnerability-tiers" class="level2" data-number="5.2">
+<h2 data-number="5.2" class="anchored" data-anchor-id="differentiated-vulnerability-tiers"><span class="header-section-number">5.2</span> Differentiated Vulnerability Tiers</h2>
+<p>Socioeconomic profiling confirms that global environmental decline cannot be managed as a singular crisis; it operates via highly differentiated exposure pathways. Urban populations face acute, localized vulnerabilities tied directly to structural infrastructural safety (e.g., loss of coastal protection and natural runoff moderation), requiring targeted urban green-infrastructure integration. Concurrently, rural and marginalized agrarian communities face direct threats to food security and long-term economic solvency due to systemic pollination collapse and agricultural water degradation. Conservation architectures must therefore abandon uniform paradigms and align directly with the specific socioeconomic realities of the exposed populations.</p>
+</section>
+<section id="attribution-complexity-the-degradation-dominance" class="level2" data-number="5.3">
+<h2 data-number="5.3" class="anchored" data-anchor-id="attribution-complexity-the-degradation-dominance"><span class="header-section-number">5.3</span> Attribution Complexity: The Degradation Dominance</h2>
+<p>The 76% attribution gap fundamentally challenges the long-standing assumption in global modeling that categorical land cover conversion serves as an accurate proxy for overall ecosystem service health. Crucially, this gap emerges despite the systemic endogeneity of our workflow, where the InVEST models rely directly on categorical land-use classifications to determine biophysical output coefficients. The fact that nearly three-quarters of extreme functional service declines bypass explicit spatial intersections with macro-scale land transitions provides an ironclad signal that sub-pixel landscape degradation—operating below the detection thresholds of 300-meter optical sensors—is the dominant mechanism driving global environmental vulnerability (Vancutsem et al., 2021). Relying strictly on protected-area boundaries designed to halt absolute deforestation will prove structurally insufficient if the internal habitat matrix continues to undergo severe in-situ functional degradation.</p>
+<p>Biophysically, we speculate that this decoupling occurs because continuous spatial and meteorological variations natively embedded within the InVEST architecture override or exacerbate the static categorical map labels. We identify two primary mechanisms driving this phenomenon:</p>
+<ol type="1">
+<li><strong>Upstream Routing Cascades:</strong> A grid cell’s land cover classification may remain statically mapped as “Forest” across both temporal snapshots, yet widespread agricultural conversion or landscape clearance upstream fundamentally alters the upslope hydrologic routing matrix. This expansion delivers a large simulated volume of sediment or nutrient loading down-gradient. The accelerated runoff cascade overwhelms the downslope cell’s native filtering capacity, triggering an extreme functional hotspot of decline despite a completely unchanged satellite-detected land label.</li>
+<li><strong>Continuous Meteorological Forcing:</strong> Independent of land-use changes, continuous climate-driven fluctuations in historical baseline rainfall vectors and erosivity layers manipulate the absolute biophysical load moving through the landscape. This shifts functional capacities into extreme outlier percentiles without requiring a corresponding categorical land-cover transition.</li>
+</ol>
+<p>These dynamics carry profound policy implications. Traditional conservation frameworks that rely strictly on static protected-area boundaries designed to halt absolute deforestation will prove structurally insufficient if the internal habitat matrix continues to undergo severe, unmapped in-situ functional degradation.</p>
+</section>
+<section id="pipeline-limitations-and-analytical-uncertainties" class="level2" data-number="5.4">
+<h2 data-number="5.4" class="anchored" data-anchor-id="pipeline-limitations-and-analytical-uncertainties"><span class="header-section-number">5.4</span> Pipeline Limitations and Analytical Uncertainties</h2>
+<p>We explicitly acknowledge several bounding limitations within this pipeline: 1. <strong>Temporal Discretization:</strong> Relying on two discrete temporal snapshots (1992 and 2020) effectively masks complex intermediate non-linearities, land-use oscillations, and short-term recovery dynamics. 2. <strong>Model Decoupling:</strong> The InVEST modeling engines utilized do not fully decouple climate-driven meteorological variations from direct, anthropogenically driven land-use changes. 3. <strong>Attribution Independence:</strong> Because the categorical ESA CCI land cover data acts concurrently as a core baseline input for the biophysical models and as the basis for the driver overlay analysis, the attribution gap must be interpreted as a highly structured indicator of sub-pixel degradation rather than a completely independent empirical validation. Extensive, localized field validation remains an irreplaceable requirement, particularly within high-intensity tropical and sub-tropical hotspot zones. 4. <strong>Socioeconomic Complexity of Exposure:</strong> While this study currently evaluates absolute population exposure and aggregated serviceshed multipliers, future iterations must systematically cross-tabulate connected beneficiaries by deeper multidimensional strata—such as localized poverty indices, granular Human Development Index (HDI) bins, and Gini wealth distributions—to accurately resolve the complex environmental justice implications of serviceshed collapse.</p>
+<hr>
+</section>
+</section>
+<section id="conclusions" class="level1" data-number="6">
+<h1 data-number="6"><span class="header-section-number">6</span> Conclusions</h1>
+<p>This global assessment structurally integrates high-resolution biophysical models, multi-decadal satellite land cover matrices, and gridded socioeconomic layers to map the macro-geography of environmental decline. Our findings demonstrate that global ecosystem service loss is highly concentrated within Latin America and East Asia, offering clear entry points for targeted international conservation allocation. We prove that socio-ecological vulnerability is deeply stratified, exposing urban and rural populations to fundamentally distinct risk profiles, and we show that localized upstream habitat impairment scales significantly: exposing 6.4 billion downstream beneficiaries and revealing a 1.15x multiplier effect when expanding to broader travel-based nature access pathways.</p>
+<p>Finally, the prominent 76% spatial attribution gap demonstrates that the preservation of macro-level land classifications is entirely insufficient to guarantee the maintenance of ecosystem functions. Future research frameworks must prioritize the empirical field-validation of global biophysical models, integrate high-resolution structural degradation sensors, explicitly isolate climate-driven flow variations, and pursue the active co-production of local management knowledge with vulnerable land managers and indigenous communities at the frontlines of global landscape change.</p>
+<p>Furthermore, while this paper focuses on specific macro-regional aggregations, the scalable spatial extraction pipeline developed for this assessment—which seamlessly “squashes” millions of high-resolution grid observations into flexible multidimensional socio-ecological intersections—provides an open-source, highly adaptable framework for future localized, equity-focused environmental policy planning.</p>
+<hr>
+</section>
+<section id="references" class="level1" data-number="7">
+<h1 data-number="7"><span class="header-section-number">7</span> References</h1>
+<ul>
+<li>Berry, D. A., &amp; Ayers, G. D. (2006). Symmetrized percent change for treatment comparisons. <em>The American Statistician</em>, 60(1), 27-31.</li>
+<li>Brauman, K. A., Daily, G. C., Duarte, T. K. E., &amp; Mooney, H. A. (2007). The nature and value of ecosystem services: an hydrological perspective. <em>Annual Review of Environment and Resources</em>, 32(1), 67-98.</li>
+<li>Chaplin-Kramer, R., Sharp, R. P., Mandle, L., Sim, S., Johnson, J. A., Mueller, I., … &amp; Daily, G. C. (2019). Global modeling of nature’s contributions to people. <em>Science</em>, 366(6462), 255-258.</li>
+<li>Daily, G. C., Polasky, S., Goldstein, J., Kareiva, P. M., Mooney, H. A., Pejchar, L., … &amp; Shallenberger, R. (2009). Mainstream conservation into practical decisions. <em>Frontiers in Ecology and the Environment</em>, 7(1), 21-28.</li>
+<li>Fedele, G., Donatti, C. I., Bornacelly, I., &amp; Hole, D. G. (2021). Nature-dependent people: Mapping human direct reliance on ecosystem services globally. <em>Global Environmental Change</em>, 71, 102368.</li>
+<li>IPBES. (2019). <em>Global assessment report on biodiversity and ecosystem services of the Intergovernmental Science-Policy Platform on Biodiversity and Ecosystem Services</em>. IPBES secretariat, Bonn, Germany.</li>
+<li>Keeler, B. L., Polasky, S., Brauman, K. A., Johnson, J. A., Finlay, J. C., O’Neill, A., … &amp; Dalzell, B. (2012). Linking water quality and human well-being on a global scale. <em>Proceedings of the National Academy of Sciences</em>, 109(45), 18619-18624.</li>
+<li>Millennium Ecosystem Assessment. (2005). <em>Ecosystems and Human Well-being: Synthesis</em>. Island Press, Washington, DC.</li>
+<li>Lin, M., Lucas, H. C., &amp; Shmueli, G. (2013). Too big to fail: Large samples and the p-value problem. Information Systems Research, 24(4), 905-917.</li>
+<li>Murray, N. (2017). Global 10 x 10-km grids suitable for use in IUCN Red List of Ecosystems assessments (vector and raster format) (p.&nbsp;135013975 Bytes) [Dataset]. figshare. https://doi.org/10.6084/M9.FIGSHARE.4653439</li>
+<li>Pontius, R. G., &amp; Millones, M. (2011). Death to Kappa: birth of quantity disagreement and allocation disagreement for accuracy assessment. <em>International Journal of Remote Sensing</em>, 32(15), 4407-4429.</li>
+<li>Pontius Jr, R. G. (2022). Metrics That Make a Difference: How to Analyze Change and Error. Springer International Publishing. https://doi.org/10.1007/978-3-030-70765-1.</li>
+<li>Sharp, R., Douglass, J., Wolny, S., Arkema, K., Bernhardt, J., Bierbower, W., … &amp; Wyatt, K. (2020). <em>InVEST User’s Guide</em>. The Natural Capital Project, Stanford University, University of Minnesota, World Wildlife Fund, and The Nature Conservancy.</li>
+<li>Sullivan, G. M., &amp; Feinn, R. (2012). Using effect size—or why the p value is not enough. Journal of Graduate Medical Education, 4(3), 279-282.</li>
+<li>Vancutsem, C., Achard, F., Pekel, J. F., Vieilledent, G., Carboni, S., Simonetti, D., … &amp; Eva, H. D. (2021). Long-term (1990–2019) forest degradation and deforestation in the moist tropics of South Asia, Southeast Asia and Latin America. <em>Nature</em>, 591(7848), 115-122.</li>
+</ul>
+<hr>
+</section>
+<section id="annex-supplemental-figures" class="level1" data-number="8">
+<h1 data-number="8"><span class="header-section-number">8</span> Annex: Supplemental Figures</h1>
+<p>This annex contains supplemental figures that provide additional detail and context for the analyses presented in the main body of the paper.</p>
+<section id="regional-trajectories-by-world-bank-region" class="level2" data-number="8.1">
+<h2 data-number="8.1" class="anchored" data-anchor-id="regional-trajectories-by-world-bank-region"><span class="header-section-number">8.1</span> Regional Trajectories by World Bank Region</h2>
+<div id="fig-annex-wb-trajectories" class="quarto-layout-panel">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-annex-wb-trajectories-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/output_plots_diff/region_wb_combined_diffs.png" class="img-fluid figure-img"></p>
+<figcaption>Absolute and relative change in ecosystem services by World Bank Region (Path A).</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/maps/map_region_wb_pct.png" class="img-fluid figure-img"></p>
+<figcaption>Faceted maps showing percentage ecosystem service change by World Bank Region.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/maps/map_region_wb_abs.png" class="img-fluid figure-img"></p>
+<figcaption>Faceted maps showing absolute ecosystem service change by World Bank Region.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/intensity/hotspot_relative_intensity_region_wb.png" class="img-fluid figure-img"></p>
+<figcaption>Relative intensity of hotspots by World Bank Region.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/boxplots_unified/region_wb/boxplots_volumetric_pct.png" class="img-fluid figure-img"></p>
+<figcaption>Distribution of percentage change values within hotspots for volumetric services, faceted by World Bank Region.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/boxplots_unified/region_wb/boxplots_coastal_pct.png" class="img-fluid figure-img"></p>
+<figcaption>Distribution of percentage change values within hotspots for coastal and ratio-based services, faceted by World Bank Region.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig quarto-uncaptioned" id="fig-annex-wb-trajectories-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;11
+</figcaption>
+</figure>
+</div>
+<div class="cell">
+<div id="tbl-regional-intensity" class="cell quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-regional-intensity-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;2: Relative Intensity of Ecosystem Service Hotspots by World Bank Region
+</figcaption>
+<div aria-describedby="tbl-regional-intensity-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="cell-output-display">
+<table class="cell caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">World Bank Region</th>
+<th style="text-align: center;">Relative Intensity (Enrichment)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Latin America &amp; Caribbean</td>
+<td style="text-align: center;">1.40×</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">East Asia &amp; Pacific</td>
+<td style="text-align: center;">1.30×</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">South Asia</td>
+<td style="text-align: center;">0.80×</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sub-Saharan Africa</td>
+<td style="text-align: center;">0.78×</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Europe &amp; Central Asia</td>
+<td style="text-align: center;">0.65×</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</figure>
+</div>
+</div>
+</section>
+<section id="regional-trajectories-by-income-group" class="level2" data-number="8.2">
+<h2 data-number="8.2" class="anchored" data-anchor-id="regional-trajectories-by-income-group"><span class="header-section-number">8.2</span> Regional Trajectories by Income Group</h2>
+<div id="fig-annex-inc-trajectories" class="quarto-layout-panel">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-annex-inc-trajectories-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/output_plots_diff/income_grp_combined_diffs.png" class="img-fluid figure-img"></p>
+<figcaption>Absolute and relative change in ecosystem services by Income Group (Path A).</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/maps/map_income_grp_pct.png" class="img-fluid figure-img"></p>
+<figcaption>Faceted maps showing percentage ecosystem service change by Income Group.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/maps/map_income_grp_abs.png" class="img-fluid figure-img"></p>
+<figcaption>Faceted maps showing absolute ecosystem service change by Income Group.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/intensity/hotspot_relative_intensity_income_grp.png" class="img-fluid figure-img"></p>
+<figcaption>Relative intensity of hotspots by Income Group.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/boxplots_unified/income_grp/boxplots_volumetric_pct.png" class="img-fluid figure-img"></p>
+<figcaption>Distribution of percentage change values within hotspots for volumetric services, faceted by World Bank Income Group.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/boxplots_unified/income_grp/boxplots_coastal_pct.png" class="img-fluid figure-img"></p>
+<figcaption>Distribution of percentage change values within hotspots for coastal and ratio-based services, faceted by World Bank Income Group.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig quarto-uncaptioned" id="fig-annex-inc-trajectories-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;12
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="geographic-distribution-by-country" class="level2" data-number="8.3">
+<h2 data-number="8.3" class="anchored" data-anchor-id="geographic-distribution-by-country"><span class="header-section-number">8.3</span> Geographic Distribution by Country</h2>
+<div id="fig-annex-country-trajectories" class="quarto-layout-panel">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-annex-country-trajectories-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/output_plots_diff/country_combined_diffs.png" class="img-fluid figure-img"></p>
+<figcaption>Absolute and relative change in ecosystem services by Country (Path A).</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/maps/map_country_pct.png" class="img-fluid figure-img"></p>
+<figcaption>Faceted maps showing percentage ecosystem service change by Country.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/maps/map_country_abs.png" class="img-fluid figure-img"></p>
+<figcaption>Faceted maps showing absolute ecosystem service change by Country.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig quarto-uncaptioned" id="fig-annex-country-trajectories-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;13
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="serviceshed-multiplier-effect-breakdowns" class="level2" data-number="8.4">
+<h2 data-number="8.4" class="anchored" data-anchor-id="serviceshed-multiplier-effect-breakdowns"><span class="header-section-number">8.4</span> Serviceshed Multiplier Effect Breakdowns</h2>
+<div id="fig-annex-multiplier" class="quarto-layout-panel">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-annex-multiplier-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/exposure_multiplier_dumbbell_WWF_biome.png" class="img-fluid figure-img"></p>
+<figcaption>Multiplier Effect of Ecosystem Service Hotspots by WWF Biome.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div class="quarto-layout-row">
+<div class="quarto-layout-cell" style="flex-basis: 100.0%;justify-content: flex-start;">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="outputs/plots/exposure_multiplier_dumbbell_income_grp.png" class="img-fluid figure-img"></p>
+<figcaption>Multiplier Effect of Ecosystem Service Hotspots by Income Group.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig quarto-uncaptioned" id="fig-annex-multiplier-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;14
+</figcaption>
+</figure>
+</div>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

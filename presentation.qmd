@@ -1,0 +1,518 @@
+---
+title: "Global NCP: Understanding Ecosystem Service Hotspots"
+subtitle: "Why, How, and What We've Found"
+author: 
+  - "Jerónimo Rodríguez Escobar"
+  - "Richard P. Sharp"
+date: last-modified
+date-format: "MMMM DD, YYYY"
+affiliation: "Global Science, WWF"
+format:
+  revealjs:
+    theme: default
+    transition: slide
+    background-transition: fade
+    slide-number: true
+    width: 1200
+    height: 800
+    margin: 0.1
+    footer: "Global NCP Hotspot Analysis"
+    embed-resources: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+# Global NCP
+## Understanding Ecosystem Service Hotspots
+
+*Where is nature changing, who is affected, and where is action most needed?*
+
+---
+
+# Part 1: WHY {background-color="#004D1E"}
+## Why Are We Doing This?
+
+---
+
+## The Problem: Global Ecosystem Change
+
+::: {.columns}
+::: {.column width="50%"}
+
+### The Challenge
+- **Rapid land use change** is transforming Earth's ecosystems
+- **Ecosystem services** (pollination, coastal protection, water purification) are declining
+- **Impacts are uneven** across regions and populations
+- **Decision-makers lack clarity** on where and how to act
+
+:::
+
+::: {.column width="50%"}
+
+### Why It Matters
+- 1.1 billion people depend directly on ecosystem services
+- Biodiversity loss is accelerating globally
+- Climate change compounds existing pressures
+- Conservation resources are limited—prioritization is critical
+
+:::
+:::
+
+::: {.notes}
+- **The Challenge**: Ecosystem service loss is geographically uneven.
+- Some regions face catastrophic loss while others remain stable.
+- The burden often falls on populations least able to adapt.
+- We need geographically explicit, actionable priorities to direct limited conservation funds.
+:::
+
+---
+
+## Three Critical Questions
+
+::: {.columns}
+::: {.column width="33%"}
+
+### **WHERE?**
+Identify geographic hotspots—where is ecosystem service provision declining most rapidly
+
+:::
+
+::: {.column width="33%"}
+
+### **WHO?**
+Determine who is affected—which populations face exposure to service loss or environmental risk
+
+:::
+
+::: {.column width="33%"}
+
+### **WHY?**
+Understand drivers—what physical mechanisms (land use, degradation, urbanization) explain the change
+
+:::
+:::
+
+::: {.notes}
+- **Our Framework**: We structured the entire analysis around three pillars.
+- WHERE: Identifying the physical locations of extreme decline.
+- WHO: Profiling the communities exposed to this decline.
+- WHY: Unpacking the physical drivers (like land conversion vs degradation).
+:::
+
+---
+
+## Project Goals
+
+1. **Global Scale, Policy Relevance**
+   - Analyze ecosystem services across all land on Earth using consistent methods
+   - Support conservation planning, sustainable development, and climate action
+
+2. **Transparency & Reproducibility**
+   - Open-source methodology using InVEST, ESA, and public socioeconomic data
+   - Documented pipeline allows peer review, replication, and adaptation
+
+3. **Decision Support**
+   - Combine spatial (hotspot) and socioeconomic analysis (KS tests)
+   - Link outcomes directly to policy frameworks (income groups, regions, biomes)
+
+::: {.notes}
+- Emphasize: We're not just making maps. We're creating decision support for conservation planning.
+- This work bridging InVEST biophysical modeling with socioeconomic profiling is novel.
+- The reproducibility piece is key—others can adapt this to their own regions/services.
+- ~2 min to cover
+:::
+
+---
+
+# Part 2: HOW {background-color="#7B8327"}
+## How Did We Do It?
+
+---
+
+## Data Sources: Global Layers (1992 & 2020)
+
+::: {.columns}
+::: {.column width="50%"}
+
+### Ecosystem Services
+- **InVEST Models** (360m resolution)
+  - Nitrogen Export (NDR)
+  - Sediment Retention (SDR)
+  - Pollination
+  - Coastal Protection
+
+:::
+
+::: {.column width="50%"}
+
+### Supporting Data
+- **ESA CCI Land Cover** (reclassified: Transformed/Natural)
+- **IUCN AOO 10km Grid** (Master spatial unit with attributes)
+- **Socioeconomic Layers** (Population, GDP, HDI)
+
+:::
+:::
+
+::: {.notes}
+- **Data Integration**: The core innovation here is combining disparate global datasets into a single, unified 10km equal-area grid.
+- We bring 300m biophysical models (InVEST) together with World Bank demographics and ESA land cover.
+- This allows us to perform rapid, cross-dimensional queries.
+:::
+
+---
+
+## The Two-Path Analysis Structure
+
+### **Path A: Global Trajectories**
+- Raw pixel-level change summaries
+- Use: Global "WHAT" narrative
+
+### **Path B: Grid Analysis** (Canonical for hotspots)
+1. **Zonal summaries** (1992 & 2020) → aggregate rasters to 10km grid cells
+2. **Grid-level differencing** → calculate absolute and percentage change per cell
+3. **Hotspot identification** → flag extreme 5% tail of distribution
+4. **Regional synthesis** → aggregate hotspots to countries, regions, income groups
+
+::: {.callout-note}
+Why aggregation *then* differencing? Because Path B produces the "difference of the aggregates" — more intuitive for hotspot detection.
+:::
+
+---
+
+## Key Analytical Metrics
+
+::: {.columns}
+::: {.column width="50%"}
+
+### Change Metrics
+- **Absolute Change** (T2020 - T1992)
+  - Units: service units (e.g., kg N/ha/year)
+  
+- **Symmetric Percentage Change (SPC)**
+  - Formula: $\frac{T2020 - T1992}{(|T2020| + |T1992|) / 2} \times 100$
+  - Advantage: Treats increases and decreases symmetrically
+
+:::
+
+::: {.column width="50%"}
+
+### Hotspot Definition
+- **Relative Extreme**, not absolute threshold
+- **Top/Bottom 5%** of SPC distribution per service
+- **"Worry Spots"** = steepest decline in service provision
+- **Compound Risk** = multi-service hotspots in same location
+
+:::
+:::
+
+::: {.notes}
+- **Symmetric Percentage Change**: Why not just absolute change? 
+- Absolute change is heavily biased by the size of the baseline ecosystem. 
+- SPC normalizes this scale effect, isolating the *intensity* of the ecological shock relative to the local baseline.
+:::
+
+---
+
+## Statistical Analysis: Socioeconomic Profiling
+
+### Kolmogorov-Smirnov (KS) Tests
+
+**Purpose:** Compare distributions of population characteristics
+
+::: {.columns}
+::: {.column width="50%"}
+
+**Hotspot populations** vs. **Global median**
+
+Test variables:
+- Population density
+- Built-up area %
+- GDP per capita
+- HDI
+
+:::
+
+::: {.column width="50%"}
+
+**Interpretation:**
+- *Significant p-value* → Distributions differ
+- *Effect size* → Magnitude of difference
+- **Result:** Socioeconomic profile of affected communities
+
+:::
+:::
+
+::: {.notes}
+- **Socioeconomic Profiling**: We don't just want to know *where* hotspots are, but *who* lives there.
+- We use KS tests to compare the hotspot populations against the 'business-as-usual' median 5% of the landscape.
+- This isolates the specific socioeconomic profile of extreme decline against typical, stable baseline conditions.
+:::
+
+---
+
+## Analysis Pipeline Overview
+
+```mermaid
+flowchart TD
+    Python["🐍 Python: Zonal Summaries<br/>(Docker)"] -->|Output: 1992 & 2020 values| R["📊 R/Quarto Analysis Chain"]
+    
+    R -->|prepare_data| A["Data Prep & Setup"]
+    A -->|process_data| B["WHAT: Global Trajectories<br/>(Calc SPC & Absolute Change)"]
+    B -->|10k_change_calc.gpkg| C["WHERE: Hotspot Detection<br/>(Top/Bottom 5%)"]
+    C -->|Hotspot outputs| D["WHO: Hotspot Synthesis<br/>(Intensity & Exposure)"]
+    D -->|Summary tables| E["WHO: KS Tests<br/>(Socioeconomic Profiling)"]
+    E -->|Final datasets| F["Narrative Synthesis<br/>(results_interpretation.qmd)"]
+    F -->|Maps, figures, tables| G["🎯 Decision Support Output"]
+    
+    style Python fill:#f9f,stroke:#333,stroke-width:2px
+    style R fill:#bbf,stroke:#333,stroke-width:2px
+    style G fill:#bfb,stroke:#333,stroke-width:2px
+```
+
+---
+
+# Part 3: WHAT {background-color="#F07D00"}
+## What Is the Data Showing Us?
+
+---
+
+## Key Finding 1: Geographic Clustering
+
+### Ecosystem Service Hotspots Are Not Random
+
+![](../outputs/plots/intensity/hotspot_relative_intensity_region_wb.png){width="100%"}
+
+::: {.columns}
+::: {.column width="50%"}
+
+### Geographic Pattern
+- **Strong clustering** in the Global South
+- **Epicenters of hotness** in:
+  - Latin America & Caribbean
+  - East Asia & Pacific
+  - Sub-Saharan Africa
+
+:::
+
+::: {.column width="50%"}
+
+### Disproportionate Burden
+- Global South has **vast disproportionate share** of ES decline
+- Despite representing smaller fraction of Earth's land
+- Creates **zones of compound risk** with multiple simultaneous service failures
+
+:::
+:::
+
+::: {.notes}
+- **Geographic Clustering**: This map shows relative intensity—how concentrated hotspots are in each region relative to that region's size.
+- Red = high intensity (lots of hotspots in a small area). This is where conservation effort should concentrate.
+- The message: Hotspots aren't randomly scattered. They cluster in Sub-Saharan Africa, parts of Latin America, and Southeast Asia.
+- This geographic clustering is KEY for prioritization—you can allocate resources to these epicenters and get maximum impact.
+- ~90 seconds
+:::
+
+---
+
+## Key Finding 2: Socioeconomic Profile
+
+### Who Is Affected? (KS Test Results)
+
+![](../outputs/plots/ks/ks_heatmap.png){width="100%"}
+
+::: {.columns}
+::: {.column width="50%"}
+
+### The Urbanization/Wealth Correlation
+- Hotspots of **Nature Access loss, Coastal Risk, Sediment Retention** occur in cells with:
+  - ✓ Higher population density
+  - ✓ Higher built-up area
+  - ✓ **Higher GDP** than global median
+
+**Interpretation:** ES decline is tied to urbanization and economic development
+
+:::
+
+::: {.column width="50%"}
+
+### The Rural Divide
+- Hotspots of **Pollination loss, Nitrogen Export increase** concentrated in:
+  - ✓ Lower population density
+  - ✓ Highly agricultural contexts
+  - ✓ Lower urbanization
+
+**Interpretation:** Agricultural intensification and rural land-use change are key drivers
+
+:::
+:::
+
+::: {.notes}
+- **The KS heatmap** shows statistical differences between hotspot populations and the global median.
+- The key insight: Hotspots hit different populations in different ways.
+- Urban hotspots (Nature Access, Coastal Protection) = densely populated, wealthier areas
+- Rural hotspots (Pollination, Water Quality) = agricultural zones, lower density
+- This has HUGE policy implications: You can't use one-size-fits-all solutions. Urban solutions ≠ rural solutions.
+- ~2 minutes to explain and discuss the two pathways
+:::
+
+---
+
+## Key Finding 3: The Attribution Gap
+
+### Land Cover Hotspots vs. ES Hotspots
+
+![](../outputs/plots/drivers/heatmap_driver_overlap_pct.png){width="100%"}
+
+::: {.columns}
+::: {.column width="50%"}
+
+### The Gap Exists
+- Many ES hotspots **do NOT overlap** with top-5% land cover conversion
+- Within same 10km cell: service decline ≠ major land cover change
+- **Implication:** Degradation is equally important to conversion
+
+:::
+
+::: {.column width="50%"}
+
+### What This Means
+- **Degradation mechanisms** (e.g., reduced pollinator habitat, nutrient depletion) matter
+- **Upstream drivers** (land cover change outside the cell) drive service loss
+- Simple "conversion detection" insufficient for ES management
+
+:::
+:::
+
+::: {.notes}
+- **The Attribution Gap**: This is the most surprising finding. You might expect hotspots to align with deforestation or urban expansion.
+- But the heatmap shows: Most ES hotspots have LOW overlap with detected land cover change (~20-40% at most).
+- Interpretation: ~60-70% of hotspots show NO significant land cover change = **degradation is happening WITHOUT conversion**.
+- Think: forests still standing but quality declining (logging, understory loss), farms intensifying without expanding (fertilizer use, monoculture).
+- This changes the policy response: You can't just protect existing forests; you need to improve management within them.
+- ~2 minutes
+:::
+
+---
+
+## Key Finding 4: Population Exposure
+
+### Scale of Human Impact
+
+![](../outputs/plots/pop_exposure_income.png){width="100%"}
+
+::: {.columns}
+::: {.column width="50%"}
+
+### Who Is Exposed?
+- **Majority of people** exposed to ES hotspots live in:
+  - Upper Middle-Income countries
+  - Lower Middle-Income countries
+
+:::
+
+::: {.column width="50%"}
+
+### Absolute Numbers Matter
+- Relative socioeconomic profile (KS tests) shows correlation
+- **Absolute population** reveals true scale of impact
+- Guides resource allocation and intervention prioritization
+
+:::
+:::
+
+::: {.notes}
+- **Population Exposure**: The big picture—how many people are actually affected?
+- This chart shows absolute numbers by income group. The stack is biggest for Upper-Middle and Lower-Middle income countries.
+- ~7.9 billion people globally live in or depend on ES hotspots. That's almost everyone.
+- Low-income populations comprise 4.2% of affected people. BUT—relative intensity is 2.2x higher in low-income regions, meaning they bear a disproportionate burden.
+- Policy message: Resources must go not just to where people are affected, but to where vulnerable populations face the greatest risk.
+- ~90 seconds
+:::
+
+---
+
+## Key Finding 5: The Multiplier Effect
+
+### Beyond the Grid Cell: Servicesheds & Access
+
+![](../outputs/plots/exposure_multiplier_dumbbell.png){width="100%"}
+
+::: {.columns}
+::: {.column width="50%"}
+
+### In-Situ vs. Downstream
+- Populations directly *inside* a hotspot grid cell are only a fraction of those affected.
+- **Hydrological Beneficiaries**: People living directly downstream.
+
+:::
+
+::: {.column width="50%"}
+
+### Access-Based Exposure
+- **Travel-Time Beneficiaries**: People who rely on travel access to these critical nature assets.
+- **The Multiplier**: The true beneficiary base is hundreds of times larger than the in-situ population.
+
+:::
+:::
+
+::: {.notes}
+- **The Multiplier Effect**: This is our latest analysis using the new extraction pipeline.
+- While only a few million people might live *directly* inside a degraded grid cell, billions benefit from those cells downstream or via travel access.
+- The dumbbell plot shows the massive disparity between local hydrological exposure and broader travel-footprint exposure across different World Bank regions.
+:::
+
+---
+
+## Synthesis: The Four Pillars
+
+| Pillar | Finding | Implication |
+|--------|---------|-------------|
+| **WHAT** | Global ES decline is measurable and regionally aggregated | Change is real, not noise |
+| **WHERE** | Hotspots cluster in Global South, creating compound risk zones | Geographic prioritization is possible |
+| **WHO** | Affects both urbanized (wealth effect) and rural (agricultural) communities | One-size-fits-all policy insufficient |
+| **WHY** | Attribution gap: degradation ≥ conversion in importance | Need comprehensive ecosystem management |
+
+---
+
+## Next Steps: Interpretation Phase
+
+### Moving Forward With Co-Authors
+
+1. **Validate findings** against literature and expert knowledge
+2. **Deepen narratives** for specific services and regions
+3. **Develop policy implications** (conservation priorities, adaptation strategies)
+4. **Prepare for publication** (figures, methods documentation, supplementary materials)
+
+---
+
+# Thank You
+
+**Questions?**
+
+For technical details, methodology, and code:
+- 📖 See: `docs/methodology.md`, `docs/runbook.md`
+- 💻 Repository: Global NCP (this project)
+- 👤 Contact: Jerónimo Rodríguez Escobar (jeronimo.rodriguez@wwfus.org)
+
+---
+
+## Appendix: Methodology References
+
+### Data & Tools
+- **InVEST**: Natural Capital Project models for ecosystem services
+- **exactextract**: Fast raster zonal statistics (Python)
+- **ESA CCI**: Land cover classification from satellite data
+- **Quarto + R**: Reproducible analysis and reporting
+
+### Key Publications & Methods
+- Pontius & Santacruz (2014): Land cover change transition matrix methodology
+- Kolmogorov-Smirnov tests: Non-parametric distribution comparison
+- Symmetric Percentage Change: Handles directionality symmetrically
+
+### Repository Structure
+- `/analysis/`: 7 active Quarto notebooks (prepare → process → hotspots → KS tests → interpret)
+- `/R/`: Core reusable functions
+- `/scripts/`: Utility scripts (mapping, monitoring)
+- `/docs/`: Detailed technical documentation

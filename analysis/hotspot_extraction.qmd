@@ -5,7 +5,7 @@ author: "Jerónimo Rodríguez Escobar"
 email: "jeronimo.rodriguez@wwfus.org"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
-analysis_version: "v1.3.3"
+analysis_version: "v1.3.4"
 format:
 #  html:
 #    toc: true
@@ -21,11 +21,13 @@ format:
 editor: source
 
 params:
-  analysis_version: "v1.3.3"
+  analysis_version: "v1.3.4"
   input_gpkg: "10k_change_calc.gpkg"
   output_suffix: "" # e.g., "_v2"
   force_export: true
   run_hotspot_export: true
+execute:
+  cache: false
 ---
 
 ## Overview
@@ -101,7 +103,7 @@ invisible(lapply(list.files(here::here("R"), pattern = "\\.R$", full.names = TRU
 
 # ---- Python (enable when needed) ----------------------------------------
 library(reticulate)
-use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
+# use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 
 ```
 
@@ -261,7 +263,7 @@ if (!"fid" %in% names(sf_f)) {
 missing_groupings <- setdiff(groupings, names(sf_f))
 if (length(missing_groupings) > 0) {
   message("Joining missing attributes from master grid: ", paste(missing_groupings, collapse = ", "))
-  master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"), quiet = TRUE)
+  master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "landgrid_1_clean_enriched_4326.gpkg"), quiet = TRUE)
   master_grid <- sf::st_drop_geometry(master_grid)
   if ("orig_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = orig_fid)
   if ("grid_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = grid_fid)
@@ -811,6 +813,7 @@ cat(paste0(
 
 ```{r}
 #| label: ensure-plt-long-loaded
+#| cache: false
 #| echo: false
 if (!exists("plt_long")) {
   rds_path <- file.path(data_dir(), "processed", paste0("plt_long", params$output_suffix, ".rds"))
@@ -862,7 +865,7 @@ if (length(intersect(svc_in_data, svc_in_cfg)) == 0) {
 if (exists("grid_sf") && inherits(grid_sf, "sf")) {
   geom_sf <- dplyr::select(grid_sf, dplyr::any_of(c("fid")))
 } else {
-  master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
+  master_path <- file.path(data_dir(), "vector_basedata", "landgrid_1_clean_enriched_4326.gpkg")
   stopifnot(file.exists(master_path))
   geom_sf <- sf::st_read(master_path, quiet = TRUE)
 
@@ -1134,6 +1137,7 @@ if (length(pngs)) {
 
 ```{r}
 #| label: load-cached-plt-long
+#| cache: false
 #| echo: false
 #| message: true
 
@@ -1190,7 +1194,7 @@ missing_groupings <- setdiff(groupings, names(plt_long))
 if (length(missing_groupings)) {
   cat("[DIAGNOSTIC] Grouping column(s) missing from plt_long:", paste(missing_groupings, collapse = ", "), "\n", file=stderr())
   cat("[DIAGNOSTIC] Joining missing attributes from master grid...\n", file=stderr())
-  master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg"), quiet = TRUE)
+  master_grid <- sf::st_read(file.path(data_dir(), "vector_basedata", "landgrid_1_clean_enriched_4326.gpkg"), quiet = TRUE)
   master_grid <- sf::st_drop_geometry(master_grid)
   if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) {
     master_grid <- dplyr::rename(master_grid, fid = id)
@@ -1731,7 +1735,7 @@ if (lc_data_ready) {
     # Get attributes from plt_long, but if grouping columns are missing, join them from the base grid.
     if (!all(group_cols %in% names(plt_long))) {
       message("Grouping columns missing from plt_long. Joining from base grid attributes.")
-      grid_attrs_path <- file.path(data_dir(), "interim", "..", "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
+      grid_attrs_path <- file.path(data_dir(), "interim", "..", "vector_basedata", "landgrid_1_clean_enriched_4326.gpkg")
       if (!file.exists(grid_attrs_path)) stop("Base grid attribute file not found.")
 
     grid_attrs_df <- sf::st_read(grid_attrs_path, quiet = TRUE) %>% sf::st_drop_geometry()

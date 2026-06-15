@@ -1,4 +1,198 @@
-# Worklog — Global NCP Hotspots (v1.3.3)
+# Worklog — Global NCP Hotspots (v1.3.4)
+
+### 2026-06-12
+*   **Population Exposure Milestone:** Calculated the total 2020 GHSL population captured across the 1.3 million evaluated 10km grid cells (7,855,519,292 people).
+*   **Near-Universal Exposure:** Verified that the 7.6 Billion "Connected Beneficiaries" represent **96.7%** of the evaluated global population. This massive share confirms that almost the entire global population is connected to at least one ecosystem service loss hotspot via downstream hydrological pathways or travel-access footprints.
+
+### 2026-06-11
+*   **Methodological Optimization (Population Exposure Extraction):** Bypassed the single-attribute limitation of `zonal_stats_toolkit` for the multi-level hotspot beneficiaries analysis. 
+*   **Multi-Dimensional Slicing:** By extracting raw population data directly to the 1.5 million 10km grid cells (`landgrid_1_clean_enriched_4326.gpkg`) using `exactextract` (with `strategy="raster-sequential"` to prevent GEOS C++ crashes) and subsequently grouping in Pandas by `['country', 'region_wb', 'income_grp', 'WWF_biome']` simultaneously, we squash millions of rows into a lightweight, highly flexible CSV.
+*   **Analytical Power Unlocked:** This structural decision allows downstream R scripts to effortlessly filter and cross-tabulate complex intersections (e.g., "Exposure in Low-Income countries within Sub-Saharan Africa") on the fly, without needing to re-run expensive spatial intersections.
+
+### 2026-06-08
+*   **Ground-Truth Narrative Audit:** Conducted a comprehensive, data-driven audit of all high-level claims in the synthesis chapters and manuscript draft using exact values from `hotspot_area_stats.csv` and the attribution scripts.
+*   **Narrative Corrections:** Purged several "echo chamber" inaccuracies in the text. Verified that Lower-Middle Income countries face the highest relative intensity (1.19x absolute, 1.6x OECD), Latin America and East Asia are the true regional epicenters, and Mangroves are the most severely impacted biome (nearly 5x expected intensity). Excluded micro-states (area < 10,000 sq km) from country-level rankings, revealing South Korea, Jamaica, Malaysia, and Guatemala as top intensity spots.
+*   **Hotspot Definition Refinement:** Clarified manuscript language to explicitly define hotspots based on the "extreme 5% of relative change values (Symmetric Percentage Change)", correctly identifying approx. 250,000 unique cells with at least one hotspot.
+*   **Output Audit Artifact:** Established a permanent logging mechanism (`outputs/audit_summary.txt`) to maintain a paper trail of the core ground-truth statistics for peer review and manuscript defense.
+
+### 2026-06-04
+*   **Pipeline Robustness & Zombie Data Fix:** Identified and resolved a critical bug where `process_data.qmd` ingested a stale, misaligned coastal GPKG because the file loading was hardcoded to grab the top 3 files by date. Updated the script to dynamically load *all* GPKGs present in `summary_pipeline_workspace_ha`.
+*   **Coastal Extraction Canonical Path:** Restored `analysis_configs/c_protection_synth.yaml` to point to the archived coastal risk rasters (`Rt_1992.tif`, etc.). Confirmed that calculating ratios natively on vectors and *then* rasterizing them is the only stable path, bypassing C-level crashes.
+*   **Dateline Artifact Resolution:** Added `sf::st_wrap_dateline()` with `DATELINEOFFSET=180` to the final export step of `process_data.qmd` to prevent horizontal tearing artifacts when rendering the EPSG:4326 output in QGIS.
+*   **Future-Proofing the Pipeline:** Refactored year-detection regex from hardcoded `"1992|2020"` to dynamic `"[0-9]{4}"`. Added prominent `[MANUAL UPDATE REQUIRED]` templates directly into the `process_data.qmd` script to guide future users on exactly how to drop specific years (for multi-year comparisons) or add new variables without breaking the analysis.
+
+### 2026-06-03
+*   **Geometry Crashes Finally Conquered:** After a grueling two-week struggle involving `GEOSException` crashes, memory leaks, and exploded geometries, we have finally established a mathematically sound and highly performant vector-extraction workflow.
+*   **The Breakthrough:** The root cause of the crashes in Python/GEOS was isolated to a small number of malformed "poison polygons" during the C-level EPSG:4326 reprojection phase.
+*   **Solution Implementation:** We consolidated the grid creation into a single, robust Python script (`build_master_grid.py`). It uses chunked reprojection (processing the 1.5M cell grid in blocks of ~7500). If a chunk fails the fast C-level reprojection, the script falls back to an isolated row-by-row projection, safely discarding the few mathematically impossible geometries while preserving the rest.
+*   **Pipeline Success:** `summary_pipeline_landgrid.py` was successfully run against this new master grid (`landgrid_1_clean_enriched_4326.gpkg`) for both the 1992/2020 Services and the Socioeconomic Beneficiaries. The pipeline finished in ~13 minutes with zero crashes and zero duplicated/exploded fragments.
+*   **Housekeeping:** Deleted redundant scratch scripts (e.g., `clean_grid_4326.py`, deprecated in favor of `build_master_grid.py`).
+*   **R Consolidation:** `process_data.qmd` was overhauled to simply merge the pristine output GPKGs from the Python workspace based on the reliable `fid`.
+
+### 2026-06-02
+*   **Vector Data Enrichment Pipeline Stabilized:** After being blocked for over a week by intractable geometry and performance issues in the R-based `prepare_data.qmd` script, a robust Python-based solution has been successfully developed and executed.
+*   **Problem:** The original R script was unacceptably slow and consistently failed with obscure `GEOSException` errors when performing spatial joins on the 1.5M-cell grid.
+*   **Solution:** A new script, `Python_scripts/enrich_grid.py`, was created to handle this critical data preparation step.
+    1.  **Performance:** The initial polygon-intersection approach was too slow. The script was re-engineered to use a much faster and more stable **centroid-based spatial join**. This reduced processing time from hours to minutes.
+    2.  **Robustness:** Iteratively debugged a series of `KeyError` and `ValueError` exceptions related to inconsistent column names (`WWF_BIOME` vs. `WWF_biome`, `country` vs. `nev_name`) and internal `geopandas` state (`index_right` conflicts).
+    3.  **Final Output:** The script successfully produced `landgrid_1_clean_enriched.gpkg`, a clean, attribute-rich vector grid containing all necessary biome and country/regional information. This file now serves as the canonical input for the main zonal statistics pipeline, unblocking all downstream analysis.
+
+---
+
+### 2026-05-27 (cont. 7)
+*   **Final Strategic Pivot & Course Correction:** The `GEOSException: ...closed linestring` error continues to be completely intractable in the vector-based Python pipeline (`summary_pipeline_landgrid.py`), even with multiple aggressive cleaning patches. This confirms that the vector file's geometry issues are too severe to be reliably fixed on-the-fly in a multiprocessing environment.
+*   **Definitive Solution:** The project is now fully reverting to the **hybrid raster-vector workflow** that was prototyped on 2026-05-26. This is the only robust path forward.
+    1.  **Deprecate Vector Pipeline:** The `summary_pipeline_landgrid.py` script and its associated vector-based logic are now considered deprecated. All efforts will focus on the raster-based workflow.
+    2.  **Create Zone Raster:** The `analysis/create_zone_raster.R` script provides the stable "zone" input needed for Python.
+    3.  **Implement Raster Pipeline:** A new configuration (`analysis_configs/services_raster.yaml`) has been created to drive `summary_pipeline_rasterzones.py`. This script performs all zonal statistics using the zone raster, completely avoiding vector geometry processing in Python and thus eliminating the `GEOSException`.
+    4.  **Simplify R Consolidation:** The `analysis/process_data.qmd` script has been overhauled. It no longer needs to perform complex spatial joins or aggregations to fix "exploded" fragments. It now reads the clean CSV output from the raster pipeline and performs a simple, fast `left_join` by `fid` against the master grid.
+*   This new workflow is not only more robust and error-free but also significantly simpler and faster. The `README.md` has been updated to reflect this as the new canonical procedure.
+
+---
+
+### 2026-05-27 (cont. 6)
+*   **Python Pipeline Failure (`GEOSException` Persists):** The `closed linestring` error continues to occur in the `zonal_stats` worker process during reprojection, even after the `buffer(0)` patch was applied.
+*   **Root Cause Analysis:**
+    1.  This confirms that this dataset contains exceptionally stubborn geometry invalidities.
+    2.  The file I/O cycle where the main process writes a temporary GeoPackage and the worker process reads it is the most likely source of re-introducing these subtle errors.
+    3.  The single `buffer(0)` call in the worker is insufficient. It may even be creating empty or invalid sliver polygons from highly malformed inputs, which are not being filtered out before the `to_crs()` call.
+*   **Resolution:**
+    1.  **Aggressive Just-in-Time Cleaning:** The `zonal_stats` function in `summary_pipeline_landgrid.py` has been patched with a much more robust cleaning sequence. It now performs a `buffer(0).make_valid()` and then explicitly filters out any empty or near-zero-area geometries that may have been created. This mirrors the extensive cleaning performed in the main process and ensures the data is as clean as possible immediately before the sensitive reprojection step. This should finally resolve the recurring geometry exceptions.
+
+---
+
+### 2026-05-27 (cont. 5)
+*   **Python Pipeline Failure (`GEOSException`):** The pipeline is now running past the `FileNotFoundError` but fails during zonal statistics with a `shapely.errors.GEOSException: IllegalArgumentException: Points of LinearRing do not form a closed linestring`.
+*   **Root Cause Analysis:**
+    1.  This error occurs during the `gdf.to_crs()` reprojection step inside the `zonal_stats` function.
+    2.  This is a classic geometry validity issue. Although the `main()` function performs extensive cleaning (`buffer(0)`, `make_valid()`) before writing a temporary GeoPackage, this error indicates that either the cleaning was insufficient, or that the file I/O cycle and/or the reprojection operation itself is re-introducing or exposing subtle invalidities.
+    3.  The history of this project (`WORKLOG.md`) shows a recurring theme of geometry issues when passing data from R's `sf` package to Python's `geopandas`.
+*   **Resolution:**
+    1.  **Pipeline Hardening:** A patch has been applied to `summary_pipeline_landgrid.py`. The `zonal_stats` function will now re-apply the `gdf.geometry.buffer(0)` cleaning trick immediately after reading the vector data. This ensures that any geometry issues are fixed just-in-time before the reprojection is attempted, making the process more robust against these recurring data integrity problems.
+
+---
+
+### 2026-05-27 (cont. 4)
+*   **Recurring Python Pipeline Failure (`RasterioIOError`):** The pipeline failed again with a `No such file or directory` error, this time for `n_retention_ratio_2020.tif`.
+*   **Root Cause Analysis:**
+    1.  The error message (`/data/base_years_ha/n_retention_ratio_2020.tif: No such file or directory`) is identical in nature to the previous failure. It indicates the Python script is looking for a file in a path that is missing the `/raw/` subdirectory.
+    2.  The fix applied in the previous step (updating all paths in `analysis_configs/services_slim.yaml` to include `/raw/`) correctly resolves this issue for all raster layers.
+    3.  The fact that the pipeline failed again on a *different* file but with the *same* path issue strongly indicates that the pipeline was executed using the original, un-patched YAML configuration file.
+*   **Resolution:**
+    1.  **Action Required:** The user must ensure they are running the Python pipeline using the version of `analysis_configs/services_slim.yaml` that was corrected in the previous step. No new code or configuration changes are needed.
+    2.  The `summary_pipeline_landgrid.py` script remains robust enough to handle individual task failures if the YAML is partially correct, but the root cause of the `FileNotFoundError` must be addressed by using the fully corrected configuration file.
+
+---
+
+### 2026-05-27 (cont. 3)
+*   **Python Pipeline Failure (`RasterioIOError`):** The Python pipeline failed during zonal statistics with a `No such file or directory` error for `sed_retention_ratio_2020.tif`.
+*   **Root Cause Analysis:**
+    1.  The immediate error is a `FileNotFoundError`, indicating the path in the `services_slim.yaml` config is incorrect or the file is missing.
+    2.  The user confirmed with an `ls` command that all required raster files, including the ratio files, exist in a single directory: `.../raw/base_years_ha/`.
+    3.  A review of `analysis_configs/services_slim.yaml` revealed that the paths were missing the `/raw/` subdirectory (e.g., pointing to `${GLOBAL_NCP_DATA}/base_years_ha/...` instead of `${GLOBAL_NCP_DATA}/raw/base_years_ha/...`). This path mismatch is the direct cause of the `FileNotFoundError`.
+*   **Resolution:**
+    1.  **Primary Fix:** All raster paths in `analysis_configs/services_slim.yaml` have been updated to include the correct `/raw/` subdirectory, ensuring they point to the actual file locations.
+    2.  **Robustness Patch (Retained):** A patch was previously applied to `summary_pipeline_landgrid.py` to make it more robust. It now checks if a task returns `None` (indicating failure) and skips it, preventing the main script from crashing with an `AttributeError`. This remains a useful improvement.
+
+---
+
+### 2026-05-27 (cont. 2)
+*   **Definitive Root Cause & Solution:** The user discovered that the Python `GEOSException` could be bypassed by using `geopandas.read_file(..., on_invalid="ignore")`. This confirms the root cause is a small number of features with invalid geometries being written by R's `sf` package that `geopandas` cannot read by default.
+*   **Pipeline Hardening:** Instead of creating more intermediate "cleaned" files, the core Python script (`summary_pipeline_landgrid.py`) has been updated to use the `on_invalid="ignore"` flag. This makes the pipeline itself resilient to these minor upstream errors, providing a much more robust and direct solution. The separate `patch_add_biomes.R` script is no longer necessary, as the main `prepare_data.qmd` can be run in its complete form, and the Python script will now correctly ignore any problematic geometries it produces.
+
+---
+
+### 2026-05-27 (cont.)
+*   **Pipeline Unblocking Strategy:** The `prepare_data.qmd` script continues to fail on complex geometry operations. To unblock the pipeline without losing more time, we've adopted a two-stage approach:
+    1.  **Generate Base Grid:** Run a simplified version of `prepare_data.qmd` that intentionally excludes the problematic biome attribute join. This is expected to succeed and produce a clean grid with country/regional attributes.
+    2.  **Patch Biomes:** Created a new, standalone script (`analysis/patch_add_biomes.R`) that takes the output from step 1 and performs only the biome join. This script uses a robust `st_join` followed by a `distinct(ID)` call to handle any duplicates created if a grid cell touches multiple biomes.
+*   This strategy allows us to get a complete, analysis-ready grid file (`AOOGrid_10x10km_land_4326_clean.gpkg`) so the downstream Python pipeline can finally proceed.
+
+---
+
+### 2026-05-27
+*   **Data Pipeline Failure & Strategic Rollback:**
+    *   **Breaking Change Identified:** After multiple failed attempts to fix the `IllegalArgumentException: Invalid number of points in LinearRing` error, a comparison with the last known working version of `prepare_data.qmd` was performed.
+    *   **Root Cause:** The error was introduced when the data preparation logic was changed to accommodate biome attributes. The original, working script used a direct `st_join` on polygons. The new, failing script introduced a call to `st_point_on_surface()` before joining, which is much less tolerant of minor geometric invalidities created during the `st_transform()` reprojection step.
+    *   **Resolution:** The `prep-grid-aoo-land` chunk in `prepare_data.qmd` has been reverted to the simpler, more robust logic from the last working version. This removes the dependency on `st_point_on_surface` and the complex, multi-source attribute join, which was the source of the instability. The pipeline should now be able to generate the base grid successfully, as it did before these changes. The addition of biome data will be re-evaluated in a separate, more robust manner after the core pipeline is restored.
+
+---
+
+### 2026-05-26
+*   **Data Pipeline Crisis & Strategic Pivot:**
+    *   **Root Cause Re-confirmed:** The Python pipeline (`summary_pipeline_landgrid.py`) consistently fails with a `GEOSException: Invalid number of points in LinearRing` when reading the master grid GeoPackage (`AOOGrid_10x10km_land_4326_clean.gpkg`). This indicates a subtle geometry validity issue created by the R `sf` package that Python's `geopandas/shapely` cannot tolerate.
+    *   **Failed Repair Attempts:** A standalone patch script (`patch_fix_grid_geom.R`) using `st_buffer(dist = 0)` was created to aggressively repair the geometries. However, this process proved to be unacceptably slow, running for over 4.5 hours without completion, making it an unviable solution.
+    *   **New Strategy: Hybrid Raster-Vector Workflow:** A new, more robust strategy has been adopted to permanently solve this issue.
+        1.  **Create Zone Raster:** A new script (`create_zone_raster.R`) was created to perform a fast, one-time conversion of the vector grid into a "zone raster" where each pixel's value is its corresponding `fid`.
+        2.  **Raster-Based Zonal Stats:** A new Python script (`summary_pipeline_rasterzones.py`) will perform the zonal statistics using the new zone raster and the service rasters. This completely bypasses the need for Python to read the problematic vector file, eliminating the geometry errors.
+        3.  **Attribute Join in R:** The main R script (`process_data.qmd`) will be updated to read the simple CSV output from the new Python script and join it back to the canonical vector grid, which contains all the rich attribute data (country, biome, etc.).
+    *   This new hybrid approach is faster, more robust, and preserves the methodological integrity of the analysis by separating the geometry-heavy processing from the statistical calculation.
+
+---
+
+### 2026-05-22
+*   **Major Data Pipeline Overhaul & Rerun:**
+    *   **Root Cause Identified:** The critical `orig_fid not found` error in `process_data.qmd` was traced back to a stale base grid file (`AOOGrid_10x10km_land_4326_clean.gpkg`). This old grid was missing key attributes (like country names) and contained geometric artifacts (dateline wraparound), which were causing cascading failures in the Python pipeline.
+    *   **Robust Solution Implemented:**
+        1.  The `prepare_data.qmd` script was updated with a new, authoritative chunk (`prep-grid-aoo-land`) to generate a clean master grid from the original sources. This new grid correctly joins all attributes and fixes the dateline artifact.
+        2.  The `process_data.qmd` script was simplified by removing the redundant and error-prone "Robust Attribute Assembly" logic, as the pipeline can now trust its clean input.
+    *   **Full Data Regeneration Initiated:** A full rerun of the data pipeline has been started on the `lilling` server. This involves:
+        1.  Running `prepare_data.qmd` to create the new master grid (a long process, ~1.5 hours).
+        2.  Running the upstream Python pipeline (`summary_pipeline_landgrid.py`) for both services and beneficiaries using the new clean grid.
+        3.  Running `process_data.qmd` to generate the final analysis-ready datasets.
+    *   **YAML Fix:** Corrected a `YAMLException` in `chapters/01-problem.qmd` caused by improper indentation in the YAML header.
+*   **Next Steps:** While the data regeneration runs, the focus will shift to refining the narrative, language, and presentation of the final Quarto book. A transfer prompt has been created to start a new chat session for this purpose.
+
+---
+
+### 2026-05-21
+*   **Dashboard Layout Debugging Saga:** Spent significant time debugging the layout of `analysis/eda_dashboard.qmd`.
+    *   **Initial Problem:** Plots were rendering too small to be readable in the dashboard format.
+    *   **Attempt 1:** Switched the document format from `html` (page) back to `dashboard` and enabled `scrollable: true` to allow tall plots to render at their full height.
+    *   **Attempt 2:** Implemented a side-by-side `columns` layout for the main plot sections to improve readability and use of space.
+    *   **Core Issue Identified:** An unclosed `div` block (caused by a missing `:::` to close a `columns` section) was making all subsequent dashboard tabs appear empty.
+    *   **Resolution & Final Layout:** Correctly structured the `columns` blocks for all sections, which fixed the empty tabs. After experimentation with side-by-side layouts (e.g., `width="50%"`), the decision was made to lock in a vertically stacked layout (`width="100%"` for all columns) within each major section. This provides a consistent, readable, top-to-bottom flow for all plots and tables in the dashboard. The layout is now considered stable.
+
+---
+
+### 2026-05-17 (cont.)
+*   **Rasterization Workflow Template:** Created `scripts/gdal_rasterization_template.sh` to formalize and document the robust `gdal_rasterize`-based workflow. This template includes steps for GeoPackage reprojection and rasterization of both continuous and binary columns, ensuring easy reusability and preventing loss of this critical methodological knowledge.
+
+---
+
+### 2026-05-17
+*   **Output Naming Convention:** Standardized raster output filenames to include the change metric (`_abs` or `_pct`) for clarity and consistency. For example, `hotspot_count.tif` is now `hotspot_count_abs.tif`. This ensures that all raster files can be distinguished by their filename alone.
+
+---
+
+### 2026-05-16
+*   **Methodological Reflection:** Acknowledged that the extensive time spent debugging Python-based rasterization was inefficient. The direct use of `gdal_rasterize` from the command line proved to be a faster, more powerful, and more reliable solution from the beginning. Future rasterization tasks should default to using the core GDAL command-line tools to avoid similar issues with high-level library wrappers.
+
+---
+
+### 2026-05-15
+*   **Rasterization & Grid Validation Saga:**
+    *   Spent significant time debugging a persistent and subtle rasterization issue. Initial attempts to rasterize hotspot counts using the `vector_to_raster.py` script resulted in "ghost rasters" (tiny file sizes, empty when loaded in QGIS/R) and severe spatial misalignment artifacts (a single vector grid cell producing up to four raster pixels).
+    *   After exhausting multiple fixes within the Python `rasterio` library (grid snapping, nodata value changes, removing compression/tiling), the root cause was identified as a deep incompatibility within the library stack in the server's Python environment.
+    *   **Definitive Solution:** Abandoned the Python script in favor of the core `gdal_rasterize` command-line tool. This immediately produced a correctly aligned raster with a 1-to-1 mapping between vector cells and raster pixels. This will be the standard procedure for all future rasterizations.
+    *   **Grid Geometry Verification:** A subsequent check of the reprojected vector grid's geometry (`hotspots_global_abs_epsg8857.gpkg`) initially caused confusion, as the bounding box of individual cells was not 10km x 10km.
+    *   **Final Validation:** Developed a new verification script (`verify_grid_area.py`) to measure the true geometric **area** of the reprojected polygons, not just their bounding box. This definitively confirmed that each grid cell has an area of **100 km²**, validating the integrity of our equal-area grid and resolving a long-standing point of uncertainty. The project's core spatial foundation is now fully verified.
+
+---
+
+### 2026-05-12
+*   **Finalize `hotspot_synthesis.qmd` & Prepare for Interpretation:**
+    *   Completed a major debugging and refinement pass on `analysis/hotspot_synthesis.qmd` to ensure it runs locally and produces clean, final outputs.
+    *   Resolved numerous rendering errors, including TeX installation failures (by switching to HTML output), missing `kable()` function errors (by adding `library(knitr)`), and data type mismatches in summary tables.
+    *   Significantly improved the population exposure plots by:
+        *   Correctly handling and filtering income group categories to remove "NA" values from plots.
+        *   Enforcing a canonical service order for facets.
+        *   Switching to a fixed y-axis scale for better comparability across services.
+    *   Enhanced the report's clarity by replacing the raw configuration code chunk with a clean, formatted summary table.
+    *   The `hotspot_synthesis.qmd` notebook is now stable and produces all necessary summary tables and visualizations, paving the way for the final interpretation phase.
+    *   Prepared a transfer prompt and a git commit message to checkpoint this progress before moving to a new chat session focused on `analysis/results_interpretation.qmd`.
+
+---
 
 ## Project Overview & Goals
 
@@ -113,7 +307,7 @@ This section highlights the major technical and methodological hurdles overcome 
 ### 2026-05-02
 *   **Infrastructure & Sync:** Diagnosed and bypassed silent VS Code Remote SSH hangs on `lilling` without a hard reboot (safely wiped corrupted `~/.vscode-server`). Established a `tar`-over-SSH sync workaround to bypass strict Windows IT firewalls lacking `rsync`.
 *   **Python Engine Optimization:** Refactored `zonal_stats_toolkit/runner.py` to concurrently schedule both raster and vector tasks in the execution graph, significantly improving parallelism ahead of the v1.4.0 merger.
-*   **Visual Polish (Boxplot Color Ramps):** Solved the `ggplot2` global scale dominance issue in `hotspot_violins.R` and `hotspot_extraction.qmd`. Implemented localized data normalization (`scales::rescale`) so canonical intensity colors (Reds) dynamically scale from 0 to 1 strictly within their respective facets.
+*   **Visual Polish (Boxplot Color Ramps):** Solved the `ggplot2` global scale dominance issue in the plotting scripts (`hotspot_extraction.qmd`). Implemented localized data normalization (`scales::rescale`) so canonical intensity colors (Reds) dynamically scale from 0 to 1 strictly within their respective facets.
 *   **Methodology Documentation:** Updated `README_Methodology.md` to formally transition "Path C" from a hypothetical "Future Analysis" into a completed "Validation Analysis," explicitly confirming that the grid-level hotspots mathematically align with pixel-level differences.
 *   **Feedback Manifesto Audit:** Cross-referenced meeting notes to finalize terminology ("Multi-service Decline" over "collapse"), prepared the biome-faceted scatterplots for the "Attribution Gap", and confirmed non-OECD outlier exclusions for main report boxplots.
 *   **Next Steps Planned:** Ready to implement "Model 3: Grassland Loss" in `LC_change_granular.qmd` to accurately track Forest-to-Grassland and pristine Grassland-to-Cropland transitions.

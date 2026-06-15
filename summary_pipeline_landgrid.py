@@ -102,6 +102,26 @@ def create_progress_logger(update_rate, task_id):
 
     return _process_logger
 
+def fix_geometries(gdf, name=""):
+    """
+    Aggressively validate and fix invalid geometries in a GeoDataFrame.
+    This is applied in the worker process just-in-time before reprojection.
+    """
+    LOGGER.info(f"Validating and fixing geometries in {name}...")
+    original_len = len(gdf)
+    
+    # The buffer(0) trick is a common way to fix simple invalidities.
+    # .make_valid() handles more complex cases like self-intersections.
+    # We chain them and remove any empty geometries that might be created.
+    gdf.geometry = gdf.geometry.buffer(0).make_valid()
+    gdf = gdf[~gdf.geometry.is_empty].copy()
+    
+    fixed_len = len(gdf)
+    if original_len != fixed_len:
+        LOGGER.warning(f"  Removed {original_len - fixed_len} invalid/empty geometries from {name}.")
+    LOGGER.info(f"  ✓ {fixed_len} valid geometries remaining in {name}")
+    return gdf
+
 
 def zonal_stats(raster_path_band_dict, op_stats, vector_path):
     """Calculate zonal statistics for vector file over a given raster.
@@ -126,7 +146,12 @@ def zonal_stats(raster_path_band_dict, op_stats, vector_path):
         per polygon, identified by 'fid' and columns for each calculated
         statistic named from `op_stats`.
     """
-    gdf = gpd.read_file(vector_path)
+    # Use on_invalid="ignore" to be robust against minor geometry errors on read.
+    gdf = gpd.read_file(vector_path, on_invalid="ignore")
+
+    # Aggressive just-in-time cleaning before reprojection, as this is where
+    # the GEOSException occurs. This mirrors the logic from enrich_grid.py.
+    gdf = fix_geometries(gdf, f"worker for {Path(vector_path).stem}")
 
     # reproject if necessary
     with rasterio.open(raster_path_band_dict["path"]) as src:
@@ -279,33 +304,12 @@ def main():
         zonal_stats_task_list = []
         vector_path = vector_config["path"]
 
-        # Pre-process the vector to make it valid and explode multipolygons
-        # This entirely prevents GEOS segfaults in exactextract
-        LOGGER.info(f"Pre-processing vector {vector_id} to fix geometries and explode multipolygons...")
-        gdf = gpd.read_file(vector_path)
+        LOGGER.info(f"Pre-processing vector {vector_id}...")
+        gdf = gpd.read_file(vector_path, on_invalid="ignore")
         if "fid" not in gdf.columns:
             gdf["fid"] = gdf.index.astype("int32") + 1
         else:
             gdf["fid"] = gdf["fid"].astype("int32")
-
-        # Repair geometries: buffer(0) is a robust way to fix GEOS topological errors
-        gdf["geometry"] = gdf.geometry.buffer(0)
-        gdf["geometry"] = gdf.geometry.make_valid()
-        gdf = gdf.explode(ignore_index=True)
-
-        # Keep only valid, non-empty Polygons with a measurable area to prevent 'Never get here' crashes
-        gdf = gdf[~gdf.geometry.isna()]
-        gdf = gdf[gdf.geometry.geom_type.isin(['Polygon', 'MultiPolygon'])]
-        gdf = gdf[~gdf.geometry.is_empty]
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", UserWarning)
-            gdf = gdf[gdf.geometry.area > 1e-10].reset_index(drop=True)
-
-        gdf["frag_id"] = gdf.index.astype("int32")
-
-        # Rename fid to orig_fid to prevent GPKG driver UNIQUE constraint failures on duplicated fids
-        gdf.rename(columns={"fid": "orig_fid"}, inplace=True)
 
         exploded_vector_path = os.path.join(workspace_dir, f"_exploded_{vector_id}.gpkg")
         gdf.to_file(exploded_vector_path, driver="GPKG")
@@ -326,12 +330,15 @@ def main():
 
         for raster_id, band_idx, stats_task in zonal_stats_task_list:
             stats_df = stats_task.get()
+            if stats_df is None:
+                LOGGER.error(f"Zonal stats for {raster_id} returned None. The task likely failed. Skipping.")
+                continue
             # renames the stat to be the raster id provided in the
             # config file with a _operation at the end so we can
             # differentiate the operation applied to that raster
             rename_map = {op: f"{raster_id}_{op}" for op in op_stats}
             stats_df.rename(columns=rename_map, inplace=True)
-            gdf = gdf.merge(stats_df, on="frag_id")
+            gdf = gdf.merge(stats_df, on="fid")
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         out_vector_path = os.path.join(
             workspace_dir, f"{vector_id}_synth_zonal_{timestamp}.gpkg"

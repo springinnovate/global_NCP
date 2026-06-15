@@ -1,22 +1,25 @@
 ---
 title: "Data Processing"
-subtitle: "v1.3.1"
+subtitle: "v1.3.4"
 author: "Jerónimo Rodríguez Escobar"
 date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
 format:
-#  html:
-#    toc: true
-#    number-sections: true
-#   theme: cosmo
-  pdf:
+  html:
     toc: true
     number-sections: true
-    geometry: margin=1in
+    theme: cosmo
+#  pdf:
+#    toc: true
+#    number-sections: true
+#    geometry: margin=1in
 editor: source
+execute:
+  eval: false
 ---
 
 ```{r setup, message=FALSE, warning=FALSE}
+#| eval: true
 library(terra)
 library(sf)
 library(dplyr)
@@ -42,11 +45,12 @@ library(httpgd)
 load_all()
 
 # set venv for Python
-use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
+# use_virtualenv("/home/jeronimo/venvs/coastal_snap_env", required = TRUE)
 
 # Centralize data roots (set GLOBAL_NCP_DATA in ~/.Renviron)
 data_root <- data_dir()
 interim_dir <- data_interim()
+interim_raster_dir <- file.path(data_dir(), "interim_raster")
 processed_dir <- data_processed()
 
 processed_tables_dir <- file.path(processed_dir, "tables")
@@ -55,31 +59,27 @@ processed_hotspots_dir <- file.path(processed_dir, "hotspots")
 # Source unified hotspot/change helpers
 source(here::here("R", "utils_hotspot.R"))
 
+# ============================================================================
+# [MANUAL UPDATE REQUIRED IF ADDING NEW VARIABLES OR YEARS]
+# Map raw column names from Python (synth outputs) to canonical names.
+# If you add a new year (e.g., 2015) or new service, add its exact Python 
+# output name here and assign it your desired canonical name.
+# ============================================================================
 # This maps raw column names from synth outputs to canonical names.
 rename_list <- list(
   c(
-    usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean",
-    usle_2020_mean = "global_usle_marine_mod_ESA_2020_mean",
-    nature_access_1992_mean = "nature_access_lspop2019_ESA1992_mean",
-    nature_access_2020_mean = "nature_access_lspop2019_ESA2020_mean",
-    n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean",
-    n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
-    sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean",
-    sed_ret_ratio_2020_mean = "Sed_ret_ratio_2020_mean",
-    c_risk_1992_mean = "C_Risk_1992_mean",
-    c_risk_2020_mean = "C_Risk_2020_mean",
-    c_risk_red_ratio_1992_mean = "C_Risk_Red_Ratio_1992_mean",
-    c_risk_red_ratio_2020_mean = "C_Risk_Red_Ratio_2020_mean"
+    usle_1992_mean = "global_usle_marine_mod_ESA_1992_mean", usle_2020_mean = "global_usle_marine_mod_ESA_2020_mean",
+    nature_access_1992_mean = "nature_access_lspop2019_ESA1992_mean", nature_access_2020_mean = "nature_access_lspop2019_ESA2020_mean",
+    n_ret_ratio_1992_mean = "N_ret_ratio_1992_mean", n_ret_ratio_2020_mean = "N_ret_ratio_2020_mean",
+    sed_ret_ratio_1992_mean = "Sed_ret_ratio_1992_mean", sed_ret_ratio_2020_mean = "Sed_ret_ratio_2020_mean",
+    c_risk_1992_mean = "C_Risk_1992_mean", c_risk_2020_mean = "C_Risk_2020_mean",
+    c_risk_red_ratio_1992_mean = "C_Risk_Red_Ratio_1992_mean", c_risk_red_ratio_2020_mean = "C_Risk_Red_Ratio_2020_mean"
   ),
   c(
-    n_export_1992_sum = "global_n_export_tnc_esa1992_sum",
-    n_export_2020_sum = "global_n_export_tnc_esa2020_sum",
-    n_retention_1992_sum = "global_n_retention_ESAmar_1992_fertilizer_sum",
-    n_retention_2020_sum = "global_n_retention_ESAmar_2020_fertilizer_sum",
-    sed_export_1992_sum = "global_sed_export_marine_mod_ESA_1992_sum",
-    sed_export_2020_sum = "global_sed_export_marine_mod_ESA_2020_sum",
-    pollination_1992_sum = "realized_polllination_on_ag_ESA1992_sum",
-    pollination_2020_sum = "realized_polllination_on_ag_ESA2020_sum"
+    n_export_1992_sum = "global_n_export_tnc_esa1992_sum", n_export_2020_sum = "global_n_export_tnc_esa2020_sum",
+    n_retention_1992_sum = "global_n_retention_ESAmar_1992_fertilizer_sum", n_retention_2020_sum = "global_n_retention_ESAmar_2020_fertilizer_sum",
+    sed_export_1992_sum = "global_sed_export_marine_mod_ESA_1992_sum", sed_export_2020_sum = "global_sed_export_marine_mod_ESA_2020_sum",
+    pollination_1992_sum = "realized_polllination_on_ag_ESA1992_sum", pollination_2020_sum = "realized_polllination_on_ag_ESA2020_sum"
   )
 )
 ```
@@ -94,105 +94,41 @@ Assemble the final gridded Change/Beneficiary dataset by joining the interim syn
 #| label: assemble-final-grid
 #| eval: true
 #| include: false
-source(here::here("R", "paths.R"))
-interim_dir <- data_interim()
-processed_dir <- data_processed()
+library(readr)
 
-latest_interim <- function(pattern) {
-  files <- list.files(interim_dir, pattern = pattern, full.names = TRUE)
+latest_raster_summary <- function(pattern) {
+  files <- list.files(interim_raster_dir, pattern = pattern, full.names = TRUE)
   if (!length(files)) stop("No interim files match pattern: ", pattern)
   files[which.max(file.mtime(files))]
 }
 
-inpath <- processed_dir
-# Optional: export name indexes to CSV
-write_index <- FALSE
 write_base_synth <- FALSE
 
-# New workflow: means + sums are in the same synth output.
-serv_path  <- latest_interim("^10k_grid_services_base\\.gpkg$")
-ben_path   <- latest_interim("^10k_grid_benef(.*)?\\.gpkg$")
+# The new, robust Python pipeline (`summary_pipeline_landgrid.py`) now outputs 
+# mathematically sound GPKGs without geometry errors or fragment explosions.
+# We just need to load the two most recent runs (services and beneficiaries) and merge them.
+workspace_dir <- here::here("summary_pipeline_workspace_ha")
+gpkg_files <- list.files(workspace_dir, pattern = "^grid_10km_land_synth_zonal_.*\\.gpkg$", full.names = TRUE)
+gpkg_files <- gpkg_files[order(file.mtime(gpkg_files), decreasing = TRUE)]
 
-S <- st_read(serv_path)
-B <- st_read(ben_path)
+if (length(gpkg_files) == 0) {
+  stop("No GPKG files found in the workspace!")
+}
 
-# We MUST resolve the fragment explosion caused by upstream Python (1.67M fragments vs 1.5M grid cells).
-# We use an R-tree spatial intersection to drop every fragment's centroid into the pristine master grid,
-# and then re-aggregate them mathematically to prevent duplicate hotspot counts and coordinate striping.
-#
-# TODO (v1.4.0 Refactor): Python now preserves the pre-explosion grid ID as `orig_fid`.
-# This entire spatial join and group_by block should be ripped out and replaced with a simple
-# tabular `left_join(by = "orig_fid")` once the new python extractions are fully cached.
-master_path <- file.path(data_dir(), "vector_basedata", "AOOGrid_10x10km_land_4326_clean.gpkg")
-if (!file.exists(master_path)) stop("Master grid not found!")
-master_grid <- sf::st_read(master_path, quiet = TRUE)
+# Load ALL GPKG files currently present in the workspace
+files_to_load <- gpkg_files
 
-# Safely resolve canonical ID, avoiding seq_len() which causes spatial shifts
-if ("orig_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = orig_fid)
-if ("grid_fid" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = grid_fid)
-if ("id" %in% names(master_grid) && !"fid" %in% names(master_grid)) master_grid <- dplyr::rename(master_grid, fid = id)
-if (!"fid" %in% names(master_grid)) master_grid$fid <- seq_len(nrow(master_grid))
+message("Loading Base Run: ", basename(files_to_load[1]))
+sf_f <- sf::st_read(files_to_load[1], quiet = TRUE)
+if (!"fid" %in% names(sf_f)) sf_f$fid <- seq_len(nrow(sf_f))
 
-master_grid <- sf::st_make_valid(master_grid)
-
-# Normalize grouping column names to canonical forms (handle casing issues)
-expected_attrs <- c(
-  "iso3", "continent", "region_un", "subregion", "nev_name",
-  "region_wb", "income_grp", "WWF_biome"
-)
-
-message("Aligning fragmented polygons via centroid-within-polygon spatial join...")
-S <- sf::st_make_valid(S)
-S_pts <- sf::st_point_on_surface(S)
-if (sf::st_crs(S_pts) != sf::st_crs(master_grid)) S_pts <- sf::st_transform(S_pts, sf::st_crs(master_grid))
-S_joined <- sf::st_join(S_pts, master_grid %>% dplyr::select(true_fid = fid, dplyr::any_of(expected_attrs)), join = sf::st_intersects)
-
-B <- sf::st_make_valid(B)
-B_pts <- sf::st_point_on_surface(B)
-if (sf::st_crs(B_pts) != sf::st_crs(master_grid)) B_pts <- sf::st_transform(B_pts, sf::st_crs(master_grid))
-B_joined <- sf::st_join(B_pts, master_grid %>% dplyr::select(true_fid = fid), join = sf::st_intersects)
-
-message("Re-aggregating fragments into canonical 10km grid cells...")
-S_df <- sf::st_drop_geometry(S_joined) %>% dplyr::filter(!is.na(true_fid))
-B_df <- sf::st_drop_geometry(B_joined) %>% dplyr::filter(!is.na(true_fid))
-
-safe_sum <- function(x) { if(all(is.na(x))) NA_real_ else sum(x, na.rm = TRUE) }
-safe_mean <- function(x) { if(all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE) }
-
-sum_cols_S <- grep("_sum$", names(S_df), value = TRUE)
-mean_cols_S <- grep("_mean$", names(S_df), value = TRUE)
-group_cols_S <- intersect(names(S_df), c("true_fid", expected_attrs))
-
-S_agg <- S_df %>%
-  dplyr::group_by(dplyr::across(dplyr::all_of(group_cols_S))) %>%
-  dplyr::summarise(
-    dplyr::across(dplyr::all_of(sum_cols_S), safe_sum),
-    dplyr::across(dplyr::all_of(mean_cols_S), safe_mean),
-    .groups = "drop"
-  )
-
-sum_cols_B <- grep("_sum$", names(B_df), value = TRUE)
-mean_cols_B <- grep("_mean$", names(B_df), value = TRUE)
-
-B_agg <- B_df %>%
-  dplyr::group_by(true_fid) %>%
-  dplyr::summarise(
-    dplyr::across(dplyr::all_of(sum_cols_B), safe_sum),
-    dplyr::across(dplyr::all_of(mean_cols_B), safe_mean),
-    .groups = "drop"
-  )
-
-message("Joining Services, Beneficiaries, and restoring Master Geometry...")
-joined_tbl <- S_agg %>%
-  dplyr::left_join(B_agg, by = "true_fid") %>%
-  dplyr::rename(fid = true_fid)
-
-sf_f <- master_grid %>%
-  dplyr::select(fid) %>%
-  dplyr::inner_join(joined_tbl, by = "fid")
-
-# CLEAN UP: Remove duplicate .x / .y columns that crash GPKG export
-sf_f <- sf_f %>% dplyr::select(-dplyr::matches("\\.x$|\\.y$"))
+for (i in 2:length(files_to_load)) {
+  message("Joining Run ", i, ": ", basename(files_to_load[i]))
+  run_i <- sf::st_read(files_to_load[i], quiet = TRUE)
+  if (!"fid" %in% names(run_i)) run_i$fid <- seq_len(nrow(run_i))
+  cols_to_join <- c("fid", setdiff(names(run_i), names(sf_f)))
+  sf_f <- sf_f %>% dplyr::left_join(sf::st_drop_geometry(run_i)[cols_to_join], by = "fid")
+}
 
 # Canonical renaming: safely apply only for existing columns
 rename_map <- c(rename_list[[1]], rename_list[[2]])
@@ -207,6 +143,11 @@ for (new_name in names(rename_map)) {
 # Ensure c_fid is present (critical for downstream hotspot extraction)
 if (!"c_fid" %in% names(sf_f)) {
   sf_f$c_fid <- sf_f$fid
+}
+
+# Ensure canonical country column name is used so it isn't dropped
+if ("country" %in% names(sf_f) && !"nev_name" %in% names(sf_f)) {
+  names(sf_f)[names(sf_f) == "country"] <- "nev_name"
 }
 
 # Optional: save the base synthesis (raw 1992/2020 + beneficiaries + coastal)
@@ -252,6 +193,18 @@ if (!exists("sf_f")) {
 # Division by zero yields Inf/NaN in standard pct change; symmetric change handles this by bounding at +/-200%.
 # However, if any Inf values persist (e.g. appearing from 0), we clamp them to the max symmetric range (+/- 200%).
 # Use pct_mode = "symm" to avoid counter-intuitive sign flips and handle zero baselines.
+
+# ============================================================================
+# [MANUAL UPDATE REQUIRED IF ADDING MULTIPLE YEARS]
+# The pipeline is currently designed for a BI-TEMPORAL comparison (T0 vs T1).
+# `compute_change` automatically finds the MIN year (T0) and MAX year (T1).
+# If you add an intermediate year (e.g. 2015) and want to compare 2015 vs 2020, 
+# you MUST manually drop the 1992 columns from `sf_f` BEFORE this step!
+#
+# Example: To drop all 1992 columns so 2015 becomes T0, uncomment the line below:
+# sf_f <- sf_f %>% dplyr::select(-matches("_1992_"))
+#
+# ============================================================================
 t0_change <- Sys.time()
 gc_before <- gc()
 
@@ -339,7 +292,7 @@ benef_pattern <- "^(GHS_|GlobPOP_|hdi_|rast_gdpTot_|rast_adm1_gini_|fields_mehra
 
 # Drop raw/base-year service columns; we only keep change metrics here.
 message("Dropping raw year columns to reduce memory footprint...")
-year_cols <- grep("1992|2020", names(sf_f), value = TRUE)
+year_cols <- grep("[0-9]{4}", names(sf_f), value = TRUE)
 benef_cols <- grep(benef_pattern, names(sf_f), value = TRUE)
 drop_year_cols <- setdiff(year_cols, benef_cols)
 
@@ -385,7 +338,7 @@ if (!"c_fid" %in% names(sf_f)) {
 
 # Define canonical services and beneficiaries to keep
 svc_cols <- names(c(rename_list[[1]], rename_list[[2]]))
-svc_base <- unique(stringr::str_replace(svc_cols, "_(1992|2020)_", "_"))
+svc_base <- unique(stringr::str_replace(svc_cols, "_[0-9]{4}_", "_"))
 
 canonical_change <- unique(c(
   paste0(svc_base, "_abs_chg"),
@@ -393,6 +346,11 @@ canonical_change <- unique(c(
 ))
 chg_cols <- intersect(chg_cols, canonical_change)
 
+# ============================================================================
+# [MANUAL UPDATE REQUIRED IF ADDING NEW SOCIOECONOMIC DATA]
+# Define canonical beneficiaries to KEEP (preventing them from being dropped).
+# If you add a new continuous raster (like GDP, Pop, new HDI), add it here.
+# ============================================================================
 benef_keep <- intersect(
   c(
     paste0(c("fields_mehrabi_2017", "GHS_BUILT_S_E2020", "hdi_raster_predictions_2020", "rast_adm1_gini_disp_2020"), "_mean"),
@@ -476,6 +434,11 @@ if ("fid" %in% names(sf_to_write)) {
   if ("grid_fid" %in% names(sf_to_write)) sf_to_write <- dplyr::select(sf_to_write, -grid_fid)
   sf_to_write <- dplyr::rename(sf_to_write, grid_fid = fid)
 }
+
+# Fix Dateline Artifact before export
+message("Wrapping dateline to prevent QGIS rendering artifacts...")
+sf_to_write <- sf::st_wrap_dateline(sf_to_write, options = c("WRAPDATELINE=YES", "DATELINEOFFSET=180"))
+
 tryCatch({
   st_write(
     sf_to_write,
