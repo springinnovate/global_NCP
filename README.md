@@ -22,17 +22,15 @@ By identifying areas of rapid change or high importance, this pipeline supports 
 
 ### Data Preparation (One-Time Setup)
 
-The analysis pipelines require a clean, canonical 10km grid file. The original method used an R script (`analysis/prepare_data.qmd`), but this has been a source of persistent geometry errors.
-
-A more robust, pure-Python alternative is now provided and is the recommended approach.
+The analysis pipelines require a clean, canonical 10km grid file. This is handled entirely by a pure-Python workflow which builds an enriched grid without geometry errors.
 
 #### Grid Preparation using Python (Recommended)
 
-This script creates a clean grid file guaranteed to be compatible with the downstream Python pipelines. Run this from your terminal, providing the path to your data directory.
+This script creates a clean grid file guaranteed to be compatible with the downstream Python pipelines.
 
 ```bash
-# Replace `/path/to/global_ncp/data` with the actual path to your data
-python analysis/prepare_grid_python.py --data-root /path/to/global_ncp/data
+# Ensure you are using the correct Python environment
+python Python_scripts/enrich_grid.py
 ```
 
 ### Running the Python Stage (Raster-based Zonal Statistics)
@@ -41,10 +39,7 @@ python analysis/prepare_grid_python.py --data-root /path/to/global_ncp/data
 # Pull Docker image
 docker pull therealspring/global_ncp-computational-environment:latest
 
-# First, generate the zone raster (one-time setup) from an R console:
-# Rscript analysis/create_zone_raster.R
-
-# Then, run the raster-based zonal stats pipeline inside the Docker container:
+# Run the raster-based zonal stats pipeline inside the Docker container:
 docker run -it --rm \
   -v $(pwd):/workspace \
   -v /path/to/global_ncp/data:/data \
@@ -62,12 +57,19 @@ Execute the following Quarto notebooks **in order** from the repository root:
 
 ```bash
 # Full sequential analysis
-quarto render analysis/prepare_data.qmd
 quarto render analysis/process_data.qmd
 quarto render analysis/hotspot_extraction.qmd
 quarto render analysis/hotspot_synthesis.qmd
 quarto render analysis/KS_tests_hotspots.qmd
 quarto render analysis/results_interpretation.qmd
+```
+
+### Rasterizing the Outputs
+
+After the analysis chain is complete, run the bash script to rasterize the hotspot output geometries to 10km GeoTiffs using GDAL:
+
+```bash
+bash scripts/gdal_rasterize_hotspots.sh
 ```
 
 Or render the full book (includes all chapters):

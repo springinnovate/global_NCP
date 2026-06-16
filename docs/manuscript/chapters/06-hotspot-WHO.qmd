@@ -1,0 +1,77 @@
+# Socioeconomic Analysis (WHO) {#sec-who}
+
+```{r setup}
+#| include: false
+library(dplyr)
+library(readr)
+library(here)
+
+source(here::here("R", "paths.R"))
+
+# Load the population exposure stats
+pop_exposure <- read_csv(
+  file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv"),
+  show_col_types = FALSE
+)
+
+ks_results <- read_csv(
+  file.path(data_dir(), "processed", "tables", "ks_results_hot_vs_non.csv"),
+  show_col_types = FALSE
+)
+```
+
+## Absolute Population Exposure
+
+How many people are directly living within the top 5% areas of ecosystem service decline? The charts below break down the exposed population by World Bank Income Group and the UN Human Development Index (HDI).
+
+![Absolute Population Exposure by Income Group](../outputs/plots/pop_exposure_income.png){width=100%}
+
+![Absolute Population Exposure by HDI](../outputs/plots/pop_exposure_hdi.png){width=100%}
+
+## In-Situ vs. Downstream Exposure (Servicesheds)
+
+For compound hotspots (areas experiencing overlapping ecosystem service declines), the impact extends beyond the immediate grid cell. We calculated the "multiplier effect" of these hotspots by comparing the local (in-situ) population with the total population exposed downstream within the serviceshed. 
+
+Incorporating downstream populations increases the exposed population by several orders of magnitude. For instance, while approximately 8.6 million people live directly within areas experiencing declines in 2 or more services, over 6.0 billion people reside downstream and are potentially affected—a multiplier effect of nearly 700x. For areas with 3 or more overlapping declines, the multiplier effect grows to over 1700x.
+
+![Multiplier Effect: Downstream vs. Local Population Exposure](../outputs/plots/multiplier_effect.png){width=100%}
+
+## The Multiplier Effect: Absolute Population Exposure
+
+While socioeconomic profiling reveals the *relative characteristics* of hotspot areas, we must also quantify the *absolute number* of people who benefit from them. Our previous analysis (`hotspot_pop_exposure.csv`) showed that **5,286.2 million people** live directly within hotspot grid cells.
+
+However, the benefits of nature extend far beyond the cell in which they are generated. Using a high-performance spatial extraction pipeline, we analyzed two distinct beneficiary pathways for all 250,000+ hotspot cells combined:
+
+1.  **Hydrological Beneficiaries:** People living downstream within the same watershed relying on upstream regulation.
+2.  **Access-Based Beneficiaries:** People who can reach the hotspot within a defined travel time, reflecting cultural, recreational, and non-timber provisioning services.
+
+Our analysis reveals that approximately **7.6 billion people** (7,596.0 million) benefit from these hotspots through at least one of these pathways. Crucially, when expanding our analysis from **Local Residents** to **Connected Beneficiaries**, we observe massive variations depending on the pathway of service delivery. 
+
+By tracing down-gradient hydrological flow paths, we identify **6,420.1 million** downstream beneficiaries reliant on these impaired upstream grids. When evaluating the access-based travel footprint (populations relying on nature access and wild pollination within reachable distances), the reliant population expands to **7,401.2 million** individuals. This reveals a profound **Multiplier Effect**: the vulnerable population balloons by nearly 1.4× when accounting for physical access, and is 1.15 times larger globally than populations living directly downstream.
+
+This "multiplier effect" varies significantly by region, as shown below.
+
+```{r exposure-multiplier-plot-region, fig.cap="The Multiplier Effect by World Bank Region"}
+# This code assumes you have run `analysis/plot_multiplier_effect.R`
+knitr::include_graphics(here::here("outputs", "plots", "exposure_multiplier_dumbbell_region_wb.png"))
+```
+
+### Disparities by Income Group and Biome
+
+The multiplier effect is highly sensitive to the socioeconomic and ecological context.
+
+```{r exposure-multiplier-plot-income, fig.cap="The Multiplier Effect by Income Group"}
+knitr::include_graphics(here::here("outputs", "plots", "exposure_multiplier_dumbbell_income_grp.png"))
+```
+
+```{r exposure-multiplier-plot-biome, fig.cap="The Multiplier Effect by WWF Biome"}
+knitr::include_graphics(here::here("outputs", "plots", "exposure_multiplier_dumbbell_WWF_biome.png"))
+```
+
+## Relative Socioeconomic Shift
+
+We perform two-sample Kolmogorov-Smirnov (KS) tests to determine if the socioeconomic profiles of ecosystem service "hotspots" are statistically different from the background landscape. 
+
+![KS Statistic Heatmap (Distribution Distance)](../outputs/plots/ks/ks_heatmap.png){width=100%}
+
+![Directionality of Hotspot Effects (Cliff's Delta)](../outputs/plots/ks/directionality_cliffs_delta.png){width=100%}
