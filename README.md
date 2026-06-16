@@ -47,8 +47,8 @@ docker run -it --rm \
   therealspring/global_ncp-computational-environment:latest /bin/bash
 
 # Inside container, execute raster-based zonal summaries:
-python summary_pipeline_rasterzones.py --data-root /data analysis_configs/services_raster.yaml
-# python summary_pipeline_rasterzones.py --data-root /data analysis_configs/beneficiaries_raster.yaml
+python Python_scripts/summary_pipeline_rasterzones.py --data-root /data analysis_configs/services_raster.yaml
+# python Python_scripts/summary_pipeline_rasterzones.py --data-root /data analysis_configs/beneficiaries_raster.yaml
 ```
 
 ### Running the R/Quarto Analysis Chain
@@ -281,9 +281,9 @@ docker run -it --rm ^
 Then, run the workflow:
 
 ``` bash
-python summary_pipeline_landgrid.py --data-root /data analysis_configs/services_slim.yaml
-python summary_pipeline_landgrid.py --data-root /data analysis_configs/beneficiaries_slim.yaml
-python summary_pipeline_landgrid.py --data-root /data analysis_configs/c_protection_synth.yaml
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/services_slim.yaml
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/beneficiaries_slim.yaml
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/c_protection_synth.yaml
 ```
 
 Each raster-vector combo is processed in parallel, using `exactextract` for
@@ -328,7 +328,7 @@ ogr2ogr -wrapdateline -datelineoffset 180 \
 
 The pipeline is designed to be highly modular and extensible. To add new continuous raster data to the analysis in the future:
 1. **Add to Config:** Add the new raster path to the appropriate YAML config (or create a new one).
-2. **Run Python Extraction:** Run `python summary_pipeline_landgrid.py` with your config. This drops a new spatial GPKG into the workspace.
+2. **Run Python Extraction:** Run `python Python_scripts/summary_pipeline_landgrid.py` with your config. This drops a new spatial GPKG into the workspace.
 3. **R Consolidation:** Run `analysis/process_data.qmd`. It will automatically grab the latest extractions from the workspace, strip their geometries, and seamlessly `left_join` them to the canonical grid using the stable `fid` row identifier. 
 
 **Important Manual Steps in `process_data.qmd`:**
