@@ -8,6 +8,9 @@ author:
   - "[Additional Authors]"
 date: today
 format:
+#  docx:
+#    toc: true
+#    number-sections: true
   html:
     toc: true
     toc-depth: 3
@@ -55,7 +58,7 @@ This study addresses four structurally linked research questions:
 To evaluate global ecosystem dynamics, we established a 28-year temporal scope spanning between 1992 and 2020. This specific window was selected to leverage the maximum continuous historical baseline provided by the European Space Agency Climate Change Initiative (ESA CCI) land cover time series (ESA, 2017), allowing us to capture long-term landscape trajectories preceding and following the transition into the Sustainable Development Goal (SDG) era. The spatial scope encompasses all terrestrial landmasses, initially partitioned into a standardized equal-area master grid of 1,522,073 cells ($100\text{ km}^2$ each), utilizing the IUCN Area of Occupancy (Murray, 2017) structural backbone grid. During the spatial data extraction pipeline, grid cells that lacked complete underlying raster data coverage (e.g., due to raster extents not fully covering coastal margins, small islands, or specific regions across all 1992 and 2020 baseline variables) were systematically dropped when calculating temporal changes. This exclusion ensured that our analysis only compared cells with consistent, non-NA biophysical data across both time periods, resulting in a final evaluated sample of 1,302,099 viable cells out of the original 1.52 million.
 
 ### Biophysical Modeling of Ecosystem Services
-We used eight simulated continuous ecosystem service variables modeled at a native 300-meter spatial resolution using the InVEST (Integrated Valuation of Ecosystem Services and Tradeoffs) biophysical software suite (Sharp et al., 2020). To ensure comparisons of volumetric ecosystem services (those expressed in absolute physical units such as kilograms of nutrient or tons of sediment) remain physically meaningful across latitudes, we standardized all extensive variables to a per-hectare basis prior to grid aggregation. Intensive variables (e.g., risk and retention ratios) were retained in their native dimensionless index units. Additionally, coastal risk indices were calculated natively in the vector domain before rasterization to prevent floating-point interpolation errors along complex shorelines. The modeled suite targets three core thematic areas of human-nature interdependence:
+We used eight simulated continuous ecosystem service variables modeled at a native 300-meter spatial resolution using the InVEST (Integrated Valuation of Ecosystem Services and Tradeoffs) biophysical software suite (Sharp et al., 2020). To ensure comparisons of volumetric ecosystem services (those expressed in absolute physical units such as kilograms of nutrient or tons of sediment) remain physically meaningful across latitudes, we standardized all extensive variables to a per-hectare basis prior to grid aggregation. Intensive variables (e.g., risk indices and retention ratios) were retained in their native dimensionless index units. Additionally, coastal risk indices were calculated natively in the vector domain before rasterization to prevent floating-point interpolation errors along complex shorelines. The modeled suite targets three core thematic areas of human-nature interdependence:
 
 1. **Local & Habitat Services:** *Nature access* (modeled as a spatial proxy of human proximity to intact natural habitat matrices) and *pollination* (evaluated as landscape-level habitat suitability and foraging range support for wild pollinator guilds).
 2. **Coastal Risk Mitigation:** *Coastal protection* (simulated as absolute open-ocean wave energy attenuation by marine and coastal vegetative barriers) and the *coastal risk reduction ratio* (the proportional reduction in socio-ecological vulnerability directly mitigated by the presence of protective coastal habitats).
@@ -187,23 +190,23 @@ To isolate the operational drivers of decline, we executed a spatial overlay ana
 ## Global and Regional Trajectories
 The aggregated regional analysis shows a decoupling between absolute volumetric changes and relative functional shifts. Continental summaries show large absolute volume losses concentrated within expansive, high-baseline tropical forest biomes, representing a systemic drawdown of global ecological capital. Concurrently, evaluating percentage changes across intermediate or arid biomes reveals widespread, low-magnitude landscape transitions that point to a generalized destabilization of global landscape regulation functions over the 28-year window.
 
-![Absolute and relative change in ecosystem services by Biome, calculated via the 'aggregate of differences' (Path A) to preserve true volumetric trends.](outputs/plots/output_plots_diff/biome_combined_diffs.png){#fig-regional-trajectories .quarto-figure-center}
+![Absolute and relative change in ecosystem services by Biome, calculated via the 'aggregate of differences' (Path A) to preserve true volumetric trends.](../../outputs/plots/output_plots_diff/biome_combined_diffs.png){#fig-regional-trajectories .quarto-figure-center}
 
 ### Geographic Distribution by Biome
 
 The maps below illustrate the spatial distribution of these trajectories across global biomes, highlighting relative shifts in ecosystem service provision alongside absolute volumetric change.
 
-![Faceted maps showing percentage ecosystem service change by WWF Biome.](outputs/maps/map_biome_pct.png){#fig-faceted-biome-pct .quarto-figure-center width="100%"}
+![Faceted maps showing percentage ecosystem service change by WWF Biome.](../../outputs/maps/map_biome_pct.png){#fig-faceted-biome-pct .quarto-figure-center width="100%"}
 
-![Faceted maps showing absolute ecosystem service change by WWF Biome.](outputs/maps/map_biome_abs.png){#fig-faceted-biome-abs .quarto-figure-center width="100%"}
+![Faceted maps showing absolute ecosystem service change by WWF Biome.](../../outputs/maps/map_biome_abs.png){#fig-faceted-biome-abs .quarto-figure-center width="100%"}
 
 ## Global Hotspot Distribution
 At the grid scale, we identified 252,215 unique cells experiencing at least one extreme ecosystem service hotspot (19.37% of evaluated cells). These zones exhibit intense geographic clustering. When evaluated across ecological contexts, Mangroves stand out as the most severely impacted biome, experiencing nearly 5× the expected hotspot intensity relative to their global area. (Detailed geographic breakdowns of these epicenters by World Bank Region—where Latin America and East Asia dominate—and by Income Group are provided in the Annex).
 
 ::: {#fig-hotspot-dist}
-![Global distribution of multi-service hotspots ("Hotness").](outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png){width="100%"}
+![Global distribution of multi-service hotspots ("Hotness").](../../outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png){width="100%"}
 
-![Relative intensity of hotspots by WWF Biome. Values > 1 indicate a biome has more hotspot area than expected given its total size.](outputs/plots/intensity/hotspot_relative_intensity_wwf_biome.png){width="100%"}
+![Relative intensity of hotspots by WWF Biome. Values > 1 indicate a biome has more hotspot area than expected given its total size.](../../outputs/plots/intensity/hotspot_relative_intensity_wwf_biome.png){width="100%"}
 
 Global Compound Risk (Hotness) and Relative Intensity. The map (top) shows the count of overlapping negative hotspots in a single 10km cell. The bar chart (bottom) shows the disproportionate burden of hotspots relative to a biome's global area.
 :::
@@ -212,24 +215,24 @@ Global Compound Risk (Hotness) and Relative Intensity. The map (top) shows the c
 Beyond identifying where hotspots are, we analyze the magnitude of change within them. The Symmetric Percentage Change (SPC) show significant variation across both ecosystem services and biophysical contexts. The variation highlights how different ecological foundations experience relative extremes. (Analysis of magnitude variation across socioeconomic strata is available in the Annex).
 
 ::: {#fig-boxplots-biome}
-![Distribution of percentage change values within hotspots for volumetric services, faceted by WWF Biome.](outputs/plots/boxplots_unified/wwf_biome/boxplots_volumetric_pct.png){width="100%"}
+![Distribution of percentage change values within hotspots for volumetric services, faceted by WWF Biome.](../../outputs/plots/boxplots_unified/wwf_biome/boxplots_volumetric_pct.png){width="100%"}
 
-![Distribution of percentage change values within hotspots for coastal and ratio-based services, faceted by WWF Biome.](outputs/plots/boxplots_unified/wwf_biome/boxplots_coastal_pct.png){width="100%"}
+![Distribution of percentage change values within hotspots for coastal and ratio-based services, faceted by WWF Biome.](../../outputs/plots/boxplots_unified/wwf_biome/boxplots_coastal_pct.png){width="100%"}
 
 Distribution of Hotspot Magnitudes. The boxplots show the distribution of Symmetric Percentage Change (SPC) values for cells identified as hotspots, broken down by biome. This highlights how the intensity of change within hotspots varies across different ecological contexts.
 :::
 
 ## Socioeconomic Profiling: KS Diagnostics
-![Global distribution of key socioeconomic context variables (Population, GDP, HDI, and GINI).](outputs/plots/maps/global_socioeconomic_context_map.png){#fig-socioeconomic-context .quarto-figure-center}
+![Global distribution of key socioeconomic context variables (Population, GDP, HDI, and GINI).](../../outputs/plots/maps/global_socioeconomic_context_map.png){#fig-socioeconomic-context .quarto-figure-center}
 
 The spatial KS tests reveal that 47 out of 48 service-by-covariate combinations (97.9%) show highly significant distributional differences between hotspot and background populations ($p < 0.05$ after strict FDR correction). Cliff’s Delta metrics cleanly separate these dynamics into two distinct socioeconomic typologies:
 * **Infrastructure-Driven Typologies:** Hotspots tracking declines in *Nature Access*, *Coastal Protection*, and *Sediment Retention* are heavily associated with high baseline population densities, expanding built-up footprints, and high localized GDP profiles,possibly related with  urban infrastructural expansion.
 * **Agricultural-Driven Typologies:** Hotspots tracking *Pollination* losses and accelerated *Nitrogen Export* are strongly coupled with low population densities and elevated agricultural plot intensity, isolating crop intensification as the primary driver of rural landscape decline.
 
 ::: {#fig-ks-diagnostics}
-![Heatmap of Kolmogorov-Smirnov (KS) statistic (D), indicating the distance between the socioeconomic distributions of hotspot vs. background populations. Brighter colors indicate greater statistical separation.](outputs/plots/ks/ks_heatmap.png){width="100%"}
+![Heatmap of Kolmogorov-Smirnov (KS) statistic (D), indicating the distance between the socioeconomic distributions of hotspot vs. background populations. Brighter colors indicate greater statistical separation.](../../outputs/plots/ks/ks_heatmap.png){width="100%"}
 
-![Directionality of socioeconomic effects in hotspots, measured by Cliff's Delta. Positive values indicate hotspots are associated with higher values of the covariate (e.g., higher population), while negative values indicate the opposite.](outputs/plots/ks/directionality_cliffs_delta.png){width="100%"}
+![Directionality of socioeconomic effects in hotspots, measured by Cliff's Delta. Positive values indicate hotspots are associated with higher values of the covariate (e.g., higher population), while negative values indicate the opposite.](../../outputs/plots/ks/directionality_cliffs_delta.png){width="100%"}
 
 Socioeconomic profiling of hotspots. The KS statistic heatmap (top) quantifies the magnitude of difference between hotspot and background populations, while the Cliff's Delta plot (bottom) shows the direction of that difference.
 :::
@@ -244,7 +247,7 @@ To evaluate how this multiplier behaves under escalating ecological failure, we 
 The resulting Compound Risk dumbbell chart (plotted on a logarithmic scale) unequivocally demonstrates that they do not. Even in the rarest, most severely degraded landscapes ($\ge 4$ overlapping hotspots), the number of Connected Beneficiaries remains logarithmically larger than the in-situ Local Residents. The persistent multiplier gap across all risk tiers proves that compounding environmental collapse projects systemic vulnerabilities far down-gradient and across broader travel networks, threatening populations that do not even reside within the degraded zones. 
 
 ::: {#fig-multiplier-compound}
-![Multiplier Effect across Compound Risk Levels. The dumbbell chart illustrates the expansion of exposed populations from Local Residents directly inside hotspots, to Total Connected Beneficiaries relying on them via downstream flow or travel access.](outputs/plots/downstream_exposure_dumbbell_compound.png){width="100%"}
+![Multiplier Effect across Compound Risk Levels. The dumbbell chart illustrates the expansion of exposed populations from Local Residents directly inside hotspots, to Total Connected Beneficiaries relying on them via downstream flow or travel access.](../../outputs/plots/downstream_exposure_dumbbell_compound.png){width="100%"}
 
 Serviceshed Multiplier Effect by Compound Risk. The chart tracks how population exposure scales logarithmically across locations experiencing 1, 2, 3, or 4+ simultaneous ecosystem service declines. (Detailed multiplier breakdowns faceted by Biome and Income Group are available in the Annex).
 :::
@@ -266,17 +269,17 @@ driver_overlap <- data.frame(
 )
 knitr::kable(driver_overlap, align = c("l", "r"))
 ```
-![Global distribution of primary land cover conversion drivers (1992-2020), identifying areas of granular transitions such as deforestation for cropland, savannization, and urban expansion.](outputs/plots/maps/global_lcc_driver_map.png){#fig-lcc-drivers .quarto-figure-center width="100%"}
+![Global distribution of primary land cover conversion drivers (1992-2020), identifying areas of granular transitions such as deforestation for cropland, savannization, and urban expansion.](../../outputs/plots/maps/global_lcc_driver_map.png){#fig-lcc-drivers .quarto-figure-center width="100%"}
 
 ::: {#fig-attribution-comparison layout-ncol=2}
-![All Ecosystem Service Decline Hotspots](outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png){width="100%"}
+![All Ecosystem Service Decline Hotspots](../../outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png){width="100%"}
 
-![Hotspots overlapping Land Cover Change](outputs/plots/maps/global_lcc_driver_hotspots_map.png){width="100%"}
+![Hotspots overlapping Land Cover Change](../../outputs/plots/maps/global_lcc_driver_hotspots_map.png){width="100%"}
 
 Visualizing the Spatial Attribution Gap. The map on the left shows the total footprint of extreme ecosystem service decline. The map on the right isolates only the locations where those service declines spatially intersect with severe land cover conversion. The stark difference between the two footprints visually demonstrates the 76% attribution gap.
 :::
 
-![Heatmap showing the percentage of ecosystem service hotspots that geographically overlap with hotspots of land cover conversion. The large proportion of low values highlights the "attribution gap."](outputs/plots/drivers/heatmap_driver_overlap_pct.png){#fig-attribution-gap .quarto-figure-center}
+![Heatmap showing the percentage of ecosystem service hotspots that geographically overlap with hotspots of land cover conversion. The large proportion of low values highlights the "attribution gap."](../../outputs/plots/drivers/heatmap_driver_overlap_pct.png){#fig-attribution-gap .quarto-figure-center}
 
 ---
 
@@ -345,17 +348,17 @@ This annex contains supplemental figures that provide additional detail and cont
 ## Regional Trajectories by World Bank Region
 
 ::: {#fig-annex-wb-trajectories layout-ncol=1}
-![Absolute and relative change in ecosystem services by World Bank Region (Path A).](outputs/plots/output_plots_diff/region_wb_combined_diffs.png)
+![Absolute and relative change in ecosystem services by World Bank Region (Path A).](../../outputs/plots/output_plots_diff/region_wb_combined_diffs.png)
 
-![Faceted maps showing percentage ecosystem service change by World Bank Region.](outputs/maps/map_region_wb_pct.png)
+![Faceted maps showing percentage ecosystem service change by World Bank Region.](../../outputs/maps/map_region_wb_pct.png)
 
-![Faceted maps showing absolute ecosystem service change by World Bank Region.](outputs/maps/map_region_wb_abs.png)
+![Faceted maps showing absolute ecosystem service change by World Bank Region.](../../outputs/maps/map_region_wb_abs.png)
 
-![Relative intensity of hotspots by World Bank Region.](outputs/plots/intensity/hotspot_relative_intensity_region_wb.png)
+![Relative intensity of hotspots by World Bank Region.](../../outputs/plots/intensity/hotspot_relative_intensity_region_wb.png)
 
-![Distribution of percentage change values within hotspots for volumetric services, faceted by World Bank Region.](outputs/plots/boxplots_unified/region_wb/boxplots_volumetric_pct.png)
+![Distribution of percentage change values within hotspots for volumetric services, faceted by World Bank Region.](../../outputs/plots/boxplots_unified/region_wb/boxplots_volumetric_pct.png)
 
-![Distribution of percentage change values within hotspots for coastal and ratio-based services, faceted by World Bank Region.](outputs/plots/boxplots_unified/region_wb/boxplots_coastal_pct.png)
+![Distribution of percentage change values within hotspots for coastal and ratio-based services, faceted by World Bank Region.](../../outputs/plots/boxplots_unified/region_wb/boxplots_coastal_pct.png)
 :::
 
 ```{r}
@@ -374,33 +377,33 @@ knitr::kable(region_data, align = c("l", "c"))
 ## Regional Trajectories by Income Group
 
 ::: {#fig-annex-inc-trajectories layout-ncol=1}
-![Absolute and relative change in ecosystem services by Income Group (Path A).](outputs/plots/output_plots_diff/income_grp_combined_diffs.png)
+![Absolute and relative change in ecosystem services by Income Group (Path A).](../../outputs/plots/output_plots_diff/income_grp_combined_diffs.png)
 
-![Faceted maps showing percentage ecosystem service change by Income Group.](outputs/maps/map_income_grp_pct.png)
+![Faceted maps showing percentage ecosystem service change by Income Group.](../../outputs/maps/map_income_grp_pct.png)
 
-![Faceted maps showing absolute ecosystem service change by Income Group.](outputs/maps/map_income_grp_abs.png)
+![Faceted maps showing absolute ecosystem service change by Income Group.](../../outputs/maps/map_income_grp_abs.png)
 
-![Relative intensity of hotspots by Income Group.](outputs/plots/intensity/hotspot_relative_intensity_income_grp.png)
+![Relative intensity of hotspots by Income Group.](../../outputs/plots/intensity/hotspot_relative_intensity_income_grp.png)
 
-![Distribution of percentage change values within hotspots for volumetric services, faceted by World Bank Income Group.](outputs/plots/boxplots_unified/income_grp/boxplots_volumetric_pct.png)
+![Distribution of percentage change values within hotspots for volumetric services, faceted by World Bank Income Group.](../../outputs/plots/boxplots_unified/income_grp/boxplots_volumetric_pct.png)
 
-![Distribution of percentage change values within hotspots for coastal and ratio-based services, faceted by World Bank Income Group.](outputs/plots/boxplots_unified/income_grp/boxplots_coastal_pct.png)
+![Distribution of percentage change values within hotspots for coastal and ratio-based services, faceted by World Bank Income Group.](../../outputs/plots/boxplots_unified/income_grp/boxplots_coastal_pct.png)
 :::
 
 ## Geographic Distribution by Country
 
 ::: {#fig-annex-country-trajectories layout-ncol=1}
-![Absolute and relative change in ecosystem services by Country (Path A).](outputs/plots/output_plots_diff/country_combined_diffs.png)
+![Absolute and relative change in ecosystem services by Country (Path A).](../../outputs/plots/output_plots_diff/country_combined_diffs.png)
 
-![Faceted maps showing percentage ecosystem service change by Country.](outputs/maps/map_country_pct.png)
+![Faceted maps showing percentage ecosystem service change by Country.](../../outputs/maps/map_country_pct.png)
 
-![Faceted maps showing absolute ecosystem service change by Country.](outputs/maps/map_country_abs.png)
+![Faceted maps showing absolute ecosystem service change by Country.](../../outputs/maps/map_country_abs.png)
 :::
 
 ## Serviceshed Multiplier Effect Breakdowns
 
 ::: {#fig-annex-multiplier layout-ncol=1}
-![Multiplier Effect of Ecosystem Service Hotspots by WWF Biome.](outputs/plots/exposure_multiplier_dumbbell_WWF_biome.png)
+![Multiplier Effect of Ecosystem Service Hotspots by WWF Biome.](../../outputs/plots/exposure_multiplier_dumbbell_WWF_biome.png)
 
-![Multiplier Effect of Ecosystem Service Hotspots by Income Group.](outputs/plots/exposure_multiplier_dumbbell_income_grp.png)
+![Multiplier Effect of Ecosystem Service Hotspots by Income Group.](../../outputs/plots/exposure_multiplier_dumbbell_income_grp.png)
 :::

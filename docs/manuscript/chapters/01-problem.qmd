@@ -111,11 +111,19 @@ We embrace these uncertainties. This analysis is a starting point for prioritiza
 - [InVEST ecosystem service models (Sharp et al., 2020)](https://naturalcapitalproject.stanford.edu/software/invest)
 - [ESA Climate Change Initiative land cover](https://climate.esa.int/en/projects/land-cover/)
 - [IUCN 10km equal-area grids (Murray, 2017)](https://doi.org/10.6084/m9.figshare.4653439.v1)
-- Socioeconomic and demographic data: World Bank regions; Global Population Density grids; [Human Development Index (HDI)](https://doi.org/10.1038/s41467-026-68805-6) (Sherman, L., Proctor, J., Druckenmiller, H., Tapia, H., & Hsiang, S. (2026)
+- Socioeconomic and demographic data: World Bank regions, income Group, individual countries 'ee_correspondence.gpkg'
+- Global Population Density grids 
+- [Human Development Index (HDI)](https://doi.org/10.1038/s41467-026-68805-6) (Sherman, L., Proctor, J., Druckenmiller, H., Tapia, H., & Hsiang, S. (2026))
+- Add missing references to the other datasets we used (e.g., GDP, built area, agricultural area)
 
-**Methods**: Python-based zonal statistics → R processing → hotspot detection (top 5% of grid cells by rank for Symmetric Percentage Change) → Kolmogorov-Smirnov statistical profiling
+**Methods**:
 
-**Reproducibility**: All code and intermediate outputs available; see Technical Appendix
+- **Biophysical Modeling**: 300m resolution InVEST ecosystem service simulations aggregated to a canonical 10km equal-area grid.
+- **Change Detection**: Dual-pathway analysis evaluating both macro-regional volumetric shifts and localized intensities using Symmetric Percentage Change (SPC).
+- **Hotspot Extraction**: Identifying the extreme 5% of grid cells experiencing acute relative decline.
+- **Socioeconomic Profiling**: Kolmogorov-Smirnov (KS) tests and serviceshed multiplier models to quantify direct and downstream human exposure.
+- **Driver Attribution**: Spatial overlay with ESA CCI land cover transition matrices to isolate conversion versus degradation signals.
+- **Reproducibility**: All code and intermediate outputs available; see Technical Appendix
 
 ## What's Next
 

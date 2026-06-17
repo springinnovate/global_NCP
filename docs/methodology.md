@@ -27,7 +27,7 @@ Due to severe performance and geometry-validity bottlenecks encountered when per
 2.  **Geometry Cleaning:**
     *   To resolve minor topological errors (e.g., self-intersecting rings caused by clipping at coastlines and the dateline), the geometries were validated and cleaned, resulting in `landgrid_1_clean.gpkg`.
 3.  **Attribute Enrichment (Python):**
-    *   The final stage is handled by `Python_scripts/enrich_grid.py`.
+    *   The final stage is handled by `Python_scripts/build_master_grid.py`.
     *   This script performs a highly optimized, centroid-based spatial join to map WWF Biomes, Country, UN/World Bank Regions, and Income Group attributes (from the `ee_correspondence` dataset) onto the grid.
     *   It inherently handles geometry validation (`buffer(0).make_valid()`) and deduplication, outputting the final, analysis-ready `landgrid_1_clean_enriched.gpkg`.
 
@@ -155,7 +155,7 @@ A challenge in multi-stage spatial pipelines is maintaining exact 1:1 row integr
 ### Key Analysis Parameters (What is a Hotspot?)
 The threshold for identifying hotspots is defined centrally in `HOTS_CFG` (`analysis/hotspot_extraction.qmd`) using the parameter `pct_cutoff = 0.05`.
 
-*   **Relative Extreme:** A cell is cosndierd a "hotspot" if its change sits in the most extreme 5% *within that specific service's own distribution*. It is a ranking label, not an absolute physical threshold. A cell can enter or leave the top 5% even if its raw change isn't huge in absolute terms, simply because it is relative to the rest of the globe.
+*   **Relative Extreme:** A cell is considered a "hotspot" if its change places it among the 5% of grid cells with the most extreme changes *within that specific service's own distribution*. It is a ranking label (the worst 5% of cells), not an absolute physical threshold. A cell can enter or leave the top 5% even if its raw change isn't huge in absolute terms, simply because it is relative to the rest of the globe.
 *   **Comparability:** Comparisons are strictly within-service. A top 5% decline in Service A isn't necessarily comparable in absolute magnitude to a top 5% decline in Service B.
 *   **Not Evidence of Cause:** Being a hotspot flags that "this cell's change is unusually large," but it does not inherently prove *why* the value is extreme. To discuss drivers, we use additional robust analyses (LCC attribution and KS profiling).
 

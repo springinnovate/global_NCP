@@ -1,6 +1,6 @@
 ---
-title: "Our Approach"
-subtitle: "How we detected and analyzed ecosystem service hotspots"
+title: "Methodological Approach"
+subtitle: "Detection and analysis of ecosystem service hotspots"
 ---
 
 ## Data Sources
@@ -8,32 +8,33 @@ subtitle: "How we detected and analyzed ecosystem service hotspots"
 This analysis integrates four major datasets:
 
 ### 1. Ecosystem Service Models (InVEST)
-**Source**: The Nature Conservancy's InVEST model suite
-**Coverage**: Global, 300m resolution, 1992 & 2020 snapshots
-**Services modeled**:
-- Pollination (agricultural crop pollination)
-- Nitrogen Export & Retention (water quality)
-- Sediment Export & Retention (water quality)
-- Nature Access (recreation/cultural ecosystem services)
-- Coastal Protection (mangrove/coral reef storm buffering)
+
+- **Source**: Natureal Capital Project InVEST model suite
+- **Coverage**: Global, 300m resolution, 1992 & 2020 snapshots
+- **Services modeled**:
+    - Pollination (agricultural crop pollination)
+    - Nitrogen Export & Retention (water quality)
+    - Sediment Export & Retention (water quality/erosion control)
+    - Nature Access (recreation/cultural ecosystem services)
+    - Coastal Protection (mangrove/coral reef storm buffering)
 
 **How it works**: InVEST uses land use, climate, and biophysical data to estimate ecosystem service supply. A full technical description is in the Technical Appendix.
 
 ### 2. Land Cover Data
-**Source**: ESA Climate Change Initiative, 300m resolution
-**Classification**: Reclassified to Transformed (agriculture, urban, plantations) vs. Natural (forests, grasslands, wetlands)
-**Purpose**: Explain ecosystem service change; attribute decline to land conversion vs. degradation
+**Source**: ESA Climate Change Initiative, 300m resolution.
+**Classification**: Reclassified to Transformed (agriculture, urban, plantations) vs. Natural (forests, grasslands, wetlands).
+**Purpose**: Explain ecosystem service change; attribute decline to land conversion vs. degradation.
 
-### 3. Administrative Grid
-**Source**: IUCN Oecism Opportunity Grid, 10km equal-area cells
-**Coverage**: ~1.5M cells covering all land globally
-**Attributes**: Country, World Bank region, income group, WWF biome
-**Purpose**: Common spatial unit for all analysis; enables regional/income aggregation
+### 3. Master Grid
+**Source**: IUCN Oecism Opportunity Grid, 10km equal-area cells.
+**Coverage**: ~1.5M cells covering all land globally.
+**Attributes**: Country, World Bank region, income group, WWF biome.
+**Purpose**: Common spatial unit for all analysis; enables regional/income aggregation.
 
 ### 4. Socioeconomic Layers
-**Sources**: World Bank, UNDP, CIESIN
-**Variables**: Population density, GDP per capita, Human Development Index, built area, agricultural intensity, Gini coefficient
-**Purpose**: Profile who lives in hotspot regions; test whether hotspot populations differ from global norm
+**Sources**: World Bank, UNDP, CIESIN.
+**Variables**: Population density, GDP per capita, Human Development Index, built area, agricultural intensity, Gini coefficient.
+**Purpose**: Profile who lives in hotspot regions; test whether hotspot populations differ from global norm.
 
 ## The Two-Path Analysis
 
@@ -74,45 +75,47 @@ Simple subtraction. Problem: Services with different baselines are not comparabl
 ### Percentage Change (Naive)
 **Formula**: $\text{PC} = \frac{T_{2020} - T_{1992}}{T_{1992}} \times 100\%$
 
-Normalizes by baseline. Problem: **Zero-baseline services** (services that could have 0 value in 1992) produce infinite values.
+Normalizes by baseline. Problem: Zero-baseline services (services that could have 0 value in 1992) produce infinite values.
 
-### Symmetric Percentage Change (SPC) ✓ *Our choice*
+### Symmetric Percentage Change (SPC)
 **Formula**: $\text{SPC} = \frac{T_{2020} - T_{1992}}{(|T_{2020}| + |T_{1992}|) / 2} \times 100\%$
 
 Handles zero-baselines by using the mean of absolute values as denominator. Symmetric treatment of gains/losses.
 
 **Example**:
-- Service goes from 100 → 200: SPC = +67% (2/3 increase)
-- Service goes from 100 → 0: SPC = -100% (complete loss)
-- Service goes from 0 → 100: SPC = +100% (from nothing to something)
 
-**Why SPC?** It prevents scale bias (large-baseline services dominating hotspot identification) and handles zero-baseline services elegantly.
+- Service goes from 100 → 200: SPC = +67% (2/3 increase).
+- Service goes from 100 → 0: SPC = -100% (complete loss).
+- Service goes from 0 → 100: SPC = +100% (from nothing to something).
+
+Using the SPC prevents scale bias (large-baseline services dominating hotspot identification) and handles zero-baseline services.
 
 ## Hotspot Definition
 
-**Hotspots** = Grid cells in the **top 5% by rank** of the SPC change magnitude for each service.
+**Hotspots** = Grid cells in the top 5% by rank of the SPC change magnitude for each service.
 
 **Rationale**:
-- Top 5% of grid cells by rank for detrimental change = Locations with **most rapid DECLINE** or risk increase (greatest concern)
-- Top 5% of grid cells by rank for beneficial change = Locations with **most rapid RECOVERY** or risk decrease (positive learning)
-- 5% threshold: Balance between statistical rigor and practical granularity
+- Top 5% of grid cells by rank for detrimental change = Locations with most rapid DECLINE or risk increase (greatest concern)
 
 **Result**: ~75,000 hotspot cells per service (5% of 1.5M global cells)
 
 ## Socioeconomic Profiling: Kolmogorov-Smirnov Tests
 
-We ask: **Are populations in hotspots statistically different from non-hotspot populations?**
+Question: Are populations in hotspots statistically different from non-hotspot populations?
 
 **Method**: Kolmogorov-Smirnov (KS) test compares cumulative distributions:
+
 - **Hotspot population**: All socioeconomic values in hotspot cells
 - **Non-hotspot population**: All values in non-hotspot cells
 
 **Output**:
+
 - **KS Statistic (D)**: Maximum vertical distance between curves (0-1 scale); larger = more different
 - **P-value**: Probability difference occurred by chance; p < 0.05 = significant
 - **Cliff's Delta**: Effect size (how meaningful is the difference, not just statistically significant)
 
 **Interpretation**:
+
 - Significant KS test + high Cliff's Delta = Hotspot populations meaningfully different (e.g., "Pollination hotspots are predominantly rural/agricultural")
 - Significant but low Cliff's Delta = Difference is small despite statistical significance
 
@@ -121,13 +124,16 @@ We ask: **Are populations in hotspots statistically different from non-hotspot p
 **Question**: What % of ecosystem service hotspots overlap with observed land cover change?
 
 **Method**:
+
 1. Identify all grid cells with converted land cover (natural → transformed, 1992→2020)
 2. For each hotspot cell, check if it also has conversion
 3. Calculate % overlap
 
 **Result**: Heatmap showing which services' hotspots coincide with which LCC types (forest loss, cropland expansion, etc.)
 
-**Attribution Gap**: = 100% - (% overlap with any LCC type)
+**Attribution Gap**: 
+
+- 100% - (0% overlap with any LCC type)
 - High gap (e.g., 50%) → Service decline not fully explained by observed land conversion; suggests degradation signal
 - Low gap (e.g., 10%) → Service decline primarily explained by land cover change
 
@@ -137,7 +143,7 @@ We ask: **Are populations in hotspots statistically different from non-hotspot p
 1. Grid geometry verification (all ~1.5M cells registered correctly)
 2. Data integrity checks (no missing values in key attributes)
 3. Sanity checks on InVEST values (within expected ranges; realistic spatial patterns)
-4. Validation with literature (hotspot locations match known conservation priorities)
+4. Validation with literature (hotspot locations match known conservation priorities) [pending to do]
 
 **Uncertainties acknowledged**:
 - InVEST models depend on input data quality (see Technical Appendix)
@@ -148,6 +154,7 @@ We ask: **Are populations in hotspots statistically different from non-hotspot p
 ## Reproducibility
 
 All analysis is reproducible:
+
 - **Code**: R/Quarto notebooks (available on project repository)
 - **Data**: Processed CSVs and intermediate outputs in `/data/processed/`
 - **Full pipeline**: Python zonal statistics → R processing → hotspot detection
@@ -155,9 +162,8 @@ All analysis is reproducible:
 
 ## Plain Language Summary
 
-**In brief**:
-We compared global ecosystem service models from 1992 and 2020. We identified regions (hotspots) where services changed most dramatically. We then asked: "Who lives there?" (socioeconomic profiling) and "Why?" (land cover drivers). The result is a map of ecosystem service priorities for conservation and development policy.
+We compared modeled global ecosystem service from 1992 and 2020. We identified regions (hotspots) where services changed most dramatically. We then asked: "Who lives there?" (socioeconomic profiling) and "Why?" (land cover drivers). The result is a map of ecosystem service priorities for conservation and development policy.
 
 ## Next Steps
 
-Chapter 3 shows what changed globally. Chapters 4-7 drill into WHERE (geographic patterns), WHO (affected populations), and WHY (land cover drivers).
+Chapter 3 shows what changed globally. Chapters 4-7 focus into WHERE (geographic patterns), WHO (affected populations), and WHY (land cover drivers).

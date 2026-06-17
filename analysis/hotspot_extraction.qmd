@@ -709,10 +709,10 @@ message("plt_long generated and cached to: ", rds_path)
 
 We identify per-service hotspots using a 5% percentile rule and **direction vectors**: - `loss_services` (e.g., Nature_Access, Pollination, N/Sed_Ret_Ratio, C_Risk_Red_Ratio) → we flag the **lowest** values; - `gain_services` (Sed_export, N_export, C_Risk) → we flag the **highest** values.
 **Definition of a Hotspot:**
-A hotspot is defined as a grid cell representing the **most detrimental 5% of change** globally for a given service.
+A hotspot is defined as being among the **5% of grid cells with the most detrimental change** globally for a given service.
 
-*   **For Beneficial Services** (e.g., Nature Access, Pollination, Retention Ratios): Hotspots are cells with the **steepest declines** (bottom 5% of the distribution).
-*   **For Detrimental Flows/Risks** (e.g., N/Sed Export, Coastal Risk): Hotspots are cells with the **steepest increases** (top 5% of the distribution).
+*   **For Beneficial Services** (e.g., Nature Access, Pollination, Retention Ratios): Hotspots are the 5% of cells with the **steepest declines** (the bottom 5% of grid cells by rank).
+*   **For Detrimental Flows/Risks** (e.g., N/Sed Export, Coastal Risk): Hotspots are the 5% of cells with the **steepest increases** (the top 5% of grid cells by rank).
 
 We run this **once globally** and then **once per subregion** (World Bank region, income group, WWF biome). For each run and for each metric (absolute and percent change) we write a compact **GPKG** containing only the hotspot cells, plus a CSV index:
 

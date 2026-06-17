@@ -89,7 +89,17 @@ hotness_stats <- read_csv(
 ```{r}
 #| label: tbl-area
 #| echo: false
-kable(head(area_stats, 10), caption = "Hotspot Area Coverage (Top 10 Rows)")
+if (requireNamespace("DT", quietly = TRUE)) {
+  DT::datatable(
+    area_stats,
+    caption = "Hotspot Area Coverage",
+    filter = "top",
+    options = list(pageLength = 10, autoWidth = TRUE),
+    rownames = FALSE
+  )
+} else {
+  kable(head(area_stats, 10), caption = "Hotspot Area Coverage (Top 10 Rows)")
+}
 ```
 
 ### Hotness Overview
@@ -97,7 +107,21 @@ kable(head(area_stats, 10), caption = "Hotspot Area Coverage (Top 10 Rows)")
 ```{r}
 #| label: tbl-hotness
 #| echo: false
-kable(head(hotness_stats, 10), caption = "Compound Risk Summary (Top 10 Rows)")
+if (requireNamespace("DT", quietly = TRUE)) {
+  DT::datatable(
+    hotness_stats,
+    caption = "Compound Risk Summary",
+    filter = "top",
+    options = list(
+      pageLength = 10, 
+      autoWidth = TRUE,
+      order = list(list(which(names(hotness_stats) == "mean_hotspots") - 1, 'desc'))
+    ),
+    rownames = FALSE
+  )
+} else {
+  kable(head(hotness_stats, 10), caption = "Compound Risk Summary (Top 10 Rows)")
+}
 ```
 
 ## Key Takeaways

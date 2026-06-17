@@ -8,7 +8,7 @@
 *   **R Analysis Runbook:**
     1.  `process_data.qmd`: Consolidates GPKGs, calculates change.
     2.  `LC_change_preparation.qmd` & `LC_change_granular.qmd`: Land cover metrics (`diffeR`).
-    3.  `hotspot_extraction.qmd`: Flags 5% extreme tails, attributes LCC drivers, generates maps/plots.
+    3.  `hotspot_extraction.qmd`: Flags the top 5% of grid cells by rank, attributes LCC drivers, generates maps/plots.
     4.  `KS_tests_hotspots.qmd`: Socioeconomic profiling (KS tests, Cliff's Delta).
 
 ## 2. Core Methodological Quirks
@@ -23,7 +23,7 @@
     *   **Gain Services** (Bad when going UP): `Sed_export`, `N_export`, `C_Risk`.
 *   **Grouping Variables:** `income_grp`, `region_wb`, `WWF_biome`, `nev_name` (Country).
 *   **Key Files:**
-    *   Master Grid: `/home/jeronimo/data/global_ncp/vector_basedata/AOOGrid_10x10km_land.gpkg`
+    *   Master Grid: `/home/jeronimo/data/global_ncp/interim/landgrid_1_clean_enriched_4326.gpkg`
     *   Clean Output: `processed/10k_change_calc.gpkg`
     *   Pivot Table: `processed/plt_long.rds` (Used by Hotspot/KS pipelines)
 
@@ -37,7 +37,7 @@
 Hotspot thresholds are defined centrally in `hotspot_extraction.qmd`.
 ```R
 HOTS_CFG <- list(
-  pct_cutoff      = 0.05,            # Extreme 5% tail
+  pct_cutoff      = 0.05,            # Top 5% of grid cells by rank
   loss            = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
   gain            = c("Sed_export","N_export","C_Risk"),
   combos          = list(...)        # Overlapping combinations

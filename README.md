@@ -30,7 +30,7 @@ This script creates a clean grid file guaranteed to be compatible with the downs
 
 ```bash
 # Ensure you are using the correct Python environment
-python Python_scripts/enrich_grid.py
+python Python_scripts/build_master_grid.py
 ```
 
 ### Running the Python Stage (Raster-based Zonal Statistics)

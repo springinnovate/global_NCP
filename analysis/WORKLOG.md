@@ -456,3 +456,4 @@ This section highlights the major technical and methodological hurdles overcome 
 
 ### 2026-01-05
 *   **AI Context Migration:** Created `ai_context.md`, migrated to AI assistant (Copilot / Gemini).
+`n### 2026-06-16`n- **Documentation Clarification:** Standardized the definition of 'hotspot' across the repository (including `README.md`, manuscript `index.qmd`, `paper_draft.qmd`, methodology, and book chapters) to explicitly state it is the top 5% of grid cells by rank, not a value-based percentile.
