@@ -6,14 +6,12 @@
 library(dplyr)
 library(ggplot2)
 library(readr)
-library(here)
 
 has_dt <- requireNamespace("DT", quietly = TRUE)
 if(has_dt) library(DT)
 
-knitr::opts_knit$set(root.dir = here::here())
-source(here::here("R", "paths.R"))
-source(here::here("R", "plotting_functions.R"))
+source("../../../R/paths.R")
+source("../../../R/plotting_functions.R")
 
 # Load data
 area_stats <- read_csv(
@@ -215,4 +213,3 @@ if (nrow(pop_exposure) > 0) {
 
 - **Chapter 8** synthesizes geographic, socioeconomic, and driver patterns into policy recommendations
 *(Detailed regional breakdown to be added).*
-

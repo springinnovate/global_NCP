@@ -55,7 +55,7 @@ We implement a **two-path analysis** to separate WHERE hotspots are from WHY the
 │ Process:                                                     │
 │   1. Aggregate 300m InVEST to 10km cell level (1992 & 2020)│
 │   2. Calculate change per cell (absolute & percentage)      │
-│   3. Identify hotspots: top/bottom 5% of distribution       │
+│   3. Identify hotspots: top 5% of grid cells by rank        │
 │   4. Aggregate hotspots to regions/countries/biomes         │
 │ Output: Hotspot locations, intensity, populations affected  │
 │ Use: Chapters 4-7 (geographic, socioeconomic, drivers)      │
@@ -90,11 +90,11 @@ Handles zero-baselines by using the mean of absolute values as denominator. Symm
 
 ## Hotspot Definition
 
-**Hotspots** = Grid cells in the **top or bottom 5%** of the SPC distribution for each service.
+**Hotspots** = Grid cells in the **top 5% by rank** of the SPC change magnitude for each service.
 
 **Rationale**:
-- Top 5% = Locations with **most rapid DECLINE** (greatest concern)
-- Bottom 5% = Locations with **most rapid RECOVERY** (positive learning)
+- Top 5% of grid cells by rank for detrimental change = Locations with **most rapid DECLINE** or risk increase (greatest concern)
+- Top 5% of grid cells by rank for beneficial change = Locations with **most rapid RECOVERY** or risk decrease (positive learning)
 - 5% threshold: Balance between statistical rigor and practical granularity
 
 **Result**: ~75,000 hotspot cells per service (5% of 1.5M global cells)
