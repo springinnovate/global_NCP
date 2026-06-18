@@ -1,4 +1,4 @@
-# Methodology & Analytical Framework
+﻿# Methodology & Analytical Framework
 
 This document details the overarching methodology, spatial framework, and computational architecture used in the Global NCP project to analyze changes in ecosystem service provision between 1992 and 2020.
 
@@ -44,7 +44,7 @@ By dropping these cells, we guarantee that the final analysis compares a mathema
 
 *   **Geographic vs. Projected Grids:** The original analysis grid is defined in a geographic coordinate system (WGS 84, EPSG:4326). When reprojected into an equal-area system (like Equal Earth, EPSG:8857) for analysis, the shapes of the cells stretch and tilt to preserve their area on a flat map.
 *   **Bounding Box vs. True Area:** As a result, measuring the `width` and `height` of a reprojected grid cell's bounding box will **not** yield 10km x 10km. 
-*   **Area is the Invariant:** A validation script (`Python_scripts/verify_grid_area.py`) measured the true geometric area of the reprojected grid cells, definitively confirming that each cell has an area of **100 km²** (10km x 10km).
+*   **Area is the Invariant:** A validation script (`Python_scripts/verify_grid_area.py`) measured the true geometric area of the reprojected grid cells, definitively confirming that each cell has an area of **100 kmÂ²** (10km x 10km).
 
 ### Data Preparation: Coastal Risk & Protection
 The Coastal Risk and Protection datasets are originally provided as high-resolution vector line geometries representing discrete coastal locations. 
@@ -198,7 +198,7 @@ To assess the human impact of ecosystem service hotspots, the pipeline quantifie
 2. **Connected Beneficiaries (The Multiplier):** We trace exposure beyond the immediate degraded zone using two specialized geospatial delivery pathways:
    * **Hydrological Footprint:** Populations living down-gradient that rely on the upstream landscape for water purification, sediment retention, and flow regulation.
    * **Access-Based Travel Footprint:** Populations living within physical travel distances that rely on local nature for recreation, wild pollination, and access to natural capital.
-3. **Compound Risk Analysis:** To evaluate how this exposure behaves under escalating ecological failure, populations are grouped by their localized **Compound Risk**—the number of simultaneous overlapping hotspots in a single cell (ranging from $\ge 1$ to $\ge 4$). 
+3. **Compound Risk Analysis:** To evaluate how this exposure behaves under escalating ecological failure, populations are grouped by their localized **Compound Risk**â€”the number of simultaneous overlapping hotspots in a single cell (ranging from $\ge 1$ to $\ge 4$). 
 
 **Analytical Purpose:** 
 This framework allows us to test whether intense, compounding environmental crises remain geographically contained. By plotting the exposed populations on a logarithmic scale across escalating compound risk tiers, we measure the multiplier gap between *Local Residents* and total *Connected Beneficiaries*. This mathematically tracks how highly localized environmental degradation cascades into systemic regional vulnerabilities.
@@ -227,7 +227,65 @@ To move beyond binary "Natural vs. Transformed" analysis, we implement two speci
 
 ---
 
-## 6. Outputs & Visualization
+## 6. Subregional & Filtering Infrastructure
+
+### Pre-computed subsets
+
+After `hotspot_synthesis.qmd` produces the global summary tables, its final chunk
+(`regional-subsets-export`) splits `hotspot_area_stats.csv` and
+`hotspot_multiservice_stats.csv` into per-group CSV files:
+
+```
+data/processed/tables/regional_subsets/
+â”œâ”€â”€ region_wb/
+â”‚   â”œâ”€â”€ hotspot_area_stats_region_wb.csv        â† all 7 regions combined
+â”‚   â”œâ”€â”€ hotspot_area_stats_Sub_Saharan_Africa.csv
+â”‚   â””â”€â”€ ...
+â”œâ”€â”€ income_grp/
+â”‚   â”œâ”€â”€ hotspot_area_stats_income_grp.csv
+â”‚   â””â”€â”€ ...
+â”œâ”€â”€ WWF_biome/
+â””â”€â”€ nev_name/
+```
+
+These files need regenerating only when `hotspot_area_stats.csv` itself changes (new
+services, updated InVEST inputs, or a changed hotspot threshold). Run the chunk
+interactively in RStudio â€” it does not require `plt_long` or the GPKGs.
+
+### R filtering functions (`R/get_hotspots.R`)
+
+Two functions support on-demand filtering beyond the pre-computed groupings:
+
+**`extract_hotspots_by(plt_long, grouping_col, services, exclude_vals, ...)`**
+
+Wraps `extract_hotspots()` across all levels of a grouping column. Returns a named list
+(one entry per group value) of `extract_hotspots()` result lists. This formalizes the
+inline loop in `hotspot_extraction.qmd` as a reusable function for custom runs.
+
+**`filter_multidim(data, region_wb, income_grp, WWF_biome, country)`**
+
+Filters a data frame (typically `plt_long` or the raw grid `sf`) by any combination of
+the four geographic/socioeconomic dimensions. Columns that are `NULL` are ignored, so
+partial specifications work naturally. Use this when you need a cross-cut that is not
+available in the pre-computed CSVs (e.g., "Sub-Saharan Africa cells classified as Low income"):
+
+```r
+subset_df <- filter_multidim(plt_long,
+                             region_wb  = "Sub-Saharan Africa",
+                             income_grp = "5. Low income")
+hs <- extract_hotspots(subset_df, ...)
+```
+
+### Regional report template
+
+`docs/templates/regional_report_template.qmd` is a parameterized Quarto document that
+produces a self-contained HTML for any single grouping-variable value. It reads from the
+pre-computed `regional_subsets/` CSVs (with a fallback to the full table if subsets have
+not been generated yet). See `docs/runbook.md` for render commands.
+
+---
+
+## 7. Outputs & Visualization
 
 ### Output Directory Structure
 The project's graphical outputs are organized into specialized subdirectories within `outputs/plots/` (e.g., `maps/`, `drivers/`, `ks/`, `boxplots_unified/`, `signed_bars/`). 

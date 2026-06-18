@@ -108,6 +108,7 @@ options(dplyr.summarise.inform = FALSE)
 ```{r}
 #| label: cleanup-legacy
 #| echo: false
+#| eval: false
 # 1. Clear summary CSVs
 csvs_to_remove <- c(
 file.path(data_dir(), "processed", "hotspot_area_stats.csv"),
@@ -136,6 +137,7 @@ if (length(old_hotness) > 0) {
 ```{r}
 #| label: load-data
 #| echo: false
+#| eval: false
 
 # Helper function to find and rename a column from a list of candidates
 standardize_col_name <- function(df, new_name, candidates) {
@@ -191,6 +193,7 @@ if (length(missing_cols) > 0) {
 ```{r}
 #| label: global-filters
 #| echo: false
+#| eval: false
 
 # --- GLOBAL FILTER: Exclude "High income: nonOECD" from all analyses in this script ---
 if ("income_grp" %in% names(grid_df)) {
@@ -217,6 +220,7 @@ if ("income_grp" %in% names(grid_df)) {
 #| label: config-summary
 #| echo: false
 #| results: 'asis'
+#| eval: false
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
@@ -280,6 +284,7 @@ valid_groupings <- intersect(HOTS_CFG$groupings, names(grid_df))
 ```{r}
 #| label: extract-hotspots
 #| echo: false
+#| eval: false
 
 hs_global_obj <- extract_hotspots(
   df = plt_long,
@@ -298,7 +303,8 @@ hs_global_obj <- extract_hotspots(
 
 ```{r}
 #| label: calc-intensity
-#| echo: false  
+#| echo: false
+#| eval: false
 
 hs_flags <- hs_global_obj$hotspots_df %>%
   dplyr::select(fid, service) %>%
@@ -358,6 +364,7 @@ message("Hotspot area statistics saved to: ", out_csv_path)
 #| label: plot-intensity
 #| message: false
 #| echo: false
+#| eval: false
 
 
 biome_labels <- c(
@@ -489,6 +496,7 @@ for (g_var in valid_groupings) {
 ```{r}
 #| label: calc-overlap
 #| echo: false
+#| eval: false
 
 hotspot_counts <- hs_global_obj$hotspots_df %>%
   dplyr::group_by(fid) %>%
@@ -534,6 +542,7 @@ readr::write_csv(hotness_stats, out_csv)
 ```{r}
 #| label: plot-overlap
 #| echo: false
+#| eval: false
 
 plot_hotness <- function(df, g_var) {
   d_plot <- df %>% dplyr::filter(grouping == g_var) %>% dplyr::slice_head(n = 15) %>%
@@ -620,6 +629,7 @@ For reporting absolute exposure, using the `_sum` of population is critical to c
 #| label: calc-pop-exposure
 #| message: false
 #| echo: false
+#| eval: false
 
 # Define the canonical socioeconomic variables to use for exposure
 pop_var <- "GHS_POP_E2020_GLOBE_sum"
@@ -683,6 +693,7 @@ if (length(missing_vars) == 0) {
 #| label: plot-pop-exposure
 #| message: false
 #| echo: false
+#| eval: false
 
 pop_exposure_csv <- file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv")
 if (file.exists(pop_exposure_csv)) {
@@ -812,5 +823,72 @@ if (file.exists(pop_exposure_csv)) {
 
   plots_pop <- list(p_pop_inc, p_pop_hdi, p_pop_gdp, p_pop_gini)
   if (length(plots_pop) > 0) plots_pop[]
+}
+```
+
+## Regional Subsets Export
+
+Split `hotspot_area_stats.csv` into per-group CSV files under
+`data/processed/tables/regional_subsets/` so that the regional report
+template can load them without re-reading the full table.
+
+```{r}
+#| label: regional-subsets-export
+#| message: false
+#| echo: false
+
+area_stats_path <- file.path(data_dir(), "processed", "tables", "hotspot_area_stats.csv")
+multi_stats_path <- file.path(data_dir(), "processed", "tables", "hotspot_multiservice_stats.csv")
+
+if (file.exists(area_stats_path)) {
+  stats_df <- readr::read_csv(area_stats_path, show_col_types = FALSE)
+  multi_df <- if (file.exists(multi_stats_path)) {
+    readr::read_csv(multi_stats_path, show_col_types = FALSE)
+  } else NULL
+
+  subsets_dir <- file.path(data_dir(), "processed", "tables", "regional_subsets")
+
+  safe_name <- function(x) {
+    x <- gsub("[^A-Za-z0-9]+", "_", x)
+    x <- gsub("_+", "_", x)
+    gsub("^_|_$", "", x)
+  }
+
+  for (gv in unique(stats_df$grouping_var)) {
+    gv_dir <- file.path(subsets_dir, gv)
+    dir.create(gv_dir, recursive = TRUE, showWarnings = FALSE)
+
+    gv_df <- dplyr::filter(stats_df, grouping_var == gv)
+
+    # One combined CSV per grouping variable (for multi-group comparisons)
+    readr::write_csv(
+      gv_df,
+      file.path(gv_dir, paste0("hotspot_area_stats_", gv, ".csv"))
+    )
+
+    # One CSV per individual group value
+    for (grp in unique(gv_df$group)) {
+      readr::write_csv(
+        dplyr::filter(gv_df, group == grp),
+        file.path(gv_dir, paste0("hotspot_area_stats_", safe_name(grp), ".csv"))
+      )
+    }
+
+    # Mirror multiservice stats if available (grouping col is named "grouping" there)
+    if (!is.null(multi_df) && "grouping" %in% names(multi_df)) {
+      gv_multi <- dplyr::filter(multi_df, grouping == gv)
+      if (nrow(gv_multi) > 0) {
+        readr::write_csv(
+          gv_multi,
+          file.path(gv_dir, paste0("hotspot_multi_stats_", gv, ".csv"))
+        )
+      }
+    }
+  }
+
+  n_files <- length(list.files(subsets_dir, recursive = TRUE, pattern = "\\.csv$"))
+  message(sprintf("Regional subset CSVs written: %d files in %s", n_files, subsets_dir))
+} else {
+  warning("hotspot_area_stats.csv not found; skipping regional_subsets export.")
 }
 ```
