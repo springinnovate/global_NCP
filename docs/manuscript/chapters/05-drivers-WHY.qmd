@@ -22,6 +22,25 @@ Our spatial overlay analysis reveals that major land cover transitions intersect
 
 The magnitude of this 76% gap confirms that standard macro-scale satellite classifications are largely blind to the primary drivers of environmental decline. This strong analytical signal indicates that global ecosystem service loss is fundamentally driven by sub-pixel, in-situ landscape degradation—such as selective logging, understory clearance, chemical intensification, and localized edaphic degradation—which structurally compromises biophysical flow capacities while leaving the macro-level vegetation classification completely unchanged.
 
+### Driver Overlap Statistics
+
+The interactive table below provides the detailed percentage of ecosystem service hotspots that overlap with specific land cover conversion drivers. You can use the search box to filter by specific land cover drivers or ecosystem services.
+
+```{r driver-table}
+#| echo: false
+if (requireNamespace("DT", quietly = TRUE)) {
+  DT::datatable(
+    lcc_pct,
+    caption = "Ecosystem Service Hotspots vs. Land Cover Conversion Drivers",
+    filter = "top",
+    options = list(pageLength = 10, autoWidth = TRUE),
+    rownames = FALSE
+  )
+} else {
+  knitr::kable(head(lcc_pct, 15), caption = "Ecosystem Service Hotspots vs. Land Cover Conversion Drivers (Top 15)")
+}
+```
+
 ### Overlap Heatmaps
 
 The heatmaps below show what percentage of ecosystem service hotspots geographically overlap with the top 5% of land cover conversion (e.g., deforestation, urbanization).

@@ -267,7 +267,15 @@ driver_overlap <- data.frame(
   `Overlap with Hotspots` = c("19.8%", "19.0%", "7.7%", "76.0%"),
   check.names = FALSE
 )
-knitr::kable(driver_overlap, align = c("l", "r"))
+if (requireNamespace("DT", quietly = TRUE)) {
+  DT::datatable(
+    driver_overlap,
+    options = list(dom = 't', paging = FALSE, searching = TRUE),
+    rownames = FALSE
+  )
+} else {
+  knitr::kable(driver_overlap, align = c("l", "r"))
+}
 ```
 ![Global distribution of primary land cover conversion drivers (1992-2020), identifying areas of granular transitions such as deforestation for cropland, savannization, and urban expansion.](../../outputs/plots/maps/global_lcc_driver_map.png){#fig-lcc-drivers .quarto-figure-center width="100%"}
 
@@ -371,7 +379,15 @@ region_data <- data.frame(
   `Relative Intensity (Enrichment)` = c("1.40×", "1.30×", "0.80×", "0.78×", "0.65×"),
   check.names = FALSE
 )
-knitr::kable(region_data, align = c("l", "c"))
+if (requireNamespace("DT", quietly = TRUE)) {
+  DT::datatable(
+    region_data,
+    options = list(dom = 't', paging = FALSE, searching = TRUE),
+    rownames = FALSE
+  )
+} else {
+  knitr::kable(region_data, align = c("l", "c"))
+}
 ```
 
 ## Regional Trajectories by Income Group

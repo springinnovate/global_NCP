@@ -341,7 +341,7 @@ The R/Quarto analysis workflow is conducted through a series of notebooks in the
 
 ## Core R Analysis Chain (Execution Order)
 
-1. **`prepare_data.qmd`** – **Data Preparation & Baseline Setup**
+1. **`build_master_grid.py`** – **Data Preparation & Baseline Setup**
    - Loads raw zonal statistics from Python pipeline outputs
    - Prepares and validates the canonical 10km IUCN AOO grid with subregional attributes
    - Creates baseline data structures for downstream analysis
