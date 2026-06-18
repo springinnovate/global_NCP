@@ -18,9 +18,18 @@ lcc_pct <- read_csv(
 
 To explain *why* hotspots occur, we integrated Land Cover Change (LCC) metrics derived from our ESA/C3S data. We executed a spatial overlay analysis between the finalized ecosystem service hotspot grids and areas of explicit land cover conversion (gross loss of natural land, agricultural expansion, etc.) at the 300-meter scale.
 
-Our spatial overlay analysis reveals that major land cover transitions intersect with an average of only 24% of identified ecosystem service hotspots. **The remaining 76% of hotspots constitute a profound spatial attribution gap**, exhibiting zero intersection with satellite-detected categorical land-use change. 
+Our spatial overlay analysis reveals that major land cover transitions intersect with an average of only 24% of identified ecosystem service hotspots. **The remaining 76% of hotspots show no detectable categorical land-cover transition at 300-meter resolution**, constituting a substantial spatial attribution gap.
 
-The magnitude of this 76% gap confirms that standard macro-scale satellite classifications are largely blind to the primary drivers of environmental decline. This strong analytical signal indicates that global ecosystem service loss is fundamentally driven by sub-pixel, in-situ landscape degradation—such as selective logging, understory clearance, chemical intensification, and localized edaphic degradation—which structurally compromises biophysical flow capacities while leaving the macro-level vegetation classification completely unchanged.
+The magnitude of this gap challenges the assumption that macro-scale land conversion serves as an adequate proxy for ecosystem service change. We note, however, that this analysis identifies **spatial co-occurrence** between hotspots and LCC drivers, not causal attribution. An important structural constraint is that ESA CCI land cover data serves simultaneously as a primary input to the InVEST biophysical models and as the basis for the LCC overlay. This endogeneity means the gap cannot be interpreted as an independent empirical partition between degradation-driven and conversion-driven change. We present the 76% figure as a directional signal warranting further investigation rather than as a definitive mechanism assignment.
+
+### Plausible Mechanisms Behind the Gap
+
+Two mechanisms could generate large attribution gaps without requiring detectable categorical transitions:
+
+1. **Upstream routing cascades**: A cell's land cover classification may remain mapped as "Forest" across both temporal snapshots, while agricultural conversion or clearance upstream fundamentally alters the hydrologic routing matrix. The resulting sediment or nutrient load overwhelms downslope filtering capacity, triggering a functional hotspot without any land-cover change recorded at the hotspot cell itself.
+2. **Climate forcing**: Independent of land-use change, multi-decadal shifts in rainfall intensity and erosivity propagate through the InVEST routing architecture and shift modeled service outputs into extreme percentiles without a corresponding categorical land transition.
+
+Disentangling these hypotheses rigorously would require controlled factorial experiments—holding climate inputs constant while varying land cover, or vice versa—that are beyond the scope of the current analysis. The policy implication nonetheless holds: conservation strategies focused exclusively on preventing categorical deforestation may be insufficient if functional decline is occurring in areas that appear structurally intact by satellite observation.
 
 ### Driver Overlap Statistics
 

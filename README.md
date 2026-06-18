@@ -416,22 +416,51 @@ See the project runbook for detailed methodology and validation notes:
 *   **`docs/methodology.md`** – Technical explanation of two-path analysis structure
 *   **`analysis/README.md`** – Archive policy and notebook scoping
 
+# Pipeline Scalability & Extensibility
+
+The current analysis applies this pipeline at global scale with two temporal snapshots (1992, 2020), a 100 km² grid, and globally-applied InVEST default parameters. These are **implementation choices for a global proof-of-concept**, not architectural constraints. The pipeline is designed to be flexible along all of these dimensions:
+
+## Spatial resolution
+The hotspot extraction, synthesis, and subregional analysis infrastructure is resolution-agnostic. Replacing the 100 km² global grid with a finer-resolution regional grid (e.g., 1 km² for a river basin or country study) requires only new Python zonal statistics inputs — all downstream R analysis and reporting steps work without modification. Finer resolution would directly address the site-level planning limitation of the current global analysis.
+
+## Temporal coverage
+The pipeline's dual-pathway structure already handles arbitrary numbers of time points. The `process_data.qmd` notebook identifies T0 and T1 automatically from available columns; adding a third or fourth year (e.g., 2000, 2010) requires populating those columns from new InVEST model runs. Multi-temporal analysis is a documented future task in `analysis/hotspot_extraction.qmd`.
+
+## Geographic scope
+The same pipeline can be run on a regional study area (Amazon basin, Southeast Asia, West Africa coastal zone, etc.) with locally-calibrated InVEST inputs. Regional applications benefit from site-specific parameterization that is not feasible at global scale, yielding more defensible biophysical outputs. The subregional filtering infrastructure (`filter_multidim()`, regional CSV subsets, and the parameterized report template) was designed to support exactly this kind of targeted analysis.
+
+## Additional services
+Any InVEST output — or output from another biophysical model — can be added as a new service column. Add the raster path to the Python YAML config, run the extraction, and update the `rename_list` in `process_data.qmd`. The hotspot identification, synthesis, and reporting steps handle arbitrary service sets automatically.
+
+## Quick reference: what to change for a regional high-resolution application
+
+| Component | Global (current) | Regional adaptation |
+|---|---|---|
+| Grid | IUCN AOO 100 km², global | Custom polygon grid at target resolution |
+| InVEST inputs | Global default parameters | Locally calibrated biophysical tables |
+| Temporal snapshots | 1992, 2020 | Any available model years |
+| Services | 8 global services | Any InVEST or compatible model outputs |
+| Socioeconomic data | Global gridded datasets | National/regional census or survey data |
+| Hotspot threshold | 5% global percentile | Adjustable via `pct_cutoff` in `HOTS_CFG` |
+
+See `docs/runbook.md` for the full execution guide and `docs/methodology.md` for the analytical framework.
+
+---
+
 # Future Directions
 
--   Implement PostgreSQL + PostGIS backend
--   Normalize values (e.g., population-weighted) during extraction
--   Extend temporal coverage (e.g., 1990–2020 at 5-year intervals)
--   **TODO:** Compare results between the 10km grid-based approach and per-pixel analysis to quantify differences and determine the optimal method.
--   Add transitions and swap metrics to land cover summaries
--   Build R + Python dashboards or plug-ins for visualization
+-   **Multi-temporal analysis:** Extend to 3+ snapshots (e.g., 1992, 2000, 2010, 2020) to capture trajectories, recovery events, and rate of change — not just net difference.
+-   **Regional high-resolution applications:** Apply the pipeline to priority regions (Amazon, SE Asia, West Africa) at 1–10 km resolution with locally calibrated InVEST inputs.
+-   **Attribution strengthening:** Factorial InVEST experiments (fixed climate / varying land cover, and vice versa) to partition the attribution gap between land-use-driven and climate-driven change.
+-   **Population exposure by region and biome:** Extend `hotspot_pop_exposure.csv` to stratify by `region_wb`, `WWF_biome`, and country (currently income-group only; requires full synthesis re-run on adequate hardware).
+-   **Extend temporal coverage:** Incorporate intermediate years to characterize change trajectories rather than single bi-temporal snapshots.
+-   **Normalize values:** Explore population-weighted or area-normalized exposure metrics alongside absolute counts.
 
 ::: {.callout-tip icon="true"}
-## Future Tasks & Ideas
+## Open Technical Tasks
 
-Here are some ideas and future tasks for this analysis:
-
-1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
-2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to quantify and visualize the share of total change (from bar plots) that occurs within hotspots versus outside of them, possibly using stacked bar plots.
+1.  **Adapt analysis for multi-temporal data:** Adapt hotspot_extraction.qmd to handle 3+ time points.
+2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to show the share of total change occurring within vs. outside hotspots (stacked bar approach).
 :::
 
 ## License
