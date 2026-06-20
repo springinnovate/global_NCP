@@ -1,5 +1,29 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-06-20
+
+#### Book chapter polish (Phase 3, sessions 5–6)
+
+*   **Chapter 7 (Regional Profiles) reviewed and cleaned:**  All `~X million` population placeholders replaced with `[TBD — extract from pop_exposure table]`. Two suspicious hardcoded numbers removed: "~580 million depending on water/food" (effectively LAC's entire population) and "~1,450 million smallholder farmers" (South Asia's full regional head-count, not just farmers). A `callout-warning` was added explaining how to extract real region-level numbers from the interactive pop_exposure table. "Next Steps" stub section removed.
+*   **Key Takeaways sections added to all remaining chapters:** Chapters 4, 6, 7, and 8 now have substantive Key Takeaways callouts (five findings each). These synthesize the geographic concentration patterns (Ch4), cross-scale exposure logic and three socioeconomic typologies (Ch6), Global South burden and within-region heterogeneity (Ch7), and the five top-line policy messages including the pipeline-as-infrastructure framing (Ch8).
+*   **Final attribution language fix in Ch8:** Bullet "(no detectable conversion)" in the policy section's Driver-Specific Strategies → "(no co-occurrence with extreme LCC)". Zero remaining instances of the old causal framing across all `.qmd` files.
+
+#### Interactive Summary Statistics — Chapter 4
+
+*   **DT replaced with `reactable`:** The two existing Summary Statistics tables (Hotspot Area Coverage, Compound Risk) were failing to show filter inputs in Quarto tabsets because DT's `filter = "top"` row does not initialize in hidden tabs. Switched to `reactable` (`filterable = TRUE`, `searchable = TRUE`), which initializes lazily and renders filter inputs correctly. All column names cleaned (snake_case → readable labels), numerics pre-rounded, default sort set to Relative Intensity / Mean Overlapping Services descending. Installed `reactable` (v0.4.5) + its dependency `reactR` into the project R library.
+
+*   **Cross-dimensional analysis tab added:** A third tab "Country × Biome (Cross-dimensional)" was added to the Summary Statistics tabset. It loads `hotspots_global_pct.gpkg` via SQL (no geometry, 225K rows in ~1.4 s), pivots the 8 per-service hotspot flags to long format, and computes a (country × biome × service) cross-tabulation with n_hot, n_total, % hotspot area, % of global hotspots, expected share, and relative intensity. Produces 3,553 rows (country–biome–service combinations with ≥1 hotspot cell). The chunk is cached so it only runs on first render.
+
+    Example query verified in R: Brazilian Mangroves — 83 cells total; Pollination 57/83 (68.7%, 2.25× expected); Coastal Risk 7/83 (8.4%, 4.78× expected — nearly 5×). Any similar combination (e.g., Indonesia Mangroves, India Tropical Dry Forests, South Korea Temperate Forests) can be queried live in the rendered HTML book without re-running R.
+
+*   **README updated:** New "## Interactive Book Output" section added describing the three table types, their filter/sort capabilities, and example queries. Aimed at co-authors and future users who receive the rendered HTML and want to understand what analytical questions can be answered without re-running the pipeline.
+
+### 2026-06-19
+*   **Paper polish (Phase 3):** Completed Introduction AI-slop cleanup, added Scalability paragraph to Conclusions, swept all book chapters for attribution language. No issues found in chapters 03, 04, 06, 07, 09.
+*   **Attribution framing hardened:** Rewrote Results §Spatial Attribution Gap (was making causal claims inconsistent with Discussion), tightened Abstract, Methods, and Conclusions to consistently use co-occurrence language. Table label changed from "Unmapped Degradation" → "No Detected LCC".
+*   **Climate forcing mechanism clarified:** Expanded Discussion item 2 to explain the specific R-factor pathway by which precipitation changes propagate through InVEST SDR/NDR into modeled service outputs. Added IPCC AR6 (2021) and Nearing et al. (2004) to references.
+*   **⚠️ OPEN QUESTION FOR BECKY — blocks submission:** Were the InVEST SDR/NDR model runs for 1992 and 2020 performed with (a) the **same fixed climate inputs** (e.g., one long-term-average WorldClim R-factor raster applied to both years) or (b) **era-specific climate inputs** for each year (e.g., year-matched CHELSA or ERA5 precipitation/erosivity)? This determines whether "Climate Forcing" is a direct or only indirect explanation for the 76% attribution gap, and therefore how strongly to hedge the Discussion language. A callout note has been added in `paper_draft.qmd` §Attribution Analysis to flag this for the next advisor meeting.
+
 ### 2026-06-16
 *   **Repository Restructuring & Cleanup:** Conducted a major repository cleanup to align with FAIR principles and good industry practices. Transitioned the project from a standard R package structure to a broader reproducible research project structure, acknowledging its evolution into a large-scale analytical pipeline.
 *   **Data Consolidation:** Unified data directories, ensuring that `C:\projects\global_NCP\data` contains the most recent canonical data, while deprecating redundant `home/` directories.

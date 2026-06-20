@@ -74,3 +74,50 @@ We perform two-sample Kolmogorov-Smirnov (KS) tests to determine if the socioeco
 ![KS Statistic Heatmap (Distribution Distance)](../../../outputs/plots/ks/ks_heatmap.png){width=100%}
 
 ![Directionality of Hotspot Effects (Cliff's Delta)](../../../outputs/plots/ks/directionality_cliffs_delta.png){width=100%}
+
+## Distributional Profiles (ECDF Overlays)
+
+The KS heatmap and Cliff's Delta charts show *how strongly* and *in which direction* hotspot distributions depart from background. The ECDF (Empirical Cumulative Distribution Function) plots below reveal the *shape* of those differences — where in the distribution the gap opens, how wide it is, and whether it is consistent across all quantiles. In each panel, red = hotspot cells, blue = median-background cells. A rightward shift of the red curve means hotspot cells tend toward higher values; leftward means lower.
+
+### Population and GDP: A Universal Signal
+
+Across all eight services, hotspot cells carry substantially higher population density and GDP than the median background. The gap is large and consistent across the full distribution — not just in the tails — explaining the uniformly positive Cliff's Delta seen in the directionality chart above.
+
+![ECDF Overlays — Population (GHS-POP 2020, log₁₊ scale)](../../../outputs/plots/ks/ecdf/ecdf_GHS_POP_E2020_GLOBE_sum_log1p.png){width=100%}
+
+![ECDF Overlays — GDP 2020 (log₁₊ scale)](../../../outputs/plots/ks/ecdf/ecdf_rast_gdpTot_1990_2020_30arcsec_2020_sum_log1p.png){width=100%}
+
+### HDI and GINI: Three Socioeconomic Typologies
+
+Unlike population and GDP — which show a uniform elevation across all services — HDI and GINI are the variables that split the services into three distinct socioeconomic typologies, visible in the diverging directions of the ECDF curves.
+
+![ECDF Overlays — Human Development Index (HDI)](../../../outputs/plots/ks/ecdf/ecdf_hdi_raster_predictions_2020_mean.png){width=100%}
+
+**Coastal services (C_Risk, C_Risk_Red_Ratio):** Hotspot curves shift *rightward* in HDI — declines co-occur with more developed contexts. This is consistent with populated coastlines where prior settlement increases hazard exposure and reduces relative protection benefits.
+
+**Terrestrial provisioning and export services (Pollination, Nature_Access, N_export, Sed_export):** Hotspot curves shift *leftward* in HDI — less-developed contexts — while GINI shows a rightward shift (higher inequality). Service losses co-occur with limited adaptive capacity and structural inequality.
+
+**Retention ratio services (N_Ret_Ratio, Sed_Ret_Ratio):** Near-neutral HDI shift (slight rightward), but GINI shifts *leftward* (lower inequality than background) — a third, distinct pattern that does not reduce to either of the above.
+
+![ECDF Overlays — GINI Coefficient](../../../outputs/plots/ks/ecdf/ecdf_rast_adm1_gini_disp_2020_mean.png){width=100%}
+
+These typologies reflect spatial co-occurrence between ecosystem service decline and socioeconomic context, not causal attribution. They provide a framework for targeting policy attention and structuring future analyses that explicitly model the pathways connecting land-use pressure, service change, and human welfare.
+
+## Key Takeaways
+
+::: {.callout-note}
+**Five findings on who is exposed:**
+
+1. **Scale depends critically on the unit of analysis.** At 10km grid resolution, ~5.3 billion people reside within hotspot cells. At 300m in-situ resolution (compound hotspot cells only, 2+ services), ~8.6 million people live directly within the most intensely affected sites. Both numbers are real — they measure different things (grid-cell overlap vs. fine-scale within-cell concentration).
+
+2. **Connectivity multiplies exposure by orders of magnitude.** The downstream + access pathway analysis raises the potentially affected population from in-situ residents to ~7.6 billion globally — nearly the entire world population. For compound hotspot cells (2+ services), the local-to-downstream multiplier exceeds 700×; for cells with 3+ overlapping declines, it exceeds 1700×. This reflects the functional connectivity between upstream ecosystem processes and distant beneficiaries.
+
+3. **Population density and GDP elevation are universal.** All eight services show hotspot cells with higher population and GDP than the median background — a consistent, large-magnitude signal across the full distribution (not just the tails). The world's hotspots are not wilderness: they are embedded in human landscapes.
+
+4. **Three distinct socioeconomic typologies emerge from HDI and GINI patterns:**
+   - *Coastal services* (C_Risk, C_Risk_Red_Ratio): co-occur with *higher* HDI — declines are concentrated in developed, densely settled coastlines.
+   - *Terrestrial provisioning services* (Pollination, Nature Access, N/Sed export): co-occur with *lower* HDI and *higher* GINI — losses fall on less-developed, more unequal contexts with limited adaptive capacity.
+   - *Retention ratio services* (N_Ret_Ratio, Sed_Ret_Ratio): near-neutral or slight positive HDI shift, but *lower* GINI than background — a third, structurally distinct pattern.
+
+5. **The equity implication is not symmetric across services.** The terrestrial service typology — where the most people depend on pollination and water quality — is precisely the typology concentrated in lower-HDI, higher-inequality settings. The communities least able to substitute or adapt bear the largest relative burden.
+:::

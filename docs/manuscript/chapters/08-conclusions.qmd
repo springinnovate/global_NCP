@@ -29,7 +29,7 @@ Ecosystem service decline **disproportionately burdens vulnerable populations**:
 ### **WHY are services declining?**
 Decline mechanisms are **service- and region-specific**:
 - **Conversion-detectable decline** (~24%): Land cover change co-occurs with roughly a quarter of hotspots
-- **Attribution gap** (~76%): The majority of hotspot cells show no detectable categorical land-cover transition at 300m resolution — plausible mechanisms include sub-pixel degradation, upstream routing cascades, and climate forcing, but this analysis identifies spatial co-occurrence, not causal attribution
+- **Attribution gap** (~76%): The majority of hotspot cells do not co-occur with extreme (top 5%) land cover conversion at 300m — those cells may still have moderate LCC below the threshold; plausible mechanisms for the gap include sub-pixel degradation, upstream routing cascades, and climate forcing, but this analysis identifies spatial co-occurrence, not causal attribution
 - **Regional variation**: Tropics show higher conversion signature; developed regions show more degradation signals
 
 **Actionable implication**: One-size-fits-all interventions won't work. Conversion-detectable hotspots need land protection; hotspots in the attribution gap require targeted investigation and likely a mix of management reform, restoration, and climate adaptation.
@@ -56,7 +56,7 @@ Decline mechanisms are **service- and region-specific**:
 
 **4. Driver-Specific Strategies**
 - **For conversion hotspots**: Land protection (PA expansion, tenure security), PES programs
-- **For degradation hotspots**: Restoration, sustainable agriculture, forest management reform
+- **For attribution-gap hotspots** (no co-occurrence with extreme LCC): Restoration, sustainable land management, and investment in fine-scale monitoring to diagnose underlying mechanisms
 - **For knowledge gaps**: Invest in fine-scale monitoring, degradation mapping, climate integration
 
 ### For Governments
@@ -103,7 +103,7 @@ Decline mechanisms are **service- and region-specific**:
 **1. Ground-Truthing**
 - Validate InVEST models in hotspot regions (field surveys)
 - Investigate degradation signal: what mechanisms drive unexplained service loss?
-- Test attribution: do conversion-driven vs. degradation-driven hotspots respond differently to interventions?
+- Test attribution: do conversion hotspots respond differently to interventions than attribution-gap hotspots?
 
 **2. Temporal Dynamics**
 - Expand analysis beyond 1992-2020 snapshots
@@ -134,7 +134,7 @@ Monitoring progress requires tracking:
 
 3. **Driver outcomes**:
    - Are gross natural land conversion rates declining specifically within hotspot boundaries?
-   - For degradation-driven hotspots, are sustainable land management practices increasing?
+   - For attribution-gap hotspots, are sustainable land management practices increasing and fine-scale monitoring being deployed?
 
 4. **System outcomes**:
    - Is biodiversity recovering? (Target: populations stable/increasing in protected hotspot zones)
@@ -146,7 +146,7 @@ We acknowledge important caveats:
 
 1. **Temporal limitation**: 1992-2020 is a single 28-year snapshot; long-term patterns may differ
 2. **Resolution limitation**: 100 sq km cells mask sub-grid heterogeneity; extreme variation within cells possible
-3. **Attribution analysis as co-occurrence**: ~76% of hotspot cells show no detectable LCC transition; this identifies spatial co-occurrence, not causal attribution — the endogeneity of ESA CCI as both an InVEST input and attribution overlay means the gap is a structured signal, not an independent empirical partition
+3. **Attribution analysis as co-occurrence**: ~76% of hotspot cells do not co-occur with extreme (top 5%) land cover conversion at 300m — those cells may still have minor or moderate LCC; this identifies spatial co-occurrence, not causal attribution — the endogeneity of ESA CCI as both an InVEST input and attribution overlay means the gap is a structured signal, not an independent empirical partition
 4. **Model validation**: InVEST models not independently validated in all regions (see Technical Appendix)
 5. **Social data**: Socioeconomic layers aggregated to 10-km; local variation substantial
 
@@ -166,7 +166,7 @@ Ecosystem services are declining, but the decline is **not inevitable or irrever
 
 - **Where** action is most urgent (hotspot regions)
 - **Who** depends on restoration (vulnerable populations)
-- **Why** services are declining (conversion co-occurs with 24%; a 76% attribution gap signals mechanisms operating below detection thresholds)
+- **Why** services are declining (extreme land conversion co-occurs with 24% of hotspots; the 76% attribution gap signals ES declines not co-located with the most extreme categorical conversions)
 - **How** to prioritize intervention (geographic + equity weighting)
 
 The analysis is a **starting point, not a destination**. It enables prioritization, hypothesis testing, and adaptive management. As monitoring data accumulates and our understanding deepens, strategies can be refined.
@@ -174,6 +174,30 @@ The analysis is a **starting point, not a destination**. It enables prioritizati
 **The question is not whether we can reverse ecosystem service decline.** Examples of ecosystem recovery (forests regenerating, wetlands restoring) prove we can. **The question is whether we have the will and resources to do it at global scale, with equity.**
 
 This book provides the evidence base. **Now it's time for action.**
+
+## Key Takeaways
+
+::: {.callout-note}
+**The five things to carry forward from this book:**
+
+1. **Hotspot geography is structured, not random.** Tropical and subtropical biomes, low- and lower-middle income countries, and coastal nations collectively bear a disproportionate share of ecosystem service decline relative to their land area. This spatial concentration is the primary argument for geographic prioritization of conservation and climate finance.
+
+2. **Exposure scales with connectivity.** The ~5.3 billion people within 10km hotspot cells and the ~7.6 billion connected through hydrological and access pathways are not interchangeable numbers — they describe different beneficiary relationships. Both matter for policy: in-situ residents for direct livelihood interventions, connected beneficiaries for watershed governance and access planning.
+
+3. **The 76% attribution gap is a structured signal, not a data failure.** Most hotspot cells do not co-occur with the most extreme (top 5%) land cover conversion. This could reflect sub-pixel degradation, upstream routing effects, or climate forcing — mechanisms this analysis identifies as plausible but cannot partition. The implication is that relying solely on categorical land conversion mapping will miss the majority of ES decline.
+
+4. **Three socioeconomic typologies determine who is hurt.** The coastal / terrestrial provisioning / retention-ratio split (Chapter 6) reveals that the equity dimension of ES decline is service-specific. Blanket vulnerability claims obscure these distinctions; effective policy must be typology-aware.
+
+5. **The pipeline is the contribution, not just the map.** The global snapshot is a proof of concept. The modular extraction → hotspot → synthesis pipeline can be re-run at regional scale, with finer resolution, at additional time points, or with expanded service sets — making this infrastructure for ongoing monitoring rather than a one-time analysis.
+:::
+
+---
+
+## Using and Adapting the Pipeline
+
+This global assessment is intentionally scoped as a proof of concept — the open-source pipeline underlying it is designed to be reused rather than treated as a one-off analysis. The same extraction, hotspot identification, and synthesis infrastructure can be applied at regional scale (e.g., the Amazon basin, Southeast Asia, sub-Saharan Africa) with locally-calibrated InVEST inputs and higher-resolution rasters, yielding greater spatial fidelity than global defaults can provide. Additional time points and service variables can be incorporated by extending the extraction and synthesis steps without modifying the core pipeline structure, making multi-temporal and multi-service analyses tractable as monitoring data improve.
+
+For technical details on the pipeline architecture, see @sec-annex and the project repository below.
 
 ---
 

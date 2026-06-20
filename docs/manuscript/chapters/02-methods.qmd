@@ -9,61 +9,104 @@ This analysis integrates four major datasets:
 
 ### 1. Ecosystem Service Models (InVEST)
 
-- **Source**: Natureal Capital Project InVEST model suite
+- **Source**: Natural Capital Project — InVEST (Integrated Valuation of Ecosystem Services and Tradeoffs) model suite (Sharp et al., 2020)
 - **Coverage**: Global, 300m resolution, 1992 & 2020 snapshots
 - **Services modeled**:
-    - Pollination (agricultural crop pollination)
-    - Nitrogen Export & Retention (water quality)
-    - Sediment Export & Retention (water quality/erosion control)
-    - Nature Access (recreation/cultural ecosystem services)
-    - Coastal Protection (mangrove/coral reef storm buffering)
+    - Pollination (habitat suitability and foraging range support for wild pollinators)
+    - Nitrogen Export & Retention Ratio (nutrient loading and landscape filtration efficiency)
+    - Sediment Export & Retention Ratio (erosion delivery and on-slope retention capacity)
+    - Nature Access (proximity to intact natural habitat)
+    - Coastal Protection / Coastal Risk Reduction Ratio (wave energy attenuation by coastal habitats)
 
-**How it works**: InVEST uses land use, climate, and biophysical data to estimate ecosystem service supply. A full technical description is in the Technical Appendix.
+**How it works**: InVEST uses land cover, climate, and biophysical parameters to simulate ecosystem service supply via process-based models. Each service is modeled independently; outputs are continuous rasters at 300m resolution. A full technical description is in the Technical Appendix (Sharp et al., 2020).
 
 ### 2. Land Cover Data
-**Source**: ESA Climate Change Initiative, 300m resolution.
-**Classification**: Reclassified to Transformed (agriculture, urban, plantations) vs. Natural (forests, grasslands, wetlands).
-**Purpose**: Explain ecosystem service change; attribute decline to land conversion vs. degradation.
+
+Two temporally contiguous products from the ESA classification lineage:
+
+- **1992 baseline**: ESA Climate Change Initiative (CCI) Land Cover v2.0.7 — annual 300m global maps, 1992–2015. Citation: Defourny et al. (2017); ESA (2017). [URL — to add: esa-landcover-cci.org]
+- **2020 endpoint**: Copernicus Climate Change Service (C3S) Global Land Cover v2.1.1 — continuation of the CCI series for 2016–2020, same LCCS classification scheme. [citation — to verify: C3S (2021) or Buchhorn et al. (2020)]
+- **Note**: A minor processing-chain discontinuity exists at the 2015/2016 version boundary and is acknowledged as a potential source of classification inconsistency.
+
+**Reclassification**: The original 37-class LCCS legend is reclassified to 9 simplified functional classes (see Attribution Analysis section below), from which three driver-specific conversion metrics are derived: gross forest loss, cropland expansion, and urban expansion.
+
+**Purpose**: Serve a dual role — primary input to InVEST biophysical models, and baseline for the downstream spatial attribution analysis.
 
 ### 3. Master Grid
-**Source**: IUCN Oecism Opportunity Grid, 10km equal-area cells.
-**Coverage**: ~1.5M cells covering all land globally.
-**Attributes**: Country, World Bank region, income group, WWF biome.
-**Purpose**: Common spatial unit for all analysis; enables regional/income aggregation.
+
+- **Source**: IUCN Area of Occupancy (AOO) Grid (Murray, 2017). [URL — to add]
+- **Coverage**: 1,522,073 cells covering all terrestrial landmasses globally; ~1.30M cells retained after dropping those with incomplete raster coverage across both time periods.
+- **Cell size**: 100 km² equal-area cells (~10km × 10km).
+- **Attributes**: Country, World Bank region, income group, WWF biome — joined via expert-reviewed correspondence table (`ee_correspondence`).
+- **Purpose**: Common spatial unit for all analysis; enables consistent regional and income-group aggregation.
 
 ### 4. Socioeconomic Layers
-**Sources**: World Bank, UNDP, CIESIN.
-**Variables**: Population density, GDP per capita, Human Development Index, built area, agricultural intensity, Gini coefficient.
-**Purpose**: Profile who lives in hotspot regions; test whether hotspot populations differ from global norm.
 
-## The Two-Path Analysis
+| Variable | Source | Citation |
+|---|---|---|
+| Population density | Global Human Settlement Layer (GHSL-POP 2020) | [Schiavina et al. — citation to verify] |
+| Built-up area | GHSL-BUILT | [same GHSL release — citation to verify] |
+| GDP (total) | World Bank gridded economic layers | [citation — to add] |
+| Human Development Index | Gridded HDI predictions (10km, ML-downscaled) | Sherman et al. (2026) |
+| Agricultural plot intensity | Global field size dataset | Mehrabi et al. (2022) |
+| Gini coefficient | Gridded admin-1 Gini (disposable income, 2020) | [citation — to verify: source of `rast_adm1_gini_disp_2020`] |
 
-We implement a **two-path analysis** to separate WHERE hotspots are from WHY they occur:
+**Purpose**: Profile the socioeconomic context of hotspot areas; test whether hotspot populations differ systematically from the background landscape (KS tests + Cliff's Delta).
 
+## Analytical Pipeline
+
+The full workflow implements a dual-pathway structure, with Path B hotspots feeding three downstream analyses (attribution, socioeconomic profiling, and off-site beneficiary routing):
+
+```{mermaid}
+%%{init: {'flowchart': {'rankSpacing': 55, 'nodeSpacing': 30}}}%%
+flowchart TB
+    RawES["InVEST ES Models\n300m · 1992 & 2020"]
+    RawGrid["IUCN 10km Master Grid\nSubregional Attributes"]
+    RawLC["ESA CCI Land Cover\n300m · 1992 & 2020"]
+    RawSoc["Socioeconomic Data\nPop, GDP, HDI"]
+
+    IntA["Path A\nPixel-level Summaries"]
+    MathA["Path A Metrics\nSPC & Absolute Δ"]
+
+    IntB["Path B\n10km Grid Analysis"]
+    MathB["Path B Metrics\nSPC & Absolute Δ"]
+
+    MathLC["Land Cover\nTransitions"]
+    MathSoc["KS Tests &\nSocioeco. Profiling"]
+    MathBenef["Serviceshed\nRouting"]
+
+    P1(["WHAT\nGlobal Trajectories"])
+    P2(["WHERE\nHotspot Detection"])
+    P3(["WHY\nAttribution Gap"])
+    P4(["WHO\nExposure & Multiplier"])
+
+    RawES ==> IntA & IntB
+    RawGrid ==> IntB & MathLC & MathSoc
+    RawLC ==> MathLC
+    RawSoc ==> MathSoc & MathBenef
+
+    IntA ==> MathA ==> P1
+    IntB ==> MathB ==> P2
+
+    P2 ==> MathLC & MathSoc & MathBenef
+    MathLC ==> P3
+    MathSoc ==> P4
+    MathBenef ==> P4
+
+    classDef c_what fill:#007930,stroke:#004D1E,stroke-width:2px,color:#FFF;
+    classDef c_where fill:#7B8327,stroke:#515619,stroke-width:2px,color:#FFF;
+    classDef c_why fill:#F07D00,stroke:#A85700,stroke-width:2px,color:#FFF;
+    classDef c_who fill:#F5D200,stroke:#B39900,stroke-width:2px,color:#333;
+
+    class RawES,IntA,MathA,P1 c_what;
+    class RawGrid,IntB,MathB,P2 c_where;
+    class RawLC,MathLC,P3 c_why;
+    class RawSoc,MathSoc,MathBenef,P4 c_who;
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ Path A: Global Trajectories (Pixel-level summary)           │
-│ What: Aggregate 300m InVEST rasters to understand          │
-│ global-level change trends by service                       │
-│ Output: Global summary statistics per service               │
-│ Use: Chapter 3 (global context)                             │
-└─────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────┐
-│ Path B: Grid Analysis (Canonical for hotspots)              │
-│ What: Zonal statistics within IUCN 10km cells               │
-│ (difference of aggregates, not aggregate of differences)    │
-│ Process:                                                     │
-│   1. Aggregate 300m InVEST to 10km cell level (1992 & 2020)│
-│   2. Calculate change per cell (absolute & percentage)      │
-│   3. Identify hotspots: top 5% of grid cells by rank        │
-│   4. Aggregate hotspots to regions/countries/biomes         │
-│ Output: Hotspot locations, intensity, populations affected  │
-│ Use: Chapters 4-7 (geographic, socioeconomic, drivers)      │
-└─────────────────────────────────────────────────────────────┘
-```
+**Path A** answers "what happened globally" — pixel-level summaries by biome, region, and income group (Chapter 3).
 
-**Why two paths?** Path A answers "what happened globally"; Path B answers "where did it happen" with actionable spatial detail.
+**Path B** answers "where, who, and why" with cell-level precision. Identified hotspot cells feed three parallel analyses: spatial overlay against land cover transitions (WHY), socioeconomic KS profiling of in-situ populations (WHO), and serviceshed routing to count off-site downstream and travel-access beneficiaries (WHO multiplier effect). Chapters 4–7 build on these outputs.
 
 ## Change Metrics: From Absolute to Symmetric Percentage Change
 
@@ -101,69 +144,115 @@ Using the SPC prevents scale bias (large-baseline services dominating hotspot id
 
 ## Socioeconomic Profiling: Kolmogorov-Smirnov Tests
 
-Question: Are populations in hotspots statistically different from non-hotspot populations?
+**Question**: Are socioeconomic conditions in hotspot cells statistically and practically different from a matched background landscape?
 
-**Method**: Kolmogorov-Smirnov (KS) test compares cumulative distributions:
+**Comparison design**: Hotspot cells are compared against a *median background* — the 47.5th to 52.5th percentiles of service change — rather than all non-hotspot cells. This avoids confounding with extreme gains in the opposite direction and isolates the specific profile of acute decline against typical, stable conditions (Andam et al., 2008). All p-values are FDR-corrected (Benjamini & Hochberg, 1995) across the full 40-comparison matrix (8 services × 5 covariates).
 
-- **Hotspot population**: All socioeconomic values in hotspot cells
-- **Non-hotspot population**: All values in non-hotspot cells
+**Method**: Two-sample Kolmogorov-Smirnov (KS) test (Kolmogorov, 1933; Smirnov, 1948) compares the full empirical cumulative distribution functions (ECDFs) of each covariate between groups:
 
-**Output**:
+- **KS Statistic (D)**: Maximum vertical distance between the two ECDFs (0–1 scale); larger = greater separation between distributions
+- **P-value**: Probability the observed separation arose by chance under the null hypothesis of identical distributions; adjusted for multiple testing via Benjamini-Hochberg FDR
 
-- **KS Statistic (D)**: Maximum vertical distance between curves (0-1 scale); larger = more different
-- **P-value**: Probability difference occurred by chance; p < 0.05 = significant
-- **Cliff's Delta**: Effect size (how meaningful is the difference, not just statistically significant)
+**Why Cliff's Delta, not just the p-value**: With ~250,000 hotspot cells and a matched background of similar size, p-values are inflated by sample size — even a negligible difference will reach p < 0.001 (Lin et al., 2013). Cliff's Delta (δ) is immune to this: it measures the *probability* that a randomly drawn hotspot cell has a higher covariate value than a randomly drawn background cell, minus the reverse:
+
+> δ = P(X_hotspot > X_background) − P(X_hotspot < X_background)
+
+Range is −1 to +1, where 0 = complete distributional overlap and ±1 = complete separation. It is equivalent to 2·AUC − 1 from ROC analysis. Standard magnitude thresholds (Romano et al., 2006): negligible |δ| < 0.147, small < 0.33, medium < 0.474, large ≥ 0.474.
 
 **Interpretation**:
 
-- Significant KS test + high Cliff's Delta = Hotspot populations meaningfully different (e.g., "Pollination hotspots are predominantly rural/agricultural")
-- Significant but low Cliff's Delta = Difference is small despite statistical significance
+- High |δ| + significant p_adj = distributions are both statistically and practically distinct (e.g., coastal risk hotspots: δ_HDI ≈ +0.30, large effect — co-occur with more developed contexts)
+- Near-zero δ despite significant p = difference is real but negligibly small in practical terms (e.g., agricultural plot intensity across all services: δ ≈ 0)
 
-## Attribution Analysis: Overlap with Land Cover Change
+## Attribution Analysis: Land Cover Change Methodology
 
-**Question**: What % of ecosystem service hotspots overlap with observed land cover change?
+**Question**: What proportion of extreme ecosystem service decline hotspots (top 5% of SPC change) spatially co-occur with extreme land cover conversion hotspots (top 5% of gross conversion magnitude) between 1992 and 2020?
 
-**Method**:
+### Reclassification Scheme
 
-1. Identify all grid cells with converted land cover (natural → transformed, 1992→2020)
-2. For each hotspot cell, check if it also has conversion
-3. Calculate % overlap
+The original 37-class ESA LCCS legend is reclassified in two steps:
 
-**Result**: Heatmap showing which services' hotspots coincide with which LCC types (forest loss, cropland expansion, etc.)
+**Step 1 — 9 simplified classes** (applied to both 1992 and 2020 rasters):
 
-**Attribution Gap**: 
+| Class | Label | ESA source classes |
+|---|---|---|
+| 1 | Cropland | 10, 11, 12, 20, 30, 40 |
+| 2 | Forest | 50–100, 160, 170 (flooded trees mapped to Forest, not Wetland, to capture mangroves and swamp forest) |
+| 3 | Grassland / Shrubland | 110–130 |
+| 4 | Sparse vegetation | 140–153 |
+| 5 | Wetland | 180 |
+| 6 | Urban / Built-up | 190 |
+| 7 | Bare land | 200–202 |
+| 8 | Water | 210 |
+| 9 | Snow / Ice | 220 |
 
-- 100% - (0% overlap with any LCC type)
-- High gap (e.g., 50%) → Service decline not fully explained by observed land conversion; suggests degradation signal
-- Low gap (e.g., 10%) → Service decline primarily explained by land cover change
+**Step 2 — Parallel models** (run on the 9-class maps):
+
+- **Binary Natural/Transformed**: Transformed = Cropland (1) + Urban (6); Natural = all other classes. This provides a broad measure of anthropogenic land conversion.
+- **Forest Loss model**: Forest (class 2) vs. Non-Forest — tracks gross deforestation and reforestation.
+- **Urban & Cropland Expansion model**: Cropland / Urban / Other — tracks the expansion of specific anthropogenic land uses.
+
+### Transition Metrics (diffeR framework)
+
+For each 10km grid cell, per-class transition metrics are calculated using the `diffeR` R package (Pontius, 2022; Pontius & Millones, 2011):
+
+- **Gain**: Area of a class present in 2020 that was absent in 1992
+- **Loss**: Area of a class present in 1992 that was absent in 2020
+- **Persistence**: Area that remained the same class in both years
+- **Quantity / Exchange / Shift**: Decomposition of total change into net quantity change vs. spatial swap (see Pontius & Millones, 2011)
+
+Key attribution metrics used:
+
+- `ForestLoss_Loss_Forest_1992_2020` — gross deforestation
+- `Expansion_Gain_Cropland_1992_2020` — agricultural expansion
+- `Expansion_Gain_Urban_1992_2020` — urbanization
+
+### Spatial Co-occurrence Test
+
+Ecosystem service hotspot cells (top 5% by SPC, per service) are overlaid against land cover **conversion hotspot** cells (top 5% of grid cells by gross Loss of Natural land or gross Gain of Cropland/Urban). The 5% threshold is deliberately symmetric with the ES hotspot definition.
+
+**Attribution Gap** = 100% − (% of ES hotspot cells that also fall in the top 5% of any LCC conversion metric)
+
+A high gap means most severe ES decline does not co-occur with the most intense land cover conversion — those cells may still have moderate or minor LC change, just not at the top-5% threshold. This is a **spatial co-occurrence signal, not a causal partition**: ESA CCI land cover serves as both a primary InVEST model input and the attribution overlay, so the gap cannot be interpreted as an independent empirical separation between degradation-driven and conversion-driven change (see Chapter 5 for full discussion).
 
 ## Quality Assurance
 
-**Validation steps**:
-1. Grid geometry verification (all ~1.5M cells registered correctly)
-2. Data integrity checks (no missing values in key attributes)
-3. Sanity checks on InVEST values (within expected ranges; realistic spatial patterns)
-4. Validation with literature (hotspot locations match known conservation priorities) [pending to do]
+**Validation steps completed**:
+
+1. Grid geometry verification — all ~1.5M cells confirmed at 100 km² in equal-area projection
+2. Data integrity checks — no missing values in key attributes across both time periods
+3. InVEST output sanity checks — values within expected biophysical ranges; spatial patterns consistent with known ecological gradients
+4. Pollination special case — a valid-pixel mask was applied across both dates and NA cells reclassified to zero prior to difference calculation, to prevent spurious NA propagation in the change layer
 
 **Uncertainties acknowledged**:
-- InVEST models depend on input data quality (see Technical Appendix)
-- 10-km resolution may mask sub-grid heterogeneity
-- 1992-2020 is a single temporal snapshot; intermediate dynamics unknown
-- Socioeconomic data at 10-km resolution may not capture local variation
+
+- InVEST models depend on input data quality and global-default parameterization (see Technical Appendix)
+- 100 km² cells mask sub-grid heterogeneity; local-scale variation may be substantial
+- Two-snapshot design (1992 vs. 2020) cannot capture intermediate dynamics or recovery events
+- Socioeconomic layers at 10km resolution may not reflect within-cell inequality
+- Minor classification inconsistency at the ESA CCI v2.0.7 / C3S v2.1.1 version boundary (2015/2016)
+
+::: {.callout-important}
+**[FOR BECKY — pending before finalizing]**
+
+One validation step is still open: cross-checking hotspot locations against known conservation priorities in the literature (e.g., do our hotspot clusters correspond to previously identified biodiversity or ES decline zones?). I haven't done this systematically yet. Do you have specific reference maps or studies you'd suggest for this comparison — or is this something we defer to the peer-review response?
+:::
 
 ## Reproducibility
 
-All analysis is reproducible:
+All analysis is reproducible from raw inputs:
 
-- **Code**: R/Quarto notebooks (available on project repository)
-- **Data**: Processed CSVs and intermediate outputs in `/data/processed/`
-- **Full pipeline**: Python zonal statistics → R processing → hotspot detection
-- **See**: Technical Appendix for full methodological detail
+- **Code**: R/Quarto notebooks and Python extraction scripts (project repository)
+- **Data**: Processed GeoPackages and CSVs in `/data/processed/`
+- **Pipeline**: Python zonal statistics (via `zonal_stats_toolkit`) → R processing → hotspot detection → synthesis
+- **Technical detail**: Full pipeline documentation in the Technical Appendix (@sec-annex)
 
-## Plain Language Summary
+## Summary
 
-We compared modeled global ecosystem service from 1992 and 2020. We identified regions (hotspots) where services changed most dramatically. We then asked: "Who lives there?" (socioeconomic profiling) and "Why?" (land cover drivers). The result is a map of ecosystem service priorities for conservation and development policy.
+This chapter describes a four-component methodological framework designed to diagnose global ecosystem service change with spatial and socioeconomic precision. Eight biophysical services were simulated at 300m resolution using InVEST for 1992 and 2020, then aggregated to a consistent 10km equal-area grid spanning 1.3 million terrestrial cells globally.
 
-## Next Steps
+Two parallel analytical pathways address different spatial questions. Path A computes pixel-level regional trajectories to answer *what changed globally* — preserving true volumetric trends by aggregating differences before summarizing. Path B identifies localized extremes by aggregating raster values to the grid first, then computing change, isolating the most intense local shifts without them being averaged away. Hotspots are defined as the top 5% of cells by Symmetric Percentage Change per service — a rank-based, scale-invariant threshold that enables fair comparison across services measured in fundamentally different units.
 
-Chapter 3 shows what changed globally. Chapters 4-7 focus into WHERE (geographic patterns), WHO (affected populations), and WHY (land cover drivers).
+Socioeconomic profiling tests whether hotspot populations are systematically different from the background landscape using Kolmogorov-Smirnov tests, complemented by Cliff's Delta to measure practical effect size rather than statistical significance alone — a necessary correction given the very large sample size. The attribution analysis asks how much of this extreme ES decline co-occurs with equally extreme land cover conversion, using a symmetric 5% threshold on both sides. The resulting attribution gap is interpreted as a spatial co-occurrence signal, not a causal partition, because ESA CCI land cover serves simultaneously as both an InVEST model input and the attribution overlay.
+
+Together, these design choices produce a spatially explicit, methodologically consistent evidence base for the WHERE, WHO, and WHY questions addressed in Chapters 4–7.
