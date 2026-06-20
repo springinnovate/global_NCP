@@ -164,52 +164,61 @@ if (nrow(pop_exposure) > 0) {
 
 ## Regional Policy Priorities
 
-::: {.callout-warning}
-**Draft stubs — data extraction pending.** The regional summaries below are illustrative placeholders. Population figures marked [TBD] should be replaced with region-specific estimates extracted from the interactive `pop_exposure` table above (filter `grouping_var == "region_wb"`). Hotspot service rankings should be verified against the country-intensity chart for each region.
-:::
+Regional hotspot burden is quantified by **relative intensity** (observed hotspot share ÷ expected share given regional land area): values above 1.0 indicate a region hosts a disproportionate share of global hotspot cells. All figures below are derived from `hotspot_area_stats.csv` (grouping_var == "region_wb") at 10 km² grid resolution. Per-region population counts are not directly available in current outputs; see the multiplier effect dumbbell plots in Chapter 6 for regional exposure scale.
 
 ### Sub-Saharan Africa
-- **Hotspot Services**: Pollination, N/Sed export
+- **Top Hotspot Services** (by relative intensity): Nature Access (1.17×), Sediment Retention (1.10×), Pollination (1.09×)
+- **Geographic footprint**: ~14,700 Nature Access cells; ~13,700 Pollination cells (out of 241,000 regional cells)
 - **Key Countries**: Nigeria, DRC, Ethiopia, Tanzania
-- **Priority**: Agricultural sustainability; soil conservation; crop diversification
-- **Vulnerable Population**: [TBD — extract from pop_exposure table]
+- **Priority**: Ecosystem-based agriculture; soil and water conservation; access to natural areas for rural communities
+- **Regional burden**: All three services exceed the 1.0 benchmark — disproportionate risk given the region's low historical contribution to drivers
 
 ### Latin America & Caribbean
-- **Hotspot Services**: Water quality (N/Sed), Nature Access
+- **Top Hotspot Services** (by relative intensity): Sediment Export (2.51×), Pollination (1.91×), Nitrogen Export (1.65×)
+- **Geographic footprint**: ~26,600 Sediment Export cells; ~20,300 Pollination cells (out of 204,000 regional cells)
 - **Key Countries**: Brazil, Colombia, Mexico, Bolivia
-- **Priority**: Upstream protection; riparian restoration; sustainable agriculture
-- **Vulnerable Population**: [TBD — extract from pop_exposure table]
+- **Priority**: Upstream watershed protection; riparian buffer restoration; sustainable agricultural intensification to reduce sediment and nutrient loads
+- **Regional burden**: Sediment Export at 2.51× is the highest region-service relative intensity in the entire dataset — a global priority signal
 
 ### East Asia & Pacific
-- **Hotspot Services**: Mixed (varies by service)
+- **Top Hotspot Services** (by relative intensity): Nitrogen Retention (1.80×), Nitrogen Export (1.57×), Sediment Retention (1.56×)
+- **Geographic footprint**: ~23,000 N_Ret_Ratio cells; ~20,000 N_export cells (out of 246,000 regional cells)
 - **Key Countries**: Indonesia, Philippines, Vietnam, China
-- **Priority**: Forest protection; wetland restoration; coastal management
-- **Vulnerable Population**: [TBD — extract from pop_exposure table]
+- **Priority**: Nutrient management; watershed restoration; wetland conservation for water purification
+- **Regional burden**: Water quality services are strongly disproportionate here; coastal risk is at approximately expected levels (relative intensity ≈ 0.95)
 
 ### South Asia
-- **Hotspot Services**: Water quality; pollination
+- **Top Hotspot Services** (by relative intensity): Nitrogen Retention (1.37×), Nature Access (1.08×), Nitrogen Export (1.08×)
+- **Geographic footprint**: ~3,600 N_Ret_Ratio cells; ~2,800 Nature Access cells (out of 51,000 regional cells)
 - **Key Countries**: India, Bangladesh, Pakistan
-- **Priority**: Fertilizer management; groundwater protection; crop diversity
-- **Vulnerable Population**: [TBD — extract from pop_exposure table]
+- **Priority**: Fertilizer management; groundwater and riparian protection; urban green access
+- **Regional burden**: Moderate relative intensities but very high absolute population density — geographic footprint understates human exposure
+
+### Middle East & North Africa
+- **Top Hotspot Services** (by relative intensity): Nature Access (1.31×), Nitrogen Retention (1.13×)
+- **Geographic footprint**: ~5,800 Nature Access cells; ~5,000 N_Ret_Ratio cells (out of 86,000 regional cells)
+- **Key Countries**: Morocco, Egypt, Iran, Algeria
+- **Priority**: Access to nature for urban and semi-arid populations; water retention in dryland watersheds
+- **Regional burden**: Nature access disproportionate (1.31×); most other services near or below expected levels
 
 ### Europe & Central Asia
-- **Hotspot Services**: Fewer/lower intensity than Global South
-- **Notable Pattern**: Greater ecosystem stability despite development
-- **Mechanisms**: Protected area systems; ecosystem recovery in post-industrial areas
-- **Lesson for Others**: Green infrastructure can restore ecosystem function
+- **Top Hotspot Services**: All services below the 1.0 equal-distribution benchmark (highest: Coastal Risk Reduction ≈ 0.88×)
+- **Notable Pattern**: No service exceeds its expected share — region hosts fewer global hotspot cells than its land area would predict
+- **Mechanisms**: Protected area systems; ecosystem recovery in post-industrial landscapes; agri-environment policy schemes
+- **Lesson for Others**: Policy-driven land management can yield measurable ecosystem recovery at regional scale
 
 ## Key Takeaways
 
 ::: {.callout-note}
-**Key findings from regional analysis (to be refined with narrative from pop_exposure data):**
+**Key findings from regional analysis:**
 
-1. **Disproportionate burden in the Global South.** Sub-Saharan Africa and South Asia consistently show hotspot relative intensities above 1.0, meaning they host more hotspot area than their land share would predict — while contributing least to the historical land-use pressures driving those changes.
+1. **Disproportionate burden in the Global South.** Sub-Saharan Africa, Latin America & the Caribbean, East Asia & Pacific, and South Asia all show hotspot relative intensities above 1.0 for at least their top services, meaning they host more hotspot area than their land share would predict — while contributing least to the historical land-use pressures driving those changes.
 
 2. **Compound risk concentrates in tropical regions.** The country-level compound risk chart above shows that countries with high *average* overlapping hotspot counts tend to be in tropical biomes — where multiple services co-decline in the same cells, leaving communities with no substitute service buffer.
 
-3. **East Asia & Pacific faces concentrated coastal risk.** Countries along the Pacific Rim show elevated coastal risk service hotspots, connecting to the higher HDI pattern observed for coastal services in Chapter 6.
+3. **East Asia & Pacific faces concentrated water quality risk.** The region's top signals are Nitrogen Retention (1.80×), Nitrogen Export (1.57×), and Sediment Retention (1.56×) — all substantially above the equal-distribution benchmark. Coastal risk in EAP is at approximately expected levels (0.95×); the dominant burden is freshwater ecosystem degradation.
 
-4. **Europe & Central Asia diverges.** Lower hotspot intensity in this region likely reflects a combination of ecosystem recovery post-industrial decline and stronger protected-area systems — a pattern that warrants cautious interpretation given that low SPC can reflect either ecological health *or* already-depleted baselines.
+4. **Europe & Central Asia diverges.** No service in this region exceeds the 1.0 equal-distribution benchmark — it hosts *fewer* global hotspot cells than its land area would predict. This likely reflects a combination of ecosystem recovery post-industrial decline and stronger protected-area systems, though low SPC values can reflect either ecological health *or* already-depleted baselines.
 
 5. **Country-level variation within regions is substantial** (see interactive table above). Regional averages mask heterogeneity: within Sub-Saharan Africa, for instance, small land-locked states often show higher relative intensity than large forested nations.
 :::
