@@ -84,29 +84,83 @@ We perform two-sample Kolmogorov-Smirnov (KS) tests to determine if the socioeco
 
 ## Distributional Profiles (ECDF Overlays)
 
-The KS heatmap and Cliff's Delta charts show *how strongly* and *in which direction* hotspot distributions depart from background. The ECDF (Empirical Cumulative Distribution Function) plots below reveal the *shape* of those differences — where in the distribution the gap opens, how wide it is, and whether it is consistent across all quantiles. In each panel, red = hotspot cells, blue = median-background cells. A rightward shift of the red curve means hotspot cells tend toward higher values; leftward means lower.
+The KS heatmap and Cliff's Delta charts show *how strongly* and *in which direction* hotspot distributions depart from background. The ECDF (Empirical Cumulative Distribution Function) plots below reveal the *shape* of those differences — where in the distribution the gap opens, how wide it is, and whether it is consistent across all quantiles.
+
+**How to read these plots:** In each panel, **red = hotspot cells**, **blue = median-background cells** (47.5th–52.5th percentile of ES change — the "business-as-usual" landscape). The x-axis is the socioeconomic variable value; the y-axis is the fraction of cells at or below that value. The key landmark is **where each curve crosses y = 0.5** — that is the median. When the red curve sits to the **right** of the blue curve at y = 0.5, hotspot cells have higher values; when it sits to the **left**, hotspot cells have lower values. The width of the horizontal gap between the two curves at any given y-level is proportional to Cliff's Delta.
 
 ### Population and GDP: A Universal Signal
 
-Across all eight services, hotspot cells carry substantially higher population density and GDP than the median background. The gap is large and consistent across the full distribution — not just in the tails — explaining the uniformly positive Cliff's Delta seen in the directionality chart above.
+The population and GDP signals are the clearest in the dataset — and the reason why is structural. More than half of all 10 km background cells contain **zero people** (wilderness, dryland, uninhabited terrain). As a result, the blue ECDF curve makes a **steep vertical jump right at x = 0** on the log₁₊ scale: a large mass of background cells all piled at the same zero value. The red curve for hotspot cells, by contrast, starts rising gradually from much lower cumulative probabilities — far fewer hotspot cells are uninhabited. The red curve then lies **consistently and far to the right** of the blue curve across the entire distribution, not just at the median.
+
+Hotspot cell population medians range from ~78 people per cell (Sed_export) to ~6,033 (C_Risk_Red_Ratio), against a background median of essentially zero for most services. Cliff's Delta spans **+0.47 to +0.66** across services — meaning if you draw one random hotspot cell and one random background cell, the hotspot cell has more people roughly **74–83% of the time**. GDP tells the same story with similar magnitude (+0.49 to +0.67).
+
+The practical implication is clear without any close reading of the curves: the gap is large, it opens immediately at the left tail, and it persists to the right tail.
 
 ![ECDF Overlays — Population (GHS-POP 2020, log₁₊ scale)](../../../outputs/plots/ks/ecdf/ecdf_GHS_POP_E2020_GLOBE_sum_log1p.png){width=100%}
 
 ![ECDF Overlays — GDP 2020 (log₁₊ scale)](../../../outputs/plots/ks/ecdf/ecdf_rast_gdpTot_1990_2020_30arcsec_2020_sum_log1p.png){width=100%}
 
-### HDI and GINI: Three Socioeconomic Typologies
+### HDI: A Small Effect That Changes Direction by Service
 
-Unlike population and GDP — which show a uniform elevation across all services — HDI and GINI are the variables that split the services into three distinct socioeconomic typologies, visible in the diverging directions of the ECDF curves.
+HDI is where interpretation requires more care. Unlike population, **HDI has no zeros** — every inhabited cell has a value between roughly 0.3 and 0.9, so all distributions heavily overlap. The curves sit close together, and the gap between red and blue at the median is measured in hundredths of an HDI point, not orders of magnitude. The direction of that gap — not its size — is the signal.
+
+The table below gives the actual median HDI values for each service:
+
+| Service | Hotspot median HDI | Background median HDI | Cliff's Delta | Direction |
+|---|---|---|---|---|
+| C_Risk | **0.817** | 0.744 | **+0.30** | Rightward — more developed |
+| C_Risk_Red_Ratio | **0.816** | 0.743 | **+0.29** | Rightward — more developed |
+| N_Ret_Ratio | **0.664** | 0.617 | **+0.19** | Slight rightward |
+| Sed_Ret_Ratio | **0.650** | 0.612 | **+0.18** | Slight rightward |
+| Pollination | 0.641 | **0.653** | −0.06 | Slight leftward — less developed |
+| Nature_Access | 0.654 | **0.667** | −0.07 | Slight leftward — less developed |
+| Sed_export | 0.636 | **0.667** | −0.08 | Slight leftward — less developed |
+| N_export | 0.652 | **0.653** | −0.01 | Negligible |
+
+**Coastal services (C_Risk, C_Risk_Red_Ratio):** The red curves sit visibly to the right — hotspot cells have a median HDI of 0.817 vs 0.744 for background, a 7-point difference. At y = 0.5, the red curve crosses at a clearly higher x than the blue. Cliff's Delta of +0.30 means hotspot cells have higher HDI about 65% of the time. This is the largest HDI effect in the dataset, and it is perceptible in the plot.
+
+**Terrestrial provisioning and export services (Pollination, Nature_Access, N_export, Sed_export):** These curves are where the visual subtlety is greatest. The difference at the median ranges from 0.001 (N_export: 0.652 vs 0.653) to 0.031 (Sed_export: 0.636 vs 0.667). On the plot, **the red and blue curves for these services will appear nearly on top of each other** — you will not easily see left versus right without squinting at the median crossing. The effect is real (it passes the statistical test because n ≈ 67,000 hotspot cells), but it is not visually dramatic. What it means ecologically: terrestrial service declines tilt slightly toward less-developed contexts, but the global footprint of these services is large enough that hotspot cells span the full HDI range.
+
+**Retention ratio services (N_Ret_Ratio, Sed_Ret_Ratio):** Intermediate and positive — red sits slightly right of blue (median difference of ~4–5 HDI points), more visible than the terrestrial group but less than coastal. Fix your eye at y = 0.5 and the red curve crosses at a marginally higher x than blue.
+
+**Reading tip:** In the HDI ECDF plot, rather than trying to judge the overall shape of each curve, isolate the horizontal gap between each red–blue pair **at y = 0.5**. You will see: (1) a clear rightward gap for the two coastal curves; (2) slight rightward gaps for the two retention curves; (3) near-zero or imperceptible gaps for the four terrestrial curves.
 
 ![ECDF Overlays — Human Development Index (HDI)](../../../outputs/plots/ks/ecdf/ecdf_hdi_raster_predictions_2020_mean.png){width=100%}
 
-**Coastal services (C_Risk, C_Risk_Red_Ratio):** Hotspot curves shift *rightward* in HDI — declines co-occur with more developed contexts. This is consistent with populated coastlines where prior settlement increases hazard exposure and reduces relative protection benefits.
+### GINI: Larger Effects, and a Reversal That Defines the Third Typology
 
-**Terrestrial provisioning and export services (Pollination, Nature_Access, N_export, Sed_export):** Hotspot curves shift *leftward* in HDI — less-developed contexts — while GINI shows a rightward shift (higher inequality). Service losses co-occur with limited adaptive capacity and structural inequality.
+The GINI plot is more legible than HDI because the effects are larger, and the **direction reversal between terrestrial and retention services** is the most important pattern in the entire socioeconomic analysis.
 
-**Retention ratio services (N_Ret_Ratio, Sed_Ret_Ratio):** Near-neutral HDI shift (slight rightward), but GINI shifts *leftward* (lower inequality than background) — a third, distinct pattern that does not reduce to either of the above.
+| Service | Hotspot median GINI | Background median GINI | Cliff's Delta | Direction |
+|---|---|---|---|---|
+| Pollination | **0.378** | 0.315 | **+0.30** | Rightward — more unequal |
+| Sed_export | **0.366** | 0.305 | **+0.30** | Rightward — more unequal |
+| N_export | **0.354** | 0.322 | **+0.22** | Rightward — more unequal |
+| Nature_Access | **0.365** | 0.322 | **+0.22** | Rightward — more unequal |
+| C_Risk | 0.321 | 0.305 | +0.07 | Negligible |
+| C_Risk_Red_Ratio | 0.321 | 0.302 | +0.07 | Negligible |
+| Sed_Ret_Ratio | 0.359 | **0.401** | **−0.11** | Leftward — *less* unequal |
+| N_Ret_Ratio | 0.346 | **0.388** | **−0.17** | Leftward — *less* unequal |
+
+**Terrestrial provisioning services (Pollination, Sed_export, N_export, Nature_Access):** The red curves sit clearly to the right — a 6-point GINI difference at the median for Pollination (0.378 vs 0.315). This is the most visually legible effect in the GINI plot. Hotspot cells for these services are concentrated in **higher-inequality** contexts. Combined with the (very slight) leftward HDI shift, the portrait of the terrestrial typology is: service losses in areas that are simultaneously somewhat less developed *and* more unequal — less capacity to adapt, less safety net.
+
+**Coastal services (C_Risk, C_Risk_Red_Ratio):** Red and blue curves nearly overlap in GINI (1.6-point difference at median, Cliff's Delta only +0.07). The coastal typology is defined by *high HDI*, not by any particular inequality pattern.
+
+**Retention ratio services (N_Ret_Ratio, Sed_Ret_Ratio):** This is the surprising result. The red curves shift **to the left** — hotspot cells have *lower* GINI than background (N_Ret_Ratio: 0.346 vs 0.388, a 4-point difference in the opposite direction from terrestrial services). At y = 0.5 in the GINI plot, the retention-ratio red curves cross at a clearly *lower* x than their blue pairs. This means declining water-retention efficiency is concentrated in **more equal** contexts — a pattern consistent with intensive but relatively homogeneous agricultural regions (parts of Western Europe, East Asia, temperate North America), where broad-based farming subsidies or land tenure systems reduce income inequality even as diffuse nutrient and sediment loads erode ecosystem function.
+
+The retention typology therefore does not fit either of the other two: it is *not* the "poor and unequal" pattern of terrestrial services, and it is *not* the "wealthy coastline" pattern of coastal services. It occupies a distinct third position in the HDI–GINI space.
 
 ![ECDF Overlays — GINI Coefficient](../../../outputs/plots/ks/ecdf/ecdf_rast_adm1_gini_disp_2020_mean.png){width=100%}
+
+### Putting It Together
+
+The three typologies are most clearly distinguished by reading HDI and GINI together:
+
+| Typology | HDI shift | GINI shift | What it means |
+|---|---|---|---|
+| **Coastal** (C_Risk, C_Risk_Red_Ratio) | +0.29–0.30 (rightward) | ~0 (negligible) | Higher development; inequality irrelevant |
+| **Terrestrial provisioning** (Pollination, N/Sed export, Nature Access) | −0.01 to −0.08 (slight leftward) | +0.22–0.30 (rightward) | Slightly less developed; substantially more unequal |
+| **Retention ratios** (N_Ret_Ratio, Sed_Ret_Ratio) | +0.18–0.19 (slight rightward) | −0.11 to −0.17 (leftward) | Moderately developed; distinctly *more* equal |
 
 These typologies reflect spatial co-occurrence between ecosystem service decline and socioeconomic context, not causal attribution. They provide a framework for targeting policy attention and structuring future analyses that explicitly model the pathways connecting land-use pressure, service change, and human welfare.
 
