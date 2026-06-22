@@ -137,7 +137,7 @@ Understand drivers—what physical mechanisms (land use, degradation, urbanizati
 ::: {.column width="50%"}
 
 ### Ecosystem Services
-- **InVEST Models** (360m resolution)
+- **InVEST Models** (300m resolution)
   - Nitrogen Export (NDR)
   - Sediment Retention (SDR)
   - Pollination
@@ -148,7 +148,7 @@ Understand drivers—what physical mechanisms (land use, degradation, urbanizati
 ::: {.column width="50%"}
 
 ### Supporting Data
-- **ESA CCI Land Cover** (reclassified: Transformed/Natural)
+- **ESA CCI / C3S Land Cover** (300m; reclassified to 9 functional classes, 1992 & 2020)
 - **IUCN AOO 10km Grid** (Master spatial unit with attributes)
 - **Socioeconomic Layers** (Population, GDP, HDI)
 
@@ -217,44 +217,49 @@ Why aggregation *then* differencing? Because Path B produces the "difference of 
 
 ## Statistical Analysis: Socioeconomic Profiling
 
-### Kolmogorov-Smirnov (KS) Tests
+### KS Tests + Cliff's Delta effect sizes
 
-**Purpose:** Compare distributions of population characteristics
+**Purpose:** Compare socioeconomic distributions of hotspot cells vs. median-background cells
 
 ::: {.columns}
 ::: {.column width="50%"}
 
-**Hotspot populations** vs. **Global median**
+**Hotspot cells** vs. **Median-background cells**
+(47.5th–52.5th percentile of ES change — business-as-usual)
 
 Test variables:
-- Population density
-- Built-up area %
-- GDP per capita
-- HDI
+- Population density (GHS-POP)
+- GDP (gridded, 2020)
+- Human Development Index (HDI)
+- Gini coefficient
 
 :::
 
 ::: {.column width="50%"}
 
-**Interpretation:**
-- *Significant p-value* → Distributions differ
-- *Effect size* → Magnitude of difference
-- **Result:** Socioeconomic profile of affected communities
+**Two-step interpretation:**
+1. *KS statistic + p-value* → Do distributions differ?
+2. *Cliff's Delta (δ)* → Direction and magnitude
+
+Cliff's Delta = probability that a random hotspot cell has a higher value than a random background cell. δ > 0: hotspot higher; δ < 0: hotspot lower.
+
+Large-n correction: background is median 5% of landscape, not full distribution — avoids inflated significance from 1.5M cell sample size.
 
 :::
 :::
 
 ::: {.notes}
-- **Socioeconomic Profiling**: We don't just want to know *where* hotspots are, but *who* lives there.
-- We use KS tests to compare the hotspot populations against the 'business-as-usual' median 5% of the landscape.
-- This isolates the specific socioeconomic profile of extreme decline against typical, stable baseline conditions.
+- We compare hotspot cells against the *median background* (cells near the 50th percentile of change) — not the global average.
+- This isolates what's distinctive about extreme decline vs. typical, stable conditions.
+- Cliff's Delta solves the large-n problem: with 67,000 hotspot cells, almost any difference is "statistically significant." Delta tells you the practical magnitude.
+- δ = 0.5 means completely overlapping distributions; δ = 1.0 means all hotspot cells are above all background cells.
 :::
 
 ---
 
 ## Analysis Pipeline Overview
 
-```mermaid
+```{mermaid}
 flowchart TD
     Python["🐍 Python: Zonal Summaries<br/>(Docker)"] -->|Output: 1992 & 2020 values| R["📊 R/Quarto Analysis Chain"]
     
@@ -280,37 +285,26 @@ flowchart TD
 
 ## Key Finding 1: Geographic Clustering
 
-### Ecosystem Service Hotspots Are Not Random
-
-![](../outputs/plots/intensity/hotspot_relative_intensity_region_wb.png){width="100%"}
+### Hotspots Are Not Random — They Concentrate in the Global South
 
 ::: {.columns}
-::: {.column width="50%"}
+::: {.column width="55%"}
 
-### Geographic Pattern
-- **Strong clustering** in the Global South
-- **Epicenters of hotness** in:
-  - Latin America & Caribbean
-  - East Asia & Pacific
-  - Sub-Saharan Africa
+![252,215 cells with at least one extreme service decline (top 5% SPC). Compound hotspots (3+ services) shown in darkest red.](../../outputs/plots/maps/global_hotspot_count_heatmap_cap3_pct.png){width="100%"}
 
 :::
 
-::: {.column width="50%"}
+::: {.column width="45%"}
 
-### Disproportionate Burden
-- Global South has **vast disproportionate share** of ES decline
-- Despite representing smaller fraction of Earth's land
-- Creates **zones of compound risk** with multiple simultaneous service failures
+![Relative intensity by World Bank region (observed ÷ expected share given land area). Values > 1.0 = disproportionate burden.](../../outputs/plots/intensity/hotspot_relative_intensity_region_wb.png){width="100%"}
 
 :::
 :::
 
 ::: {.notes}
-- **Geographic Clustering**: This map shows relative intensity—how concentrated hotspots are in each region relative to that region's size.
-- Red = high intensity (lots of hotspots in a small area). This is where conservation effort should concentrate.
-- The message: Hotspots aren't randomly scattered. They cluster in Sub-Saharan Africa, parts of Latin America, and Southeast Asia.
-- This geographic clustering is KEY for prioritization—you can allocate resources to these epicenters and get maximum impact.
+- **Left map**: where the hotspot cells actually are. Darkest red = 3+ services declining in the same cell. Notice the clustering in Latin America, SE Asia, and parts of Sub-Saharan Africa — not random scatter.
+- **Right chart**: relative intensity corrects for region size. Latin America & Caribbean is at 2.5× for sediment export — by far the highest in the dataset. EAP is 1.5–1.8× for water quality services.
+- The compound risk map is the key visual: those darkest cells are where conservation attention gives maximum co-benefit across multiple services simultaneously.
 - ~90 seconds
 :::
 
@@ -318,43 +312,43 @@ flowchart TD
 
 ## Key Finding 2: Socioeconomic Profile
 
-### Who Is Affected? (KS Test Results)
+### Who Is Affected? Three Distinct Typologies
 
-![](../outputs/plots/ks/ks_heatmap.png){width="100%"}
+![](../../outputs/plots/ks/directionality_cliffs_delta.png){width="100%"}
 
 ::: {.columns}
-::: {.column width="50%"}
+::: {.column width="33%"}
 
-### The Urbanization/Wealth Correlation
-- Hotspots of **Nature Access loss, Coastal Risk, Sediment Retention** occur in cells with:
-  - ✓ Higher population density
-  - ✓ Higher built-up area
-  - ✓ **Higher GDP** than global median
-
-**Interpretation:** ES decline is tied to urbanization and economic development
+### Universal signal
+**All 8 services:** hotspot cells have higher population density and GDP than background (Cliff's Delta +0.47–0.66). Hotspots are embedded in human landscapes — not wilderness.
 
 :::
 
-::: {.column width="50%"}
+::: {.column width="33%"}
 
-### The Rural Divide
-- Hotspots of **Pollination loss, Nitrogen Export increase** concentrated in:
-  - ✓ Lower population density
-  - ✓ Highly agricultural contexts
-  - ✓ Lower urbanization
+### Coastal typology
+**C_Risk, C_Risk_Red_Ratio:** higher HDI (+0.30), near-zero GINI shift. Declines concentrate in developed, densely settled coastlines.
 
-**Interpretation:** Agricultural intensification and rural land-use change are key drivers
+:::
+
+::: {.column width="33%"}
+
+### Terrestrial vs. Retention
+**Pollination, N/Sed export, Nature Access:** slightly lower HDI, substantially higher GINI (+0.22–0.30) — less-developed, more unequal contexts.
+
+**N_Ret_Ratio, Sed_Ret_Ratio:** slight positive HDI, *lower* GINI (−0.11 to −0.17) — a third, structurally distinct pattern.
 
 :::
 :::
 
 ::: {.notes}
-- **The KS heatmap** shows statistical differences between hotspot populations and the global median.
-- The key insight: Hotspots hit different populations in different ways.
-- Urban hotspots (Nature Access, Coastal Protection) = densely populated, wealthier areas
-- Rural hotspots (Pollination, Water Quality) = agricultural zones, lower density
-- This has HUGE policy implications: You can't use one-size-fits-all solutions. Urban solutions ≠ rural solutions.
-- ~2 minutes to explain and discuss the two pathways
+- **Three typologies, not two.** The old framing of "urban/wealthy vs. rural/agricultural" was wrong — pollination is NOT concentrated in agricultural zones (fields_mehrabi Cliff's Delta ≈ 0 across all services).
+- The real split is on HDI + GINI, not urban vs. rural.
+- **Coastal** (C_Risk): higher HDI — dense, developed coastlines bear more coastal risk decline.
+- **Terrestrial provisioning** (Pollination, N/Sed export, Nature Access): slight tilt toward lower HDI + substantially higher GINI. Less adaptive capacity. Most people in the world depend on these services.
+- **Retention ratios** (N_Ret_Ratio, Sed_Ret_Ratio): surprising reversal — hotspot cells have LOWER inequality than background. Consistent with intensive but homogeneous agricultural regions (W. Europe, E. Asia) where nutrient retention is degrading from diffuse loads.
+- Policy implication: One-size-fits-all approach fails across all three typologies.
+- ~2 minutes
 :::
 
 ---
@@ -363,34 +357,42 @@ flowchart TD
 
 ### Land Cover Hotspots vs. ES Hotspots
 
-![](../outputs/plots/drivers/heatmap_driver_overlap_pct.png){width="100%"}
+::: {.columns}
+::: {.column width="50%"}
+![ES hotspot footprint (left) vs. cells that co-occur with extreme LCC conversion (right). The stark size difference is the 76% gap.](../../outputs/plots/maps/global_lcc_driver_hotspots_map.png){width="100%"}
+:::
+::: {.column width="50%"}
+![Percentage of ES hotspot cells co-occurring with top 5% of each land cover conversion driver, per service.](../../outputs/plots/drivers/heatmap_driver_overlap_pct.png){width="100%"}
+:::
+:::
 
 ::: {.columns}
 ::: {.column width="50%"}
 
-### The Gap Exists
-- Many ES hotspots **do NOT overlap** with top-5% land cover conversion
-- Within same 10km cell: service decline ≠ major land cover change
-- **Implication:** Degradation is equally important to conversion
+### The Gap
+- **76% of ES hotspot cells** do not co-occur with extreme (top 5%) land cover conversion at 300m resolution
+- ES hotspots and LCC hotspots are each defined as their top 5% — so under spatial independence you'd expect only ~5% overlap by chance
+- The observed **~24% co-occurrence** is 4–5× above random, but still leaves a large unexplained fraction
 
 :::
 
 ::: {.column width="50%"}
 
 ### What This Means
-- **Degradation mechanisms** (e.g., reduced pollinator habitat, nutrient depletion) matter
-- **Upstream drivers** (land cover change outside the cell) drive service loss
-- Simple "conversion detection" insufficient for ES management
+- The 76% does **not** mean those cells had zero land cover change — many had moderate conversion below the top-5% threshold
+- Plausible mechanisms: upstream routing cascades, sub-pixel degradation, climate forcing
+- **Caution:** current design cannot distinguish these — the gap is a co-occurrence signal, not a causal partition
+- Simple "conversion detection" alone is insufficient for ES management
 
 :::
 :::
 
 ::: {.notes}
-- **The Attribution Gap**: This is the most surprising finding. You might expect hotspots to align with deforestation or urban expansion.
-- But the heatmap shows: Most ES hotspots have LOW overlap with detected land cover change (~20-40% at most).
-- Interpretation: ~60-70% of hotspots show NO significant land cover change = **degradation is happening WITHOUT conversion**.
-- Think: forests still standing but quality declining (logging, understory loss), farms intensifying without expanding (fertilizer use, monoculture).
-- This changes the policy response: You can't just protect existing forests; you need to improve management within them.
+- **The Attribution Gap**: this is a co-occurrence finding, not a causal attribution. We compare the top 5% of ES decline cells against the top 5% of land cover conversion cells — the most extreme vs. the most extreme.
+- 24% of ES hotspot cells co-occur with extreme LCC (4–5× above random), so there IS a genuine spatial association — just not a dominant one.
+- The 76% gap: those cells may still have moderate LCC, just not in the most extreme 5%. We cannot say "degradation is happening without conversion" — that's overclaiming what the spatial overlay can show.
+- The gap is consistent with several mechanisms (upstream cascades, sub-pixel change, climate inputs to InVEST) but the current analysis can't partition them. This is acknowledged as a limitation.
+- Policy message: You can't manage ES outcomes by monitoring categorical land cover conversion alone. The gap motivates finer-scale and mechanism-specific monitoring.
 - ~2 minutes
 :::
 
@@ -400,7 +402,7 @@ flowchart TD
 
 ### Scale of Human Impact
 
-![](../outputs/plots/pop_exposure_income.png){width="100%"}
+![](../../outputs/plots/pop_exposure_income.png){width="100%"}
 
 ::: {.columns}
 ::: {.column width="50%"}
@@ -425,8 +427,8 @@ flowchart TD
 ::: {.notes}
 - **Population Exposure**: The big picture—how many people are actually affected?
 - This chart shows absolute numbers by income group. The stack is biggest for Upper-Middle and Lower-Middle income countries.
-- ~7.9 billion people globally live in or depend on ES hotspots. That's almost everyone.
-- Low-income populations comprise 4.2% of affected people. BUT—relative intensity is 2.2x higher in low-income regions, meaning they bear a disproportionate burden.
+- ~7.6 billion people globally live in or depend on ES hotspots (downstream + access pathways). That's almost everyone.
+- Low-income populations comprise ~12.4% of affected people. BUT—relative hotspot intensity is 1.6× higher in lower-middle-income countries vs. high-income countries, meaning they bear a disproportionate burden.
 - Policy message: Resources must go not just to where people are affected, but to where vulnerable populations face the greatest risk.
 - ~90 seconds
 :::
@@ -437,7 +439,7 @@ flowchart TD
 
 ### Beyond the Grid Cell: Servicesheds & Access
 
-![](../outputs/plots/exposure_multiplier_dumbbell.png){width="100%"}
+![Each dumbbell spans in-situ (left dot) to total connected beneficiaries (right dot). Long dumbbells = large hydrological or access footprint.](../../outputs/plots/exposure_multiplier_dumbbell_region_wb.png){width="100%"}
 
 ::: {.columns}
 ::: {.column width="50%"}
@@ -471,19 +473,28 @@ flowchart TD
 |--------|---------|-------------|
 | **WHAT** | Global ES decline is measurable and regionally aggregated | Change is real, not noise |
 | **WHERE** | Hotspots cluster in Global South, creating compound risk zones | Geographic prioritization is possible |
-| **WHO** | Affects both urbanized (wealth effect) and rural (agricultural) communities | One-size-fits-all policy insufficient |
-| **WHY** | Attribution gap: degradation ≥ conversion in importance | Need comprehensive ecosystem management |
+| **WHO** | Three socioeconomic typologies: coastal (higher HDI), terrestrial (lower HDI + higher GINI), retention (moderate HDI + lower GINI) | Requires typology-specific policy responses |
+| **WHY** | 76% of hotspots do not co-occur with extreme land cover conversion — gap driven by upstream cascades, sub-pixel change, and climate forcing | Conversion monitoring alone insufficient; mechanism-specific management needed |
 
 ---
 
-## Next Steps: Interpretation Phase
+## Status & Open Questions
 
-### Moving Forward With Co-Authors
+### Paper is at advisor draft stage
 
-1. **Validate findings** against literature and expert knowledge
-2. **Deepen narratives** for specific services and regions
-3. **Develop policy implications** (conservation priorities, adaptation strategies)
-4. **Prepare for publication** (figures, methods documentation, supplementary materials)
+**Done:**
+- Full 9-chapter book + paper draft circulated to Becky & co-authors
+- Attribution gap reframed as co-occurrence throughout
+- KS three-typology finding documented with Cliff's Delta
+- Regional profiles with real hotspot intensity data
+
+**Open — awaiting Becky:**
+1. Were InVEST SDR/NDR runs performed with fixed or era-specific climate inputs?
+2. Ch05 scatterplot: replace X-axis with per-driver panels, or drop entirely?
+3. Literature validation for hotspot cross-check (Ch02 QA callout)
+4. REDD+ / IPBES citation for LCC–ES relationship (Ch05)
+
+**Next milestone:** Incorporate Becky's feedback → journal submission
 
 ---
 
