@@ -19,6 +19,11 @@ ks_results <- read_csv(
 )
 ```
 
+::: {.callout-note}
+**Unit of analysis: grid cells, not social units.**
+Throughout this chapter, "populations" refers to individuals aggregated within 100 km² equal-area grid cells — defined entirely by their location and the socioeconomic characteristics of their cell (population density, GDP, HDI, Gini coefficient). The analysis does not observe social units such as communities, households, or ethnic groups, and cannot make claims about social cohesion, governance structures, or lived experience. Characterisations of "exposed populations" or "populations bearing disproportionate burden" are statistical descriptions of grid-cell-level aggregates, not sociological claims. Whether the spatial patterns identified here translate into differentiated social impacts requires validation with community-level data — a direction flagged for future work. ⚠️ *Flag for Becky: is this caveat sufficient, or should we recommend a specific approach for community-level validation?*
+:::
+
 ## Absolute Population Exposure
 
 How many people are directly living within the top 5% areas of ecosystem service decline? The charts below break down the exposed population by World Bank Income Group and the UN Human Development Index (HDI).
@@ -37,24 +42,42 @@ How many people are directly living within the top 5% areas of ecosystem service
 
 ## In-Situ vs. Downstream Exposure (Servicesheds)
 
-For compound hotspots (areas experiencing overlapping ecosystem service declines), the impact extends beyond the immediate grid cell. We calculated the "multiplier effect" of these hotspots by comparing the local (in-situ) population with the total population exposed downstream within the serviceshed. 
+For compound hotspots (areas experiencing overlapping ecosystem service declines), the impact extends beyond the immediate grid cell. We calculated the "multiplier effect" of these hotspots by comparing the local (in-situ) population with the total population exposed through downstream hydrological flow or physical access pathways.
 
-Incorporating downstream populations increases the exposed population by several orders of magnitude. For instance, while approximately 8.6 million people live directly within areas experiencing declines in 2 or more services, over 6.0 billion people reside downstream and are potentially affected—a multiplier effect of nearly 700x. For areas with 3 or more overlapping declines, the multiplier effect grows to over 1700x.
+Incorporating connectivity substantially expands the population at risk. **1,212 million people** (1.2 billion) live directly within 10km grid cells that are hotspots for 2 or more services simultaneously. Those same cells are connected through downstream flow and physical access pathways to a combined **6,011 million people** in total — a connectivity multiplier of approximately **5×**. For areas with 3 or more overlapping service declines, the in-situ population is **445 million**, connected to 3,756 million total — a multiplier of approximately **8×**. These multipliers reflect the functional connectivity between upstream ecosystem processes and distant beneficiaries through servicesheds.
+
+::: {.callout-important}
+**Data traceability for these numbers — computed and verified 2026-06-22**
+
+All population figures in this section are derived from two sources: (1) the global hotspot GeoPackage (`hotspots_global_pct.gpkg`) which carries a `hotspot_count` field per cell recording how many of the 8 services identify that cell as a hotspot (top 5% of SPC change); and (2) the canonical analysis grid (`10k_change_calc.gpkg`) which carries `GHS_POP_E2020_GLOBE_sum` — the GHSL-POP 2020 population summed within each 10km² cell.
+
+| Measure | Filter | Cells | Population |
+|---|---|---|---|
+| In-situ, any hotspot service | `hotspot_count ≥ 1` | 225,113 | **3,065 M** |
+| In-situ, compound hotspot | `hotspot_count ≥ 2` | 85,599 | **1,212 M** |
+| In-situ, 3+ services | `hotspot_count ≥ 3` | 41,025 | **445 M** |
+| Connected, 2+ (union: downstream + access) | beneficiary analysis | — | **6,011 M** |
+| Connected, 3+ (union) | beneficiary analysis | — | **3,756 M** |
+| Connected, all (union) | beneficiary analysis | — | **7,584 M** |
+
+**Multiplier computation:** connectivity multiplier = union population ÷ in-situ population for the same set of cells. For 2+ compound cells: 6,011 M ÷ 1,212 M ≈ **5×**. For 3+ cells: 3,756 M ÷ 445 M ≈ **8×**.
+:::
+
 
 ![Multiplier Effect: Downstream vs. Local Population Exposure](../../../outputs/plots/multiplier_effect.png){width=100%}
 
 ## The Multiplier Effect: Absolute Population Exposure
 
-Beyond characterising *who* lives near hotspots, we must quantify the *absolute number* of people who depend on them — including those connected through downstream hydrological flow or travel access. The in-situ analysis above (`hotspot_pop_exposure.csv`) showed that **5,286.2 million people** live directly within hotspot grid cells at 10km resolution.
+Beyond characterising *who* lives near hotspots, we must quantify the *absolute number* of people who depend on them — including those connected through downstream hydrological flow or travel access. **3,065 million people** (3.1 billion) reside within at least one hotspot grid cell at 10km resolution (see Data Traceability callout above for derivation).
 
 However, the benefits of nature extend far beyond the cell in which they are generated. Using a high-performance spatial extraction pipeline, we analyzed two distinct beneficiary pathways for all 250,000+ hotspot cells combined:
 
 1.  **Hydrological Beneficiaries:** People living downstream within the same watershed relying on upstream regulation.
 2.  **Access-Based Beneficiaries:** People who can reach the hotspot within a defined travel time, reflecting cultural, recreational, and non-timber provisioning services.
 
-Our analysis reveals that approximately **7.6 billion people** (7,596.0 million) benefit from these hotspots through at least one of these pathways. Crucially, when expanding our analysis from **Local Residents** to **Connected Beneficiaries**, we observe massive variations depending on the pathway of service delivery. 
+Our analysis reveals that approximately **7.6 billion people** (7,584 million) benefit from these hotspots through at least one of these pathways — nearly the entire global population. Crucially, when expanding our analysis from **Local Residents** (3,065 million) to **Connected Beneficiaries**, the affected population more than doubles depending on the pathway of service delivery.
 
-By tracing down-gradient hydrological flow paths, we identify **6,420.1 million** downstream beneficiaries reliant on these impaired upstream grids. When evaluating the access-based travel footprint (populations relying on nature access and wild pollination within reachable distances), the reliant population expands to **7,401.2 million** individuals. This reveals a profound **Multiplier Effect**: the vulnerable population balloons by nearly 1.4× when accounting for physical access, and is 1.15 times larger globally than populations living directly downstream.
+By tracing down-gradient hydrological flow paths, we identify **6,409 million** downstream beneficiaries reliant on these impaired upstream grids. When evaluating the access-based travel footprint (populations relying on nature access and wild pollination within reachable distances), the reliant population expands to **7,390 million** individuals. This reveals a profound **Multiplier Effect**: the total connected population (7,584 million) is approximately **2.5×** larger than the in-situ local residents (3,065 million), and the access-based population is 1.15 times larger than populations living directly downstream alone.
 
 This "multiplier effect" varies significantly by region, socioeconomic context, and biome, as shown in the tabs below.
 
@@ -164,14 +187,14 @@ The three typologies are most clearly distinguished by reading HDI and GINI toge
 
 These typologies reflect spatial co-occurrence between ecosystem service decline and socioeconomic context, not causal attribution. They provide a framework for targeting policy attention and structuring future analyses that explicitly model the pathways connecting land-use pressure, service change, and human welfare.
 
-## Key Takeaways
+## Summary
 
 ::: {.callout-note}
 **Five findings on who is exposed:**
 
-1. **Scale depends critically on the unit of analysis.** At 10km grid resolution, ~5.3 billion people reside within hotspot cells. At 300m in-situ resolution (compound hotspot cells only, 2+ services), ~8.6 million people live directly within the most intensely affected sites. Both numbers are real — they measure different things (grid-cell overlap vs. fine-scale within-cell concentration).
+1. **Scale depends on how you count.** The in-situ count of **distinct individuals** living within any hotspot grid cell is **3,065 million (~3.1 billion)**. When all connectivity pathways are included (downstream + access), the total rises to **7.6 billion** — nearly the entire world population. See the Data Traceability callout above for the full derivation.
 
-2. **Connectivity multiplies exposure by orders of magnitude.** The downstream + access pathway analysis raises the potentially affected population from in-situ residents to ~7.6 billion globally — nearly the entire world population. For compound hotspot cells (2+ services), the local-to-downstream multiplier exceeds 700×; for cells with 3+ overlapping declines, it exceeds 1700×. This reflects the functional connectivity between upstream ecosystem processes and distant beneficiaries.
+2. **Connectivity multiplies exposure by 2.5–8× depending on compound risk.** The downstream + access pathway analysis raises the potentially affected population from 3,065 million (in-situ, all hotspot cells) to ~7.6 billion globally. For compound hotspot cells (2+ services), the in-situ population of 1,212 million connects to 6,011 million through servicesheds — a multiplier of approximately **5×**. For cells with 3+ overlapping declines (445 million in-situ), the multiplier is approximately **8×**. This reflects the functional connectivity between upstream ecosystem processes and distant beneficiaries.
 
 3. **Population density and GDP elevation are universal.** All eight services show hotspot cells with higher population and GDP than the median background — a consistent, large-magnitude signal across the full distribution (not just the tails). The world's hotspots are not wilderness: they are embedded in human landscapes.
 
@@ -180,5 +203,5 @@ These typologies reflect spatial co-occurrence between ecosystem service decline
    - *Terrestrial provisioning services* (Pollination, Nature Access, N/Sed export): co-occur with *lower* HDI and *higher* GINI — losses fall on less-developed, more unequal contexts with limited adaptive capacity.
    - *Retention ratio services* (N_Ret_Ratio, Sed_Ret_Ratio): near-neutral or slight positive HDI shift, but *lower* GINI than background — a third, structurally distinct pattern.
 
-5. **The equity implication is not symmetric across services.** The terrestrial service typology — where the most people depend on pollination and water quality — is precisely the typology concentrated in lower-HDI, higher-inequality settings. The communities least able to substitute or adapt bear the largest relative burden.
+5. **The equity implication is not symmetric across services.** The terrestrial service typology — where the most people depend on pollination and water quality — is precisely the typology concentrated in lower-HDI, higher-inequality settings. The populations least able to substitute or adapt bear the largest relative burden.
 :::

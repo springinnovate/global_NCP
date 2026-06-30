@@ -42,7 +42,7 @@ How much of each region's land area falls within a hotspot? And does that region
 
 ## Compound Risk: Multi-Service Hotspots
 
-A single declining service is a concern; multiple co-occurring declines in the same grid cell represent severe compound risk — communities that lose several services simultaneously face compounding adaptive challenges. We refer to the count of overlapping negative hotspots in a single 10km cell as its **Hotness**.
+A single declining service is a concern; multiple co-occurring declines in the same grid cell represent severe compound risk — populations that lose several services simultaneously face compounding adaptive challenges. We refer to the count of overlapping negative hotspots in a single 10km cell as its **Hotness**.
 
 ### Global Compound Risk Map
 
@@ -68,33 +68,49 @@ A single declining service is a concern; multiple co-occurring declines in the s
 
 ## Hotspot Magnitude by Service Type
 
-Beyond identifying *where* hotspots are, the boxplots below show how intense those changes are within each group. The spread of SPC values reveals whether hotspots in a region represent moderate or extreme functional shifts.
+The previous section established *where* hotspots are concentrated and which groups bear a disproportionate share. This section asks a complementary question: within those hotspot cells, how severe is the change? A region can have many hotspots that are moderately degraded, or few hotspots that are extremely severe — the geographic distribution alone cannot distinguish these cases.
+
+::: {.callout-note}
+**How to read these charts**
+
+Each chart shows the distribution of Symmetric Percentage Change (SPC) values **for hotspot cells only** (the top 5% most extreme globally, per service) within each analytical group.
+
+- **The box** spans the interquartile range (IQR: 25th–75th percentile of hotspot intensities within the group)
+- **The median line** = the typical intensity of a hotspot cell in that group
+- **Whiskers** extend to 1.5× IQR; points beyond are individual extreme cells
+- **Color intensity** scales with median severity — darker red = more severe change
+- **Wide box** = high variability: some cells near the top-5% threshold, others far beyond it; hotspot severity is not uniform within the group
+- **Narrow box** = hotspot intensities are consistently extreme throughout the group
+- **Important**: all cells shown are already in the global top 5% — even the "lightest" boxes represent severe change relative to the rest of the world
+
+Direction of change differs by service: negative SPC = declining provision (worse for Pollination, Nature Access, retention ratios); positive SPC = increasing export/risk (worse for N_export, Sed_export, C_Risk).
+:::
 
 ::: {.panel-tabset}
 
 ### By Income Group
 
-![Volumetric services (N/Sed export, Pollination, Nature Access) — percentage hotspot magnitudes by Income Group.](../../../outputs/plots/boxplots_unified/income_grp/boxplots_volumetric_pct.png){width=100%}
+![Volumetric services (N/Sed export, Pollination, Nature Access) — SPC distribution of hotspot cells by income group. Lower-middle income [3] shows the most intense and variable hotspots for Nature Access and Pollination, consistent with the KS typology finding that these services co-occur with lower HDI and higher inequality.](../../../outputs/plots/boxplots_unified/income_grp/boxplots_volumetric_pct.png){width=100%}
 
-![Coastal and ratio services — percentage hotspot magnitudes by Income Group.](../../../outputs/plots/boxplots_unified/income_grp/boxplots_coastal_pct.png){width=100%}
+![Coastal services — SPC distribution of hotspot cells by income group.](../../../outputs/plots/boxplots_unified/income_grp/boxplots_coastal_pct.png){width=100%}
 
-![](../../../outputs/plots/boxplots_unified/income_grp/boxplots_ratios_pct.png){width=100%}
+![Retention ratio services (N_Ret_Ratio, Sed_Ret_Ratio) — SPC distribution of hotspot cells by income group. Declining ratios indicate the landscape is losing filtration capacity even when absolute export volumes may remain stable.](../../../outputs/plots/boxplots_unified/income_grp/boxplots_ratios_pct.png){width=100%}
 
 ### By World Bank Region
 
-![Volumetric services — percentage hotspot magnitudes by World Bank Region.](../../../outputs/plots/boxplots_unified/region_wb/boxplots_volumetric_pct.png){width=100%}
+![Volumetric services — SPC distribution of hotspot cells by World Bank region. Latin America & Caribbean [3] shows the widest and most intense boxes for Nature Access and Pollination — hotspot severity is both high and highly variable, with some cells approaching complete functional loss (SPC near −200%).](../../../outputs/plots/boxplots_unified/region_wb/boxplots_volumetric_pct.png){width=100%}
 
-![Coastal and ratio services — percentage hotspot magnitudes by World Bank Region.](../../../outputs/plots/boxplots_unified/region_wb/boxplots_coastal_pct.png){width=100%}
+![Coastal services — SPC distribution of hotspot cells by World Bank region.](../../../outputs/plots/boxplots_unified/region_wb/boxplots_coastal_pct.png){width=100%}
 
-![](../../../outputs/plots/boxplots_unified/region_wb/boxplots_ratios_pct.png){width=100%}
+![Retention ratio services — SPC distribution of hotspot cells by World Bank region.](../../../outputs/plots/boxplots_unified/region_wb/boxplots_ratios_pct.png){width=100%}
 
 ### By WWF Biome
 
-![Volumetric services — percentage hotspot magnitudes by WWF Biome.](../../../outputs/plots/boxplots_unified/WWF_biome/boxplots_volumetric_pct.png){width=100%}
+![Volumetric services — SPC distribution of hotspot cells by WWF biome.](../../../outputs/plots/boxplots_unified/WWF_biome/boxplots_volumetric_pct.png){width=100%}
 
-![Coastal and ratio services — percentage hotspot magnitudes by WWF Biome.](../../../outputs/plots/boxplots_unified/WWF_biome/boxplots_coastal_pct.png){width=100%}
+![Coastal services — SPC distribution of hotspot cells by WWF biome.](../../../outputs/plots/boxplots_unified/WWF_biome/boxplots_coastal_pct.png){width=100%}
 
-![](../../../outputs/plots/boxplots_unified/WWF_biome/boxplots_ratios_pct.png){width=100%}
+![Retention ratio services — SPC distribution of hotspot cells by WWF biome.](../../../outputs/plots/boxplots_unified/WWF_biome/boxplots_ratios_pct.png){width=100%}
 
 :::
 
@@ -342,7 +358,7 @@ if (has_reactable) {
 
 :::
 
-## Key Takeaways
+## Summary
 
 ::: {.callout-note}
 **Five structural patterns from the hotspot geography analysis:**

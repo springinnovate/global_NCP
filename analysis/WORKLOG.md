@@ -1,5 +1,73 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-06-24
+
+#### Presentation polish (session 10) + WHY reframing across paper, book, and presentation
+
+**Blank slides fully eliminated (second pass)**
+Removed 8 additional `---` separators immediately *before* `#` section headers (Part 2: Methods, WHAT, WHERE, WHO, WHY, Regional Profiles, Synthesis, Thank You). First pass (session 9) removed `---` after section headers; these were the before-header instances also creating blank slides.
+
+**Mermaid Analytical Pipeline: font and label fixes**
+Reduced `fontSize` to `13px` via `themeVariables`; shortened longest node labels to reduce box overflow. Box sizing still tight — flagged as todo for future pass.
+
+**Methods slides restructured: two new slides added**
+- *Data Sources* renamed *Data Inputs* and split into three-column layout (ES / Land Cover / Socioeconomic)
+- *Eight Ecosystem Services*: new slide with all 8 services in a table grouped by theme (Habitat & Access / Coastal Risk / Hydrological Regulation), plain-language descriptions, and a callout explaining the retention ratio distinction (declining ratio = functional degradation even without volume change)
+- *Socioeconomic Context: The WHO Input Layers*: new slide with `global_socioeconomic_context_map.png` (4-panel: Pop, HDI, GDP, GINI); caption points to KS typology finding
+- *Spatial Framework & Analytical Groupings*: kept, with italic grid note and cleaned caption
+
+**WHY section: two new slides added**
+- *What Land Cover Change Looked Like 1992–2020*: `global_lcc_net_change_map.png` as setup before attribution gap results
+- Existing attribution gap slide unchanged
+
+**Appendix: hotspot intensity boxplot added**
+- `boxplots_unified/region_wb/boxplots_volumetric_pct.png` added as appendix slide with compact reading guide callout (wide box = variable, narrow = consistently extreme; Latin America punchline)
+
+**WHY reframing — major conceptual work (presentation + paper + book)**
+
+Core insight: the WHY question is not "what drives ES change" but "is land cover monitoring alone sufficient to track where ES provision is declining most?" — more honest about what the co-occurrence analysis actually measures and more novel as a contribution.
+
+Changes applied across all files:
+- **Presentation**: section divider → "WHY: The Monitoring Gap"; slide 4 WHY question → "Is monitoring land cover change alone enough to track where ES provision is declining most?"; mermaid node → "Monitoring Gap"; speaker notes updated
+- **paper_draft.qmd**: Discussion section title → "The Sufficiency of Land Cover Monitoring as a Proxy for ES Provision Change"; Becky callout resolved (Option A applied — "consistent with the view that LC monitoring is insufficient", compressed to a short flag asking for an optional citation if she wants Option B)
+- **ch01-problem.qmd**: WHY question heading → "Is land cover change alone enough to track ES provision decline?"; WHY framework bullets updated; chapter cross-reference corrected (8→5)
+- **ch05-drivers-WHY.qmd**: chapter title → "The Monitoring Gap: Is Land Cover Change Alone Enough? (WHY)"; opening sentence → "To assess whether monitoring land cover change alone is sufficient..."; Summary callout header → "Five findings on the sufficiency of LC monitoring..."
+
+**ch04 boxplot section: reading guide added**
+Full callout explaining how to read the boxplots added before the tabset — axes, IQR, whiskers, color, wide vs narrow interpretation, direction of change per service type, and the key point that all cells are already global top 5%. All three ratio boxplot figures (previously captionless) now have proper captions. Latin America finding called out in region tab.
+
+**Paper and book shared with Becky Chaplin-Kramer** for co-author review. Two open questions flagged for her:
+1. Were InVEST SDR/NDR runs performed with fixed or era-specific climate inputs?
+2. Optional Option B citation for the monitoring proxy claim (REDD+/IPBES literature)
+
+**Nothing committed** — awaiting render review and Becky's feedback before committing.
+
+### 2026-06-22
+
+#### Population exposure numbers — full audit and correction
+
+Traced all population exposure figures to their source data. Two errors found and corrected across Ch06, Ch08, paper_draft.qmd, and docs/methodology.md.
+
+**Error 1 — Service-weighted sum reported as distinct individuals.**
+`hotspot_pop_exposure.csv` stores one row per (service × socioeconomic bin). Summing `exposed_population` across all 8 services yields 5,286 million — but this counts each person once per qualifying service (avg 1.68 services per hotspot cell → 377,719 cell-service units across 225,113 unique cells). The correct count of distinct individuals in any hotspot cell is **3,065 million**, computed by joining `hotspot_count ≥ 1` cells from `hotspots_global_pct.gpkg` to `GHS_POP_E2020_GLOBE_sum` in `10k_change_calc.gpkg`.
+
+**Error 2 — In-situ compound hotspot population was unverifiable and wrong.**
+The figure of 8.6 million for "people living in 2+ service areas" could not be reproduced from any output file. The beneficiary CSVs for 2+ overlapping cells only store connected (downstream/access) populations in the billions, not in-situ counts. The correct in-situ figure for `hotspot_count ≥ 2` cells is **1,212 million** (85,599 cells).
+
+**Verified numbers (from current data):**
+
+| Filter | Cells | GHS-POP in-situ | Connected (union) | Multiplier |
+|---|---|---|---|---|
+| `hotspot_count ≥ 1` | 225,113 | 3,065 M | 7,584 M | 2.5× |
+| `hotspot_count ≥ 2` | 85,599 | 1,212 M | 6,011 M | ~5× |
+| `hotspot_count ≥ 3` | 41,025 | 445 M | 3,756 M | ~8× |
+
+The 7.6B / 6,409M / 7,390M beneficiary figures (all hotspot cells) were verified correct.
+
+The 700× and 1,700× multipliers previously stated were derived from the wrong 8.6M denominator and have been corrected to ~5× and ~8× respectively.
+
+**Files updated:** Ch06 (data traceability callout + all prose + Key Takeaways), Ch08 (Key Takeaway #2), paper_draft.qmd (§Population Exposure), docs/methodology.md (§Population Exposure section with verified table; §Attribution section with symmetric 5%/5% threshold documentation). Changes not yet committed — awaiting render review.
+
 ### 2026-06-20
 
 #### Book chapter polish (Phase 3, sessions 5–6)

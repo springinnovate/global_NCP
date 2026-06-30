@@ -198,10 +198,30 @@ To assess the human impact of ecosystem service hotspots, the pipeline quantifie
 2. **Connected Beneficiaries (The Multiplier):** We trace exposure beyond the immediate degraded zone using two specialized geospatial delivery pathways:
    * **Hydrological Footprint:** Populations living down-gradient that rely on the upstream landscape for water purification, sediment retention, and flow regulation.
    * **Access-Based Travel Footprint:** Populations living within physical travel distances that rely on local nature for recreation, wild pollination, and access to natural capital.
-3. **Compound Risk Analysis:** To evaluate how this exposure behaves under escalating ecological failure, populations are grouped by their localized **Compound Risk**â€”the number of simultaneous overlapping hotspots in a single cell (ranging from $\ge 1$ to $\ge 4$). 
+3. **Compound Risk Analysis:** To evaluate how this exposure behaves under escalating ecological failure, populations are grouped by their localized **Compound Risk** — the number of simultaneous overlapping hotspots in a single cell, recorded as `hotspot_count` in `hotspots_global_pct.gpkg` (ranging from 1 to 8). Compound hotspot subsets are stored in `data/processed/hotspots/hotspot_beneficiaries/` (subfolders: `all hotspots/`, `2 or more overlapping/`, `3 or more overlapping/`, `4 or more overlapping/`).
+
+**Service-weighted vs. distinct population counts**
+
+The intermediate table `hotspot_pop_exposure.csv` stores population stratified by (service × income group × HDI × GDP × GINI). Summing `exposed_population` across all 8 services yields ~5,286 million — a **service-weighted sum** where a person in a cell qualifying as a hotspot for k services is counted k times. This is the correct input for socioeconomic stratification plots (e.g., exposure by income group per service) but is not a count of distinct individuals.
+
+To obtain **distinct people** in at least one hotspot cell, join `hotspot_count ≥ 1` rows from `hotspots_global_pct.gpkg` to `GHS_POP_E2020_GLOBE_sum` from `10k_change_calc.gpkg` and sum once per unique cell: **~3,065 million** (verified 2026-06-22).
+
+**Verified numbers (audited 2026-06-22, branch task/housekeeping)**
+
+All figures derived from: `hotspots_global_pct.gpkg` (`hotspot_count` field) joined to `10k_change_calc.gpkg` (`GHS_POP_E2020_GLOBE_sum`), and beneficiary CSVs in `hotspot_beneficiaries/`.
+
+| Population tier | Filter | Cells | GHS-POP in-situ | Connected (union) | Multiplier |
+|---|---|---|---|---|---|
+| Any hotspot (1+ services) | `hotspot_count ≥ 1` | 225,113 | **3,065 M** | 7,584 M | **2.5×** |
+| Compound (2+ services) | `hotspot_count ≥ 2` | 85,599 | **1,212 M** | 6,011 M | **~5×** |
+| High compound (3+ services) | `hotspot_count ≥ 3` | 41,025 | **445 M** | 3,756 M | **~8×** |
+
+Beneficiary source files: `jeronimo_hotspots_all_beneficiaries_2026_06_01_12_09_23.csv` (all hotspots), `jeronimo_2hotspot_beneficiaries_2026_06_02_11_17_05.csv` (2+), `jeronimo_3hotspot_beneficiaries_2026_06_02_10_54_22.csv` (3+).
+
+The `hotspot_count` distribution in the current GeoPackage: 1 service = 139,514 cells; 2 = 44,574; 3 = 19,211; 4 = 12,835; 5 = 7,427; 6 = 1,504; 7 = 47; 8 = 1.
 
 **Analytical Purpose:** 
-This framework allows us to test whether intense, compounding environmental crises remain geographically contained. By plotting the exposed populations on a logarithmic scale across escalating compound risk tiers, we measure the multiplier gap between *Local Residents* and total *Connected Beneficiaries*. This mathematically tracks how highly localized environmental degradation cascades into systemic regional vulnerabilities.
+This framework allows us to test whether intense, compounding environmental crises remain geographically contained. By plotting the exposed populations across escalating compound risk tiers, we measure the multiplier gap between *Local Residents* and total *Connected Beneficiaries*. This mathematically tracks how highly localized environmental degradation cascades into systemic regional vulnerabilities.
 
 ### Land Cover Change Attribution
 To explain *why* hotspots occur, we integrate Land Cover Change (LCC) metrics derived from ESA CCI (1992) and C3S (2020) maps.
@@ -212,7 +232,19 @@ Instead of simple "Net Change" (which masks simultaneous loss and gain), we use 
 *   **Gross Gain:** The area of natural land recovered.
 *   **Exchange:** Shifts that don't affect the net total but represent dynamic turnover.
 
-These metrics are aggregated to the 100 sq km master grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation). The analysis produces both a single, global attribution map showing the overall footprint of degradation, as well as a series of detailed maps breaking down the specific drivers for each of the 8 individual ecosystem service hotspots.
+These metrics are aggregated to the 100 sq km master grid and overlaid with ES hotspots to quantify the **"Attribution Gap"**.
+
+**Symmetric threshold design (critical for correct interpretation)**
+
+The co-occurrence analysis uses a **symmetric 5%/5% threshold**: ES hotspot cells are defined as the top 5% of SPC change per service; LCC driver hotspot cells are defined as the top 5% of gross conversion magnitude per driver. Both thresholds operate within the same 10km equal-area grid.
+
+Under spatial independence, the probability that a randomly selected ES hotspot cell also falls in the LCC top 5% is 5% by chance alone. The **observed co-occurrence of 24%** is therefore approximately 4–5× above the random baseline, confirming a genuine spatial association between extreme ES decline and extreme land cover conversion where it occurs.
+
+The **Attribution Gap of 76%** means that 76% of ES hotspot cells do **not** co-occur with any extreme (top 5%) LCC driver cell. This must not be read as "76% of cells had no land cover change" — it means those cells did not co-occur with the *most intense* conversion cells. Moderate or low-level land cover change may still be present in those cells but below the top-5% threshold.
+
+This is a **spatial co-occurrence analysis, not causal attribution**. An important structural constraint is that ESA CCI land cover data serves simultaneously as a primary input to InVEST biophysical models and as the basis for the LCC overlay. This endogeneity means the gap cannot be treated as an independent empirical partition between degradation-driven and conversion-driven change.
+
+The analysis produces both a single, global attribution map showing the overall footprint of degradation, as well as a series of detailed maps breaking down the specific drivers for each of the 8 individual ecosystem service hotspots.
 
 **Granular Models:**
 To move beyond binary "Natural vs. Transformed" analysis, we implement two specific driver models:

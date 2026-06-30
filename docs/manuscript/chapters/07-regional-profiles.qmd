@@ -7,234 +7,286 @@ library(dplyr)
 library(ggplot2)
 library(readr)
 
-has_dt <- requireNamespace("DT", quietly = TRUE)
-if(has_dt) library(DT)
+has_reactable <- requireNamespace("reactable", quietly = TRUE)
+if (has_reactable) {
+  library(reactable)
+  .or_filter <- JS("function(rows, columnId, filterValue) {
+    const terms = filterValue.split('|').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
+    if (terms.length === 0) return rows;
+    return rows.filter(row => {
+      const val = String(row.values[columnId] || '').toLowerCase();
+      return terms.some(t => val.includes(t));
+    });
+  }")
+}
+
+# Top-N country plot helper (used in nested service tabs)
+make_country_top_plot <- function(df, svc, n = 20) {
+  d <- df %>%
+    filter(service == svc) %>%
+    slice_max(relative_intensity, n = n) %>%
+    arrange(relative_intensity) %>%
+    mutate(group = factor(group, levels = group))
+  ggplot(d, aes(x = relative_intensity, y = group, fill = relative_intensity > 1)) +
+    geom_col() +
+    geom_vline(xintercept = 1, linetype = "dashed", color = "black", linewidth = 0.5) +
+    scale_fill_manual(values = c("TRUE" = "#E83737", "FALSE" = "gray70"), guide = "none") +
+    labs(x = "Relative Intensity", y = NULL) +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid.minor = element_blank())
+}
 
 source("../../../R/paths.R")
 source("../../../R/plotting_functions.R")
 
-# Load data
 area_stats <- read_csv(
   file.path(data_dir(), "processed", "tables", "hotspot_area_stats.csv"),
   show_col_types = FALSE
 )
-
-pop_exposure <- read_csv(
-  file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv"),
-  show_col_types = FALSE
-)
-```
-
-## Overview
-
-This chapter provides detailed geographic deep-dives. You can explore patterns by:
-
-- **World Bank Region** – Continental/regional hotspot patterns
-- **Income Group** – Socioeconomic clustering of hotspots
-- **Biome** – Ecosystem-specific service change patterns
-- **Country** – Specific country-level priorities
-
-Use the tabs below to drill into specific geographies of interest.
-
-## Hotspot Intensity by Region
-
-```{r intensity-region-detail}
-#| fig-cap: "Detailed regional hotspot intensity. Explore which services are most affected in each region."
-#| fig-height: 8
-#| fig-width: 12
-
-make_intensity_plot(area_stats, "region_wb")
-```
-
-## Country-Level Rankings
-
-```{r country-rank}
-#| fig-cap: "Top countries by hotspot relative intensity, faceted by service. Countries above the dashed line have disproportionately high hotspot concentration."
-#| fig-height: 12
-#| fig-width: 14
-
-# Filter out micro-states (<10,000 sq km) to prevent skewed relative intensities
-filtered_area_stats <- area_stats %>%
-  filter(!(grepl("countr|nev_name|admin", grouping_var, ignore.case = TRUE) & as.numeric(n_total) < 100))
-
-make_country_intensity_plot(filtered_area_stats)
-```
-
-## Interactive Country Profiles
-
-Explore country-specific hotspot statistics. Filter by service, country, or intensity to find regions of interest:
-
-```{r country-table}
-#| fig-cap: "Interactive table of country-level hotspot statistics. Click column headers to sort; use the search box to filter."
-
-country_data <- area_stats %>%
-  filter(grouping_var == "country") %>%
-  select(service, group, n_hot, pct_area, relative_intensity) %>%
-  arrange(desc(relative_intensity)) %>%
-  rename(
-    Service = service,
-    Country = group,
-    "Hotspot Cells" = n_hot,
-    "% of Country Area" = pct_area,
-    "Relative Intensity" = relative_intensity
-  ) %>%
-  mutate(
-    "% of Country Area" = round(`% of Country Area`, 2),
-    "Relative Intensity" = round(`Relative Intensity`, 2)
-  )
-
-if(has_dt) {
-  DT::datatable(
-    country_data,
-    filter = "top",
-    options = list(
-      pageLength = 30,
-      columnDefs = list(
-        list(targets = 2, render = JS("function(data) {return Math.round(data);}"))
-      )
-    ),
-    rownames = FALSE,
-    caption = "Country-Level Hotspot Statistics"
-  )
-} else {
-  knitr::kable(country_data, caption = "Country-Level Hotspot Statistics")
-}
-```
-
-## Compound Risk by Geography
-
-```{r compound-by-region}
-#| fig-cap: "Countries ranked by compound risk (average overlapping hotspots per cell). High values indicate areas where multiple services are failing simultaneously."
-#| fig-height: 8
-#| fig-width: 10
 
 multiservice_stats <- read_csv(
   file.path(data_dir(), "processed", "tables", "hotspot_multiservice_stats.csv"),
   show_col_types = FALSE
 )
 
-if (nrow(multiservice_stats) > 0 && "grouping" %in% names(multiservice_stats)) {
-  make_country_multi_plot(multiservice_stats)
-} else {
-  ggplot() + theme_void() + ggtitle("Multi-service data not available")
-}
+# Country subset: exclude micro-states (<100 grid cells ≈ <1,000 km²)
+country_area_stats <- area_stats %>%
+  filter(grouping_var == "nev_name", !is.na(group), as.numeric(n_total) >= 100)
 ```
 
-## Population Exposure by Country
+## Hotspot Intensity by Geography
 
-Below is an interactive breakdown of population exposure to hotspots at the country level:
+Relative intensity: each group's share of global hotspot cells divided by its share of global land area. Dashed line = equal distribution (1.0).
 
-```{r pop-exposure-country}
-#| fig-cap: "Population exposure to hotspots by country. Shows absolute numbers of people affected by ecosystem service decline."
+:::: {.panel-tabset}
 
-if (nrow(pop_exposure) > 0) {
-  # Identify the geographic column dynamically
-  geo_col <- if("country" %in% names(pop_exposure)) "country" else if("group" %in% names(pop_exposure)) "group" else "service"
-  
-  pop_filtered <- pop_exposure
-  if("grouping_var" %in% names(pop_exposure)) {
-    pop_filtered <- pop_filtered %>% filter(grouping_var == "country")
-  }
-  
-  pop_by_geo <- pop_filtered %>%
-    filter(!is.na(.data[[geo_col]])) %>%
-    group_by(.data[[geo_col]]) %>%
-    summarise(total_exposed = sum(exposed_population, na.rm = TRUE), .groups = "drop") %>%
-    arrange(desc(total_exposed)) %>%
-    rename(
-      Geography = !!geo_col,
-      "Exposed Population" = total_exposed
-    ) %>%
-    mutate("Exposed Population (Millions)" = `Exposed Population` / 1e6)
+### World Bank Region
 
-  if(has_dt) {
-    DT::datatable(
-      pop_by_geo %>% select(Geography, "Exposed Population (Millions)"),
-      rownames = FALSE,
-      options = list(pageLength = 10),
-      caption = "Total Population Exposed to Ecosystem Service Declines"
+```{r intensity-region}
+#| fig-height: 10
+#| fig-width: 12
+make_intensity_plot(area_stats, "region_wb")
+```
+
+### Income Group
+
+```{r intensity-income}
+#| fig-height: 8
+#| fig-width: 12
+make_intensity_plot(area_stats, "income_grp")
+```
+
+### Biome
+
+```{r intensity-biome}
+#| fig-height: 12
+#| fig-width: 12
+make_intensity_plot(area_stats, "WWF_biome")
+```
+
+### Country
+
+Top 20 countries per service. Select a service tab to explore.
+
+::: {.panel-tabset}
+
+#### Coastal Risk
+```{r intensity-country-crisk}
+#| fig-height: 6
+#| fig-width: 9
+make_country_top_plot(country_area_stats, "C_Risk")
+```
+
+#### Coastal Risk Reduction
+```{r intensity-country-criskredratio}
+#| fig-height: 6
+#| fig-width: 9
+make_country_top_plot(country_area_stats, "C_Risk_Red_Ratio")
+```
+
+#### Nitrogen Export
+```{r intensity-country-nexport}
+#| fig-height: 6
+#| fig-width: 9
+make_country_top_plot(country_area_stats, "N_export")
+```
+
+#### Nitrogen Retention
+```{r intensity-country-nret}
+#| fig-height: 6
+#| fig-width: 9
+make_country_top_plot(country_area_stats, "N_Ret_Ratio")
+```
+
+#### Nature Access
+```{r intensity-country-nature}
+#| fig-height: 6
+#| fig-width: 9
+make_country_top_plot(country_area_stats, "Nature_Access")
+```
+
+#### Pollination
+```{r intensity-country-poll}
+#| fig-height: 6
+#| fig-width: 9
+make_country_top_plot(country_area_stats, "Pollination")
+```
+
+#### Sediment Export
+```{r intensity-country-sedexp}
+#| fig-height: 6
+#| fig-width: 9
+make_country_top_plot(country_area_stats, "Sed_export")
+```
+
+#### Sediment Retention
+```{r intensity-country-sedret}
+#| fig-height: 6
+#| fig-width: 9
+make_country_top_plot(country_area_stats, "Sed_Ret_Ratio")
+```
+
+:::
+
+::::
+
+## Compound Risk by Geography
+
+Average number of overlapping service hotspots per 10 km grid cell.
+
+:::: {.panel-tabset}
+
+### World Bank Region
+
+```{r compound-region}
+#| fig-height: 6
+#| fig-width: 10
+make_multi_plot(multiservice_stats, "region_wb")
+```
+
+### Income Group
+
+```{r compound-income}
+#| fig-height: 6
+#| fig-width: 10
+make_multi_plot(multiservice_stats, "income_grp")
+```
+
+### Biome
+
+```{r compound-biome}
+#| fig-height: 10
+#| fig-width: 10
+make_multi_plot(multiservice_stats, "WWF_biome")
+```
+
+### Country
+
+```{r compound-country}
+#| fig-height: 10
+#| fig-width: 9
+#| fig-cap: "Top 40 countries by average overlapping hotspot services per cell."
+multiservice_stats %>%
+  filter(grouping == "nev_name", !is.na(group)) %>%
+  slice_max(mean_hotspots, n = 40) %>%
+  arrange(mean_hotspots) %>%
+  mutate(group = factor(group, levels = group)) %>%
+  ggplot(aes(x = mean_hotspots, y = group, fill = mean_hotspots)) +
+  geom_col() +
+  scale_fill_distiller(palette = "Reds", direction = 1, guide = "none") +
+  labs(x = "Mean overlapping hotspot services per cell", y = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid.minor = element_blank())
+```
+
+::::
+
+## Interactive Country Table
+
+```{r country-table}
+#| echo: false
+country_data <- country_area_stats %>%
+  select(service, group, n_hot, pct_area, relative_intensity) %>%
+  arrange(desc(relative_intensity)) %>%
+  rename(
+    Service             = service,
+    Country             = group,
+    "Hotspot Cells"     = n_hot,
+    "% of Country Area" = pct_area,
+    "Relative Intensity" = relative_intensity
+  ) %>%
+  mutate(
+    "% of Country Area"  = round(`% of Country Area`, 2),
+    "Relative Intensity" = round(`Relative Intensity`, 2)
+  )
+
+if (has_reactable) {
+  reactable(
+    country_data,
+    filterable  = TRUE,
+    searchable  = TRUE,
+    pagination  = TRUE,
+    defaultPageSize = 25,
+    striped     = TRUE,
+    highlight   = TRUE,
+    compact     = TRUE,
+    columns = list(
+      Service             = colDef(minWidth = 140, filterMethod = .or_filter),
+      Country             = colDef(minWidth = 160, filterMethod = .or_filter),
+      `Hotspot Cells`     = colDef(format = colFormat(separators = TRUE), minWidth = 120),
+      `% of Country Area` = colDef(format = colFormat(suffix = "%", digits = 2), minWidth = 140),
+      `Relative Intensity` = colDef(format = colFormat(digits = 2), minWidth = 140)
     )
-  } else {
-    knitr::kable(head(pop_by_geo %>% select(Geography, "Exposed Population (Millions)"), 15), caption = "Total Population Exposed to Ecosystem Service Declines (Top 15)")
-  }
+  )
 } else {
-  cat("Population exposure data not available")
+  knitr::kable(head(country_data, 20), caption = "Country-Level Hotspot Statistics — install `reactable` for interactive filtering")
 }
 ```
 
-## Regional Policy Priorities
+## Regional Hotspot Profiles
 
-Regional hotspot burden is quantified by **relative intensity** (observed hotspot share ÷ expected share given regional land area): values above 1.0 indicate a region hosts a disproportionate share of global hotspot cells. All figures below are derived from `hotspot_area_stats.csv` (grouping_var == "region_wb") at 10 km² grid resolution. Per-region population counts are not directly available in current outputs; see the multiplier effect dumbbell plots in Chapter 6 for regional exposure scale.
+Source: `hotspot_area_stats.csv`, grouping_var == "region_wb", 10 km² grid. Per-region population exposure in Chapter 6.
 
 ### Sub-Saharan Africa
-- **Top Hotspot Services** (by relative intensity): Nature Access (1.17×), Sediment Retention (1.10×), Pollination (1.09×)
-- **Geographic footprint**: ~14,700 Nature Access cells; ~13,700 Pollination cells (out of 241,000 regional cells)
-- **Key Countries**: Nigeria, DRC, Ethiopia, Tanzania
-- **Priority**: Ecosystem-based agriculture; soil and water conservation; access to natural areas for rural communities
-- **Regional burden**: All three services exceed the 1.0 benchmark — disproportionate risk given the region's low historical contribution to drivers
+- **Top services by relative intensity**: Nature Access (1.17×), Sediment Retention (1.10×), Pollination (1.09×)
+- **Geographic footprint**: ~14,700 Nature Access cells; ~13,700 Pollination and Sediment Retention cells (out of 241,000 regional cells)
+- **Regional burden**: All three top services exceed the 1.0 equal-distribution benchmark — the region hosts a disproportionate share of global hotspot area across terrestrial and freshwater services
 
 ### Latin America & Caribbean
-- **Top Hotspot Services** (by relative intensity): Sediment Export (2.51×), Pollination (1.91×), Nitrogen Export (1.65×)
+- **Top services by relative intensity**: Sediment Export (2.51×), Pollination (1.91×), Nitrogen Export (1.65×), Sediment Retention (1.61×)
 - **Geographic footprint**: ~26,600 Sediment Export cells; ~20,300 Pollination cells (out of 204,000 regional cells)
-- **Key Countries**: Brazil, Colombia, Mexico, Bolivia
-- **Priority**: Upstream watershed protection; riparian buffer restoration; sustainable agricultural intensification to reduce sediment and nutrient loads
-- **Regional burden**: Sediment Export at 2.51× is the highest region-service relative intensity in the entire dataset — a global priority signal
+- **Regional burden**: Sediment Export at 2.51× is the highest region-service relative intensity in the entire dataset; all four top services substantially exceed the 1.0 benchmark; coastal risk is well below expected levels (0.51×)
 
 ### East Asia & Pacific
-- **Top Hotspot Services** (by relative intensity): Nitrogen Retention (1.80×), Nitrogen Export (1.57×), Sediment Retention (1.56×)
-- **Geographic footprint**: ~23,000 N_Ret_Ratio cells; ~20,000 N_export cells (out of 246,000 regional cells)
-- **Key Countries**: Indonesia, Philippines, Vietnam, China
-- **Priority**: Nutrient management; watershed restoration; wetland conservation for water purification
-- **Regional burden**: Water quality services are strongly disproportionate here; coastal risk is at approximately expected levels (relative intensity ≈ 0.95)
+- **Top services by relative intensity**: Nitrogen Retention (1.80×), Nitrogen Export (1.57×), Sediment Retention (1.56×)
+- **Geographic footprint**: ~23,000 Nitrogen Retention cells; ~20,000 Nitrogen Export cells (out of 246,000 regional cells)
+- **Regional burden**: Water quality services (nitrogen and sediment) are strongly disproportionate; coastal risk is at approximately expected levels (0.95×)
 
 ### South Asia
-- **Top Hotspot Services** (by relative intensity): Nitrogen Retention (1.37×), Nature Access (1.08×), Nitrogen Export (1.08×)
-- **Geographic footprint**: ~3,600 N_Ret_Ratio cells; ~2,800 Nature Access cells (out of 51,000 regional cells)
-- **Key Countries**: India, Bangladesh, Pakistan
-- **Priority**: Fertilizer management; groundwater and riparian protection; urban green access
-- **Regional burden**: Moderate relative intensities but very high absolute population density — geographic footprint understates human exposure
+- **Top services by relative intensity**: Nitrogen Retention (1.37×), Nature Access (1.08×), Nitrogen Export (1.08×)
+- **Geographic footprint**: ~3,600 Nitrogen Retention cells; ~2,800 Nature Access cells (out of 51,000 regional cells)
+- **Regional burden**: Moderate relative intensities but the region's very high population density means geographic footprint substantially understates human exposure
 
 ### Middle East & North Africa
-- **Top Hotspot Services** (by relative intensity): Nature Access (1.31×), Nitrogen Retention (1.13×)
-- **Geographic footprint**: ~5,800 Nature Access cells; ~5,000 N_Ret_Ratio cells (out of 86,000 regional cells)
-- **Key Countries**: Morocco, Egypt, Iran, Algeria
-- **Priority**: Access to nature for urban and semi-arid populations; water retention in dryland watersheds
-- **Regional burden**: Nature access disproportionate (1.31×); most other services near or below expected levels
+- **Top services by relative intensity**: Nature Access (1.31×), Nitrogen Retention (1.13×)
+- **Geographic footprint**: ~5,800 Nature Access cells; ~5,000 Nitrogen Retention cells (out of 86,000 regional cells)
+- **Regional burden**: Nature Access is disproportionate (1.31×); all other services at or below expected levels
 
 ### Europe & Central Asia
-- **Top Hotspot Services**: All services below the 1.0 equal-distribution benchmark (highest: Coastal Risk Reduction ≈ 0.88×)
-- **Notable Pattern**: No service exceeds its expected share — region hosts fewer global hotspot cells than its land area would predict
-- **Mechanisms**: Protected area systems; ecosystem recovery in post-industrial landscapes; agri-environment policy schemes
-- **Lesson for Others**: Policy-driven land management can yield measurable ecosystem recovery at regional scale
+- **Top services by relative intensity**: All services below 1.0; highest is Coastal Risk Reduction (0.88×)
+- **Geographic footprint**: ~9,300 Nature Access cells; ~8,700 Pollination cells (out of 280,000 regional cells)
+- **Regional burden**: No service exceeds its expected share
 
-## Key Takeaways
+## Summary
 
 ::: {.callout-note}
 **Key findings from regional analysis:**
 
-1. **Disproportionate burden in the Global South.** Sub-Saharan Africa, Latin America & the Caribbean, East Asia & Pacific, and South Asia all show hotspot relative intensities above 1.0 for at least their top services, meaning they host more hotspot area than their land share would predict — while contributing least to the historical land-use pressures driving those changes.
+1. **Disproportionate burden in the Global South.** Sub-Saharan Africa, Latin America & Caribbean, East Asia & Pacific, and South Asia all show relative intensities above 1.0 for their top services — they host more hotspot area than their land share would predict.
 
-2. **Compound risk concentrates in tropical regions.** The country-level compound risk chart above shows that countries with high *average* overlapping hotspot counts tend to be in tropical biomes — where multiple services co-decline in the same cells, leaving communities with no substitute service buffer.
+2. **Compound risk concentrates in tropical regions.** Countries with high average overlapping hotspot counts tend to be in tropical biomes.
 
-3. **East Asia & Pacific faces concentrated water quality risk.** The region's top signals are Nitrogen Retention (1.80×), Nitrogen Export (1.57×), and Sediment Retention (1.56×) — all substantially above the equal-distribution benchmark. Coastal risk in EAP is at approximately expected levels (0.95×); the dominant burden is freshwater ecosystem degradation.
+3. **East Asia & Pacific burden is concentrated in freshwater services.** Nitrogen Retention (1.80×), Nitrogen Export (1.57×), and Sediment Retention (1.56×) all substantially exceed the benchmark; coastal risk is at approximately expected levels (0.95×).
 
-4. **Europe & Central Asia diverges.** No service in this region exceeds the 1.0 equal-distribution benchmark — it hosts *fewer* global hotspot cells than its land area would predict. This likely reflects a combination of ecosystem recovery post-industrial decline and stronger protected-area systems, though low SPC values can reflect either ecological health *or* already-depleted baselines.
-
-5. **Country-level variation within regions is substantial** (see interactive table above). Regional averages mask heterogeneity: within Sub-Saharan Africa, for instance, small land-locked states often show higher relative intensity than large forested nations.
+4. **Europe & Central Asia is the clear outlier.** No service exceeds 1.0 — the region hosts fewer global hotspot cells than its land area would predict across all services.
 :::
-
-## How to Use This Chapter
-
-**For policymakers**: Locate your country/region and check which services are most at-risk; cross-reference with Chapter 6 for driver-specific interventions.
-
-**For conservation organizations**: Use country rankings to allocate resources to highest-burden regions; use population exposure data to identify vulnerable communities.
-
-**For researchers**: Detailed geographic data enables hypothesis testing; compound risk patterns may reveal ecological principles about multi-service failure.
-
-## Data Caveats
-
-- Country-level data aggregated from 10km grid cells; within-country variation may be substantial
-- Population exposure estimates based on grid-cell-level socioeconomic data; local variations not captured
-- Historical data (1992-2020); recent trends may differ
-- Services modeled with varying data quality (see Technical Appendix)
-

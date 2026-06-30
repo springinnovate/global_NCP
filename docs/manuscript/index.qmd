@@ -1,10 +1,14 @@
+::: {.callout-important}
+**Preliminary draft — for internal discussion only.** Do not cite, share, or distribute without permission from the authors.
+:::
+
 # Preface {.unnumbered}
 
 # Executive Summary
 
-This work brings together global data on ecosystem services, land cover, and socioeconomic variables to help understand changes in the provision of these services, who is affected, and where action is most needed. It combines data processing, change detection, and hotspot mapping in a way that is transparent and reproducible.
+This work provides a temporally explicit, globally consistent assessment of ecosystem service provision change between 1992 and 2020. Across eight biophysical services modeled with InVEST — spanning water quality regulation, pollination, coastal protection, and nature access — we track how provision has shifted over 28 years, where change is most severe relative to the local baseline, who bears the greatest burden of that change, and how observed decline relates to land cover conversion.
 
-By identifying areas of rapid change or high importance, this pipeline aims to support better decision-making for conservation, resource management policy, and sustainable development.
+The assessment integrates biophysical models, satellite land cover records (ESA CCI and C3S), and gridded socioeconomic layers across 1.3 million equal-area grid cells worldwide. All analyses are reproducible through open-source R and Python workflows documented in this book.
 
 ## Glossary
 - **AOO**: Area of Occupancy. A standard 10 km equal-area grid used for spatial analysis.
@@ -31,7 +35,7 @@ Before interpreting the results, it is critical to understand how a hotspot is d
 # Key Findings
 
 ### 1. Geographic Clustering & Compound Risk
-Hotspots of ecosystem service decline are not randomly distributed; they cluster heavily in the Global South, creating epicenters of Compound Risk where communities face multiple simultaneous ecological failures.
+Hotspots of ecosystem service decline are not randomly distributed; they cluster heavily in the Global South, creating epicenters of Compound Risk where populations face multiple simultaneous ecological failures.
 
 - **The Epicenters of Hotness:** Latin America & the Caribbean and East Asia & the Pacific are the most intensely affected regions globally.
 - **Disproportionate Burden:** Latin America and Sub-Saharan Africa carry a vastly disproportionate share of the global damage compared to their landmass. Lower-middle-income countries experience the highest relative intensity, roughly 1.6× that of high-income OECD countries.
@@ -39,9 +43,9 @@ Hotspots of ecosystem service decline are not randomly distributed; they cluster
 ### 2. Socioeconomic Profiling (Who is affected?)
 Using Kolmogorov-Smirnov (KS) tests, we compared the socioeconomic profile of hotspots against the "business-as-usual" median landscape. 39 out of 40 service-covariate combinations (97.5%) are highly significant after FDR correction.
 
-- **Universal signal — population and GDP:** Across all eight services, hotspot cells have markedly higher population density and total GDP than background (Cliff's Delta: +0.47 to +0.66 for population; +0.49 to +0.67 for GDP). This is a structural feature of where ecosystem services matter to people, not a distinguishing characteristic of any particular service type.
+- **Universal signal — population and GDP:** Across all eight services, hotspot cells have substantially higher population density and total GDP than background (Cliff's Delta: +0.47 to +0.66 for population; +0.49 to +0.67 for GDP). This is a structural feature of where ecosystem services matter to people, not a distinguishing characteristic of any particular service type.
 - **Coastal services (C_Risk, C_Risk_Red_Ratio):** Co-occur with higher-HDI, more economically developed contexts — consistent with populated coastlines where urban expansion increases hazard exposure.
-- **Terrestrial provisioning and export services (Pollination, Nature Access, N_export, Sed_export):** Co-occur with lower HDI and markedly higher income inequality (GINI), indicating communities most exposed to these declines tend to have less adaptive capacity. Agricultural plot intensity does *not* distinguish these hotspots (Cliff's Delta ≈ 0).
+- **Terrestrial provisioning and export services (Pollination, Nature Access, N_export, Sed_export):** Co-occur with lower HDI and substantially higher income inequality (GINI), indicating populations most exposed to these declines tend to have less adaptive capacity. Agricultural plot intensity does *not* distinguish these hotspots (Cliff's Delta ≈ 0).
 - **Retention ratio services (N_Ret_Ratio, Sed_Ret_Ratio):** A distinct third pattern — intermediate-to-higher HDI alongside *lower* GINI than background, not captured by either typology above.
 
 ### 3. Spatial Co-occurrence with Land Cover Change (The "Attribution Gap")
