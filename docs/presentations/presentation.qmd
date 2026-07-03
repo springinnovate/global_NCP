@@ -213,6 +213,46 @@ Is monitoring land cover change alone enough to track where ES provision is decl
 
 ---
 
+## Why Two Pathways?
+
+::: {.columns style="font-size: 0.84em; align-items: flex-start;"}
+::: {.column width="50%"}
+
+### Path A — Pixel-level (300m)
+*Compare first, then aggregate*
+
+- Each pixel compared 1992 → 2020 at native resolution
+- Results summed to regions after comparison
+- Preserves every individual gain and loss
+- **Used for:** WHAT — global and regional trajectories
+
+:::
+::: {.column width="50%"}
+
+### Path B — 10km equal-area grid
+*Aggregate first, then compare*
+
+- 300m rasters summarised into ~1.3M equal-area cells (100km² each) *before* computing change
+- Equal-area projection: every cell = 100km² regardless of latitude
+- Standardised units enable global hotspot ranking
+- **Used for:** WHERE, WHO, WHY — hotspot detection and profiling
+
+:::
+:::
+
+::: {.callout-note style="font-size: 0.75em; margin-top: 0.5em;"}
+**Why not one path?** Averaging Path B cell values up to broad regions causes sign divergence between absolute and percentage change in some services — a MAUP artefact. Path A avoids this by never passing through an intermediate grid step.
+:::
+
+::: {.notes}
+- This is the slide that explains the design decision that generates the most questions. The key is: the ORDER of aggregation vs. differencing matters.
+- Path A: diff → aggregate. Path B: aggregate → diff. Different questions, different orders.
+- The MAUP artefact: Jerónimo discovered this empirically — in some cases N export showed a positive SPC at the regional level via Path B but a negative absolute change via Path A. Both were mathematically correct at their respective scales. This is not an error; it is a genuine scale-dependence finding.
+- Equal-area: a lat/lon grid at 10 arc-minutes would have cells ~50% smaller near 60°N than near the equator. The IUCN AOO equal-area grid removes that bias.
+:::
+
+---
+
 ## Analytical Pipeline
 
 ```{mermaid}
@@ -661,6 +701,43 @@ For technical details, methodology, and code:
 - Latin America dominates — high severity AND high variability. Some cells approaching SPC of -200% (near-complete loss) for Nature Access and Pollination.
 - Direction matters: negative SPC = declining provision (Pollination, Nature Access); positive SPC = increasing export/risk (N_export, Sed_export).
 - Full version across income groups and biomes is in Chapter 4 of the book.
+:::
+
+---
+
+## Appendix: Technical Methods — Key Decisions
+
+::: {.columns style="font-size: 0.82em; align-items: flex-start;"}
+::: {.column width="50%"}
+
+### Spatial standardisation
+- InVEST rasters are in **WGS84** — pixel area varies with latitude
+- **Volumetric services** (N export, Sed export): pre-normalised to **per hectare** before extraction, correcting for latitude-dependent pixel size
+- **Index and ratio services** (Pollination, Retention Ratios, Nature Access, Coastal Risk): **dimensionless** — area correction would introduce spurious latitudinal gradients; not applied
+- **Coastal Risk** (`C_Risk` = `Rt`): wave energy **per linear metre of shoreline** — not an area-based quantity; no per-ha correction
+
+:::
+::: {.column width="50%"}
+
+### Aggregation at the grid-cell level
+- All ES rasters extracted to 10km grid using **mean** (not sum)
+- Rasters are already per-ha → mean gives a valid, comparable per-ha rate across equal-area cells
+- For hotspot detection: SPC(mean, mean) = SPC(sum, sum) for equal-area cells — rankings are identical regardless of choice
+- **Socioeconomic variables** (Population, GDP) use **sum** — these are absolute counts/totals, a different interpretation
+
+### Equal-area grid
+- IUCN AOO 10km grid uses an **equal-area projection**, not lat/lon
+- Every cell = exactly 100 km² regardless of latitude
+- Makes cross-regional comparisons valid without polar distortion
+
+:::
+:::
+
+::: {.notes}
+- This slide is a Q&A backup — not shown in the main flow.
+- The per-hectare correction question comes up because InVEST runs in WGS84 for most services. The key point: correction was applied where it's meaningful (absolute quantities), not applied where it would distort (dimensionless values).
+- The mean vs sum question: pragmatically, it doesn't affect hotspot results because SPC normalizes the values. The choice matters more for interpretability of the grid-cell values.
+- Equal-area point: a standard lat/lon grid at 10 arc-minutes has cells ~50% smaller at 60°N than at the equator — that would bias hotspot counts toward the tropics by area alone.
 :::
 
 ---

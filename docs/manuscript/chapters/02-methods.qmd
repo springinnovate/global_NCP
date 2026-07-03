@@ -3,7 +3,9 @@ title: "Methodological Approach"
 subtitle: "Data sources, change metrics, and analytical pipeline"
 ---
 
-This chapter describes the analytical framework used to address the four questions introduced in Chapter 1: how ES provision has changed globally (WHAT), where that change is most severe (WHERE), who is most exposed (WHO), and what is driving it (WHY). The framework integrates three primary data streams — InVEST biophysical models, satellite land cover records, and gridded socioeconomic layers — within a dual-pathway structure that enables both global trajectory analysis and local hotspot detection. Key methodological decisions — including the choice of change metric, the spatial analysis grid, and the statistical profiling approach — are presented in the context of the analytical problems they were designed to solve.
+This chapter describes the methods used to address the four questions introduced in Chapter 1: how ecosystem service provision has changed globally (WHAT), where that change is most concentrated (WHERE), which populations and socioeconomic contexts face the greatest exposure (WHO), and whether land cover change monitoring alone is sufficient to track where ES provision is declining most (WHY).
+
+The analysis integrates three data streams: InVEST biophysical models of eight ecosystem services at 300m resolution; ESA CCI (1992) and Copernicus C3S (2020) land cover classification maps at 300m; and four gridded socioeconomic covariates — population density, GDP, human development index, and income inequality. These are combined within a dual-pathway structure that separates global regional trajectory analysis from local hotspot detection.
 
 ## Data Sources
 
@@ -21,6 +23,18 @@ This analysis integrates four major datasets:
     - Coastal Protection / Coastal Risk Reduction Ratio (wave energy attenuation by coastal habitats)
 
 **How it works**: InVEST uses land cover, climate, and biophysical parameters to simulate ecosystem service supply via process-based models. Each service is modeled independently; outputs are continuous rasters at 300m resolution. A full technical description is in the Technical Appendix (Sharp et al., 2020).
+
+::: {.callout-important}
+**[FOR BECKY — model run provenance]**
+
+The 300m InVEST rasters used here are not generic model outputs — they were produced for a specific project or set of projects, likely in partnership with TNC or another large NGO. Before submission we need to clarify:
+
+1. What is the exact provenance of the 1992 and 2020 InVEST rasters? Were these the same runs underlying Chaplin-Kramer et al. (2019), a direct extension, or a new set of runs?
+2. Who produced them and under what project/partnership? Is there a specific dataset citation or data paper we should reference in addition to the InVEST User's Guide?
+3. Do the model runs use fixed or era-specific climate inputs for 1992 vs. 2020? (This also affects the attribution analysis interpretation.)
+
+The citation structure may need to be: InVEST software (Sharp et al. 2020) + specific model run/dataset (TNC/NatCap project citation TBD).
+:::
 
 ### 2. Land Cover Data
 
@@ -57,7 +71,39 @@ Two temporally contiguous products from the ESA classification lineage:
 
 ## Analytical Pipeline
 
-The full workflow implements a dual-pathway structure, with Path B hotspots feeding three downstream analyses (attribution, socioeconomic profiling, and off-site beneficiary routing):
+The full workflow implements a dual-pathway structure, with Path B hotspots feeding three downstream analyses (attribution, socioeconomic profiling, and off-site beneficiary routing).
+
+### Pre-processing: Spatial Standardization of InVEST Outputs
+
+**Volumetric services** (Nitrogen Export, Sediment Export) were normalised to per-hectare units before extraction, ensuring values are comparable across the equal-area grid regardless of latitude. **Index and ratio services** (Pollination, Nature Access, Retention Ratios, Coastal Risk Reduction Ratio) are dimensionless — area normalisation is neither necessary nor appropriate for these variables.
+
+Coastal Risk is an exception of a different kind: it is derived from InVEST shore-point outputs representing wave energy per linear metre of coastline rather than per unit area, so the per-hectare correction does not apply. Nature Access was modeled in an equidistant projection to enable valid distance calculations, then reprojected for grid integration.
+
+All services were then extracted to the 10km grid using the **mean** statistic, yielding average per-hectare rates within each equal-area cell — a consistent, directly comparable measure across all services and latitudes. Population and GDP use **sum**, since these represent absolute totals within each cell. Full technical detail on projection handling and aggregation choices is in the Technical Appendix (Chapter 9).
+
+### Why Two Pathways?
+
+Answering *how much has ES provision changed?* and *where is change most concentrated?* require different aggregation orders — and the order matters because it determines whether sub-regional heterogeneity is preserved or collapsed before the comparison is made.
+
+**Path A — pixel-level (the WHAT):** Each 300m raster pixel is compared directly between 1992 and 2020; pixel-level results are then summed to any grouping (biome, country, income group). Because the comparison happens before aggregation, every gain and loss is counted independently. A landscape with ES loss in one sub-region and recovery in another yields the correct net balance — neither signal cancels the other prematurely. Path A underpins all regional trajectory analyses in Chapter 3.
+
+**Path B — 10km equal-area grid (the WHERE, WHO, and WHY):** The same 300m rasters are aggregated to approximately 1.3 million equal-area cells ([IUCN AOO 10km grid](https://doi.org/10.6084/M9.FIGSHARE.4653439), 100 km² per cell) *before* computing change. This order — aggregate first, compare second — is necessary for hotspot detection: ranking locations against the global distribution requires fixed, comparable spatial units that an individual 300m pixel cannot provide. Critically, the IUCN AOO grid uses an **equal-area projection**, not a standard latitude/longitude grid. In a lat/lon grid, cells near the poles are substantially smaller than cells near the equator; equal-area projection ensures every cell covers exactly 100 km² regardless of latitude, making a hotspot cell in the tropics directly comparable to one at 60°N. Path B underpins all WHERE, WHO, and WHY analyses.
+
+**The aggregation artefact — why Path B cannot be used for regional totals:**
+
+When Path B cell-level values are further averaged to broad regions, two interacting problems emerge:
+
+1. **Baseline weighting:** Cells with large absolute ES volumes dominate the absolute change calculation; the more numerous low-baseline cells dominate the percentage calculation. The two metrics can therefore diverge in direction even within the same region and service.
+
+2. **Within-cell cancellation:** Gains and losses occurring within a single 100 km² cell partially cancel before the comparison is made. At the pixel level, these would be separate data points; at the cell level, they collapse into a net value that may understate local extremes.
+
+Together, these produce the **Modifiable Areal Unit Problem** ([Openshaw, 1984](https://www.worldcat.org/isbn/0860941345); [Fotheringham & Wong, 1991](https://doi.org/10.1068/a231025)): results at one spatial scale that do not generalise to another. Across aggregation levels this manifests as **Simpson's Paradox** ([Simpson, 1951](https://doi.org/10.1111/j.2517-6161.1951.tb00088.x)) — a trend present in the disaggregated data reverses when data are grouped. These problems are particularly acute in ES assessments, where spatial heterogeneity is substantive signal rather than noise ([Jelinski & Wu, 1996](https://doi.org/10.1007/BF02447512)).
+
+::: {.callout-note}
+**Observed in this analysis:** For nitrogen export and sediment export, Path B regional averages in some income groups showed positive SPC (apparent percentage gain at the cell level) while Path A showed negative absolute change (net volumetric loss). Both results are mathematically correct at their respective scales. The Path B percentage signal is dominated by numerous low-baseline cells showing moderate proportional increases; the Path A absolute signal is driven by large volumetric losses in high-baseline cells. Neither metric is wrong — they answer different questions. This is precisely why Path A is used for the WHAT analysis and Path B is confined to hotspot detection and profiling.
+:::
+
+Path A, which sums pixel values directly to regions without passing through an intermediate grid step, does not exhibit this artefact. Regional summaries derived from Path B are therefore presented in the supplementary annex; Chapter 3 (WHAT) uses Path A exclusively.
 
 ```{mermaid}
 %%{init: {'flowchart': {'rankSpacing': 55, 'nodeSpacing': 30}}}%%
@@ -166,6 +212,24 @@ Range is −1 to +1, where 0 = complete distributional overlap and ±1 = complet
 - High |δ| + significant p_adj = distributions are both statistically and practically distinct (e.g., coastal risk hotspots: δ_HDI ≈ +0.30, large effect — co-occur with more developed contexts)
 - Near-zero δ despite significant p = difference is real but negligibly small in practical terms (e.g., agricultural plot intensity across all services: δ ≈ 0)
 
+## Population Exposure and the Serviceshed Multiplier
+
+**Question**: How many people are directly exposed to ES decline, and how does that number change when downstream and access-connected beneficiaries are included?
+
+The socioeconomic profiling analysis (above) characterises the *type* of landscape where hotspot cells occur. A complementary question is *how many people* depend on those landscapes — not only those living directly within them, but those connected through the delivery pathways of the services themselves.
+
+**In-situ exposure** is the baseline count: total population (GHS-POP 2020) summed within all grid cells identified as hotspot cells for at least one service. This is the most conservative estimate of affected population.
+
+**Connected beneficiaries** extend the count beyond the immediate footprint through two pathways:
+
+1. **Hydrological downstream exposure** — populations living downstream within the same watershed, who rely on upstream ES for water quality regulation, flow stabilisation, and sediment control. Pre-computed routing masks (`downstream_50k_population.tif` rasters per hotspot category) capture the population within the downstream catchment at a 50km flow accumulation threshold.
+
+2. **Travel-time access exposure** — populations within a defined travel-time radius of hotspot cells, representing those who access nature-based services (recreation, wild pollination, nature access) from the surrounding landscape. Pre-computed travel-time masks (`within_travel_time_population.tif`) capture this population.
+
+The **serviceshed multiplier** is defined as the ratio of total connected beneficiaries (union of downstream and travel-access populations) to in-situ population for the same set of cells. Values above 1 indicate that decline cascades substantially beyond the immediate local footprint — the higher the multiplier, the more the ES in question serves distant beneficiaries relative to local residents.
+
+Exposure estimates are stratified by World Bank region, income group, WWF biome, and compound risk tier (1+, 2+, 3+ co-occurring services) using pre-aggregated CSV outputs (`exposure_comparison_compiled.csv`) that allow rapid cross-tabulation without re-running the spatial analysis.
+
 ## Attribution Analysis: Land Cover Change Methodology
 
 **Question**: What proportion of extreme ecosystem service decline hotspots (top 5% of SPC change) spatially co-occur with extreme land cover conversion hotspots (top 5% of gross conversion magnitude) between 1992 and 2020?
@@ -221,9 +285,10 @@ A high gap means most severe ES decline does not co-occur with the most intense 
 
 **Validation steps completed**:
 
-1. Grid geometry verification — all ~1.5M cells confirmed at 100 km² in equal-area projection
+1. Grid geometry verification — all ~1.5M cells confirmed at 100 km² in equal-area projection (`Python_scripts/verify_grid_area.py`)
 2. Data integrity checks — no missing values in key attributes across both time periods
 3. InVEST output sanity checks — values within expected biophysical ranges; spatial patterns consistent with known ecological gradients
+4. Key claims validation — `scripts/audit_claims.R` cross-checks the core quantitative findings (income group disparity ratios, regional intensity rankings, attribution gap percentage) against the output CSVs. This script is re-run after any hotspot threshold change or pipeline update to confirm results have not drifted.
 4. Pollination special case — a valid-pixel mask was applied across both dates and NA cells reclassified to zero prior to difference calculation, to prevent spurious NA propagation in the change layer
 
 **Uncertainties acknowledged**:
@@ -242,12 +307,26 @@ One validation step is still open: cross-checking hotspot locations against know
 
 ## Reproducibility
 
-All analysis is reproducible from raw inputs:
+All analysis is reproducible from raw inputs given access to the external data directory (`GLOBAL_NCP_DATA`). The two analytical paths run through separate but complementary pipelines:
 
-- **Code**: R/Quarto notebooks and Python extraction scripts (project repository)
-- **Data**: Processed GeoPackages and CSVs in `/data/processed/`
-- **Pipeline**: Python zonal statistics (via `zonal_stats_toolkit`) → R processing → hotspot detection → synthesis
-- **Technical detail**: Full pipeline documentation in the Technical Appendix (@sec-annex)
+**Path A — Regional trajectories (WHAT chapter):**
+
+1. `Python_scripts/summary_pipeline_landgrid.py` with `analysis_configs/services_diff_ha_groupings.yaml` — extracts per-hectare service rasters directly to regional polygon groupings (countries, biomes, income groups) using a rasterized zonal statistics approach suited to complex multipolygons
+
+**Path B — Hotspot detection and profiling (WHERE, WHO, WHY chapters):**
+
+1. `Python_scripts/summary_pipeline_landgrid.py` with `analysis_configs/services_slim.yaml`, `beneficiaries_slim.yaml`, and `c_protection_synth.yaml` — extracts ES, socioeconomic, and coastal rasters to the 10km equal-area grid using exact fractional zonal statistics (`exactextract`)
+2. `analysis/process_data.qmd` — consolidation and change calculation (produces `10k_change_calc.gpkg`)
+3. `analysis/hotspot_extraction.qmd` — hotspot detection, LCC attribution overlay, visualisations
+4. `analysis/hotspot_synthesis.qmd` — relative intensity, population exposure, summary tables
+5. `analysis/KS_tests_hotspots.qmd` — socioeconomic profiling and Cliff's Delta
+6. `scripts/audit_claims.R` — validates key quantitative claims against output CSVs
+
+**Languages and tools**: Python (zonal extraction, raster pre-processing via Docker), R and Quarto (analysis, visualisation, reporting). All packages are open-source.
+
+**Outputs**: processed GeoPackages and summary CSVs in `outputs/data_package/`; plots in `outputs/plots/`.
+
+Full pipeline documentation and configuration notes are in the Technical Appendix (Chapter 9) and `docs/methodology.md`.
 
 ## Summary
 
@@ -255,6 +334,25 @@ This chapter describes a four-component methodological framework designed to dia
 
 Two parallel analytical pathways address different spatial questions. Path A computes pixel-level regional trajectories to answer *what changed globally* — preserving true volumetric trends by aggregating differences before summarizing. Path B identifies localized extremes by aggregating raster values to the grid first, then computing change, isolating the most intense local shifts without them being averaged away. Hotspots are defined as the top 5% of cells by Symmetric Percentage Change per service — a rank-based, scale-invariant threshold that enables fair comparison across services measured in fundamentally different units.
 
-Socioeconomic profiling tests whether hotspot populations are systematically different from the background landscape using Kolmogorov-Smirnov tests, complemented by Cliff's Delta to measure practical effect size rather than statistical significance alone — a necessary correction given the very large sample size. The attribution analysis asks how much of this extreme ES decline co-occurs with equally extreme land cover conversion, using a symmetric 5% threshold on both sides. The resulting attribution gap is interpreted as a spatial co-occurrence signal, not a causal partition, because ESA CCI land cover serves simultaneously as both an InVEST model input and the attribution overlay.
+Socioeconomic profiling tests whether hotspot populations are systematically different from the background landscape using Kolmogorov-Smirnov tests, complemented by Cliff's Delta to measure practical effect size rather than statistical significance alone — a necessary correction given the very large sample size.
 
-Together, these design choices produce a spatially explicit, methodologically consistent evidence base for the WHERE, WHO, and WHY questions addressed in Chapters 4–7.
+The serviceshed analysis extends exposure beyond the immediate hotspot footprint. People living *within* a hotspot cell are the in-situ exposed population; but ES decline in one location cascades to populations that depend on those services from a distance — through downstream hydrological flow (water quality and quantity regulation) or through physical travel access (recreation, wild pollination, nature access). By tracing these connectivity pathways using pre-computed routing masks, the analysis quantifies the full connected beneficiary population and produces a spatial multiplier comparing in-situ to total downstream and access-based exposure.
+
+The attribution analysis asks how much of this extreme ES decline co-occurs with equally extreme land cover conversion, using a symmetric 5% threshold on both sides. The resulting attribution gap is interpreted as a spatial co-occurrence signal, not a causal partition, because ESA CCI land cover serves simultaneously as both an InVEST model input and the attribution overlay.
+
+Together, these four components — dual-pathway change detection, socioeconomic profiling, serviceshed routing, and land cover attribution — produce a spatially explicit, methodologically consistent evidence base for the WHERE, WHO, and WHY questions addressed in Chapters 4–7.
+
+## Key References
+
+| Concept | Citation | Link |
+|:---|:---|:---|
+| Modifiable Areal Unit Problem | Openshaw, S. (1984). *The Modifiable Areal Unit Problem.* CATMOG 38, Geo Books, Norwich. | [WorldCat](https://www.worldcat.org/isbn/0860941345) |
+| MAUP in multivariate analysis | Fotheringham, A.S., & Wong, D.W.S. (1991). The modifiable areal unit problem in multivariate statistical analysis. *Environment and Planning A*, 23(7), 1025–1044. | [DOI](https://doi.org/10.1068/a231025) |
+| Simpson's Paradox | Simpson, E.H. (1951). The interpretation of interaction in contingency tables. *Journal of the Royal Statistical Society, Series B*, 13, 238–241. | [DOI](https://doi.org/10.1111/j.2517-6161.1951.tb00088.x) |
+| MAUP in landscape ecology | Jelinski, D.E., & Wu, J. (1996). The modifiable areal unit problem and implications for landscape ecology. *Landscape Ecology*, 11(3), 129–140. | [DOI](https://doi.org/10.1007/BF02447512) |
+| IUCN AOO equal-area grid | Murray, N. (2017). Global 10×10km grids for IUCN Red List of Ecosystems assessments. *Figshare*. | [DOI](https://doi.org/10.6084/M9.FIGSHARE.4653439) |
+| InVEST models | Sharp, R. et al. (2020). *InVEST User's Guide.* Natural Capital Project. | [naturalcapitalproject.org](https://naturalcapitalproject.stanford.edu/software/invest) |
+| SPC metric | Berry, D.A., & Ayers, G.D. (2006). Symmetrized percent change for treatment comparisons. *The American Statistician*, 60(1), 27–31. | [DOI](https://doi.org/10.1198/000313006X90684) |
+| Cliff's Delta | Cliff, N. (1993). Dominance statistics: Ordinal analyses to answer ordinal questions. *Psychological Bulletin*, 114(3), 494–509. | [DOI](https://doi.org/10.1037/0033-2909.114.3.494) |
+| FDR correction | Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate. *Journal of the Royal Statistical Society: Series B*, 57(1), 289–300. | [DOI](https://doi.org/10.1111/j.2517-6161.1995.tb02031.x) |
+| Land cover change methodology | Pontius, R.G., & Millones, M. (2011). Death to Kappa. *International Journal of Remote Sensing*, 32(15), 4407–4429. | [DOI](https://doi.org/10.1080/01431161.2011.552923) |

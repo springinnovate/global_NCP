@@ -94,15 +94,17 @@ This book integrates global ecosystem service models, satellite land cover data,
 
 ## Caveats & Transparency
 
-This analysis synthesizes global data at 10-km resolution. Important limitations:
+This analysis synthesizes global data at 10km resolution. Important limitations:
 
-- **Coarse resolution** – Sub-grid heterogeneity not captured; local variation substantial
-- **Data quality varies** – Ecosystem service models depend on input data; validation is ongoing
-- **Temporal snapshot** – 1992-2020 comparison; recent trends may differ
-- **Attribution gap** – ~76% of decline unexplained; reflects knowledge gap not data gap
-- **Natural variation** – Climate variability contributes to observed changes; attribution to human drivers incomplete
+- **Coarse resolution** — Each 100 km² grid cell aggregates substantial sub-grid heterogeneity. Intense localised change within a cell may be masked by surrounding stable areas. Finer-resolution regional applications — which this pipeline directly supports — would reveal patterns invisible at global scale.
 
-We recognize these uncertainties. This analysis is a starting point for prioritization and hypothesis-driven research, not a definitive answer.
+- **Two-snapshot design** — The analysis compares 1992 and 2020 endpoints only. Intermediate dynamics — recovery events, accelerating trends, threshold crossings — are not captured, and the 2020 endpoint is now several years old. Extending the analysis to additional time points (e.g. 2000, 2010) would characterise trajectories rather than net change. This is a documented future extension; the pipeline is designed to accommodate additional snapshots without structural modification.
+
+- **The attribution gap and what it means** — 76% of ES hotspot cells do not co-occur with *extreme* (top 5%) land cover conversion at the 10km grid scale. This is a spatial co-occurrence finding, not a causal diagnosis. Cells in that 76% may still have moderate land cover change below the top-5% threshold; other plausible contributors include upstream hydrological routing effects, sub-pixel habitat degradation below the 300m detection limit of ESA CCI, and direct climate effects on ecosystem function not mediated by land cover. The current design cannot partition these mechanisms — doing so would require controlled factorial experiments beyond the scope of this analysis.
+
+- **Model and data quality** — InVEST outputs depend on land cover inputs and globally applied default biophysical parameters. Local parameterisation and validation against observed data remain important next steps, particularly for fine-scale or policy-facing applications.
+
+These limitations are acknowledged openly. This analysis is a foundation for spatial prioritisation and hypothesis-driven research, not a definitive account of drivers or impacts.
 
 ## About the Analysis
 
@@ -111,24 +113,32 @@ We recognize these uncertainties. This analysis is a starting point for prioriti
 **Data sources**:
 
 - [InVEST ecosystem service models (Sharp et al., 2020)](https://naturalcapitalproject.stanford.edu/software/invest)
-- [ESA Climate Change Initiative land cover](https://climate.esa.int/en/projects/land-cover/)
-- [IUCN 10km equal-area grids (Murray, 2017)](https://doi.org/10.6084/m9.figshare.4653439.v1)
-- Socioeconomic and demographic data: World Bank regional and income-group classifications (World Bank, 2023)
+- [ESA CCI Land Cover v2.0.7](https://climate.esa.int/en/projects/land-cover/) — 1992 baseline (Defourny et al., 2017)
+- [Copernicus C3S Global Land Cover v2.1.1](https://cds.climate.copernicus.eu/) — 2020 endpoint; continuation of ESA CCI lineage [citation TBD]
+- [IUCN AOO 10km equal-area grid (Murray, 2017)](https://doi.org/10.6084/m9.figshare.4653439.v1)
 - [Global Human Settlement Layer – Population (GHSL-POP)](https://human-settlement.emergency.copernicus.eu/) (Schiavina et al., 2019)
-- [Global Human Settlement Layer – Built-up area (GHSL-BUILT)](https://human-settlement.emergency.copernicus.eu/) (Corbane et al., 2018)
-- Gross Domestic Product: gridded GDP data from Kummu et al. (2018)
-- [Human Development Index (HDI)](https://doi.org/10.1038/s41467-026-68805-6): machine-learning gridded predictions from Sherman et al. (2026)
+- Gross Domestic Product: gridded total GDP (Kummu et al., 2018) [citation TBD — verify source]
+- [Human Development Index (HDI)](https://doi.org/10.1038/s41467-026-68805-6): ML-downscaled gridded predictions, Sherman et al. (2026)
+- Gini coefficient: gridded admin-1 disposable income Gini, 2020 [citation TBD — source unconfirmed]
 - Agricultural plot-size metrics: Mehrabi et al. (2022)
+- World Bank regional and income-group classifications (World Bank, 2023)
 
 **Methods**:
 
-- **Biophysical Modeling**: 300m resolution InVEST ecosystem service simulations aggregated to a canonical 10km equal-area grid.
-- **Change Detection**: Dual-pathway analysis evaluating both macro-regional volumetric shifts and localized intensities using Symmetric Percentage Change (SPC).
-- **Hotspot Extraction**: Identifying the extreme 5% of grid cells experiencing acute relative decline.
-- **Socioeconomic Profiling**: Kolmogorov-Smirnov (KS) tests and serviceshed multiplier models to quantify direct and downstream human exposure.
-- **Driver Attribution**: Spatial overlay with ESA CCI land cover transition matrices to isolate conversion versus degradation signals.
-- **Reproducibility**: All code and intermediate outputs available; see Technical Appendix
+- **Biophysical modelling** — Eight ecosystem services modeled with InVEST at 300m resolution for 1992 and 2020. Volumetric outputs (nitrogen and sediment export) normalised to per-hectare units before spatial extraction to correct for latitude-dependent pixel area variation in the WGS84 source rasters; index and ratio services (pollination, nature access, retention ratios, coastal risk) are dimensionless and used as-is.
+
+- **Dual-pathway analytical design** — Path A extracts per-hectare rasters directly to regional groupings (countries, biomes, income groups) at pixel level, then sums to regions — producing unbiased volumetric trajectories for the WHAT analysis. Path B aggregates the same rasters to ~1.3 million equal-area 100 km² cells (IUCN AOO 10km equal-area grid) *before* computing change, enabling global hotspot ranking and socioeconomic profiling. The two paths answer different spatial questions and must not be conflated (see Chapter 2 for full rationale).
+
+- **Hotspot extraction** — Cells in the extreme 5% of Symmetric Percentage Change (SPC) per service, ranked globally. SPC is bounded ±200% and robust to near-zero baselines, enabling direct comparison across services measured in different units.
+
+- **Socioeconomic profiling** — Two-sample Kolmogorov-Smirnov tests comparing hotspot cells against a matched median-background population, complemented by Cliff's Delta effect sizes. Four covariates: population density (GHS-POP), GDP, HDI, Gini coefficient. 39 of 40 service–covariate combinations significant after FDR correction.
+
+- **Population exposure and serviceshed routing** — In-situ exposure: GHS-POP summed within hotspot grid cells. Connected beneficiaries: downstream populations traced through hydrological routing and travel-time access networks.
+
+- **Land cover attribution** — Spatial co-occurrence test between ES hotspot cells (top 5% SPC) and land cover conversion hotspot cells (top 5% of gross conversion magnitude per Pontius & Millones contingency matrix). Result is an attribution gap quantifying spatial co-occurrence — not a causal partition of ES decline.
+
+- **Reproducibility** — Open-source R and Python pipeline; all methods documented in Chapter 9 (Technical Appendix). Core scripts: `Python_scripts/summary_pipeline_landgrid.py` (extraction), `analysis/hotspot_extraction.qmd` (detection), `analysis/KS_tests_hotspots.qmd` (profiling).
 
 ## What's Next
 
-Chapter 2 presents the simplified methodology. Then we dive into geographic (WHERE), socioeconomic (WHO), and mechanistic (WHY) analyses.
+Chapter 2 presents the full methodological framework in detail. Chapters 3–7 address the four research questions in sequence: global ES trajectories (WHAT), hotspot geography (WHERE), drivers and the monitoring gap (WHY), and socioeconomic exposure (WHO). Chapter 8 synthesises the findings and discusses implications.

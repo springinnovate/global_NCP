@@ -46,9 +46,10 @@ docker run -it --rm \
   -w /workspace \
   therealspring/global_ncp-computational-environment:latest /bin/bash
 
-# Inside container, execute raster-based zonal summaries:
-python Python_scripts/summary_pipeline_rasterzones.py --data-root /data analysis_configs/services_raster.yaml
-# python Python_scripts/summary_pipeline_rasterzones.py --data-root /data analysis_configs/beneficiaries_raster.yaml
+# Inside container, execute zonal summaries (services, then beneficiaries, then coastal):
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/services_slim.yaml
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/beneficiaries_slim.yaml
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/c_protection_synth.yaml
 ```
 
 ### Running the R/Quarto Analysis Chain
@@ -61,7 +62,6 @@ quarto render analysis/process_data.qmd
 quarto render analysis/hotspot_extraction.qmd
 quarto render analysis/hotspot_synthesis.qmd
 quarto render analysis/KS_tests_hotspots.qmd
-quarto render analysis/results_interpretation.qmd
 ```
 
 ### Rasterizing the Outputs
@@ -239,14 +239,20 @@ Stored under the external data root (`raw/`), include:
 
 ## Modeled Ecosystem Services
 
-1.  **Nitrogen Export** – InVEST NDR: kg/hectare/year (Standardized from pixel)
-2.  **Sediment Export/Retention** – InVEST SDR: ton/hectare/year (Standardized from pixel)
-3.  **USLE** – Soil erosion proxy. Derived from the *Revised Universal Soil Loss Equation* USLE
-4.  **Pollination** – InVEST Pollination Model: People fed on habitat
-5.  **Coastal Protection** – InVEST Coastal Vulnerability: Unitless vulnerability index
-6.  Sediment Retention Service: $$
-    \text{Potential Sediment Retention} = \frac{\text{USLE} - \text{Export}}{\text{USLE}}
-    $$
+Eight services modeled with InVEST at 300m resolution, 1992 and 2020. All rasters pre-normalised to per-hectare units before extraction; ratio/index services are dimensionless and exempt from area correction.
+
+| # | Service | Variable | Type |
+|---|---|---|---|
+| 1 | Nitrogen Export | `N_export` | Volumetric (kg N/ha) |
+| 2 | Nitrogen Retention Ratio | `N_Ret_Ratio` | Ratio (0–1) |
+| 3 | Sediment Export (USLE) | `Sed_export` | Volumetric (ton/ha) |
+| 4 | Sediment Retention Ratio | `Sed_Ret_Ratio` | Ratio (0–1) |
+| 5 | Pollination | `Pollination` | Index |
+| 6 | Nature Access | `Nature_Access` | Index (equidistant projection) |
+| 7 | Coastal Risk | `C_Risk` | Per linear metre of shore (Rt) |
+| 8 | Coastal Risk Reduction Ratio | `C_Risk_Red_Ratio` | Ratio (Rt_ratio, 0–1) |
+
+Canonical variable names are defined in `analysis/hotspot_extraction.qmd` (`HOTS_CFG`) and `R/utils_hotspot.R` (`svc_order`).
 
 ## Land Cover Layers
 
@@ -396,12 +402,6 @@ The R/Quarto analysis workflow is conducted through a series of notebooks in the
    - Generates KS test plots and statistical summaries
    - Links ecosystem service hotspots to drivers (land cover conversion, urbanization)
 
-7. **`results_interpretation.qmd`** – **Synthesis: Narrative & Interpretation**
-   - The final analysis notebook that synthesizes outputs from all prior steps
-   - Constructs the narrative answering: **WHERE are hotspots?**, **WHO is affected?**, **WHY (what are the drivers)?**
-   - Generates key findings, figures, and tables for manuscript or presentations
-   - **Recommended as the source document for presentations and co-author communication**
-
 ## Data Flow Summary
 
 ```
@@ -412,7 +412,7 @@ Python Pipeline (Docker)
     ↓
 R Analysis Chain (Sequential)
     ↓
-    prepare_data.qmd → process_data.qmd [creates 10k_change_calc.gpkg]
+    process_data.qmd [creates 10k_change_calc.gpkg]
     ↓
     hotspot_extraction.qmd [hotspot identification]
     ↓
@@ -420,9 +420,9 @@ R Analysis Chain (Sequential)
     ↓
     KS_tests_hotspots.qmd [socioeconomic profiling]
     ↓
-    results_interpretation.qmd [narrative synthesis]
-    ↓
 Final Outputs: Maps, summary tables, KS test plots, manuscript figures
+    ↓
+Validation: scripts/audit_claims.R [verifies key paper claims against outputs]
 ```
 
 ## For Complete Technical Details

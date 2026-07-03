@@ -24,7 +24,7 @@ The notebooks should be run in the following order to ensure data dependencies a
 
 4.  **`KS_tests_hotspots.qmd`**: Consumes the hotspot outputs to perform socioeconomic profiling using Kolmogorov-Smirnov tests.
 
-5.  **`results_interpretation.qmd`**: The final interpretation script. It loads the summary tables from `hotspot_synthesis.qmd` and other notebooks to generate the narrative, key takeaways, and figures for the manuscript.
+After the analysis chain, run `scripts/audit_claims.R` to validate key paper claims (income group disparity, attribution gap %, regional intensities) against the actual output CSVs.
 
 ---
 *This README should be updated as the project evolves.*

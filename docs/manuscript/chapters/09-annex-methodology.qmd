@@ -46,6 +46,14 @@ By dropping these cells, we guarantee that the final analysis compares a mathema
 *   **Bounding Box vs. True Area:** As a result, measuring the `width` and `height` of a reprojected grid cell's bounding box will **not** yield 10km x 10km. 
 *   **Area is the Invariant:** A validation script (`Python_scripts/verify_grid_area.py`) measured the true geometric area of the reprojected grid cells, definitively confirming that each cell has an area of **100 km²** (10km x 10km).
 
+### Per-Hectare Standardization
+
+InVEST rasters are produced in WGS84 (EPSG:4326), a geographic coordinate system where pixel dimensions are expressed in degrees. Because a degree of longitude narrows toward the poles, pixels at high latitudes cover less actual ground area than equatorial pixels of the same angular size. For services representing absolute quantities (Nitrogen Export, Sediment Export), each pixel value was divided by the pixel's actual area in hectares before extraction, correcting for this latitude-dependent variation. Index and ratio services (Pollination, Nature Access, Retention Ratios, Coastal Risk indices) are dimensionless — the area term either cancels algebraically or has no area dimension — so no correction was applied. Applying per-hectare normalisation to dimensionless variables would introduce artificial latitudinal gradients driven by pixel geometry rather than ecology.
+
+Coastal Risk is a special case: InVEST coastal protection outputs are expressed per linear metre of shoreline (not per unit area), so the per-hectare correction does not apply regardless of input projection.
+
+All ES rasters were then extracted to the 10km grid using the **mean** statistic. Since inputs are in per-hectare units, the cell mean gives a comparable per-ha rate across all equal-area cells and all latitudes. Socioeconomic variables (population, GDP) use the **sum** statistic — these represent absolute counts rather than rates. For hotspot detection this distinction is immaterial: SPC values are identical whether computed from sums or means in equal-area cells, because the area term cancels.
+
 ### Data Preparation: Coastal Risk & Protection
 The Coastal Risk and Protection datasets are originally provided as high-resolution vector line geometries representing discrete coastal locations. 
 

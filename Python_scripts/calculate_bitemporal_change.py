@@ -35,6 +35,9 @@ def calculate_change(input_gpkg, output_gpkg, base_year, target_year, metric=Non
         columns = [layer_defn.GetFieldDefn(i).GetName() for i in range(layer_defn.GetFieldCount())]
 
         # Canonical mappings matching R's process_data.qmd
+        # All variables use _mean: rasters are per-hectare normalised before
+        # extraction, so mean gives a comparable per-ha rate across equal-area
+        # cells. Regional totals are handled separately via Path A.
         rename_map = {
             f"global_usle_marine_mod_ESA_{base_year}_mean": "usle",
             f"nature_access_lspop2019_ESA{base_year}_mean": "nature_access",
@@ -42,10 +45,10 @@ def calculate_change(input_gpkg, output_gpkg, base_year, target_year, metric=Non
             f"Sed_ret_ratio_{base_year}_mean": "sed_ret_ratio",
             f"C_Risk_{base_year}_mean": "c_risk",
             f"C_Risk_Red_Ratio_{base_year}_mean": "c_risk_red_ratio",
-            f"global_n_export_tnc_esa{base_year}_sum": "n_export",
-            f"global_n_retention_ESAmar_{base_year}_fertilizer_sum": "n_retention",
-            f"global_sed_export_marine_mod_ESA_{base_year}_sum": "sed_export",
-            f"realized_polllination_on_ag_ESA{base_year}_sum": "pollination"
+            f"global_n_export_tnc_esa{base_year}_mean": "n_export",
+            f"global_n_retention_ESAmar_{base_year}_fertilizer_mean": "n_retention",
+            f"global_sed_export_marine_mod_ESA_{base_year}_mean": "sed_export",
+            f"realized_polllination_on_ag_ESA{base_year}_mean": "pollination"
         }
 
         pairs = []

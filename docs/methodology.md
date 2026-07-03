@@ -12,9 +12,25 @@ Before calculating any changes or identifying hotspots, the underlying spatial a
 To ensure that comparisons of ecosystem service provision are meaningful across the globe, all volumetric services (e.g., Nitrogen Export, Sediment Export) are standardized to a **per-hectare** basis. This step corrects for the geometric distortion of raster pixels in unprojected coordinate systems.
 
 *   **Volumetric Variables:** Converted to `Unit / ha` by dividing the raw pixel value by a corresponding pixel area raster (`esa_pixel_area_ha_...`). This calculation is performed *before* any zonal statistics or spatial aggregation occurs.
-*   **Ratios & Indices:** Left in their native units (e.g., 0-1 ratios, unitless indices) as area normalization does not apply.
+*   **Ratios & Indices:** Left in their native units (e.g., 0-1 ratios, unitless indices) as area normalization does not apply — the area term cancels in ratio calculations, and applying it to index variables would introduce spurious latitudinal gradients.
+*   **Coastal Risk — resolved.** Shore-point outputs converted to 300m raster via `Python_scripts/rasterize_coastal.py` (spatial mean per pixel). InVEST produces: `Rt` (energy reaching shore with habitat), `Rt_nohab_all` (without habitat), `Rt_service` (habitat contribution), `Rt_ratio` (proportional risk reduction). Only `Rt` → **`C_Risk`** and `Rt_ratio` → **`C_Risk_Red_Ratio`** enter the hotspot analysis. `C_Risk` is a per-linear-metre shore metric (e.g. MJ/m) — not area-based — so per-hectare correction does not apply. `C_Risk_Red_Ratio` is dimensionless. `Rt_service` and `Rt_nohab_all` are rasterised but unused in the main analysis.
 
 This ensures that all downstream zonal statistics reflect physical densities that are comparable across regions.
+
+### Aggregation Statistic: Mean for All Variables at Grid-Cell Level
+
+**Decision:** All raster variables are extracted to the 10km grid using the **mean** aggregation statistic (`op_stats: [mean]` in `analysis_configs/services_slim.yaml`). This applies uniformly to volumetric services, ratios, and indices.
+
+**Rationale:** Since all input rasters are already in per-hectare units (sourced from `base_years_ha/`), the mean within each grid cell represents the average per-ha rate or concentration across that 100km² cell. This is:
+- A valid, comparable metric across cells regardless of latitude or baseline volume
+- Consistent across all service types, eliminating the need to manage mixed `_sum`/`_mean` column naming in downstream R code
+- Appropriate for hotspot detection, which ranks relative rates, not absolute volumes
+
+**Implication:** Grid-cell mean values represent per-ha rates, not cell-level totals. Regional totals for volumetric services (e.g., total N export from Sub-Saharan Africa) are computed separately via Path A, which extracts directly from per-ha rasters to large regional polygons without passing through the grid.
+
+**Known technical debt:**
+- `services_slim.yaml` still specifies `op_stats: [mean, sum]` — the `sum` stat is computed but unused downstream; should be removed to reduce wasted computation
+- `Python_scripts/calculate_bitemporal_change.py` rename_map contains stale `_sum` column references (e.g., `n_export_sum`, `pollination_sum`) from before this decision was made; these should be updated to `_mean` to match actual column names
 
 ### Canonical Master Grid Generation
 Due to severe performance and geometry-validity bottlenecks encountered when performing massive spatial joins natively in R (the `sf` package), the creation of the canonical 100 sq km master grid was migrated to a hybrid QGIS-Python workflow.
@@ -59,7 +75,9 @@ To ensure mathematical robustness, a specialized pre-processing workflow was uti
 
 ## 2. The Dual-Pathway Analysis Structure
 
-Global spatial analysis often suffers from scale artifacts (like the Modifiable Areal Unit Problem). To accurately answer both "What happened globally?" and "Where are the local hotspots?", this project splits the analysis into two parallel workflows.
+The two questions this project addresses — *how much did ES change regionally?* and *where is change most concentrated?* — require different aggregation strategies. Path A compares pixels first, then aggregates results to regions. Path B aggregates pixels to grid cells first, then computes change. Using the wrong order for either question introduces systematic bias (detailed below).
+
+Note on the grid: the IUCN AOO 10km grid is an **equal-area** projection, not a lat/lon grid. Every cell covers exactly 100 km² regardless of latitude, making cross-regional comparisons fair without polar distortion.
 
 ### Path A: True Regional Trajectories (The "WHAT")
 This path is designed to generate summary statistics for large macro-regions (e.g., Biomes, World Bank Regions) bypassing the 100 sq km grid entirely.
