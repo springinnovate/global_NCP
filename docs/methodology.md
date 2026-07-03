@@ -202,11 +202,16 @@ A question regarding Path B is the comparability of variables aggregated via **s
 ## 5. Analytical Modules
 
 ### Socioeconomic Profiling (KS Tests)
-To understand the socioeconomic context of ecosystem service hotspots (e.g., Population, GDP, HDI), we utilize two-sample Kolmogorov-Smirnov (KS) tests.
+To characterise the socioeconomic context of hotspot cells, we compare distributions of four covariates (population density, GDP, HDI, Gini coefficient) inside hotspot cells against a background of typical stable conditions using two-sample Kolmogorov-Smirnov (KS) tests, complemented by Cliff's Delta (δ) effect sizes.
 
-**Balanced Sampling Methodology:**
-A direct comparison of hotspots (the top/bottom 5% of pixels) against the entire non-hotspot background (the remaining 95%) suffers from severe sample size imbalance and includes pixels undergoing extreme changes in the *opposite* direction. To ensure a fair and stable statistical comparison, the pipeline implements a "median background" sampling strategy:
-* Hotspots are compared strictly against the "business-as-usual" median 5% of the landscape (the 47.5th to 52.5th percentiles of change). This isolates the specific socioeconomic profile of extreme decline against typical, stable baseline conditions.
+**Why the median background?**
+Hotspot cells are compared against the *median 5%* of each service's change distribution (47.5th–52.5th percentile), not the full non-hotspot set. Reason: comparing against all 95% of non-hotspot cells would include cells at the opposite extreme (large service gains), which would confound the comparison. The median background represents typical, stable conditions — the right reference for "what's distinctive about acute decline?"
+
+**Why Cliff's Delta, not just p-values?**
+With ~1.5 million grid cells, even a negligibly small difference between hotspot and background distributions will produce a statistically significant p-value. This doesn't mean the difference is practically meaningful. Cliff's Delta (δ) measures the *probability* that a randomly drawn hotspot cell has a higher covariate value than a randomly drawn background cell, independently of sample size. δ = 0 means complete overlap; δ = ±1 means complete separation.
+
+**Why FDR correction — and what 39/40 means:**
+Running 40 tests at once (8 services × 5 covariates) means roughly 2 would appear significant by chance alone at a standard 5% threshold. Benjamini-Hochberg False Discovery Rate correction adjusts the significance bar across all 40 tests together, limiting the proportion of significant results that are likely to be false alarms. That **39 of 40 combinations remain significant after correction** means the socioeconomic signal is robust — the correction barely changed anything. The one non-significant result (Coastal Risk Reduction Ratio × agricultural plot intensity, $p_{adj}$ = 0.48, δ ≈ 0.001) also makes ecological sense: coastal protection hotspots are structurally decoupled from small-plot agricultural landscapes.
 
 ### Population Exposure and the Serviceshed Multiplier Effect
 To assess the human impact of ecosystem service hotspots, the pipeline quantifies both direct and indirect population exposure, establishing a "Serviceshed Multiplier Effect."

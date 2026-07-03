@@ -175,11 +175,11 @@ Handles zero-baselines by using the mean of absolute values as denominator. Symm
 
 **Example**:
 
-- Service goes from 100 → 200: SPC = +67% (2/3 increase).
-- Service goes from 100 → 0: SPC = -100% (complete loss).
-- Service goes from 0 → 100: SPC = +100% (from nothing to something).
+- Service goes from 100 → 200: SPC = +67% — a doubling is not +100% because the denominator is the mean of both values, not just the baseline.
+- Service goes from 100 → 0: SPC = **-200%** — complete loss hits the theoretical minimum.
+- Service goes from 0 → 100: SPC = **+200%** — emergence from zero hits the theoretical maximum.
 
-Using the SPC prevents scale bias (large-baseline services dominating hotspot identification) and handles zero-baseline services.
+SPC is bounded between −200% and +200%, making these boundary cases interpretable rather than infinite. This prevents scale bias (large-baseline services dominating hotspot identification) and handles zero-baseline services.
 
 ## Hotspot Definition
 
@@ -194,7 +194,18 @@ Using the SPC prevents scale bias (large-baseline services dominating hotspot id
 
 **Question**: Are socioeconomic conditions in hotspot cells statistically and practically different from a matched background landscape?
 
-**Comparison design**: Hotspot cells are compared against a *median background* — the 47.5th to 52.5th percentiles of service change — rather than all non-hotspot cells. This avoids confounding with extreme gains in the opposite direction and isolates the specific profile of acute decline against typical, stable conditions (Andam et al., 2008). All p-values are FDR-corrected (Benjamini & Hochberg, 1995) across the full 40-comparison matrix (8 services × 5 covariates).
+**Comparison design**: Hotspot cells are compared against a *median background* — the 47.5th to 52.5th percentiles of service change — rather than all non-hotspot cells. This isolates the profile of acute decline against typical stable conditions, avoiding confounding with cells at the opposite extreme (large service gains). All p-values are FDR-corrected (Benjamini & Hochberg, 1995) across the full 40-comparison matrix (8 services × 5 covariates).
+
+::: {.callout-note}
+**Why FDR correction — and why 39/40 matters**
+
+When you run 40 statistical tests simultaneously, some will appear significant purely by chance. With a standard 5% threshold, you'd expect roughly 2 false positives just from random variation across 40 comparisons — even if nothing real is happening.
+
+Benjamini-Hochberg FDR correction adjusts the significance bar across all 40 tests together. Rather than tightening the threshold on each individual test (as Bonferroni does), it limits the *proportion* of significant results likely to be false alarms — a less conservative but statistically principled approach for exploratory analysis at this scale.
+
+That **39 of 40 combinations remain significant after correction** is itself an important finding: the socioeconomic signal is so consistent across services and covariates that multiple-testing adjustment barely changes the picture. The one non-significant combination (Coastal Risk Reduction Ratio × agricultural plot intensity) also makes ecological sense — coastal protection hotspots are structurally decoupled from small-plot agricultural landscapes.
+:::
+
 
 **Method**: Two-sample Kolmogorov-Smirnov (KS) test (Kolmogorov, 1933; Smirnov, 1948) compares the full empirical cumulative distribution functions (ECDFs) of each covariate between groups:
 
@@ -258,14 +269,14 @@ The original 37-class ESA LCCS legend is reclassified in two steps:
 - **Forest Loss model**: Forest (class 2) vs. Non-Forest — tracks gross deforestation and reforestation.
 - **Urban & Cropland Expansion model**: Cropland / Urban / Other — tracks the expansion of specific anthropogenic land uses.
 
-### Transition Metrics (diffeR framework)
+### Transition Metrics (Pontius contingency matrix approach)
 
-For each 10km grid cell, per-class transition metrics are calculated using the `diffeR` R package (Pontius, 2022; Pontius & Millones, 2011):
+For each 10km grid cell, the 1992 and 2020 classified maps are cross-tabulated into a contingency matrix from which per-class transition metrics are derived following Pontius & Millones (2011) and Pontius (2022). This approach separates genuine quantity change from spatial rearrangement — a distinction that standard net-change metrics mask. Implementation uses the `diffeR` R package:
 
 - **Gain**: Area of a class present in 2020 that was absent in 1992
 - **Loss**: Area of a class present in 1992 that was absent in 2020
 - **Persistence**: Area that remained the same class in both years
-- **Quantity / Exchange / Shift**: Decomposition of total change into net quantity change vs. spatial swap (see Pontius & Millones, 2011)
+- **Quantity / Exchange / Shift**: Decomposition of total change into net quantity change vs. spatial swap — a region can show zero net change while simultaneously losing and gaining the same area in different locations (see Pontius & Millones, 2011)
 
 Key attribution metrics used:
 

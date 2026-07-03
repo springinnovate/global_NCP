@@ -346,6 +346,42 @@ This section highlights the major technical and methodological hurdles overcome 
 *   **analysis_configs/:** archive/ created (zonal_stats_diff.yaml, global_ncp_base_ha.ini); README.md written documenting Path A / B / C config mapping; c_protection_synth.yaml path updated from interim/archive/ → interim/coastal_protection_rasters/.
 *   **README.md (root):** Fixed critical errors — Quick Start was calling deprecated `summary_pipeline_rasterzones.py` with non-existent `services_raster.yaml`; results_interpretation.qmd references removed (notebook deleted); ES services list updated to correct 8-service table with variable names; audit_claims.R added to pipeline flow.
 
+## Phase 4 continued: Paper/Book polish pass 2 (2026-07-03)
+
+### Data claim verification
+*   **Sub-Saharan Africa error caught and corrected (2026-07-03):** The preface and ch08 erroneously stated SSA carries a "disproportionate share" of hotspot burden. Verified from data: SSA relative intensity = 0.78× (BELOW expected given land area). Only LAC (1.40×) and EAP (1.30×) exceed 1.0×. Corrected in index.qmd and ch08. Root cause: AI-generated plausible-but-unverified claim. Prompted systematic review.
+*   **5×/8× claims corrected (2026-07-03):** Presentation stated "5× higher population density than median background" and "8× for 3+ service cells." These are actually **serviceshed multipliers** (connected beneficiaries ÷ in-situ for 2+/3+ compound cells) from ch06 data, not density ratios. Fixed in presentation slide and speaker notes.
+*   **SPC examples corrected (2026-07-03):** ch02 examples stated 100→0 = -100% and 0→100 = +100%. Both wrong. Correct: **100→0 = -200%** (theoretical minimum) and **0→100 = +200%** (theoretical maximum). Fixed with explanation of ±200% bounds as a feature of SPC.
+*   **audit_claims.R expanded (2026-07-03):** Now 8 checks (was 5). Fixed critical bug: income ratio check was comparing "Low income" vs "High income" but the 1.6× claim is "Lower-middle income" vs "High income OECD." Added checks for hotspot count, population exposure, 5×/8× disambiguation, KS test count.
+
+### Paper polish
+*   **Abstract rewritten** to ~210 words; closing sentence reframed from limitation ("cannot causally partition") to contribution ("highlights limits of LC monitoring as sole proxy"); nature accounting angle added.
+*   **Research objectives** updated with WHAT/WHERE/WHO/WHY labels, WHO reframing ("which socioeconomic contexts"), WHY reframing ("is monitoring LC alone sufficient").
+*   **Author list**: Stephen Polasky added; "[Additional Authors TBD]" placeholder retained.
+*   **KS methods paragraph** cleaned of AI slop: "utilizing" → "using"; "artificially inflates" → precise language; "matched counterfactual background" → "background of typical stable conditions"; Andam et al. citation removed (was misapplied — Andam is about PA effectiveness, not KS background design); "Type I error propagation across multiple simultaneous testing dimensions" → "Type I error across 40 simultaneous tests (8 services × 5 covariates)."
+*   **39/40 result** added to paper KS section, ch02 callout, presentation notes, and methodology.md.
+*   **FDR plain-language explanation** added to ch02 (callout), methodology.md, and presentation speaker notes.
+*   **Spatial co-occurrence justification** added: explicit paragraph explaining that the comparison operates on ranked binary overlays, not raw values — making the comparison between continuous-derived (SPC) and categorical-derived (Pontius) hotspots methodologically defensible. Becky callout added for literature validation.
+*   **Paper conclusions** stale numbers fixed: 6.4B / 1.15× → 3.1B / 7.6B / 2.5× (consistent with ch06).
+*   **Data sources paragraph**: verbose pipeline detail about excluded cells removed from paper (now one clause).
+*   **Paper structure callout** added for Becky (target journal question → drives restructure decision).
+*   **diffeR → Pontius contingency matrix approach**: section heading and framing corrected in ch02 and ch05. diffeR correctly positioned as implementation tool, not the methodology itself.
+
+### Book polish
+*   **ch01 How to Use**: corrected chapter numbers (ch4 WHERE was missing from all paths; ch7 was wrong labelled as "WHY"); four reading paths now accurate.
+*   **ch01 Users section**: Nature accounting practitioners added as a distinct user type (GEP, SEEA, TNFD).
+*   **ch01 About the Analysis**: authors updated (Polasky added).
+*   **ch02 intro**: "InVEST biophysical models" → "InVEST models of eight ecosystem services"; "satellite land cover records" → "ESA CCI and C3S land cover classification maps at 300m"; "gridded socioeconomic layers" → named covariates.
+*   **ch03**: Stacked three-section layout → tabset (World Bank Region / Income Group / WWF Biome).
+*   **ch08 WHO section**: "Hundreds of millions" → verified 3.1B / 7.6B figures.
+*   **ch08**: GEP / nature accounting section added ("For Nature Accounting Frameworks") covering GEP, SEEA EA, TNFD.
+*   **_quarto.yml**: Polasky added to author line.
+*   **index.qmd**: Sub-Saharan Africa claim corrected; universal signal bullet rewritten in plain language; "who bears burden" → "which populations and socioeconomic contexts"; attribution gap typo fixed; nature accounting user type added.
+
+### Documentation
+*   **methodology.md KS section** rewritten: plain-language explanations of median background rationale, Cliff's Delta vs p-values, FDR correction with 39/40 result and ecological interpretation of the one non-significant combination.
+*   **presentation.qmd**: 5×/8× serviceshed multiplier framing corrected; LAC per-service values flagged for verification; FDR plain explanation added to speaker notes.
+
 ## Reference Information
 *   **Environment Notes:** Local machine: Lenovo (Windows 11) | Remote: lilling (VS Code Remote SSH) | AI assistant: Gemini Code Assist / Copilot
 *   **Active Entry Points:** `analysis/process_data.qmd`, `analysis/hotspot_extraction.qmd`, `analysis/hotspot_synthesis.qmd`, `analysis/KS_tests_hotspots.qmd`
