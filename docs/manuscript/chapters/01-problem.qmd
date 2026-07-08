@@ -51,7 +51,7 @@ This book integrates global ecosystem service models, satellite land cover data,
    - Where do multiple services decline simultaneously, compounding the impact?
 
 3. **WHO Analysis** (Chapter 6)
-   - How many people are directly exposed to areas of extreme ES provision loss?
+   - How many people are directly exposed to areas of intense ES provision loss?
    - What socioeconomic characteristics define those populations?
    - How far does local decline cascade through connected beneficiaries downstream?
 
@@ -106,7 +106,7 @@ This analysis synthesizes global data at 10km resolution. Important limitations:
 
 - **Two-snapshot design** — The analysis compares 1992 and 2020 endpoints only. Intermediate dynamics — recovery events, accelerating trends, threshold crossings — are not captured, and the 2020 endpoint is now several years old. Extending the analysis to additional time points (e.g. 2000, 2010) would characterise trajectories rather than net change. This is a documented future extension; the pipeline is designed to accommodate additional snapshots without structural modification.
 
-- **The attribution gap and what it means** — 76% of ES hotspot cells do not co-occur with *extreme* (top 5%) land cover conversion at the 10km grid scale. This is a spatial co-occurrence finding, not a causal diagnosis. Cells in that 76% may still have moderate land cover change below the top-5% threshold; other plausible contributors include upstream hydrological routing effects, sub-pixel habitat degradation below the 300m detection limit of ESA CCI, and direct climate effects on ecosystem function not mediated by land cover. The current design cannot partition these mechanisms — doing so would require controlled factorial experiments beyond the scope of this analysis.
+- **The attribution gap and what it means** — 65.5% of ES hotspot cells do not co-occur with *intense* (top 5%) land cover conversion from any of five conversion drivers, at the 10km grid scale. This is not because land cover conversion is unrelated to ES decline: the observed 34.5% co-occurrence rate among ES hotspots is far above the 4.2% background rate of conversion hotspots elsewhere on the grid (odds ratio 12.2, risk ratio 8.3) — a strong, highly significant association that holds for every individual driver (odds ratios ranging 4.2–44.0). But even this generous, five-driver definition of "intense conversion" still fails to co-occur with the majority of the most severe ES declines. This is a spatial co-occurrence finding, not a causal diagnosis. Cells in that 65.5% may still have moderate land cover change below the top-5% threshold; other plausible contributors to the remaining gap include upstream hydrological routing effects, sub-pixel habitat degradation below the 300m detection limit of ESA CCI, and direct climate effects on ecosystem function not mediated by land cover. The current design cannot partition these mechanisms — doing so would require controlled factorial experiments beyond the scope of this analysis.
 
 - **Model and data quality** — InVEST outputs depend on land cover inputs and globally applied default biophysical parameters. Local parameterisation and validation against observed data remain important next steps, particularly for fine-scale or policy-facing applications.
 
@@ -135,7 +135,7 @@ These limitations are acknowledged openly. This analysis is a foundation for spa
 
 - **Dual-pathway analytical design** — Path A extracts per-hectare rasters directly to regional groupings (countries, biomes, income groups) at pixel level, then sums to regions — producing unbiased volumetric trajectories for the WHAT analysis. Path B aggregates the same rasters to ~1.3 million equal-area 100 km² cells (IUCN AOO 10km equal-area grid) *before* computing change, enabling global hotspot ranking and socioeconomic profiling. The two paths answer different spatial questions and must not be conflated (see Chapter 2 for full rationale).
 
-- **Hotspot extraction** — Cells in the extreme 5% of Symmetric Percentage Change (SPC) per service, ranked globally. SPC is bounded ±200% and robust to near-zero baselines, enabling direct comparison across services measured in different units.
+- **Hotspot extraction** — Cells in the most intense 5% of Symmetric Percentage Change (SPC) per service, ranked globally. SPC is bounded ±200% and robust to near-zero baselines, enabling direct comparison across services measured in different units.
 
 - **Socioeconomic profiling** — Two-sample Kolmogorov-Smirnov tests comparing hotspot cells against a matched median-background population, complemented by Cliff's Delta effect sizes. Four covariates: population density (GHS-POP), GDP, HDI, Gini coefficient. 39 of 40 service–covariate combinations significant after FDR correction.
 

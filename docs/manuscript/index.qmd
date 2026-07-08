@@ -12,7 +12,7 @@ The assessment integrates biophysical models, satellite land cover records (ESA 
 
 ## Glossary
 - **AOO**: Area of Occupancy. A standard 10 km equal-area grid used for spatial analysis.
-- **Attribution Gap**: The proportion of ecosystem service hotspots that show no spatial overlap with detectable macro-scale land cover conversion at 300m resolution. Consistent with sub-pixel degradation, upstream routing cascades, or climate-forcing shifts — but the current analytical design cannot partition their relative contributions.
+- **Attribution Gap**: The proportion of ecosystem service hotspots that show no spatial overlap with detectable macro-scale land cover conversion, at the same 10km grid used for the hotspot analysis. Consistent with sub-pixel degradation, upstream routing cascades, or climate-forcing shifts — but the current analytical design cannot partition their relative contributions.
 - **Compound Risk**: The co-occurrence of multiple ecosystem service hotspots in a single geographic area (grid cell), compounding the ecological and social impact.
 - **ES**: Ecosystem Services. Benefits people obtain from nature (e.g., pollination, coastal protection).
 - **Hotspot**: A grid cell showing unusually high or low relative change in ecosystem services (the top 5% of grid cells by rank for a given service).
@@ -49,9 +49,11 @@ Using Kolmogorov-Smirnov (KS) tests, we compared the socioeconomic profile of ho
 - **Retention ratio services (N_Ret_Ratio, Sed_Ret_Ratio):** A distinct third pattern — intermediate-to-higher HDI alongside *lower* GINI than background, not captured by either typology above.
 
 ### 3. Spatial Co-occurrence with Land Cover Change (The "Attribution Gap")
-We assessed the spatial co-occurrence between ES hotspots and detectable land cover conversion at 300m resolution (ESA CCI).
+We assessed the spatial co-occurrence between ES hotspots and detectable land cover conversion (ESA CCI-derived, aggregated to the 10km hotspot grid) across five conversion drivers: Forest Loss, Cropland Expansion, Urban Expansion, Grassland Loss, and Grassland Gain.
 
-- **Attribution Gap:** Approximately 76% of ecosystem service hotspots show no spatial overlap with macro-scale land cover conversion in the same 10km cell. This gap is consistent with mechanisms operating below the 300m detection threshold — including sub-pixel degradation, upstream routing cascades, and climate-forcing shifts — but the current analytical design cannot partition their relative contributions. It reflects a spatial co-occurrence signal, not a causal attribution of decline to any specific driver.
+- **A strong, highly significant positive association:** ES hotspots overlap with intense (top 5%) land cover conversion from any of the five drivers combined at a rate of 34.5% — versus a 4.2% background rate among non-hotspot cells (odds ratio 12.2, 95% CI 12.0–12.3; risk ratio 8.3). Where land cover conversion is genuinely severe, it is a strong predictor of ES-hotspot co-occurrence, not a negligible one.
+- **The signal holds for every individual driver:** Cropland Expansion (odds ratio 44.0), Forest Loss (19.9), Urban Expansion (8.0), Grassland Loss (4.8), and Grassland Gain (4.2) are all strongly and positively associated with ES hotspots — there is no offsetting or mixed-sign pattern once the driver-hotspot cell identities are computed correctly (see @sec-why for full methodological detail).
+- **Attribution Gap:** Even so, 65.5% of ecosystem service hotspots show no spatial overlap with any of the five intense land cover conversion drivers. This is a coverage limitation, not an absence of relationship: categorical land cover monitoring, even generously defined as the union of five driver types, still misses roughly two-thirds of where ES decline is most severe. This gap is consistent with mechanisms operating below the 300m source-data detection threshold — including sub-pixel degradation, upstream routing cascades, and climate-forcing shifts — but the current analytical design cannot partition their relative contributions. It reflects a spatial co-occurrence signal, not a causal attribution of decline to any specific driver.
 
 ### 4. Absolute Population Exposure
 While socioeconomic profiling reveals relative characteristics, absolute population provides the scale of human impact.

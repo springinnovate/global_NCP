@@ -81,34 +81,47 @@ pop_exp <- tryCatch(
   error = function(e) NULL
 )
 
-if (!is.null(pop_exp)) {
+if (!is.null(pop_exp) && "overlap_category" %in% names(pop_exp)) {
   print(head(pop_exp, 10))
   all_hotspots <- pop_exp %>% filter(grepl("all|≥1|hotspot_count.1", overlap_category, ignore.case = TRUE))
   if (nrow(all_hotspots) > 0) {
     cat(sprintf("\n[RESULT] All-hotspot rows found: %d\n", nrow(all_hotspots)))
   }
 } else {
-  cat("[WARNING] hotspot_pop_exposure.csv not found — check data/processed/tables/\n")
-  cat("[MANUAL] Verify 252,215 unique cells from hotspots_global_pct.gpkg (hotspot_count >= 1)\n")
+  cat("[WARNING] hotspot_pop_exposure.csv schema has changed (no 'overlap_category' column) --\n")
+  cat("  this check is stale and needs updating to the current column layout.\n")
+  cat("[MANUAL] Verify unique hotspot cell count directly: st_layers() on\n")
+  cat("  data/processed/hotspots/pct/global/hotspots_global_pct.gpkg (hotspot_count >= 1).\n")
+  cat("  As of this run: 225,113 -- matches Ch06's traceability table (3,065M in-situ population).\n")
+  cat("  NOTE: paper_draft.qmd and presentation.qmd still say 252,215 -- flagged for review,\n")
+  cat("  NOT corrected automatically since it touches the paper's headline abstract number.\n")
 }
 
 # ---- 4. ATTRIBUTION GAP ----
-cat("\n\nAUDIT 4: Attribution Gap\n")
-cat("  Claim: ~76% of ES hotspot cells do not co-occur with extreme (top 5%) LC conversion\n")
-cat("  Equivalently: ~24% DO co-occur\n")
+cat("\n\nAUDIT 4: Attribution Gap (true union across all 5 drivers)\n")
+cat("  Claim: ~65.5% of ES hotspot cells do not co-occur with extreme (top 5%) LC conversion\n")
+cat("  Equivalently: ~34.5% DO co-occur; nearly 10x the ~4.1% background rate\n")
+cat("  (odds ratio ~12.17) -- see scripts/compute_attribution_true_union.R\n")
+cat("  NOTE: do NOT read from lcc_es_hotspot_overlap.csv (stale, pre-5-driver, wrong threshold).\n")
+cat("  NOTE (2026-07-08): compute_attribution_true_union.R itself was fixed this session --\n")
+cat("  it previously joined LCC data to the ES grid via two grid-cell ID columns that share a\n")
+cat("  name but index different, incompatible source grids. A spatial crosswalk\n")
+cat("  (scripts/build_lc_grid_fid_crosswalk.R, data/processed/lc_grid_fid_to_master_fid_crosswalk.csv)\n")
+cat("  now corrects this. The previously-claimed 8.2%/91.8%/odds-ratio-0.88 figures were wrong.\n")
 cat("--------------------------------------------------------------------\n")
 
-driver_files <- list.files("data/processed/tables", pattern = "^lcc_es_hotspot_overlap", full.names = TRUE)
+union_file <- file.path("data", "processed", "tables", "lcc_es_hotspot_true_union.csv")
 
-if (length(driver_files) > 0) {
-  drivers <- read.csv(driver_files[1], stringsAsFactors = FALSE)
-  print(head(drivers))
-  avg_overlap <- mean(drivers$pct_overlap, na.rm = TRUE)
-  cat(sprintf("\n[RESULT] Average co-occurrence (any driver): %.1f%%  [claimed ~24%%]\n", avg_overlap))
-  cat(sprintf("[RESULT] Attribution gap: %.1f%%  [claimed ~76%%]\n", 100 - avg_overlap))
-  if (abs(avg_overlap - 24) > 2) cat("[WARNING] Co-occurrence deviates >2pp from claimed 24%\n")
+if (file.exists(union_file)) {
+  union_stats <- read.csv(union_file, stringsAsFactors = FALSE)
+  print(union_stats)
+  pct_overlap <- union_stats$pct_overlap_of_es_hotspots[1]
+  cat(sprintf("\n[RESULT] True union co-occurrence: %.1f%%  [claimed ~34.5%%]\n", pct_overlap))
+  cat(sprintf("[RESULT] Attribution gap: %.1f%%  [claimed ~65.5%%]\n", 100 - pct_overlap))
+  cat(sprintf("[RESULT] Odds ratio vs. background: %.2f  [claimed ~12.17]\n", union_stats$odds_ratio[1]))
+  if (abs(pct_overlap - 34.5) > 1) cat("[WARNING] Co-occurrence deviates >1pp from claimed 34.5%\n")
 } else {
-  cat("[WARNING] lcc_es_hotspot_overlap CSV not found\n")
+  cat("[WARNING] lcc_es_hotspot_true_union.csv not found -- run scripts/compute_attribution_true_union.R\n")
 }
 
 # ---- 5. BIOME INTENSITY ----

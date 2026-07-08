@@ -53,8 +53,7 @@ attr_colors <- c(
   "Grassland Loss" = "#fdbf6f",
   "Urban Expansion" = "#e41a1c",
   "Multiple Conversion Drivers" = "#984ea3",
-  "Change Occuring Off-Pixel" = "#3182bd",
-  "Attribution Gap (Change without Conversion)" = "#3182bd",
+  "Below Top-5% LCC Threshold" = "#3182bd",
   "Deforestation for Cropland" = "#b15928",
   "Savannization / Pasture" = "#ffff99",
   "Grassland to Cropland" = "#a65628"
@@ -78,7 +77,7 @@ classify_attribution <- function(lcc_services, lcc_count) {
     str_detect(lcc_services, "Grassland_Loss") ~ "Grassland Loss",
     str_detect(lcc_services, "Crop_Exp") ~ "Cropland Expansion",
     str_detect(lcc_services, "Urban_Exp") ~ "Urban Expansion",
-    TRUE ~ "Attribution Gap (Change without Conversion)"
+    TRUE ~ "Below Top-5% LCC Threshold"
   )
 }
 

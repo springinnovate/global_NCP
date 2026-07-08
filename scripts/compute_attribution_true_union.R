@@ -12,6 +12,16 @@
 #
 # No script previously computed the union across drivers -- only per-driver
 # marginals existed. This fills that gap and writes reproducible outputs.
+#
+# IMPORTANT: 10k_lcc_granular_metrics.gpkg's own `grid_fid` is a row-index into
+# its OWN source grid (AOOGrid_10x10km_land_4326_clean.gpkg, 1,691,819 cells),
+# which is a *different* file from landgrid_1_clean_enriched_4326.gpkg (the
+# master grid behind hotspots_global_pct.gpkg's `grid_fid`, 1,522,073 cells).
+# The two id schemes are unrelated despite the shared column name -- joining
+# them directly (as an earlier version of this script did) pairs cells
+# essentially at random. We remap lc's grid_fid to the master-grid fid via a
+# nearest-centroid spatial crosswalk (see scripts/build_lc_grid_fid_crosswalk.R)
+# before any id-based comparison against es_fids.
 
 library(sf)
 library(dplyr)
@@ -21,6 +31,7 @@ source("R/paths.R")
 lc_gpkg  <- file.path(data_dir(), "processed", "10k_lcc_granular_metrics.gpkg")
 es_gpkg  <- file.path(data_dir(), "processed", "hotspots", "pct", "global", "hotspots_global_pct.gpkg")
 out_dir  <- file.path(data_dir(), "processed", "tables")
+crosswalk_path <- file.path(data_dir(), "processed", "lc_grid_fid_to_master_fid_crosswalk.csv")
 
 drv_query <- paste0(
   "SELECT grid_fid, ",
@@ -31,7 +42,18 @@ drv_query <- paste0(
   "GrasslandLoss_Gain_Grassland_2020_1992 AS Grassland_Gain ",
   "FROM \"10k_lcc_granular_metrics\""
 )
-lc <- as.data.frame(st_read(lc_gpkg, query = drv_query, quiet = TRUE))
+lc_raw <- as.data.frame(st_read(lc_gpkg, query = drv_query, quiet = TRUE))
+
+# Remap lc's grid_fid (own-grid row index) to the master-grid fid used by
+# hotspots_global_pct.gpkg, dropping cells with no true spatial correspondence
+# (nearest master cell centroid >6km away -- i.e. not the same cell).
+crosswalk <- read.csv(crosswalk_path) %>% filter(valid_match)
+lc <- lc_raw %>%
+  inner_join(crosswalk %>% select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
+  select(-grid_fid) %>%
+  rename(grid_fid = master_fid)
+message(sprintf("LC rows: %d raw -> %d after crosswalk (dropped %d with no master-grid correspondence)",
+                 nrow(lc_raw), nrow(lc), nrow(lc_raw) - nrow(lc)))
 n_grid <- nrow(lc)
 
 es <- as.data.frame(st_read(es_gpkg, query = "SELECT grid_fid FROM hotspots_global_pct", quiet = TRUE))

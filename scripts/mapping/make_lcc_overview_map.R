@@ -82,12 +82,18 @@ if (file.exists(gpkg_drivers)) {
         str_detect(hotspot_services, "Forest_Loss") ~ "Forest Loss",
         str_detect(hotspot_services, "Crop_Exp") ~ "Agricultural Expansion",
         str_detect(hotspot_services, "Urban_Exp") ~ "Urban Expansion",
-        TRUE ~ "Other"
+        str_detect(hotspot_services, "Grassland_Loss") ~ "Grassland Loss",
+        str_detect(hotspot_services, "Grassland_Gain") ~ "Grassland Gain",
+        TRUE ~ NA_character_
       ),
-      Driver = factor(Driver, levels = c("Forest Loss", "Agricultural Expansion", "Urban Expansion", "Multiple Conversion Drivers"))
-    ) %>% filter(Driver != "Other")
+      Driver = factor(Driver, levels = c("Forest Loss", "Agricultural Expansion", "Urban Expansion",
+                                          "Grassland Loss", "Grassland Gain", "Multiple Conversion Drivers"))
+    ) %>%
+    filter(!is.na(Driver))
 
-  driver_colors <- c("Forest Loss" = "#2ca25f", "Agricultural Expansion" = "#e69138", "Urban Expansion" = "#e41a1c", "Multiple Conversion Drivers" = "#984ea3")
+  driver_colors <- c("Forest Loss" = "#2ca25f", "Agricultural Expansion" = "#e69138", "Urban Expansion" = "#e41a1c",
+                      "Grassland Loss" = "#fdbf6f", "Grassland Gain" = "#ffff99",
+                      "Multiple Conversion Drivers" = "#984ea3")
 
   message("Generating map...")
   p_drivers <- ggplot() +

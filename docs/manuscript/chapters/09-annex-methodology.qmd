@@ -77,12 +77,12 @@ This path is designed to generate summary statistics for large macro-regions (e.
 *   **Why this matters:** It is mathematically impossible to calculate percentage change from a "difference raster." By extracting the true regional baselines first, we ensure our regional percentage changes are sound. We use the outputs of this path for the main text's regional trajectory charts (the "WHAT" section).
 
 ### Path B: Grid-Level Change Calculation (The Hotspot Path)
-This is the canonical pathway for identifying localized extremes (hotspots) and assessing population exposure. The key distinction here is that **spatial aggregation to the grid precedes differencing**.
+This is the canonical pathway for identifying hotspots and assessing population exposure. The key distinction here is that **spatial aggregation to the grid precedes differencing**.
 
 *   **Workflow:** 
     1. **Independent Aggregation:** The Python pipeline aggregates the raw 1992 and 2020 rasters to the 100 sq km grid cells independently.
     2. **Grid-Level Differencing:** `analysis/process_data.qmd` computes Absolute and Symmetric Percentage Change (SPC) between the 1992 and 2020 columns for each grid cell.
-    3. **Hotspot Extraction:** `analysis/hotspot_extraction.qmd` identifies hotspots (extreme 5% of change) based on these grid cells.
+    3. **Hotspot Extraction:** `analysis/hotspot_extraction.qmd` identifies hotspots (top 5% of change) based on these grid cells.
     4. **Synthesis:** `analysis/hotspot_synthesis.qmd` aggregates these localized hotspots to calculate regional enrichment scores, coverage, and affected populations.
 *   **Use Case:** This path answers the "WHERE", "WHY", and "WHO". Its regional averages are reserved for the **Annex** due to MAUP/Simpson's paradox artifacts (explained below).
 

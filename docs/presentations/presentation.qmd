@@ -355,7 +355,7 @@ Normalised for baseline size; symmetric around zero; cross-service comparable. B
 
 ### Co-occurrence Design
 - **Symmetric threshold**: ES worst-5% (SPC) vs. LCC top-5% (gross conversion magnitude), on the same 10 km grid
-- **Key question**: what share of ES hotspot cells co-occur with extreme conversion — and what share don't? That complement is the *attribution gap*
+- **Key question**: what share of ES hotspot cells co-occur with intense conversion — and what share don't? That complement is the *attribution gap*
 
 :::
 :::
@@ -363,7 +363,7 @@ Normalised for baseline size; symmetric around zero; cross-service comparable. B
 ::: {.notes}
 - The Pontius approach matters: net change (forest in 1992 minus forest in 2020) would miss simultaneous clearing and regrowth in the same cell. Gross Loss captures what was converted regardless of what regrew.
 - Both thresholds operate on the same grid so the comparison is apples-to-apples.
-- The 76% gap is a spatial co-occurrence finding, not a causal partition — moderate LCC may still be present in those cells, just below the top-5% threshold.
+- The ~65.5% gap is a spatial co-occurrence finding, not a causal partition — moderate LCC may still be present in those cells, just below the top-5% threshold. The 34.5% that does overlap is nearly 10x the 4.1% background rate (odds ratio 12.2) — a strong, consistent positive association, true for every one of the five drivers individually.
 :::
 
 ---
@@ -400,7 +400,7 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 :::
 
 ::: {.notes}
-- Why median background, not global mean? The comparison isolates what is distinctive about *extreme* decline vs. *typical, stable* conditions.
+- Why median background, not global mean? The comparison isolates what is distinctive about *intense* decline vs. *typical, stable* conditions.
 - Cliff's Delta is the practical companion to KS: KS with 67,000 hotspot cells will be "significant" for almost any difference. Delta tells you the magnitude.
 - δ = 0: distributions fully overlap (random chance). δ = ±1: complete separation. Our range: +0.47 to +0.66 for Pop/GDP.
 - **On FDR (if asked):** Running 40 tests at once means ~2 would appear significant by chance alone. FDR correction adjusts the bar across all 40 together to limit false alarms. That 39/40 pass even after correction means the signal is real — the correction barely changed anything. The one non-significant result (Coastal Risk Reduction Ratio × agricultural plot intensity) makes ecological sense.
@@ -430,7 +430,7 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 ::: {.columns}
 ::: {.column width="56%"}
 
-![252,215 cells with at least one extreme service decline. Compound hotspots (3+ services) in darkest red.](../../outputs/plots/maps/global_hotspot_count_heatmap_cap3_pct.png){width="100%"}
+![252,215 cells with at least one intense service decline. Compound hotspots (3+ services) in darkest red.](../../outputs/plots/maps/global_hotspot_count_heatmap_cap3_pct.png){width="100%"}
 
 :::
 
@@ -561,17 +561,17 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 
 ::: {.notes}
 - This is the spatial pattern of LC change. The question the next slide addresses: do ES decline hotspots land in the same cells as this conversion?
-- This map looks dramatic — but the attribution gap analysis shows that most ES decline is NOT happening where conversion is most intense.
+- This map looks dramatic — and it turns out to be a real, strong signal: the attribution gap analysis shows ES decline is significantly more likely where conversion is most intense. The gap is about *coverage* (how much of ES decline this signal reaches), not about whether the signal is real.
 - Keep this slide brief — it's setup for the gap finding, not the main result.
 :::
 
 ---
 
-## WHY: Land Cover Does Not Explain Most Hotspots
+## WHY: A Strong Signal, But Limited Reach
 
 ::: {.columns}
 ::: {.column width="50%"}
-![ES hotspot footprint (all hotspot cells) vs. cells that co-occur with extreme LCC conversion. The stark size difference is the 76% gap.](../../outputs/plots/maps/global_lcc_driver_hotspots_map.png){width="100%"}
+![Land cover conversion hotspots (top 5% intensity, all 5 drivers). This is the full conversion footprint, not filtered to ES-hotspot status — 138,042 cells, vs. 225,113 ES hotspot cells.](../../outputs/plots/maps/global_lcc_driver_hotspots_map.png){width="100%"}
 :::
 ::: {.column width="50%"}
 ![Percentage of ES hotspot cells co-occurring with top 5% of each land cover conversion driver, per service.](../../outputs/plots/drivers/heatmap_driver_overlap_pct.png){width="100%"}
@@ -581,29 +581,29 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 ::: {.columns}
 ::: {.column width="50%"}
 
-### The Gap
-- **76% of ES hotspot cells** do not co-occur with extreme (top 5%) land cover conversion (at the 10km grid scale)
-- Under spatial independence: expect only ~5% overlap by chance
-- Observed **~24% co-occurrence** is **4–5× above random** — a real signal, but still a minority
+### The Signal
+- **34.5% of ES hotspot cells** co-occur with intense (top 5%) land cover conversion from any of 5 drivers combined (at the 10km grid scale) — vs. a **4.1% background rate** (odds ratio 12.2, risk ratio 8.3)
+- Correct chance baseline for a 5-driver union: 8.2% of the grid (not the naive ~5% for a single driver — the drivers overlap each other spatially)
+- Holds for **every driver individually**: odds ratios from 4.2 (Grassland Gain) to 44.0 (Cropland Expansion) — no offsetting or negative driver
 
 :::
 
 ::: {.column width="50%"}
 
 ### Interpreting the Gap
-- The 76% does **not** mean those cells had zero land cover change — many had moderate conversion *below* the top-5% threshold
-- Plausible mechanisms: upstream routing cascades, sub-pixel degradation, climate forcing into InVEST
-- **Important:** this is a co-occurrence finding, not a causal partition — the current design cannot distinguish these mechanisms
-- Simple "conversion detection" alone is insufficient for ES management
+- Even so, **65.5%** of ES hotspot cells do NOT co-occur with any of the 5 drivers — this is a coverage limit, not an absence of relationship
+- The 65.5% does **not** mean those cells had zero land cover change — many had moderate conversion *below* the top-5% threshold
+- **Important:** this is a co-occurrence finding, not a causal partition — the current design cannot distinguish mechanisms
+- Conversion detection is a trustworthy signal where present, but it alone still misses most ES decline
 
 :::
 :::
 
 ::: {.notes}
-- The attribution gap: we compare the top 5% of ES decline cells against the top 5% of land cover conversion cells — extreme vs. extreme.
-- 24% of ES hotspot cells co-occur with extreme LCC (4–5× above random), so there IS a genuine spatial association — just not a dominant one.
-- The 76% gap: those cells may still have moderate LCC, just not in the most extreme 5%. We cannot say "degradation is happening without conversion" — that's overclaiming what the spatial overlay can show.
-- Policy message: You can't manage ES outcomes by monitoring categorical land cover conversion alone. The gap motivates finer-scale and mechanism-specific monitoring.
+- The attribution gap: we compare the top 5% of ES decline cells against the union of the top 5% of land cover conversion cells across 5 drivers — intense vs. intense.
+- 34.5% of ES hotspot cells co-occur with the intense-LCC union — nearly 10x the 4.1% background rate, a strong and highly significant positive association (odds ratio 12.2). This corrects TWO earlier calculations: the original 24%/76% (stale, pre-5-driver file, looser threshold) and the 2026-07-07 "corrected" 8.2%/91.8% (which fixed that bug but introduced a new one — it joined LCC data to the ES grid using two grid-cell ID columns that share a name but index different, incompatible source grids; a nearest-centroid spatial crosswalk now fixes this).
+- The 65.5% gap: those cells may still have moderate LCC, just not in the most intense 5% of any driver. We still cannot say "degradation is happening without conversion" — that's overclaiming what the spatial overlay can show — but we CAN now say conversion, where intense, is a real and strong predictor.
+- Policy message: categorical land cover monitoring is trustworthy where it fires, but it still only reaches about a third of severe ES decline — you need direct ES monitoring to catch the rest. This is a more defensible, more literature-consistent story than either prior version.
 - ~2 minutes
 :::
 
@@ -643,7 +643,7 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 | **WHAT** | Ecosystem services declined measurably 1992–2020; absolute and proportional losses are decoupled by region | Change is real and geographically structured |
 | **WHERE** | 252K hotspot cells cluster in low- and middle-income regions; lower-middle-income countries bear **1.6×** disproportionate burden | Geographic prioritization is feasible; equity lens is essential |
 | **WHO** | Three typologies: coastal (higher HDI), terrestrial (lower HDI + higher GINI), retention (moderate HDI + lower GINI); **3.1 billion** in-situ | Typology-specific policy responses; scale demands systemic action |
-| **WHY** | **76%** of hotspots do not co-occur with extreme (top 5%) land cover conversion; plausible mechanisms include upstream cascades, sub-pixel change, and climate forcing — **but cannot be partitioned with current data** | Conversion monitoring alone insufficient; mechanism-specific management needed |
+| **WHY** | ES hotspots co-occur with intense (top 5%) land cover conversion at **34.5%** — nearly 10x the 4.1% background rate (odds ratio 12.2), true for every one of 5 drivers individually; but **65.5%** still show no such overlap; plausible mechanisms for the remainder include upstream cascades, sub-pixel change, and climate forcing — **but cannot be partitioned with current data** | Conversion monitoring is a reliable signal where present, but must be paired with direct ES monitoring for the majority of cases |
 
 ---
 
@@ -656,7 +656,7 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 
 **Completed:**
 - Full 9-chapter book + paper draft complete
-- Attribution gap reframed as co-occurrence throughout
+- Attribution gap reframed as co-occurrence throughout, and recomputed as a true 5-driver union — corrected twice: from a stale 76% gap (pre-5-driver file) to an incorrectly-computed 91.8% gap (grid-id mismatch bug) to the current, verified **65.5% gap / 34.5% co-occurrence** (odds ratio 12.2) — see `scripts/compute_attribution_true_union.R` and `scripts/build_lc_grid_fid_crosswalk.R`
 - KS three-typology finding with Cliff's Delta
 - Population numbers audited and corrected (3.1B in-situ)
 - Regional profiles with real hotspot intensity data
@@ -694,7 +694,7 @@ For technical details, methodology, and code:
 ![SPC distribution of hotspot cells (top 5% globally per service) by World Bank region. Each box = IQR of hotspot intensities within that group; width indicates variability, not count.](../../outputs/plots/boxplots_unified/region_wb/boxplots_volumetric_pct.png){width="100%" fig-align="center"}
 
 ::: {.callout-note style="font-size: 0.72em;"}
-**How to read:** All cells shown are already in the global top 5% — even the lightest boxes represent severe change. A **wide box** means hotspot severity is highly variable within the group (some cells near the threshold, others near complete functional loss). A **narrow box** means intensities are consistently extreme. Latin America [3] shows the widest and most intense boxes for Nature Access and Pollination — not just more hotspots, but more variable and more severe ones.
+**How to read:** All cells shown are already in the global top 5% — even the lightest boxes represent severe change. A **wide box** means hotspot severity is highly variable within the group (some cells near the threshold, others near complete functional loss). A **narrow box** means intensities are consistently high. Latin America [3] shows the widest and most intense boxes for Nature Access and Pollination — not just more hotspots, but more variable and more severe ones.
 :::
 
 ::: {.notes}

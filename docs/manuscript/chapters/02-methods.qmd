@@ -95,7 +95,7 @@ When Path B cell-level values are further averaged to broad regions, two interac
 
 1. **Baseline weighting:** Cells with large absolute ES volumes dominate the absolute change calculation; the more numerous low-baseline cells dominate the percentage calculation. The two metrics can therefore diverge in direction even within the same region and service.
 
-2. **Within-cell cancellation:** Gains and losses occurring within a single 100 km² cell partially cancel before the comparison is made. At the pixel level, these would be separate data points; at the cell level, they collapse into a net value that may understate local extremes.
+2. **Within-cell cancellation:** Gains and losses occurring within a single 100 km² cell partially cancel before the comparison is made. At the pixel level, these would be separate data points; at the cell level, they collapse into a net value that may understate local intensity.
 
 Together, these produce the **Modifiable Areal Unit Problem** ([Openshaw, 1984](https://www.worldcat.org/isbn/0860941345); [Fotheringham & Wong, 1991](https://doi.org/10.1068/a231025)): results at one spatial scale that do not generalise to another. Across aggregation levels this manifests as **Simpson's Paradox** ([Simpson, 1951](https://doi.org/10.1111/j.2517-6161.1951.tb00088.x)) — a trend present in the disaggregated data reverses when data are grouped. These problems are particularly acute in ES assessments, where spatial heterogeneity is substantive signal rather than noise ([Jelinski & Wu, 1996](https://doi.org/10.1007/BF02447512)).
 
@@ -243,7 +243,7 @@ Exposure estimates are stratified by World Bank region, income group, WWF biome,
 
 ## Attribution Analysis: Land Cover Change Methodology
 
-**Question**: What proportion of extreme ecosystem service decline hotspots (top 5% of SPC change) spatially co-occur with extreme land cover conversion hotspots (top 5% of gross conversion magnitude) between 1992 and 2020?
+**Question**: What proportion of ecosystem service decline hotspots (top 5% of SPC change) spatially co-occur with land cover conversion hotspots (top 5% of gross conversion magnitude) between 1992 and 2020?
 
 ### Reclassification Scheme
 
@@ -343,13 +343,13 @@ Full pipeline documentation and configuration notes are in the Technical Appendi
 
 This chapter describes a four-component methodological framework designed to diagnose global ecosystem service change with spatial and socioeconomic precision. Eight biophysical services were simulated at 300m resolution using InVEST for 1992 and 2020, then aggregated to a consistent 10km equal-area grid spanning 1.3 million terrestrial cells globally.
 
-Two parallel analytical pathways address different spatial questions. Path A computes pixel-level regional trajectories to answer *what changed globally* — preserving true volumetric trends by aggregating differences before summarizing. Path B identifies localized extremes by aggregating raster values to the grid first, then computing change, isolating the most intense local shifts without them being averaged away. Hotspots are defined as the top 5% of cells by Symmetric Percentage Change per service — a rank-based, scale-invariant threshold that enables fair comparison across services measured in fundamentally different units.
+Two parallel analytical pathways address different spatial questions. Path A computes pixel-level regional trajectories to answer *what changed globally* — preserving true volumetric trends by aggregating differences before summarizing. Path B aggregates raster values to the grid first, then computes change — isolating the most intense local shifts without them being averaged away. Hotspots are defined as the top 5% of cells by Symmetric Percentage Change per service — a rank-based, scale-invariant threshold that enables fair comparison across services measured in fundamentally different units.
 
 Socioeconomic profiling tests whether hotspot populations are systematically different from the background landscape using Kolmogorov-Smirnov tests, complemented by Cliff's Delta to measure practical effect size rather than statistical significance alone — a necessary correction given the very large sample size.
 
 The serviceshed analysis extends exposure beyond the immediate hotspot footprint. People living *within* a hotspot cell are the in-situ exposed population; but ES decline in one location cascades to populations that depend on those services from a distance — through downstream hydrological flow (water quality and quantity regulation) or through physical travel access (recreation, wild pollination, nature access). By tracing these connectivity pathways using pre-computed routing masks, the analysis quantifies the full connected beneficiary population and produces a spatial multiplier comparing in-situ to total downstream and access-based exposure.
 
-The attribution analysis asks how much of this extreme ES decline co-occurs with equally extreme land cover conversion, using a symmetric 5% threshold on both sides. The resulting attribution gap is interpreted as a spatial co-occurrence signal, not a causal partition, because ESA CCI land cover serves simultaneously as both an InVEST model input and the attribution overlay.
+The attribution analysis asks how much of this intense ES decline co-occurs with equally intense land cover conversion, using a symmetric 5% threshold on both sides. The resulting attribution gap is interpreted as a spatial co-occurrence signal, not a causal partition, because ESA CCI land cover serves simultaneously as both an InVEST model input and the attribution overlay.
 
 Together, these four components — dual-pathway change detection, socioeconomic profiling, serviceshed routing, and land cover attribution — produce a spatially explicit, methodologically consistent evidence base for the WHERE, WHO, and WHY questions addressed in Chapters 4–7.
 
