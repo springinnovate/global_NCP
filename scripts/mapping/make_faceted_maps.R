@@ -48,21 +48,25 @@ get_direction <- function(service) {
 }
 
 # RULE 2: Color Ramp Selection
-get_color_scale <- function(data_vec, service) {
+# Colorblind-safe diverging pair (Okabe-Ito-derived, WWF-brand-consistent):
+# orange = decline in the service being mapped, teal = improvement. Avoids
+# red/green, which is indistinguishable to the most common form of color
+# vision deficiency.
+get_color_scale <- function(data_vec, service, limits = NULL) {
   if (all(is.na(data_vec))) {
-    return(scale_fill_viridis_c(na.value = "gray90", name = "Change"))
+    return(scale_fill_viridis_c(na.value = "gray90", name = "Change", limits = limits))
   }
 
   dir <- get_direction(service)
 
   if (dir == "good") {
-    # Good: high is Green, low is Red
-    scale_fill_gradient2(low = "red", mid = "white", high = "forestgreen",
-                         midpoint = 0, name = "Change", na.value = "gray90")
+    # Good: high (more of a good thing) is teal, low (less) is orange
+    scale_fill_gradient2(low = "#F07D00", mid = "white", high = "#009191",
+                         midpoint = 0, name = "Change", na.value = "gray90", limits = limits)
   } else {
-    # Damage: high is Red, low is Green
-    scale_fill_gradient2(low = "forestgreen", mid = "white", high = "red",
-                         midpoint = 0, name = "Change", na.value = "gray90")
+    # Damage: high (more damage) is orange, low (less damage) is teal
+    scale_fill_gradient2(low = "#009191", mid = "white", high = "#F07D00",
+                         midpoint = 0, name = "Change", na.value = "gray90", limits = limits)
   }
 }
 
@@ -93,21 +97,34 @@ group_palettes <- list(
 # ------------------------------------------------------------------------------
 
 # Function to generate a plot for a single service
-plot_single_service <- function(sf_data, service_name, value_col = "pct_chg") {
+# `shared_limits`, when supplied, is a symmetric c(-lim, lim) range computed
+# ACROSS ALL SERVICES in the parent map (see generate_faceted_map()) so that
+# the same color represents the same magnitude of change in every panel.
+# Without this, each service was independently scaled to its own 1st/99th
+# percentile range, making the same red/green shade mean very different
+# things from one panel to the next.
+plot_single_service <- function(sf_data, service_name, value_col = "pct_chg", shared_limits = NULL) {
 
   # Filter data for the specific service
   plot_data <- sf_data %>% filter(service == service_name)
 
   if (nrow(plot_data) == 0) return(NULL)
 
-  # Trim extreme outliers (1st and 99th percentiles) to prevent squashed color ramps
   val_vec <- plot_data[[value_col]]
-  q_low <- quantile(val_vec, 0.01, na.rm = TRUE)
-  q_high <- quantile(val_vec, 0.99, na.rm = TRUE)
-  plot_data[[value_col]] <- pmax(pmin(val_vec, q_high), q_low)
 
-  # Apply Rule 2 to get the correct color scale
-  color_scale <- get_color_scale(plot_data[[value_col]], service_name)
+  if (!is.null(shared_limits)) {
+    # Trim to the shared, cross-service range so panels are comparable
+    plot_data[[value_col]] <- pmax(pmin(val_vec, shared_limits[2]), shared_limits[1])
+  } else {
+    # Fallback: trim extreme outliers (1st and 99th percentiles) to this
+    # service's own range only -- used only if no shared range was computed
+    q_low <- quantile(val_vec, 0.01, na.rm = TRUE)
+    q_high <- quantile(val_vec, 0.99, na.rm = TRUE)
+    plot_data[[value_col]] <- pmax(pmin(val_vec, q_high), q_low)
+  }
+
+  # Apply Rule 2 to get the correct color scale, shared across all panels
+  color_scale <- get_color_scale(plot_data[[value_col]], service_name, limits = shared_limits)
 
   # Generate the map
   p <- ggplot(plot_data) +
@@ -149,8 +166,48 @@ generate_first_look_map <- function(gpkg_path, out_file) {
   message("Saved First Look map to: ", out_file)
 }
 
+# Computes a per-service symmetric color limit (1st/99th percentile, pooled
+# across every grouping file) so the SAME service uses the SAME color range
+# in every map it appears in (region/income/biome), for a given metric
+# (pct or abs). Deliberately does NOT share one limit ACROSS different
+# services within a map: abs-change units differ by service (per-hectare
+# mass for Sed/N export, dimensionless index for Pollination/Nature Access,
+# per-linear-metre for Coastal Risk), so forcing them onto one shared
+# absolute-value scale would misrepresent magnitude rather than clarify it.
+# Percentage change is comparable across services by construction (SPC),
+# so this still gives every service its fair, comparable range, just not a
+# single one shared by all 8 at once.
+compute_service_limits <- function(gpkg_paths, value_col) {
+  all_vals <- map_dfr(gpkg_paths, function(p) {
+    if (!file.exists(p)) return(tibble())
+    d <- st_read(p, quiet = TRUE) %>% st_drop_geometry()
+    chg_cols <- grep(paste0("_", value_col, "$"), names(d), value = TRUE)
+    if (length(chg_cols) == 0) return(tibble())
+    d %>%
+      select(all_of(chg_cols)) %>%
+      pivot_longer(everything(), names_to = "service", values_to = value_col) %>%
+      mutate(service = sub(paste0("_", value_col, "$"), "", service))
+  })
+
+  limits_df <- all_vals %>%
+    filter(!is.na(.data[[value_col]])) %>%
+    group_by(service) %>%
+    summarise(
+      q_low = quantile(.data[[value_col]], 0.01, na.rm = TRUE),
+      q_high = quantile(.data[[value_col]], 0.99, na.rm = TRUE),
+      lim = max(abs(q_low), abs(q_high)),
+      .groups = "drop"
+    )
+
+  limits_list <- setNames(
+    lapply(limits_df$lim, function(l) c(-l, l)),
+    limits_df$service
+  )
+  limits_list
+}
+
 # Function to create the faceted layout for a specific grouping
-generate_faceted_map <- function(gpkg_path, grouping_name, value_col = "pct_chg", out_dir = "outputs/plots/maps") {
+generate_faceted_map <- function(gpkg_path, grouping_name, value_col = "pct_chg", out_dir = "outputs/plots/maps", service_limits = NULL) {
 
   message("Processing grouping: ", grouping_name)
 
@@ -222,7 +279,7 @@ generate_faceted_map <- function(gpkg_path, grouping_name, value_col = "pct_chg"
                    "Pollination", "Nature_Access")
   services <- intersect(canon_order, services)
 
-  plots <- map(services, ~plot_single_service(sf_data, .x, value_col))
+  plots <- map(services, ~plot_single_service(sf_data, .x, value_col, shared_limits = service_limits[[.x]]))
   plots <- compact(plots) # Remove NULLs
 
   if (length(plots) == 0) {
@@ -364,11 +421,22 @@ gpkg_global_abs <- here::here("data", "processed", "hotspots", "abs", "global", 
 generate_first_look_map(gpkg_global_pct, file.path(out_maps_dir, "first_look_map_pct.png"))
 generate_first_look_map(gpkg_global_abs, file.path(out_maps_dir, "first_look_map_abs.png"))
 
+# Compute per-service color limits ONCE, pooled across the three grouping
+# maps (region/income/biome; "country" excluded -- much larger file, and not
+# part of these particular faceted maps), so the same service gets the same
+# color range in every map it appears in. Different services keep their own
+# ranges rather than being forced onto one shared absolute-value scale.
+mapped_groupings <- groupings_files[c("region_wb", "income_grp", "biome")]
+message("Computing shared per-service color limits (pct)...")
+service_limits_pct <- compute_service_limits(mapped_groupings, value_col = "pct")
+message("Computing shared per-service color limits (abs)...")
+service_limits_abs <- compute_service_limits(mapped_groupings, value_col = "abs")
+
 # Run the loop for percentage change maps
-iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "pct", out_dir = out_maps_dir))
+iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "pct", out_dir = out_maps_dir, service_limits = service_limits_pct))
 
 # Run the loop for absolute change maps
-iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "abs", out_dir = out_maps_dir))
+iwalk(groupings_files, ~generate_faceted_map(gpkg_path = .x, grouping_name = .y, value_col = "abs", out_dir = out_maps_dir, service_limits = service_limits_abs))
 
 # Generate the contextual groupings map
 generate_context_groupings_map(groupings_files, out_dir = out_maps_dir)

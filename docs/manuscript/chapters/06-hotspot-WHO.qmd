@@ -187,6 +187,16 @@ The three typologies are most clearly distinguished by reading HDI and GINI toge
 
 These typologies reflect spatial co-occurrence between ecosystem service decline and socioeconomic context, not causal attribution. They provide a framework for targeting policy attention and structuring future analyses that explicitly model the pathways connecting land-use pressure, service change, and human welfare.
 
+### A Note on Population's Two Roles in This Analysis
+
+A fair question about this chapter is whether population is doing double duty — defining which cells count as hotspots in the first place, and then being "rediscovered" as a correlate of those same hotspots. The honest answer is that it depends on the service, and it's worth being explicit about the two distinct ways population enters this pipeline.
+
+**For seven of the eight services** (Pollination, Nitrogen and Sediment Export and Retention Ratios, Coastal Risk and Coastal Risk Reduction Ratio), the underlying InVEST models are purely biophysical — they simulate a physical flux or process (nutrient loading, sediment delivery, wave energy attenuation) with no population input at all. Hotspot status for these services is defined entirely from the modeled service value; population density, GDP, and HDI only enter afterward, in this chapter's KS-test comparison of hotspot cells against a background sample. For these seven services, there is no circularity: population is not part of the hotspot definition, only a post-hoc covariate tested against it.
+
+**Nature Access is the exception.** Its InVEST model is inherently population-weighted — the raw 1992 and 2020 input rasters both blend land-cover-derived habitat accessibility with a LandScan population layer (fixed at its 2019 vintage in both years). So a Nature Access hotspot is, by construction, partly about where people are. Critically, though, because the *same* 2019 population layer underlies both the 1992 and 2020 snapshots, the Symmetric Percentage Change that defines a Nature Access hotspot isolates the land-cover-driven shift in accessibility — it does not reflect population redistribution over time, since population is held fixed across both years being differenced. A Nature Access hotspot is defined by "accessible habitat changed a lot near a fixed population," not "population changed a lot."
+
+**A separate, real limitation remains: coarse-resolution confounding.** Even where population is not part of the hotspot definition, land conversion and population density can co-occur at the 10km grid scale for reasons unrelated to any direct relationship between them — both concentrate, for instance, in agricultural frontiers and peri-urban transition zones. This means some of the "hotspots sit in denser, more economically active landscapes" signal in this chapter could partly reflect shared coarse-grid geography rather than an independent socioeconomic pattern. This is a Modifiable Areal Unit Problem (MAUP)-adjacent concern, not a data-circularity one, and finer-resolution replication would be the way to test how much of the signal survives at smaller grain.
+
 ## Summary
 
 ::: {.callout-note}
