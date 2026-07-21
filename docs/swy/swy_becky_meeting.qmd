@@ -1,0 +1,131 @@
+---
+title: "Global Seasonal Water Yield"
+subtitle: "Scoping review with Becky — 2026-07-21"
+author:
+  - "Jerónimo Rodríguez Escobar"
+date: "2026-07-21"
+affiliation: "Global Science, WWF"
+format:
+  revealjs:
+    theme: [default, ../presentations/wwf_theme.css]
+    include-in-header:
+      text: |
+        <style>
+        .reveal section.smaller h2 { font-size: 0.85em; margin-bottom: 0.3em; }
+        </style>
+    transition: slide
+    background-transition: fade
+    slide-number: true
+    width: 1200
+    height: 800
+    margin: 0.08
+    footer: "WWF Global Science | SWY scoping | internal working meeting"
+    logo: ../presentations/wwf_logo.png
+    embed-resources: true
+title-slide-attributes:
+  data-background-color: "#004D1E"
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+## This is a different kind of task {.smaller}
+
+- The other 8 services' InVEST runs were done by you and collaborators, earlier, separately — this project only ever **post-processed** the finished outputs
+- **Nobody has run InVEST SWY globally before** — on this project, or (as far as this review found) anywhere — precisely because a single global calibration isn't considered defensible
+- This week was a **literature review and specification**, not a build: what a real global run requires, what already exists, what's been de-risked, what's still open
+
+::: {.notes}
+Open with this before anything else — make sure the scope shift lands before diving into content. This isn't "add a table to the pipeline," it's standing up and running a real model for the first time on this project. Don't undersell it, don't oversell it either — just be accurate about what kind of task this is.
+:::
+
+## No global precedent — but a major shortcut exists {.smaller}
+
+- No published global-scale InVEST SWY application found anywhere. Closest: Hamel et al. 2020, Peru + Myanmar (*J. Environ. Manage.* 270:110792) — multi-region, not global. **Full text now obtained and read** (not just abstract-level)
+- Checked SWAT's global databases as a possible curve-number shortcut — **ruled out**: they only crosswalk land cover to SWAT's own crop codes, no CN values
+- Found **GCN250** (Jaafar et al. 2019): a global 250m gridded curve-number product — not InVEST-specific, but solves the same underlying problem (CN varies by land cover and place, no single number works everywhere)
+
+::: {.notes}
+Checking SWAT and ruling it out was a real, useful step — confirms there's no existing shortcut in that ecosystem either, not just an unchecked assumption.
+
+Hamel et al. 2020 turned out to matter more than expected once read in full — it doesn't just confirm precedent, it changes two things covered on the next two slides.
+:::
+
+## What Hamel et al. 2020 actually changes {.smaller}
+
+- **Neither of their case studies derived CN/Kc from literature tables cold.** Peru reused CN from an existing *calibrated SWAT model* of that exact basin. Myanmar reused CN/Kc from an existing *national ecosystem-service assessment* (Mandle et al. 2017)
+- **This answers "how do we build subregional tables"**: search for an existing calibrated study covering a representative watershed in each flagged biome, don't derive from TR-55 tables cold
+- **CN sensitivity is dramatic, not theoretical**: their own test found quickflow changed by **10.1-13.1x** between antecedent-moisture CN settings
+- **Model reliability appears to degrade at large basin scale** — their largest basin was 114,000 km²; their own guidance: caution with absolute values in new geographies, results under 10,000 km² best supported
+
+::: {.notes}
+This slide is the one that most changes today's conversation — flag that clearly. This isn't just "found the paper," it's "the paper changes what we thought the task was."
+:::
+
+## The CN decision {.smaller}
+
+**Recommended: GCN250 as the baseline everywhere, targeted correction only on the biomes it flags as weakest** — not a flat adopt-or-rebuild choice.
+
+- Authors' own caution: forested/humid tropical environments are least validated — maps onto ~3 of our WWF_biome classes (Tropical & Subtropical Moist Broadleaf Forests, Mangroves, Flooded Grasslands & Savannas), not all 16
+- Per Hamel's precedent: patch by finding existing calibrated studies for each biome, not deriving from scratch — tropical forest already has candidates, **flooded grasslands & savannas has a direct hit (Oliveira et al. 2016, Brazilian Cerrado — the closest ecological analog to the Llanos/Orinoquía)**, mangroves still a gap
+- Patch those three, keep GCN250 for everything else
+
+::: {.notes}
+**This is the actual question for Becky, don't pre-answer it**: does "baseline + targeted patch on ~3 biomes" satisfy the original "build subregional tables" concern, or is the full from-scratch build still wanted regardless of time cost? Present the tradeoff, then stop talking and let her decide.
+
+If asked how GCN250 (a raster) actually plugs into InVEST (which wants a lucode-indexed table): summarizing GCN250's values per lucode × soil group into table form, not feeding the raster in directly. Also worth mentioning: reusing GCN250's own ESA-CCI-to-NEH-630 crosswalk as this pipeline's lucode scheme.
+
+Reminder: this decision is CN-only. Kc (FAO-56 for cropland, NDVI regression for everything else) is unaffected either way.
+
+**Personal note, worth saying out loud here, not just in passing**: offer to personally lead the flooded-grasslands/savannas patch — this sits directly on top of the PhD research background (land cover change in the Orinoquía/Llanos). Worth naming explicitly rather than letting it pass as just another bullet. Natural opening to ask Becky about her grasslands working group and whether there's room to connect there — genuine interest, not a favor being asked, and directly backed by real expertise plus the Oliveira et al. 2016 find.
+:::
+
+## The other real decision: is "one global run" even right? {.smaller}
+
+- Hamel et al.'s largest basin (114,000 km²) already showed spatial-variation problems and warranted caution with absolute values
+- A genuinely global run is planetary scale — orders of magnitude beyond anything validated anywhere in this review
+- Alternative: basin-by-basin or regional-mosaic runs, closer to what Hamel et al. actually did (two separate basin-scale applications, not one global run), combined afterward
+
+::: {.notes}
+Second real ask for Becky, and this one wasn't scoped going in — it came directly from reading the full paper. Don't need to resolve this today, but name it explicitly rather than assuming a single global run is obviously the right target.
+:::
+
+## Status, and the other open decision {.smaller}
+
+::: {.columns}
+::: {.column width="50%"}
+**Resolved this week**
+
+- Soil hydrologic group (HYSOGs250m) — confirmed available
+- Non-crop Kc via NDVI regression — confirmed still valid in 2020s literature
+- `kc_calculator.xlsx` reviewed — confirms same regional issue exists for Kc, reinforces the NDVI route
+- NDVI (MOD13A3), watersheds (HydroBASINS), precipitation (CHIRPS) — candidate sources identified
+:::
+::: {.column width="50%"}
+**Still open**
+
+- The CN decision and the scale question (previous slides)
+- **Climate data source & provenance** — ties directly to the existing open WORKLOG.md question on the SDR/NDR climate input
+- CHIRPS has a real gap: no coverage above 60°N/below 60°S — need CHELSA or similar for boreal/tundra biomes
+- Building the lucode master table; downloading NDVI/HydroBASINS
+:::
+:::
+
+::: {.notes}
+Third real ask for Becky: the precipitation/ET0 provenance question overlaps an already-open blocker on the main paper (fixed WorldClim vs. era-specific climate input). Worth resolving as one conversation instead of two.
+
+Keep this slide quick — it's a status check, not the centerpiece. Don't linger.
+:::
+
+## Next steps {.smaller}
+
+- Confirm CN approach, the scale-of-run question, and climate-data source with Becky today
+- Search for calibrated regional precedent for the mangrove and flooded-grassland biome patches (Pantanal/Llanos hydrology literature, per Hamel's own strategy)
+- Build the lucode master table (reusing GCN250's own crosswalk)
+- Acquire NDVI, HydroBASINS, and the settled precipitation source
+- Documentation stays standalone in `docs/swy/` — not merged into the paper/book until the model is actually built and validated
+
+::: {.notes}
+Close by confirming next check-in cadence — not deciding here whether that's weekly or tied to the next scheduled Becky meeting, just make sure it gets set before the meeting ends.
+:::

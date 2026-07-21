@@ -28,9 +28,7 @@ This ensures that all downstream zonal statistics reflect physical densities tha
 
 **Implication:** Grid-cell mean values represent per-ha rates, not cell-level totals. Regional totals for volumetric services (e.g., total N export from Sub-Saharan Africa) are computed separately via Path A, which extracts directly from per-ha rasters to large regional polygons without passing through the grid.
 
-**Known technical debt:**
-- `services_slim.yaml` still specifies `op_stats: [mean, sum]` — the `sum` stat is computed but unused downstream; should be removed to reduce wasted computation
-- `Python_scripts/calculate_bitemporal_change.py` rename_map contains stale `_sum` column references (e.g., `n_export_sum`, `pollination_sum`) from before this decision was made; these should be updated to `_mean` to match actual column names
+**Resolved technical debt** (was open when this section was first written, fixed since): `services_slim.yaml`'s `op_stats` now specifies `[mean]` only, and `Python_scripts/calculate_bitemporal_change.py`'s rename_map no longer contains `_sum` column references.
 
 ### Canonical Master Grid Generation
 Due to severe performance and geometry-validity bottlenecks encountered when performing massive spatial joins natively in R (the `sf` package), the creation of the canonical 100 sq km master grid was migrated to a hybrid QGIS-Python workflow.
@@ -257,26 +255,35 @@ Instead of simple "Net Change" (which masks simultaneous loss and gain), we use 
 
 These metrics are aggregated to the 100 sq km master grid and overlaid with ES hotspots to quantify the **"Attribution Gap"**.
 
+> **Numbers below current as of 2026-07-08** (via `scripts/compute_attribution_true_union.R`, see
+> `docs/runbook.md` step 5 and the LCC grid crosswalk prerequisite it depends on). This section
+> previously cited a stale 24%/76% split computed before a grid-identity bug was fixed — see
+> `analysis/WORKLOG.md`'s 2026-07-07/2026-07-08 entries for the full incident. Verify against the current
+> book (`docs/manuscript/chapters/05-drivers-WHY.qmd`) or paper before citing if this file is more than a
+> few weeks old.
+
 **Symmetric threshold design (critical for correct interpretation)**
 
-The co-occurrence analysis uses a **symmetric 5%/5% threshold**: ES hotspot cells are defined as the top 5% of SPC change per service; LCC driver hotspot cells are defined as the top 5% of gross conversion magnitude per driver. Both thresholds operate within the same 10km equal-area grid.
+The co-occurrence analysis uses a **symmetric 5%/5% threshold**: ES hotspot cells are defined as the top 5% of SPC change per service; LCC driver hotspot cells are defined as the top 5% of gross conversion magnitude per driver, across **five drivers** (Forest Loss, Cropland Expansion, Urban Expansion, Grassland Loss, Grassland Gain — see Granular Models below). Both thresholds operate within the same 10km equal-area grid.
 
-Under spatial independence, the probability that a randomly selected ES hotspot cell also falls in the LCC top 5% is 5% by chance alone. The **observed co-occurrence of 24%** is therefore approximately 4–5× above the random baseline, confirming a genuine spatial association between extreme ES decline and extreme land cover conversion where it occurs.
+**34.5% of ES hotspot cells co-occur** with at least one of the five LCC driver hotspots (the union across drivers) — a **strong, highly significant positive association** (odds ratio 12.17 for the union; risk ratios 3.9–36.6 per individual driver), far above what spatial independence would predict.
 
-The **Attribution Gap of 76%** means that 76% of ES hotspot cells do **not** co-occur with any extreme (top 5%) LCC driver cell. This must not be read as "76% of cells had no land cover change" — it means those cells did not co-occur with the *most intense* conversion cells. Moderate or low-level land cover change may still be present in those cells but below the top-5% threshold.
+The **Attribution Gap of 65.5%** means that most ES hotspot cells do **not** co-occur with any extreme (top 5%) LCC driver cell. This must not be read as "65.5% of cells had no land cover change" — it means those cells did not co-occur with the *most intense* conversion cells. Moderate or low-level land cover change may still be present in those cells but below the top-5% threshold. Framed as a *stronger* version of the chapter's thesis, not a weaker one: where land-cover conversion is detected at this intensity, it is a reliable indicator of ES-hotspot co-occurrence — but categorical monitoring alone misses the majority of cases.
 
 This is a **spatial co-occurrence analysis, not causal attribution**. An important structural constraint is that ESA CCI land cover data serves simultaneously as a primary input to InVEST biophysical models and as the basis for the LCC overlay. This endogeneity means the gap cannot be treated as an independent empirical partition between degradation-driven and conversion-driven change.
 
 The analysis produces both a single, global attribution map showing the overall footprint of degradation, as well as a series of detailed maps breaking down the specific drivers for each of the 8 individual ecosystem service hotspots.
 
 **Granular Models:**
-To move beyond binary "Natural vs. Transformed" analysis, we implement two specific driver models:
+To move beyond binary "Natural vs. Transformed" analysis, we implement driver-specific models across five drivers:
 1.  **Forest Loss Model:**
     *   **Reclassification:** Maps ESA classes to **Forest** vs. **Non-Forest**. Flooded Trees (classes 160, 170) are mapped to Forest to capture mangrove/swamp forest dynamics.
     *   **Metric:** Tracks Gross Loss of Forest cover.
 2.  **Expansion Model:**
     *   **Reclassification:** Maps ESA classes to **Urban**, **Cropland**, and **Other**.
-    *   **Metric:** Tracks the specific expansion of Urban and Cropland areas into other land cover types.
+    *   **Metric:** Tracks the specific expansion of Urban and Cropland areas into other land cover types (Urban Expansion and Cropland Expansion, tracked as separate drivers).
+3.  **Grassland Model:**
+    *   **Metric:** Tracks both Grassland Loss (conversion away from grassland/shrubland) and Grassland Gain (conversion into grassland/shrubland, e.g. from cleared forest) as two separate drivers — see the Rangelands note below for why these are tracked distinctly rather than folded into "Natural-to-Natural" exchange.
 
 **Note on Rangelands:** Logic is updated to explicitly track Forest-to-Grassland transitions as a loss of primary natural cover. Categorizing Grasslands/Shrublands as `Transformed (Rangeland/Pasture)` prevents these critical conversions from being masked as 'Natural-to-Natural' exchange.
 
@@ -292,15 +299,15 @@ After `hotspot_synthesis.qmd` produces the global summary tables, its final chun
 
 ```
 data/processed/tables/regional_subsets/
-â”œâ”€â”€ region_wb/
-â”‚   â”œâ”€â”€ hotspot_area_stats_region_wb.csv        â† all 7 regions combined
-â”‚   â”œâ”€â”€ hotspot_area_stats_Sub_Saharan_Africa.csv
-â”‚   â””â”€â”€ ...
-â”œâ”€â”€ income_grp/
-â”‚   â”œâ”€â”€ hotspot_area_stats_income_grp.csv
-â”‚   â””â”€â”€ ...
-â”œâ”€â”€ WWF_biome/
-â””â”€â”€ nev_name/
++-- region_wb/
+|   +-- hotspot_area_stats_region_wb.csv        (all 7 regions combined)
+|   +-- hotspot_area_stats_Sub_Saharan_Africa.csv
+|   +-- ...
++-- income_grp/
+|   +-- hotspot_area_stats_income_grp.csv
+|   +-- ...
++-- WWF_biome/
++-- nev_name/
 ```
 
 These files need regenerating only when `hotspot_area_stats.csv` itself changes (new
@@ -352,7 +359,7 @@ The project's graphical outputs are organized into specialized subdirectories wi
 ### Visualization Semantic Rules (Maps)
 To maintain a consistent narrative across all presentations and figures, spatial maps of Ecosystem Service change adhere to a strict semantic color rule:
 *   **Universal Diverging Scale:** All maps use a diverging color ramp anchored at zero (`midpoint = 0`).
-*   **Semantic Meaning:** Red always indicates ecological or social damage (loss of a good service, or increase in a detrimental risk). Green always indicates improvement or healthy service provision.
+*   **Semantic Meaning:** As of 2026-07-09, **orange** (`#F07D00`) always indicates ecological or social damage (loss of a good service, or increase in a detrimental risk); **teal** (`#009191`) always indicates improvement or healthy service provision. This replaced an earlier red/green scheme (still visible in any figure rendered before 2026-07-09) that was not colorblind-safe — see `scripts/mapping/make_faceted_maps.R`'s `compute_service_limits()`/fill-scale logic for the current implementation. The semantic *direction* (damage vs. improvement) is unchanged, only the color pair.
 *   **Sequential vs. Diverging Data:** Even if a regional dataset does not cross zero (e.g., all regions experience a decline), the diverging scale is maintained to preserve the semantic meaning of the colors. 
 
 ### Hotspot Rasterization Workflow
