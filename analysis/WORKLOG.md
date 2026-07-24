@@ -1,5 +1,24 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-07-24
+
+#### Attribution-gap numbers corrected AGAIN (34.5%/65.5% was itself inflated by a many-to-one join) — now 34.2%/65.8%, odds ratio 10.79
+
+**Root cause:** `scripts/compute_attribution_true_union.R`'s crosswalk join (`lc_grid_fid` → `master_fid`, built 2026-07-08) is necessarily many-to-one: the LC source grid has 1,691,819 rows vs. the master grid's 1,522,073, so nearest-centroid matching lets up to 9 LC rows share the same nearest master cell. The script used `nrow(lc)` on the joined-but-not-deduplicated table as both the total grid denominator (`n_grid`) and, via `lc$grid_fid[keep]`, each driver's hotspot-cell count — silently counting duplicate LC-side rows as distinct master cells in both places. Inflated `n_grid` by ~11% (1,681,849 counted vs. 1,515,620 actual distinct master cells) and inflated individual driver-hotspot counts unevenly.
+
+**Fix:** after the crosswalk join, keep only the nearest match (min `match_dist_m`) per master `grid_fid` before computing anything downstream (`group_by(grid_fid) %>% slice_min(match_dist_m, n = 1, with_ties = FALSE)`).
+
+**Corrected numbers (supersedes 2026-07-08's 34.5%/65.5%, odds ratio 12.17):**
+- ES-hotspot ↔ LCC-driver-union overlap: **34.2%** (77,058 / 225,113 cells), not 34.5%.
+- Background rate among non-ES cells: 4.6% (union covers 9.0% of the 1,515,620-cell grid, not 8.2% of 1,681,849).
+- Odds ratio **10.79** [10.66–10.92], risk ratio 7.44, *p* ≈ 0 — still a strong, highly significant positive association, magnitude only.
+- Per-driver risk ratios shifted much more than the union (uneven duplicate inflation): Crop_Exp 36.6→**97.5**, Forest_Loss 16.7→**25.4**, Urban_Exp 7.8→**9.1**, Grassland_Loss 4.4→**4.8**, Grassland_Gain 3.9→**4.2**. Ranking order (weakest→strongest) unchanged; the true associations were previously *understated*, not overstated.
+- Attribution gap: **65.8%**, not 65.5% — same "coverage limitation" reading holds, magnitude only.
+
+**Manuscript/book/presentation:** all attribution-gap numbers rewritten across `01-problem.qmd`, `05-drivers-WHY.qmd`, `08-conclusions.qmd`, `index.qmd`, `paper_draft.qmd` (including Table 3 and its new "how to read risk ratio vs. odds ratio" callout), `presentation.qmd`. Same-session, separately: standardized all these files on **risk ratio** as the lead effect-size statistic (was inconsistently odds ratio in some places, risk ratio in others, with per-driver odds-ratio and risk-ratio values never reconciled against each other) — odds ratio now noted as a secondary, equivalent statistic everywhere. `05-drivers-WHY.qmd`'s methodological-correction section now documents all three corrections (threshold mismatch → grid-id mismatch → many-to-one join) so the history stays traceable. All still flagged pending Becky/Steve review.
+
+**NOT fixed, deferred until after today's paper-review meeting:** `analysis/hotspot_extraction.qmd` has the *exact same* many-to-one join pattern, unfixed, in two places (the `geom_sf` enrichment chunk and the `lc-hotspot-overlap-setup` chunk — both load `10k_lcc_granular_metrics.gpkg` and join through the same crosswalk without deduplicating). This produces the per-service driver-overlap table (`lcc_es_hotspot_overlap_pct.csv`, shown in `05-drivers-WHY.qmd`'s reactable) and several driver-hotspot maps/heatmaps (`global_lcc_driver_map.png`, `global_lcc_driver_hotspots_map.png`, `heatmap_driver_overlap_pct.png`/`_abs.png`) — these likely carry the same inflation and have NOT been corrected. Deliberately not touched today: fixing it means rerunning the full hotspot-extraction notebook (regenerates maps/gpkgs), which is the same notebook that caused the 2026-07-08 striping-bug incident — too risky to do with under 40 minutes before a live paper-review meeting. **Next priority after the meeting**: apply the same nearest-match dedup fix to both chunks in `hotspot_extraction.qmd`, rerun, regenerate the affected maps/heatmaps/CSVs, and re-check every per-service number and image against the corrected output.
+
 ### 2026-07-08
 
 #### Striping bug root-caused and fixed; attribution-gap numbers corrected AGAIN (8.2%/91.8% was itself wrong) — now 34.5%/65.5%, odds ratio 12.17

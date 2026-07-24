@@ -363,7 +363,7 @@ Normalised for baseline size; symmetric around zero; cross-service comparable. B
 ::: {.notes}
 - The Pontius approach matters: net change (forest in 1992 minus forest in 2020) would miss simultaneous clearing and regrowth in the same cell. Gross Loss captures what was converted regardless of what regrew.
 - Both thresholds operate on the same grid so the comparison is apples-to-apples.
-- The ~65.5% gap is a spatial co-occurrence finding, not a causal partition — moderate LCC may still be present in those cells, just below the top-5% threshold. The 34.5% that does overlap is nearly 10x the 4.1% background rate (odds ratio 12.2) — a strong, consistent positive association, true for every one of the five drivers individually.
+- The ~65.8% gap is a spatial co-occurrence finding, not a causal partition — moderate LCC may still be present in those cells, just below the top-5% threshold. The 34.2% that does overlap is a risk ratio of 7.4 relative to the 4.6% background rate (equivalently, odds ratio 10.8) — a strong, consistent positive association, true for every one of the five drivers individually.
 :::
 
 ---
@@ -408,20 +408,20 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 
 # WHAT: Global Trajectories {background-color="#007930"}
 
-## WHAT: Ecosystem Service Change, 1992–2020 {.smaller}
+## WHAT: Ecosystem Service Change, 1992–2020
 
 [*Path A · pixel-level global summaries, aggregated by World Bank region*]{style="font-size: 0.78em;"}
 
 ::: {.columns}
-::: {.column width="42%"}
+::: {.column width="48%"}
 **Where: spatial pattern (% change)**
 
 ![](../../outputs/maps/map_region_wb_pct.png){width="100%" fig-align="center"}
 :::
-::: {.column width="58%"}
+::: {.column width="52%"}
 **By region: magnitude (% change)**
 
-![](../../outputs/plots/output_plots_diff/region_wb_pct_only_cropped.png){width="100%" fig-align="center"}
+![](../../outputs/plots/output_plots_diff/region_wb_pct_only_cropped.png){width="90%" fig-align="center"}
 :::
 :::
 
@@ -456,7 +456,7 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 
 ::: {.notes}
 - Left map: where the hotspot cells are. Darkest red = 3+ services declining simultaneously. Notice the clustering in Latin America, SE Asia, and Sub-Saharan Africa — not random scatter.
-- Right chart: corrects for region size. LAC and EAP are the only regions above 1.0× overall (1.40× and 1.30× avg). **[VERIFY before presentation: the per-service values ~2.5× for LAC sediment export and 1.5–1.8× for EAP water quality — check against intensity chart directly]**
+- Right chart: corrects for region size. LAC and EAP are the only regions above 1.0× overall (1.40× and 1.30× avg). Per-service values confirmed directly against `hotspot_area_stats_region_wb.csv` (2026-07-24): LAC sediment export 2.51×; EAP water-quality-related services (nitrogen/sediment retention) 1.56–1.80×.
 - Compound hotspot cells are the key conservation priority: maximum co-benefit across multiple services from a single intervention.
 - ~90 seconds
 :::
@@ -491,7 +491,7 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 
 ![Cliff's Delta (δ) for all services × four socioeconomic variables. Orange = hotspot cells higher; green = hotspot cells lower.](../../outputs/plots/ks/directionality_cliffs_delta.png){width="100%" fig-align="center"}
 
-::: {.columns}
+::: {.columns style="font-size: 0.65em;"}
 ::: {.column width="33%"}
 
 ### Universal signal
@@ -533,8 +533,6 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 ::: {.column width="52%"}
 
 ![~3.1 billion in-situ; largest absolute burden in upper- and lower-middle income countries.](../../outputs/plots/pop_exposure_income.png){width="100%"}
-
-[*Income group — best proxy for adaptive capacity: whether populations can respond to ES decline*]{style="font-size: 0.88em; font-style: italic;"}
 
 :::
 
@@ -580,32 +578,32 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 
 ---
 
-## WHY: A Strong Signal, But Limited Reach
+## WHY: A Strong Signal, Limited Reach
 
 ::: {.columns}
 ::: {.column width="50%"}
-![Land cover conversion hotspots (top 5% intensity, all 5 drivers). This is the full conversion footprint, not filtered to ES-hotspot status — 138,042 cells, vs. 225,113 ES hotspot cells.](../../outputs/plots/maps/global_lcc_driver_hotspots_map.png){width="100%"}
+![Land cover conversion hotspots (top 5% intensity, all 5 drivers). This is the full conversion footprint, not filtered to ES-hotspot status — 138,042 cells, vs. 225,113 ES hotspot cells.](../../outputs/plots/maps/global_lcc_driver_hotspots_map.png){width="72%" fig-align="center"}
 :::
 ::: {.column width="50%"}
-![Percentage of ES hotspot cells co-occurring with top 5% of each land cover conversion driver, per service.](../../outputs/plots/drivers/heatmap_driver_overlap_pct.png){width="100%"}
+![Percentage of ES hotspot cells co-occurring with top 5% of each land cover conversion driver, per service.](../../outputs/plots/drivers/heatmap_driver_overlap_pct.png){width="72%" fig-align="center"}
 :::
 :::
 
-::: {.columns}
+::: {.columns style="font-size: 0.72em;"}
 ::: {.column width="50%"}
 
 ### The Signal
-- **34.5% of ES hotspot cells** co-occur with intense (top 5%) land cover conversion from any of 5 drivers combined (at the 10km grid scale) — vs. a **4.1% background rate** (odds ratio 12.2, risk ratio 8.3)
-- Correct chance baseline for a 5-driver union: 8.2% of the grid (not the naive ~5% for a single driver — the drivers overlap each other spatially)
-- Holds for **every driver individually**: odds ratios from 4.2 (Grassland Gain) to 44.0 (Cropland Expansion) — no offsetting or negative driver
+- **34.2% of ES hotspot cells** co-occur with intense (top 5%) land cover conversion from any of 5 drivers combined (at the 10km grid scale) — vs. a **4.6% background rate**, a risk ratio of **7.4**
+- Correct chance baseline for a 5-driver union: 9.0% of the grid (not the naive ~5% for a single driver — the drivers overlap each other spatially)
+- Holds for **every driver individually**: risk ratios from 4.2 (Grassland Gain) to 97.5 (Cropland Expansion) — no offsetting or negative driver
 
 :::
 
 ::: {.column width="50%"}
 
 ### Interpreting the Gap
-- Even so, **65.5%** of ES hotspot cells do NOT co-occur with any of the 5 drivers — this is a coverage limit, not an absence of relationship
-- The 65.5% does **not** mean those cells had zero land cover change — many had moderate conversion *below* the top-5% threshold
+- Even so, **65.8%** of ES hotspot cells do NOT co-occur with any of the 5 drivers — this is a coverage limit, not an absence of relationship
+- The 65.8% does **not** mean those cells had zero land cover change — many had moderate conversion *below* the top-5% threshold
 - **Important:** this is a co-occurrence finding, not a causal partition — the current design cannot distinguish mechanisms
 - Conversion detection is a trustworthy signal where present, but it alone still misses most ES decline
 
@@ -614,8 +612,8 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 
 ::: {.notes}
 - The attribution gap: we compare the top 5% of ES decline cells against the union of the top 5% of land cover conversion cells across 5 drivers — intense vs. intense.
-- 34.5% of ES hotspot cells co-occur with the intense-LCC union — nearly 10x the 4.1% background rate, a strong and highly significant positive association (odds ratio 12.2). This corrects TWO earlier calculations: the original 24%/76% (stale, pre-5-driver file, looser threshold) and the 2026-07-07 "corrected" 8.2%/91.8% (which fixed that bug but introduced a new one — it joined LCC data to the ES grid using two grid-cell ID columns that share a name but index different, incompatible source grids; a nearest-centroid spatial crosswalk now fixes this).
-- The 65.5% gap: those cells may still have moderate LCC, just not in the most intense 5% of any driver. We still cannot say "degradation is happening without conversion" — that's overclaiming what the spatial overlay can show — but we CAN now say conversion, where intense, is a real and strong predictor.
+- 34.2% of ES hotspot cells co-occur with the intense-LCC union — a risk ratio of 7.4 vs. the 4.6% background rate, a strong and highly significant positive association (equivalently, odds ratio 10.8, 95% CI 10.66–10.92). We lead with risk ratio on the slide (more intuitive: "X times more likely"); odds ratio is the more commonly reported statistic if asked. This corrects THREE earlier calculations: the original 24%/76% (stale, pre-5-driver file, looser threshold), the 2026-07-07 "corrected" 8.2%/91.8% (grid-ID mismatch bug, fixed via a nearest-centroid spatial crosswalk), and the resulting 34.5%/65.5% itself (2026-07-24: the crosswalk join was many-to-one and double-counted cells, deflating the true risk/odds ratios — fixed by deduplicating to one nearest match per master cell).
+- The 65.8% gap: those cells may still have moderate LCC, just not in the most intense 5% of any driver. We still cannot say "degradation is happening without conversion" — that's overclaiming what the spatial overlay can show — but we CAN now say conversion, where intense, is a real and strong predictor.
 - Policy message: categorical land cover monitoring is trustworthy where it fires, but it still only reaches about a third of severe ES decline — you need direct ES monitoring to catch the rest. This is a more defensible, more literature-consistent story than either prior version.
 - ~2 minutes
 :::
@@ -656,7 +654,7 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 | **WHAT** | Ecosystem services declined measurably 1992–2020; absolute and proportional losses are decoupled by region | Change is real and geographically structured |
 | **WHERE** | 252K hotspot cells cluster in low- and middle-income regions; lower-middle-income countries bear **1.6×** disproportionate burden | Geographic prioritization is feasible; equity lens is essential |
 | **WHO** | Three typologies: coastal (higher HDI), terrestrial (lower HDI + higher GINI), retention (moderate HDI + lower GINI); **3.1 billion** in-situ | Typology-specific policy responses; scale demands systemic action |
-| **WHY** | ES hotspots co-occur with intense (top 5%) land cover conversion at **34.5%** — nearly 10x the 4.1% background rate (odds ratio 12.2), true for every one of 5 drivers individually; but **65.5%** still show no such overlap; plausible mechanisms for the remainder include upstream cascades, sub-pixel change, and climate forcing — **but cannot be partitioned with current data** | Conversion monitoring is a reliable signal where present, but must be paired with direct ES monitoring for the majority of cases |
+| **WHY** | ES hotspots co-occur with intense (top 5%) land cover conversion at **34.2%** — a risk ratio of **7.4** relative to the 4.6% background rate, true for every one of 5 drivers individually; but **65.8%** still show no such overlap; plausible mechanisms for the remainder include upstream cascades, sub-pixel change, and climate forcing — **but cannot be partitioned with current data** | Conversion monitoring is a reliable signal where present, but must be paired with direct ES monitoring for the majority of cases |
 
 ---
 
@@ -669,7 +667,7 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 
 **Completed:**
 - Full 9-chapter book + paper draft complete
-- Attribution gap reframed as co-occurrence throughout, and recomputed as a true 5-driver union — corrected twice: from a stale 76% gap (pre-5-driver file) to an incorrectly-computed 91.8% gap (grid-id mismatch bug) to the current, verified **65.5% gap / 34.5% co-occurrence** (odds ratio 12.2) — see `scripts/compute_attribution_true_union.R` and `scripts/build_lc_grid_fid_crosswalk.R`
+- Attribution gap reframed as co-occurrence throughout, and recomputed as a true 5-driver union — corrected three times: from a stale 76% gap (pre-5-driver file) to an incorrectly-computed 91.8% gap (grid-id mismatch bug) to a 65.5% gap that was itself still inflated by a many-to-one join double-counting cells, to the current, verified **65.8% gap / 34.2% co-occurrence** (risk ratio 7.4; odds ratio 10.8) — see `scripts/compute_attribution_true_union.R` and `scripts/build_lc_grid_fid_crosswalk.R`
 - KS three-typology finding with Cliff's Delta
 - Population numbers audited and corrected (3.1B in-situ)
 - Regional profiles with real hotspot intensity data
@@ -684,6 +682,8 @@ Cliff's Delta = probability that a random hotspot cell has a **higher** value th
 2. Ch05 scatterplot: replace X-axis with per-driver panels, or drop entirely?
 3. Literature cross-check for hotspot validation (Ch02 QA callout)
 4. REDD+ / IPBES citations for LCC–ES relationship (Ch05)
+
+**Our own TODO, not for this meeting — top priority right after:** `analysis/hotspot_extraction.qmd` has the same many-to-one crosswalk-join bug just fixed today in `compute_attribution_true_union.R` (see Ch05 methods note / WORKLOG 2026-07-24). It feeds the per-service driver-overlap table and several driver-hotspot maps/heatmaps in Ch05 — likely still inflated, not yet corrected. Deferred today because fixing it means rerunning the full notebook (regenerates maps), too risky right before this meeting.
 
 **Next milestone:** Incorporate Becky's feedback → journal submission
 

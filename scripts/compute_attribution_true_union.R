@@ -47,13 +47,28 @@ lc_raw <- as.data.frame(st_read(lc_gpkg, query = drv_query, quiet = TRUE))
 # Remap lc's grid_fid (own-grid row index) to the master-grid fid used by
 # hotspots_global_pct.gpkg, dropping cells with no true spatial correspondence
 # (nearest master cell centroid >6km away -- i.e. not the same cell).
+#
+# IMPORTANT: the LC source grid has more rows (1,691,819) than the master grid
+# (1,522,073), so nearest-centroid matching is necessarily many-to-one -- up to
+# 9 LC rows can share the same nearest master_fid. An earlier version of this
+# script used nrow(lc) as "n_grid" straight after the join, silently counting
+# LC-side rows instead of distinct master cells (1,681,849 vs. 1,515,620 actual
+# distinct master_fid values) -- an ~11% inflation of the denominator used in
+# every downstream risk ratio / odds ratio / p-value calculation. Fixed by
+# keeping only the nearest match (min match_dist_m) per master_fid, so each
+# master grid cell contributes exactly one row before any further computation.
 crosswalk <- read.csv(crosswalk_path) %>% filter(valid_match)
-lc <- lc_raw %>%
-  inner_join(crosswalk %>% select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
+lc_matched <- lc_raw %>%
+  inner_join(crosswalk %>% select(lc_grid_fid, master_fid, match_dist_m), by = c("grid_fid" = "lc_grid_fid")) %>%
   select(-grid_fid) %>%
   rename(grid_fid = master_fid)
-message(sprintf("LC rows: %d raw -> %d after crosswalk (dropped %d with no master-grid correspondence)",
-                 nrow(lc_raw), nrow(lc), nrow(lc_raw) - nrow(lc)))
+lc <- lc_matched %>%
+  group_by(grid_fid) %>%
+  slice_min(match_dist_m, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(-match_dist_m)
+message(sprintf("LC rows: %d raw -> %d after crosswalk -> %d after deduplicating to one nearest match per master cell",
+                 nrow(lc_raw), nrow(lc_matched), nrow(lc)))
 n_grid <- nrow(lc)
 
 es <- as.data.frame(st_read(es_gpkg, query = "SELECT grid_fid FROM hotspots_global_pct", quiet = TRUE))
