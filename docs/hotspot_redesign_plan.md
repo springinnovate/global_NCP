@@ -39,10 +39,20 @@ export/retention figure), and the housekeeping items below. See
 `scripts/mapping/make_5service_overlap_maps.R`, `scripts/mapping/make_5service_overlap_summary.R`,
 and `docs/hotspot_5service_rasters_README.md` for what was delivered.
 
-**Not started yet**: Phase 5.3 (biome/mangrove check), Phase 5.1/5.2 (figure restructuring),
-subregional (income/region/biome/country) hotspot reruns, Rich's beneficiary rerun (blocked on
-his reply), the KS/Gini analysis (blocked on Rich), and both housekeeping items (grid file
-naming, script consolidation).
+**Update (2026-07-29, later still)**: Phase 5.3 (biome/mangrove row-offset check) is done —
+**ruled out, not a bug**. Tested all 3,423 `WWF_biome == 'Mangroves'` cells in
+`10k_change_calc.gpkg` against a fresh, independent `gpd.sjoin` against raw `Biome.gpkg`,
+bypassing `build_master_grid.py`/`enrich_grid.py`'s merge chain entirely — zero mismatches.
+Code review also confirmed the merge chain uses genuine index-label joins throughout (`gpd.sjoin`
+preserves left-index values; the final restore-geometry step is `left_index=True,
+right_index=True`, not a positional `cbind`/`concat`), so this was never structurally the same
+failure pattern as the historical `seq_len()` bugs. Both known artifacts in the biome-level
+change maps (this one and the Mongolia one) now trace to biome-level aggregation itself, not a
+join/ID bug — see WORKLOG (2026-07-29, "Phase 5.3" entry) for full detail.
+
+**Not started yet**: Phase 5.1/5.2 (figure restructuring), subregional (income/region/biome/
+country) hotspot reruns, Rich's beneficiary rerun (blocked on his reply), the KS/Gini analysis
+(blocked on Rich), and both housekeeping items (grid file naming, script consolidation).
 
 **In progress**: Phase 1 (5-service extraction, global scope) — done via a new standalone script,
 `scripts/extract_hotspots_5service.R`. Produced `data/processed/hotspots_5service/{pct,abs}/
@@ -86,7 +96,7 @@ Becky has weighed in on the open structural questions. Do these as one batch onc
 
 ---
 
-## Two housekeeping items to close out before this redesign is considered "done" (not blocking tonight's Rich handoff, but don't let them get lost)
+## Three housekeeping items to close out before this redesign is considered "done" (not blocking tonight's Rich handoff, but don't let them get lost)
 
 1. **Grid file naming/consolidation.** This repo has several similarly-named, undocumented
    grid-like gpkgs (`landgrid_1_clean_enriched_4326.gpkg` — no ID column — `10k_change_calc.gpkg`,
@@ -100,7 +110,29 @@ Becky has weighed in on the open structural questions. Do these as one batch onc
    (renaming under time pressure risks breaking references across dozens of scripts) — flagged
    so it doesn't quietly disappear.
 
-2. **Script consolidation/cleanup.** This session (and the sessions before it) have accumulated
+2. **Document the `combos` mechanism as a first-class, user-facing capability — new item (2026-07-29).**
+   Tonight's work (water/access/combined-cross, then the two pairwise refinements) was only
+   possible because `10k_change_calc.gpkg`'s identity is now solid — that's the actual payoff of
+   getting the grid-ID foundation right. But right now, "how to build a custom service grouping"
+   only exists as tribal knowledge from this session, not as documentation a future user (without
+   this conversation) could follow. Needs, as one deliverable:
+   - **A written how-to** (candidate location: `docs/methodology.md` or a new
+     `docs/hotspot_service_grouping.md`): what `HOTS_CFG$combos` is, how a named list of service
+     vectors becomes a `count_<name>` column automatically, and — the part that ISN'T automatic —
+     how to derive an AND/cross-category combo (like `combined_cross`) that the native mechanism
+     doesn't support natively. Use tonight's water/access/combined example as the worked
+     illustration.
+   - **An explicit, reusable tool, not just prose**: right now, deriving a cross-category column
+     is a hand-written `mutate(new_col = count_A > 0 & count_B > 0)` line specific to each case
+     (see `scripts/extract_hotspots_5service.R`). Worth turning into a small, documented helper
+     function (e.g., in `R/get_hotspots.R` alongside `extract_hotspots()`) that takes two (or
+     more) combo names and returns the AND column, so a future user calls a function instead of
+     re-deriving the pattern from scratch.
+   - **This should be scoped together with housekeeping item 1 above (the config-duplication
+     consolidation)** — a clean, documented combos tool is undermined if a new user still has to
+     know to update 7 separate files to add a new service grouping. Do both in the same pass.
+
+3. **Script consolidation/cleanup.** This session (and the sessions before it) have accumulated
    standalone diagnostic/one-off scripts (`scripts/extract_hotspots_5service.R`,
    `scripts/compute_attribution_true_union.R`, various ad-hoc `check_*.R` scratch scripts) written
    quickly to answer an immediate question or unblock a specific step. Before this redesign is
@@ -297,15 +329,14 @@ beneficiary masks instead of the old hotspot_count.
    retention for context even though retention is dropped from the *hotspot definition* — two
    different roles for the same variable, worth being explicit about in the paper text so it
    doesn't read as inconsistent with the 5-service hotspot set.
-3. **Mangrove/Coastal-Risk mismatch check — separate from the Mongolia issue, still open.**
+3. **Mangrove/Coastal-Risk mismatch check — RESOLVED (2026-07-29), not a bug.**
    `generate_map_gpkgs.py`'s own join is by string name (not positional), so it's not the cause
-   here. The real suspect, still untested: `Python_scripts/build_master_grid.py` and
-   `enrich_grid.py` both do a spatial join (`gpd.sjoin` against `Biome.gpkg`, using
-   representative points) followed by a **positional-index merge** back onto the original grid
-   (`left_index=True, right_index=True`) after a `duplicated(keep='first')` row-drop. Any
-   reordering or subsetting between the sjoin and that merge is exactly the failure pattern
-   behind this project's other grid-ID bugs. Needs a direct check (confirm `BIOME`/`WWF_biome`
-   line up correctly against a few known mangrove cells) before trusting either map.
+   here. The suspected culprit — `build_master_grid.py`/`enrich_grid.py`'s `gpd.sjoin` against
+   `Biome.gpkg` followed by an index-based merge back onto the grid — was checked both by code
+   review (the merge is a genuine index-label join, not a positional `cbind`/`concat`) and by
+   direct empirical test (all 3,423 `WWF_biome == 'Mangroves'` cells re-verified against a fresh,
+   independent spatial join, zero mismatches). Not the source of the mismatch — see WORKLOG
+   (2026-07-29, "Phase 5.3" entry).
 
 ---
 
@@ -332,7 +363,7 @@ beneficiary masks instead of the old hotspot_count.
    inverted `compare_exposure_serviceshed.R` bug either way.
 3. Phase 1: 5-service hotspot re-extraction + 3 new overlap categories.
 4. Phase 2: regenerate maps (highest time-pressure item — Rich is blocked on this).
-5. Phase 5.3: biome/mangrove row-offset check (can run in parallel with 3-4, independent code path).
+5. ~~Phase 5.3: biome/mangrove row-offset check~~ — done, 2026-07-29, ruled out (not a bug).
 6. Phase 5.1/5.2: 10km-native change maps + restructured export/retention figure (can run in
    parallel, lower urgency than Phase 2).
 7. Send Rich the water/access rasters; he writes the 2 new beneficiary configs and reruns.

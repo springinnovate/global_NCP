@@ -1,5 +1,19 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-07-29 (later still)
+
+#### Phase 5.3: mangrove/biome row-offset check — ruled out, not a bug
+
+Tested the last open suspect from the redesign plan doc: whether `Python_scripts/build_master_grid.py`/`enrich_grid.py`'s positional-index merge (`left_index=True, right_index=True`, after a `duplicated(keep='first')` drop, following `gpd.sjoin` against `Biome.gpkg`) introduces a row-offset that could explain the mangrove/Coastal-Risk hotspot-vs-biome-change-map mismatch Becky flagged (a separate issue from the already-explained Mongolia artifact — see the entry below).
+
+**Code review first**: `gpd.sjoin` preserves the left GeoDataFrame's original index values in its output (not a fresh `RangeIndex`) — duplicate-index rows only occur when a point matches more than one right-side polygon, and the subsequent `.duplicated(keep='first')` correctly dedupes against that preserved index. The final `grid.merge(enriched_grid[new_cols], left_index=True, right_index=True, how="left")` is a genuine index-*label* join, not a positional `cbind`/`concat` — structurally not the same failure pattern as the historical `seq_len()`/positional-merge bugs in this project.
+
+**Empirical verification, not just code review**: pulled all 3,423 `WWF_biome == 'Mangroves'` cells from `10k_change_calc.gpkg`, took each cell's representative point (same method the pipeline uses), and ran a fresh, independent `gpd.sjoin` against the raw `Biome.gpkg` (16-row, undissolved global biome layer), bypassing the pipeline's merge chain entirely. **Zero mismatches across all 3,423 cells** — every cell the pipeline labels "Mangroves" independently falls inside the Mangroves polygon under a from-scratch join.
+
+**Conclusion**: the biome/mangrove attribute join is not the source of the mismatch Becky flagged. Combined with the already-confirmed Mongolia explanation (biome-name dissolution blending landlocked and coastal instances of the same biome), both known artifacts in the biome-level change maps trace to biome-level aggregation itself, not a join/ID bug in the grid-attribute pipeline — strengthens the case for Phase 5.1 (10km-native change maps) as the fix. Closes out the last open row-offset suspect from this project's grid-identity bug history for this data path.
+
+**Not saved to the repo**: ad-hoc verification script only (per standing preference to keep scratch/diagnostic scripts out of the permanent repo) — logic: load mangrove-labeled cells → `representative_point()` → fresh `gpd.sjoin` against `Biome.gpkg` → compare `WWF_biome` columns.
+
 ### 2026-07-29 (later same day)
 
 #### Traced the paper's "1,302,099 evaluated cells / 19.37%" figure — it's a flawed, stale calculation, not an authoritative denominator

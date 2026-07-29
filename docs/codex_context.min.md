@@ -1,4 +1,4 @@
-# Global NCP – AI Context (v1.3.2)
+# Global NCP – AI Context (v1.3.4)
 *Attach this file to all coding prompts to ensure correct paths, schemas, and architectural awareness. This file is the slimmed-down version of `docs/codex_context.md`.*
 
 *   **Documentation Rule:** The root `README.md` and the files within the `/docs` directory are the single source of truth. Do not create or reference redundant `README` files elsewhere.

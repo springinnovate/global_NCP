@@ -3,7 +3,7 @@
 Jeronimo Rodriguez Escobar
 Affiliation: Global Science, WWF
 Supervisor: Becky Chaplin-Kramer
-Version: v1.3.5
+Version: v1.3.4
 Last updated: 2026-06-20
 
 # Executive Summary
