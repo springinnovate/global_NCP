@@ -28,9 +28,21 @@ verified against the manuscript's already-correct prose numbers (no text changes
 anywhere), regenerated, paper/book/presentation re-rendered. Full detail in WORKLOG
 (2026-07-28 entry).
 
-**Not started yet**: everything in Phases 1-5 below (the actual 5-service redesign, new overlap
-maps, biome/mangrove check, Rich handoff). Buffer-distance question (open question #1) drafted
-as a message, not yet sent.
+**Update (2026-07-29)**: Phase 1 (5-service extraction) and Phase 2 (the 3 overlap maps) are
+now both done. Rasters + maps handed off to Rich, buffer-distance and LC-attribution questions
+sent to Becky. Also added, beyond the original 3 maps: 2 pairwise breakdowns of the access
+category (Access+Coastal Risk, Access+Pollination — the original 3-way access map hid a real
+signal since Coastal Risk is a narrow shoreline-only phenomenon), plus a summary CSV + faceted
+bar chart giving cell counts/land-area shares for every tier across all 5 maps. Remaining:
+Phase 5.3 (biome/mangrove row-offset check), Phase 5.1/5.2 (10km-native change maps, restructured
+export/retention figure), and the housekeeping items below. See
+`scripts/mapping/make_5service_overlap_maps.R`, `scripts/mapping/make_5service_overlap_summary.R`,
+and `docs/hotspot_5service_rasters_README.md` for what was delivered.
+
+**Not started yet**: Phase 5.3 (biome/mangrove check), Phase 5.1/5.2 (figure restructuring),
+subregional (income/region/biome/country) hotspot reruns, Rich's beneficiary rerun (blocked on
+his reply), the KS/Gini analysis (blocked on Rich), and both housekeeping items (grid file
+naming, script consolidation).
 
 **In progress**: Phase 1 (5-service extraction, global scope) — done via a new standalone script,
 `scripts/extract_hotspots_5service.R`. Produced `data/processed/hotspots_5service/{pct,abs}/
@@ -44,6 +56,33 @@ all** and would have silently produced a fake positional ID. Switched to `10k_ch
 and verified its `grid_fid` matches the canonical hotspot output's identity space exactly (zero
 mismatches across 225,113 cells, all shared attributes). Full detail in WORKLOG
 (2026-07-28, "Near-miss" entry).
+
+---
+
+## Pending major paper edits (defer until this redesign settles — don't lose track)
+
+A running list of substantive paper/book fixes identified during this redesign work, deliberately
+**not** being done now — the paper is being left alone until the 5-service numbers are final and
+Becky has weighed in on the open structural questions. Do these as one batch once Phase 1-4 land:
+
+1. **The "19.37% / 1,302,099 evaluated cells" figure is wrong, not just old.** Traced to
+   `Python_scripts/extract_book_data_fills.py`'s `total_cells_global = ...sum() / 8` — a flawed
+   average that only works if every service has the same valid-cell count (they don't: Coastal
+   Risk has ~80,000 valid cells vs. ~1.3-1.5M for the rest). The correct distinct-cell denominator
+   (verified directly against `10k_change_calc.gpkg`) is **1,372,621** for the same
+   Antarctica/Seven Seas/Lakes/Rock & Ice exclusion used throughout this analysis. Needs a proper
+   recompute of the paper's hotspot-coverage percentage once the final (5-service) hotspot count
+   is in hand — full detail in WORKLOG (2026-07-29 entry).
+2. **LC-change/attribution section removal from the paper** — pending Becky's confirmation (message
+   sent, not yet answered). Book keeps this content regardless.
+3. **5-service methodology section** — staged, not inserted: `docs/paper_5service_methodology_staging.md`
+   has candidate paragraphs ready to drop in once numbers are final and Becky's confirmed framing.
+4. **`audit_claims.R` full rerun** — every hotspot-count-derived number in the paper needs
+   re-verifying once the 5-service definition is finalized (see reconciliation table below).
+5. **Access map insight for the paper/book text**: the 3-way access map (Access+Pollination+Coastal
+   Risk) undersells its own best signal — worth a sentence noting Access+Pollination is the real,
+   broad terrestrial story (12,106 cells) while Access+Coastal Risk is a genuine but narrow
+   shoreline phenomenon (967 cells), rather than presenting them as one blended category.
 
 ---
 
@@ -242,27 +281,31 @@ beneficiary masks instead of the old hotspot_count.
 
 1. **Replace biome-level change maps with 10km-native change maps.** Reason given: biome
    aggregation misrepresents fine-scale results (e.g., Coastal Risk appearing to affect
-   Mongolia). **Found a gap during research: the script that actually generates
-   `outputs/maps/biome_change_map.gpkg` (and its region/income/country siblings) could not be
-   located anywhere in `scripts/`, `analysis/`, or `R/`** — `make_faceted_maps.R` only reads
-   these gpkgs as pre-built inputs. This needs to be found (may be an untracked/manual step) or
-   rebuilt from scratch before we can either regenerate the old biome maps or confidently
-   replace them.
+   Mongolia). **Gap resolved (2026-07-29): the missing generator script is
+   `zonal_stats_toolkit/generate_map_gpkgs.py`** (the sibling repo at `/c/projects/
+   zonal_stats_toolkit`) — it dissolves the raw global `Biome.gpkg` polygons by `WWF_biome` name
+   and merges in per-biome service stats. **The Mongolia artifact itself is very likely not a
+   bug** — dissolving by biome NAME merges every landlocked instance of a biome (Mongolia's Gobi)
+   with every coastal instance of that same biome worldwide (Atacama, Namib), so the whole
+   dissolved shape gets one blended value and landlocked land visually "inherits" a coastal
+   signal that belongs to a different desert on another continent. This is exactly the
+   representational limitation 10km-native maps are meant to fix — not something to debug
+   further, just confirms the redesign direction is right.
 2. **Main change figure restructured**: paired rows, export next to retention for each service
    (e.g., N export | N retention), red = increases in bad things / green = enhancement, ordered
    nitrogen → sediment → coastal → pollination → nature access. Note: this figure still shows
    retention for context even though retention is dropped from the *hotspot definition* — two
    different roles for the same variable, worth being explicit about in the paper text so it
    doesn't read as inconsistent with the 5-service hotspot set.
-3. **Mangrove/Coastal-Risk mismatch check**: hotspot map shows mangroves standing out for
-   Coastal Risk, but the biome change plot shows no corresponding change there — suspected row
-   offset in biome numbering. Traced the likely origin: `Python_scripts/build_master_grid.py`
-   and `enrich_grid.py` both do a spatial join (`gpd.sjoin` against `Biome.gpkg`, using
+3. **Mangrove/Coastal-Risk mismatch check — separate from the Mongolia issue, still open.**
+   `generate_map_gpkgs.py`'s own join is by string name (not positional), so it's not the cause
+   here. The real suspect, still untested: `Python_scripts/build_master_grid.py` and
+   `enrich_grid.py` both do a spatial join (`gpd.sjoin` against `Biome.gpkg`, using
    representative points) followed by a **positional-index merge** back onto the original grid
    (`left_index=True, right_index=True`) after a `duplicated(keep='first')` row-drop. Any
    reordering or subsetting between the sjoin and that merge is exactly the failure pattern
-   behind this project's two prior grid-ID bugs. This needs a direct check (confirm `BIOME`/
-   `WWF_biome` line up correctly against a few known mangrove cells) before trusting either map.
+   behind this project's other grid-ID bugs. Needs a direct check (confirm `BIOME`/`WWF_biome`
+   line up correctly against a few known mangrove cells) before trusting either map.
 
 ---
 

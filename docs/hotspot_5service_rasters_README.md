@@ -67,12 +67,54 @@ calculation.
 - **127,172** are access-overlap hotspots (≥1 of Nature Access / Pollination / Coastal Risk).
 - **48,001** meet the combined cross-category condition (≥1 water AND ≥1 access).
 
+## Maps (2026-07-29 update)
+
+The 3 requested overlap maps are now done too — `scripts/mapping/make_5service_overlap_maps.R`
+produces `outputs/plots/maps/global_{water,access,combined_cross}_overlap_heatmap_pct.png`,
+matching the visual conventions of the existing 8-service hotspot map suite.
+
+**Follow-up split (same day)**: the 3-way access map (Nature Access + Pollination + Coastal
+Risk) turned out to be a poor way to see the "all three overlap" signal — Coastal Risk is
+inherently a narrow shoreline band, so that tier is barely visible at global scale next to the
+much broader Access+Pollination pattern. Added two additional pairwise maps to the same script,
+using the individual per-service binary columns already in the gpkg (no re-extraction needed):
+
+- `global_access_coastal_pair_heatmap_pct.png` — Nature Access ∩ Coastal Risk. **967 cells**
+  (0.5% of all hotspots) — confirmed genuinely negligible at global scale, essentially invisible
+  on the map. Makes sense: pollination-dependent agriculture directly on the shoreline is rare.
+- `global_access_pollination_pair_heatmap_pct.png` — Nature Access + Pollination, reframed
+  (2026-07-29, second pass) to match the water map's two-tier structure instead of showing only
+  the strict intersection: light = hotspot for Access **or** Pollination, dark = hotspot for
+  **both** simultaneously (**12,106 cells** meet "both," 6.4% of all hotspots, 12.5× the coastal
+  pairing). Clear visible clustering in the Amazon basin (darkest/most concentrated), Southeast
+  Asia, Central Asia, Mexico.
+
+Original 3-way access map kept as-is, not replaced.
+
+**Second pass (same day)**: reframed `global_access_pollination_pair_heatmap_pct.png` to match
+the water map's two-tier structure (light = Access or Pollination, dark = both) instead of
+showing only the strict intersection — and applied the same two-tier treatment to
+`global_combined_cross_overlap_heatmap_pct.png` (light = minimum cross-over, exactly 1 water +
+1 access service; dark = deeper compounding, 3+ of the 5 services overlapping in the same cell —
+24,227 cells at the minimum vs. 23,774 at 3+, a near-even split).
+
+## Summary table + faceted chart (2026-07-29)
+
+`scripts/mapping/make_5service_overlap_summary.R` produces:
+- `outputs/tables/hotspots_5service_overlap_summary.csv` — cell counts and shares for every tier
+  shown on every map above, with two denominators: `pct_of_hotspots` (share of the 189,927
+  5-service hotspot cells) and `pct_of_land_area` (share of ~1.37M valid land grid cells — close
+  to but not identical to the paper's stricter "~1.3M evaluated cells" figure, which also drops
+  cells missing complete per-service data; treat as a working approximation, not a headline
+  number to cite directly).
+- `outputs/plots/hotspots_5service_overlap_summary_faceted.png` — one bar-chart panel per
+  category, tiers as bars, so the relative magnitudes (e.g. the 967 vs. 12,106 disparity between
+  the two access pairwise splits) are visible as numbers side by side, not just map density.
+
 ## What's NOT included yet
 
 - Subregional breakdowns (by income group, WB region, WWF biome, country) — global scope only
   for this handoff. Same extraction approach extends to those if/when needed.
-- The corresponding hotspot **maps** (visual PNGs) for water/access/combined — that's the next
-  step (Phase 2 of `docs/hotspot_redesign_plan.md`), not part of this raster handoff.
 - Rich's own two new beneficiary YAML configs (water-only downstream, access-only travel-time) —
   his to write, per his own message; this handoff just makes sure the input rasters exist in the
   shape his pipeline expects.
