@@ -1,0 +1,311 @@
+---
+title: "Hotspot Redesign Plan — 5-Service Set, New Overlap Categories, Beneficiary Reanalysis"
+status: "DRAFT — for Becky's review, she is on holiday this week"
+date: "2026-07-28"
+branch: "feature/hotspot-5service-redesign"
+---
+
+## Why this exists
+
+Becky and Steve met last week (Jerónimo not present, Steve's first time weighing in) and raised
+several concerns about the current 8-service hotspot analysis. Becky followed up directly in
+Slack with concrete instructions. This document turns both into one ordered execution plan,
+flags what's genuinely open/uncertain, and is meant to be adaptable into a status message back
+to Becky (she's on holiday, but wants the hotspot rasters ready for Rich to pick up).
+
+**Checkpoint status**: all prior work committed and pushed to `feature/swy-model-integration`
+(commit `711a621`). This plan executes on a new branch, `feature/hotspot-5service-redesign`,
+branched off that checkpoint — if anything here needs to be rolled back, that branch point is
+safe to return to.
+
+---
+
+## Status as of 2026-07-28
+
+**Resolved**: the Figure 9 / >10B population bug (open question #2 below) — confirmed root
+cause (a "Global" summary row was double-counted in `analysis/plot_multiplier_effect.R`), fixed,
+verified against the manuscript's already-correct prose numbers (no text changes needed
+anywhere), regenerated, paper/book/presentation re-rendered. Full detail in WORKLOG
+(2026-07-28 entry).
+
+**Not started yet**: everything in Phases 1-5 below (the actual 5-service redesign, new overlap
+maps, biome/mangrove check, Rich handoff). Buffer-distance question (open question #1) drafted
+as a message, not yet sent.
+
+**In progress**: Phase 1 (5-service extraction, global scope) — done via a new standalone script,
+`scripts/extract_hotspots_5service.R`. Produced `data/processed/hotspots_5service/{pct,abs}/
+global/hotspots_global_5service_{pct,abs}.gpkg` with the 3 new overlap columns (`count_water`,
+`count_access`, `combined_cross`). pct metric: 189,927 hotspot cells (1.88%), water=110,756,
+access=127,172, combined_cross=48,001. Not yet rasterized for Rich (next step) — see Phase 2.
+
+**Near-miss caught and fixed during this step**: `landgrid_1_clean_enriched_4326.gpkg` (the file
+the existing notebook falls back to when no in-memory grid is available) has **no ID column at
+all** and would have silently produced a fake positional ID. Switched to `10k_change_calc.gpkg`
+and verified its `grid_fid` matches the canonical hotspot output's identity space exactly (zero
+mismatches across 225,113 cells, all shared attributes). Full detail in WORKLOG
+(2026-07-28, "Near-miss" entry).
+
+---
+
+## Two housekeeping items to close out before this redesign is considered "done" (not blocking tonight's Rich handoff, but don't let them get lost)
+
+1. **Grid file naming/consolidation.** This repo has several similarly-named, undocumented
+   grid-like gpkgs (`landgrid_1_clean_enriched_4326.gpkg` — no ID column — `10k_change_calc.gpkg`,
+   `10k_lcc_granular_metrics.gpkg`, `AOOGrid_10x10km_land_4326_clean.gpkg`, one with a literal
+   timestamp baked into the filename) with no documented hierarchy anywhere. This ambiguity is
+   the root cause behind four separate grid-identity incidents in this project now (grid-ID
+   crosswalk bug, many-to-one join bug, the 2026-07-08 WORKLOG `seq_len()` fallback, and tonight's
+   near-miss). Needs a proper pass: document which file is canonical and why, and/or
+   rename/consolidate so there's one unambiguous master grid file — not several
+   similarly-named candidates of unknown relative authority. Deliberately not done tonight
+   (renaming under time pressure risks breaking references across dozens of scripts) — flagged
+   so it doesn't quietly disappear.
+
+2. **Script consolidation/cleanup.** This session (and the sessions before it) have accumulated
+   standalone diagnostic/one-off scripts (`scripts/extract_hotspots_5service.R`,
+   `scripts/compute_attribution_true_union.R`, various ad-hoc `check_*.R` scratch scripts) written
+   quickly to answer an immediate question or unblock a specific step. Before this redesign is
+   considered finished, do a pass to: (a) decide which of these are genuinely reusable pipeline
+   steps that should be properly named, documented, and either merged into the relevant `.qmd`
+   notebook or kept as a permanent, well-documented script; and (b) delete anything that was
+   truly one-off/diagnostic and has served its purpose. Don't let the repo accumulate an
+   ever-growing pile of similarly-named scratch scripts — that's the same class of problem as
+   item 1 above, just for code instead of data files.
+
+---
+
+## Reconciliation with the pre-meeting plan (memory, as of ~2026-07-09)
+
+Before last week's Becky/Steve meeting, the working assumption (tracked in project memory, not
+in this repo) was that the paper was close to submission-ready, pending a short list of
+confirmations from Becky. That list needs to be re-read against what actually came out of last
+week's meeting — some items are now superseded, some still stand independently, and at least one
+needs to be *redone*, not just answered, because the hotspot definition itself is changing.
+
+| Old open item (pre-2026-07-09 "MUST ASK BECKY" list) | Status now |
+|---|---|
+| #0 Attribution-gap sign-off (34.5%/65.5% framing) | **Superseded.** Those exact numbers were since corrected again (2026-07-24, now 34.2%/65.8%) — but more importantly, last week's meeting raised moving attribution analysis out of the main paper entirely (supplement, country/biome aggregation, or a separate follow-on paper). The sign-off question is moot until that structural decision is made; don't chase the old framing further. |
+| #1 Paper structure (methods to supplementary? target journal?) | **Still open, untouched by this redesign.** Independent question, still needs Becky's answer whenever she's back. |
+| #2 SDR/NDR climate inputs (fixed vs. era-specific) | **Still open, untouched.** Independent of the hotspot redesign. |
+| #3 Ch05 scatterplot (replace X-axis or drop) | **Likely moot** if attribution moves out of the main paper — revisit only if attribution stays in. |
+| #4 Literature validation of hotspot locations | **Do not do this yet.** It would validate the *current* 8-service hotspot clusters — pointless to spend time on before the 5-service redesign lands, since the clusters themselves are about to change. Explicitly deferred until Phase 1-2 complete. |
+| #5 Rt_serv confirmation (C_Risk/C_Risk_Red_Ratio only) | **Still open, independent** — though note C_Risk_Red_Ratio is one of the 3 services being dropped from the hotspot definition (not from the underlying data), so this question may partly resolve itself. |
+| `audit_claims.R` / systematic claim verification pass | **Must be rerun from scratch** once the 5-service redesign lands — every hotspot-count-derived number in the paper changes when the service set changes. Don't spend time re-verifying 8-service-era numbers now. |
+| Biome boxplots → Annex (deferred item) | **Related but distinct** from the new "replace biome-level change maps with 10km-native maps" ask — check whether these are the same assets or two separate things once Phase 5.1 starts. |
+| Phase 5 candidates (WWF Colombia deck, corporate supply chain, GDP exposure) | **Unaffected for now**, but any of these picked up later will need to reflect the new 5-service hotspot definition, not the old 8-service one. |
+
+**The honest summary**: the paper was in "final polish, minor confirmations" mode before last
+week. It is not anymore — the 5-service redesign changes the hotspot definition itself, which
+cascades into every hotspot-count, intensity, and beneficiary number in the book and paper. That
+said, per the technical research already done (see Phases 1-2 above), this is a **bounded,
+mechanical effort** — a config change plus a rerun, not a rebuild — the underlying pipeline
+architecture holds up fine.
+
+---
+
+## Two things to verify before or alongside execution (not blocking, but worth a quick check)
+
+1. **Buffer distance discrepancy.** Meeting notes say the downstream buffer may be "too
+   generous" at 500km. This repo's own methods documentation (`02-methods.qmd`) and the actual
+   output filenames (`full_raster_extent_downstream_50k_population.tif`) both say **50km**
+   flow-accumulation threshold, not 500km. Either the notes are misremembering, or Rich's
+   `wwf_es_beneficiaries` repo uses a different/newer value not reflected in this repo's docs.
+   **Action:** ask Rich directly what the current downstream threshold actually is before
+   assuming either number.
+
+2. **The 96% / 10B+ / double-counting numbers likely aren't a data bug.** The existing
+   beneficiary output structure has four overlap-tier folders (`all hotspots`, `2+`, `3+`, `4+`
+   overlapping) that are **nested subsets, not mutually exclusive bins** (4+ ⊂ 3+ ⊂ 2+ ⊂ all).
+   Summing "beneficiary count" across those four tiers as if additive would overshoot world
+   population immediately — this matches the notes' own "scale error, not a data error"
+   instinct closely. **Action:** before rebuilding anything, find out exactly which figure/sheet
+   produced the 96%/10B+ numbers and check whether it summed across tiers instead of treating
+   them as nested.
+
+---
+
+## Phase 1 — Hotspot redesign: 5 services, 3 new overlap map types
+
+**Goal (from Becky's Slack message, verbatim instructions):**
+
+Keep only: Nitrogen Export, Sediment Export, Coastal Risk, Pollination, Nature Access.
+Drop: Nitrogen Retention Ratio, Sediment Retention Ratio, Coastal Risk Reduction Ratio (the
+"same pollutant, not independent" problem — retention increases can reflect upstream
+degradation, not local improvement, and explaining that nuance would cost too much space in the
+paper).
+
+Produce exactly 3 new overlap map outputs:
+
+1. **Water overlap hotspots** — N export + Sed export, hotspot in either or both.
+2. **Access/coastal/pollination overlap hotspots** — Nature Access + Pollination + Coastal
+   Risk, hotspot in any one, two, or all three.
+3. **Combined cross-category overlap hotspots** — across all 5, but keep only cells with **at
+   least one water-service hotspot AND at least one non-water-service hotspot** (exclude
+   water-only or access-only cells).
+
+**How this maps onto the existing code** (traced directly, not guessed):
+
+- `analysis/hotspot_extraction.qmd`'s existing `combo` mechanism (`HOTS_CFG$combos`) already
+  does exactly "count how many named services are hotspots in this cell" — this is the right
+  mechanism for categories 1 and 2:
+  ```r
+  combos = list(
+    water  = c("N_export", "Sed_export"),
+    access = c("Nature_Access", "Pollination", "C_Risk")
+  )
+  ```
+  This gives `count_water` (0-2) and `count_access` (0-3) columns automatically, no core-logic
+  changes needed.
+- Category 3 (the cross-category AND) is **not** natively supported by the combo mechanism —
+  needs a small addition: either a patch to `R/get_hotspots.R` for a new "cross" combo type, or
+  a one-line derived column after extraction: `combined_cross = count_water > 0 & count_access > 0`.
+- Dropping the 3 retention/ratio services means editing `loss`/`gain`/`combos` in `HOTS_CFG` —
+  the underlying threshold/union logic in `extract_hotspots()` needs no changes, since it's
+  already generic over whatever's in `loss`/`gain`.
+
+**Real risk found during research — config duplication.** The service list + direction-of-bad
+logic is currently copy-pasted across **7 separate files**, and one of them
+(`analysis/compare_exposure_serviceshed.R`) already has an inverted (wrong) copy relative to the
+others:
+
+| File | What it holds |
+|---|---|
+| `R/utils_hotspot.R` | `svc_order` (canonical 8-service order) |
+| `analysis/hotspot_extraction.qmd` | `svc_order`, `canonical_lookup`, `HOTS_CFG` (the live config) |
+| `analysis/hotspot_synthesis.qmd` | a second, independent copy of `HOTS_CFG` |
+| `scripts/mapping/make_faceted_maps.R` | `goods`/`damages`/`canon_order` |
+| `scripts/mapping/make_paper_supplement_maps.py` | Python copy of GOODS/DAMAGES + name mapping |
+| `gdal_rasterize_hotspots.sh` | `COLUMNS` array |
+| `analysis/compare_exposure_serviceshed.R` | **inverted** loss/gain lists (pre-existing bug, unrelated to this redesign, found in passing) |
+
+This project has already had three separate incidents caused by exactly this kind of silent,
+duplicated-source-of-truth drift (the grid-ID crosswalk bug, the many-to-one join bug, and now
+this). **Recommendation: while touching all 7 files anyway for the 8→5 cut, consolidate into
+one canonical service-config object** (a single YAML or R list, sourced everywhere) so this
+can't silently drift again. This is optional extra scope — flagging it as a recommendation, not
+assuming you want it. Either way, the pre-existing inverted bug in
+`compare_exposure_serviceshed.R` should get fixed while we're in there regardless.
+
+**Deliverables for this phase:**
+- Updated `HOTS_CFG` (5 services, 2 new combos + 1 derived cross-category column) applied
+  consistently across all touched files.
+- Three new hotspot gpkgs (global scope first, matching existing `hotspots_global_{pct,abs}.gpkg`
+  pattern) with the new binary/count columns.
+- Rerun `gdal_rasterize_hotspots.sh` to produce rasters for the new columns
+  (`count_water`, `count_access`, `combined_cross`), in the same `data/processed/hotspots/rasters/`
+  location Rich's pipeline already expects.
+
+---
+
+## Phase 2 — Map outputs for Becky/Rich
+
+Three visual map outputs matching the three overlap categories above (water, access, combined),
+plus rerunning the existing suite of hotspot maps against the new 5-service definition. Target:
+**next week**, per the meeting notes — this is the most time-sensitive deliverable since Rich is
+blocked on it for the beneficiaries rerun.
+
+---
+
+## Phase 3 — Handoff to Rich: beneficiaries rerun
+
+Becky's Slack message names 4 existing config files in Rich's repo
+(`jeronimo_{2,3,4,all}hotspot_beneficiaries.yaml`) and asks for **2 new, similar configs**:
+
+- A **water-hotspot** config — downstream-only buffer, access/travel-time buffer turned off.
+- An **access-hotspot** config — travel-time-only buffer, downstream buffer turned off.
+
+This matches the meeting notes' service-specific buffer instruction exactly: water services
+(N export, Sed export) → downstream only; coastal, pollination, nature access → travel-time
+only. **This repo has no visibility into `wwf_es_beneficiaries`'s YAML schema or README** (it
+lives on Rich's machine, not accessible from here) — so this repo's job is only to hand Rich
+correctly-structured hotspot rasters/masks; the actual new YAML configs are Rich's to write
+(Becky's message already asks him directly: "are we ready... can you do that for me"). Our
+concrete deliverable here is making sure the water-only and access-only hotspot rasters exist in
+a form his pipeline can point a config at.
+
+**Output Becky wants once Rich reruns**: a table of beneficiary counts by overlap level, plus
+downstream/access/combined beneficiary masks.
+
+---
+
+## Phase 4 — Gini/HDI analysis on beneficiary masks
+
+Blocked until Phase 3 completes (needs Rich's rerun output). Once available: KS test (or
+equivalent) for whether hotspot-adjacent populations skew toward inequality (Gini) and lower
+HDI, likely restricted to 3+ overlaps (~20% of world population per the notes) — this reuses the
+existing KS/Cliff's Delta machinery already built for the WHO chapter, just against the new
+beneficiary masks instead of the old hotspot_count.
+
+---
+
+## Phase 5 — Figure/map changes (can run in parallel with Phases 1-2)
+
+1. **Replace biome-level change maps with 10km-native change maps.** Reason given: biome
+   aggregation misrepresents fine-scale results (e.g., Coastal Risk appearing to affect
+   Mongolia). **Found a gap during research: the script that actually generates
+   `outputs/maps/biome_change_map.gpkg` (and its region/income/country siblings) could not be
+   located anywhere in `scripts/`, `analysis/`, or `R/`** — `make_faceted_maps.R` only reads
+   these gpkgs as pre-built inputs. This needs to be found (may be an untracked/manual step) or
+   rebuilt from scratch before we can either regenerate the old biome maps or confidently
+   replace them.
+2. **Main change figure restructured**: paired rows, export next to retention for each service
+   (e.g., N export | N retention), red = increases in bad things / green = enhancement, ordered
+   nitrogen → sediment → coastal → pollination → nature access. Note: this figure still shows
+   retention for context even though retention is dropped from the *hotspot definition* — two
+   different roles for the same variable, worth being explicit about in the paper text so it
+   doesn't read as inconsistent with the 5-service hotspot set.
+3. **Mangrove/Coastal-Risk mismatch check**: hotspot map shows mangroves standing out for
+   Coastal Risk, but the biome change plot shows no corresponding change there — suspected row
+   offset in biome numbering. Traced the likely origin: `Python_scripts/build_master_grid.py`
+   and `enrich_grid.py` both do a spatial join (`gpd.sjoin` against `Biome.gpkg`, using
+   representative points) followed by a **positional-index merge** back onto the original grid
+   (`left_index=True, right_index=True`) after a `duplicated(keep='first')` row-drop. Any
+   reordering or subsetting between the sjoin and that merge is exactly the failure pattern
+   behind this project's two prior grid-ID bugs. This needs a direct check (confirm `BIOME`/
+   `WWF_biome` line up correctly against a few known mangrove cells) before trusting either map.
+
+---
+
+## Deprioritized / paused, not part of this plan's active scope
+
+- **SWY model integration** — explicitly paused again per your message; picked back up after
+  this redesign lands.
+- **Attribution analysis (LCC drivers) likely moving out of the main paper** — flagged in the
+  meeting notes as a structural decision (supplement-only vs. country/biome aggregation vs.
+  separate follow-on paper), with "consensus leaning toward a cleaner main paper." This is a
+  discussion item for Becky, not something to execute unilaterally — noting it here so it isn't
+  lost, not scoping work against it yet.
+- **CN/Kc work for SWY** (three problematic biomes: mangroves, flooded forests, flooded
+  savannas) — also paused, noted only for continuity with the already-recovered
+  `swy_becky_meeting.qmd`.
+
+---
+
+## Suggested order of execution
+
+1. ~~Checkpoint + branch~~ — done (`711a621` on `feature/swy-model-integration`; this branch is
+   `feature/hotspot-5service-redesign`).
+2. Consolidate/fix the 7-file service-config duplication (if you want that scope) + fix the
+   inverted `compare_exposure_serviceshed.R` bug either way.
+3. Phase 1: 5-service hotspot re-extraction + 3 new overlap categories.
+4. Phase 2: regenerate maps (highest time-pressure item — Rich is blocked on this).
+5. Phase 5.3: biome/mangrove row-offset check (can run in parallel with 3-4, independent code path).
+6. Phase 5.1/5.2: 10km-native change maps + restructured export/retention figure (can run in
+   parallel, lower urgency than Phase 2).
+7. Send Rich the water/access rasters; he writes the 2 new beneficiary configs and reruns.
+8. Phase 4: Gini/HDI KS test on the new beneficiary masks (blocked on step 7).
+
+---
+
+## Open questions to fold into the message back to Becky
+
+1. Confirm the actual downstream buffer distance in current use (50km per this repo's docs, or
+   500km per the meeting notes) — ask Rich directly.
+2. Confirm which output (figure/sheet) produced the 96%/10B+ numbers, to verify the
+   nested-tier double-counting hypothesis before assuming it's the explanation.
+3. Whether to consolidate the 7-file service-config duplication now (recommended, given this
+   project's history with this exact failure mode) or defer as a separate cleanup pass.
+4. Whether `biome_change_map.gpkg`'s generation step should be rebuilt as tracked code (it's
+   currently not reproducible from anything visible in the repo) as part of this work, or
+   whether that's acceptable technical debt to leave for later since the plan is to replace it
+   with 10km-native maps anyway.

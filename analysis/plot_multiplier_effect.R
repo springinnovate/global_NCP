@@ -95,15 +95,17 @@ for (grp_col in groupings) {
       values_fill = 0
     )
 
-  if (!"travel_footprint" %in% names(plot_data)) plot_data$travel_footprint <- 0
-  if (!"hydrological" %in% names(plot_data)) plot_data$hydrological <- 0
+  if (!"combined_total" %in% names(plot_data)) plot_data$combined_total <- 0
 
   plot_data <- plot_data %>%
     # Join the dynamically calculated Local Residents!
     left_join(local_agg, by = grp_col) %>%
     mutate(
       `Local Residents` = replace_na(`Local Residents`, 0),
-      `Connected Beneficiaries` = travel_footprint,
+      # Connected Beneficiaries = union of downstream + travel-access reach,
+      # matching the paper's documented definition (02-methods.qmd) -- NOT
+      # travel_footprint alone, which understates true connected reach.
+      `Connected Beneficiaries` = combined_total,
       multiplier = `Connected Beneficiaries` / ifelse(`Local Residents` == 0, 1, `Local Residents`)
     ) %>%
     # Order regions by their total connected exposure footprint
@@ -178,8 +180,23 @@ compound_local <- lapply(names(overlap_mapping), function(cat_name) {
   tibble(overlap_category = cat_name, `Local Residents` = local_pop)
 }) %>% bind_rows()
 
+## BUG FIX (2026-07-28): exposure_comparison_compiled.csv carries a
+## synthesized `country == "Global"` row per overlap_category/exposure_type
+## (already equal to the sum of all 224 real countries), alongside the
+## per-country rows. The filter below previously summed by overlap_category/
+## exposure_type with no country filter at all, so it silently added the
+## Global row on top of the correctly-summed per-country total -- exactly
+## doubling every value (confirmed: "all hotspots" came out 14.80B instead
+## of the true 7.40B). Also switched from `travel_footprint` alone to
+## `combined_total` (union of downstream + travel-access), matching the
+## paper's documented definition and the verified 7.6B headline figure --
+## travel_footprint alone was an under-representation of true connected
+## reach. The per-region/income/biome/country loop above was NOT affected by
+## the doubling (it already filters out its own grouping column's "Global"
+## value) but used the same wrong exposure_type; fixed there too for
+## consistency between Figure 9 and the Annex breakdowns it references.
 compound_connected <- df %>%
-  filter(exposure_type == "travel_footprint") %>%
+  filter(exposure_type == "combined_total", country != "Global") %>%
   group_by(overlap_category) %>%
   summarise(`Connected Beneficiaries` = sum(population, na.rm = TRUE), .groups = "drop")
   
@@ -202,7 +219,11 @@ p_compound <- ggplot(compound_plot_data) +
   ) +
   geom_point(aes(x = `Local Residents`, y = Label, color = "Local Residents"), size = 5) +
   geom_point(aes(x = `Connected Beneficiaries`, y = Label, color = "Connected Beneficiaries"), size = 5) +
-  scale_x_log10(labels = label_number(scale_cut = cut_short_scale())) +
+  scale_x_log10(
+    breaks = c(1e8, 3e8, 1e9, 3e9, 1e10),
+    labels = label_number(scale_cut = cut_short_scale()),
+    limits = c(1e8, 1.2e10)
+  ) +
   scale_color_manual(values = c("Local Residents" = "#E83737", "Connected Beneficiaries" = "#1F77B4")) +
   labs(
     title = "Multiplier Effect: Local vs. Connected Population Exposure",

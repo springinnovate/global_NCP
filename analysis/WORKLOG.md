@@ -1,5 +1,55 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-07-28 (later same day)
+
+#### Near-miss: `landgrid_1_clean_enriched_4326.gpkg` has no ID column at all — confirmed `10k_change_calc.gpkg` as the safe master-grid source for the 5-service redesign
+
+While building `scripts/extract_hotspots_5service.R`, copied `hotspot_extraction.qmd`'s geometry-loading fallback (reads `data/vector_basedata/landgrid_1_clean_enriched_4326.gpkg` when `grid_sf` isn't already in memory, tries `orig_fid`/`grid_fid`/`id` in turn, falls back to `geom_sf$fid <- seq_len(nrow(...))` if none exist). That file's actual columns are `Id` (junk, all zeros), `RasterVal`, `c_fid`, `country`, `continent`, etc. — **none of orig_fid/grid_fid/id exist**, so the fallback fired, producing a purely positional fake ID with no relationship to any other file's cell identity. This is the same failure class as the 2026-07-08 LCC crosswalk bug and the 2026-07-24 many-to-one join bug — the fourth instance of this project being bitten by ungoverned grid-identity assumptions. Caught this time only because a `stopifnot` fid-coverage check happened to fire; not guaranteed in general.
+
+**Fix**: used `data/processed/10k_change_calc.gpkg` instead (has a real `grid_fid` column). **Verified, not assumed**: joined its `grid_fid` against `hotspots_global_pct.gpkg` (the canonical, manuscript-verified 8-service hotspot output) — zero mismatches across all 225,113 hotspot cells on every shared attribute (c_fid, continent, region_un, subregion, nev_name, region_wb, income_grp, WWF_biome). This confirms the two files share the same true identity space, not just a coincidentally-matching column name.
+
+**Not fixed, flagged as a fast-follow, not blocking tonight's redesign work**: this repo has several similarly-named grid-like gpkgs (`landgrid_1_clean_enriched_4326.gpkg`, `10k_change_calc.gpkg`, `10k_lcc_granular_metrics.gpkg`, `AOOGrid_10x10km_land_4326_clean.gpkg`, one with a literal timestamp in its filename) with no documented hierarchy or canonical-source statement anywhere. That ambiguity is the root cause enabling all four grid-identity incidents to date. Recommend a follow-up pass: document (or better, rename/consolidate) so there is one unambiguous, well-named canonical master grid file, referenced consistently, rather than several similarly-named candidates of unknown relative authority.
+
+### 2026-07-28
+
+#### Figure 9 (compound-risk serviceshed multiplier) showed >10B people — confirmed a Global-row double-counting bug, fixed
+
+Becky and Steve flagged this in a 2026-07-21 meeting (Jerónimo not present): the compound-risk
+dumbbell chart (`outputs/plots/downstream_exposure_dumbbell_compound.png`, Figure 9 in the paper)
+appeared to show over 10 billion people at the "≥1 service" tier — impossible, exceeds world
+population.
+
+**Root cause, confirmed exactly**: `analysis/plot_multiplier_effect.R`'s compound-tier
+aggregation (`compound_connected`) summed `population` from `outputs/tables/
+exposure_comparison_compiled.csv` grouped only by `overlap_category`/`exposure_type`, with no
+filter excluding the `country == "Global"` row that the CSV also carries (a pre-computed total
+across all 224 countries, alongside the per-country rows). Summing both together exactly doubled
+every value: "≥1 service" came out as 14.80B instead of the true 7.40B. The per-region/income/
+biome/country breakdowns (the Annex charts, `analysis/plot_multiplier_effect.R`'s per-grouping
+loop) were **not** affected — they already filtered out their own grouping column's "Global"
+value.
+
+**Second, smaller issue fixed in the same pass**: the script defined "Connected Beneficiaries" as
+`travel_footprint` alone, not `combined_total` (the union of downstream + travel-access reach)
+that `02-methods.qmd` actually documents as the definition. Switched both the compound chart and
+the per-grouping charts to `combined_total` for consistency.
+
+**Verified: no manuscript/book/presentation text needed to change.** The prose numbers (3,065M
+in-situ; 6,011M/3,756M/7,584M connected at 2+/3+/1+ tiers; 2.5×/5×/8× multipliers) were already
+sourced correctly from `06-hotspot-WHO.qmd`'s own traceability table, not from the buggy script —
+only the image itself was wrong. That mismatch (chart visually contradicting correct text) is
+almost certainly what read as "the numbers don't add up."
+
+**Also**: added an explicit 10B gridline to the compound chart (previously topped out at 3B,
+making the correct ~7.6B point look like it was off the scale) and removed
+`outputs/plots/downstream_exposure_dumbbell.png` — an orphaned, unreferenced duplicate from an
+earlier iteration of this script, superseded by the `_compound` version, nothing in the repo
+generated or pointed to it anymore.
+
+**Files changed**: `analysis/plot_multiplier_effect.R`. Regenerated:
+`downstream_exposure_dumbbell_compound.png`, `exposure_multiplier_dumbbell_{region_wb,income_grp,WWF_biome}.png`.
+Paper, book, and presentation re-rendered to pick up the corrected figures.
+
 ### 2026-07-24
 
 #### Attribution-gap numbers corrected AGAIN (34.5%/65.5% was itself inflated by a many-to-one join) — now 34.2%/65.8%, odds ratio 10.79
