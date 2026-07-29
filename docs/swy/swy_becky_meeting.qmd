@@ -1,9 +1,9 @@
 ---
 title: "Global Seasonal Water Yield"
-subtitle: "Scoping review with Becky — 2026-07-21"
+subtitle: "Scoping review with Becky — Tuesday check-in + Friday update"
 author:
   - "Jerónimo Rodríguez Escobar"
-date: "2026-07-21"
+date: "2026-07-24"
 affiliation: "Global Science, WWF"
 format:
   revealjs:
@@ -30,9 +30,19 @@ execute:
   message: false
 ---
 
-## This is a different kind of task {.smaller}
+<!--
+NOTE (2026-07-24): this title slide was reconstructed from context after an
+accidental `git reset --hard` wiped the uncommitted flood-pulse update to this
+file. All 9 content slides below were transcribed directly from browser
+screenshots of the still-open, unrefreshed tab (which still held the correct
+in-memory render) and should be accurate. This YAML block and the slide title
+itself are a best-effort re-creation, not recovered from a screenshot — check
+title/subtitle/date wording before presenting if it matters.
+-->
 
-- The other 8 services' InVEST runs were done by you and collaborators, earlier, separately — this project only ever **post-processed** the finished outputs
+## Different task {.smaller}
+
+- The other 8 services' InVEST runs were already produced on earlier projects — this project only ever **post-processed** the finished outputs
 - **Nobody has run InVEST SWY globally before** — on this project, or (as far as this review found) anywhere — precisely because a single global calibration isn't considered defensible
 - This week was a **literature review and specification**, not a build: what a real global run requires, what already exists, what's been de-risked, what's still open
 
@@ -40,9 +50,9 @@ execute:
 Open with this before anything else — make sure the scope shift lands before diving into content. This isn't "add a table to the pipeline," it's standing up and running a real model for the first time on this project. Don't undersell it, don't oversell it either — just be accurate about what kind of task this is.
 :::
 
-## No global precedent — but a major shortcut exists {.smaller}
+## No global precedent — but a shortcut exists {.smaller}
 
-- No published global-scale InVEST SWY application found anywhere. Closest: Hamel et al. 2020, Peru + Myanmar (*J. Environ. Manage.* 270:110792) — multi-region, not global. **Full text now obtained and read** (not just abstract-level)
+- No published global-scale InVEST SWY application found anywhere. Closest: Hamel et al. 2020, Peru + Myanmar (*J. Environ. Manage.* 270:110792) — multi-region, not global. **Full text obtained and reading**
 - Checked SWAT's global databases as a possible curve-number shortcut — **ruled out**: they only crosswalk land cover to SWAT's own crop codes, no CN values
 - Found **GCN250** (Jaafar et al. 2019): a global 250m gridded curve-number product — not InVEST-specific, but solves the same underlying problem (CN varies by land cover and place, no single number works everywhere)
 
@@ -63,22 +73,39 @@ Hamel et al. 2020 turned out to matter more than expected once read in full — 
 This slide is the one that most changes today's conversation — flag that clearly. This isn't just "found the paper," it's "the paper changes what we thought the task was."
 :::
 
-## The CN decision {.smaller}
+## The CN decision — confirmed with Becky Tuesday {.smaller}
 
-**Recommended: GCN250 as the baseline everywhere, targeted correction only on the biomes it flags as weakest** — not a flat adopt-or-rebuild choice.
+**GCN250 as the baseline everywhere, targeted correction only on the biomes it flags as weakest** — Becky independently confirmed this same approach at Tuesday's meeting, not a still-open question.
 
 - Authors' own caution: forested/humid tropical environments are least validated — maps onto ~3 of our WWF_biome classes (Tropical & Subtropical Moist Broadleaf Forests, Mangroves, Flooded Grasslands & Savannas), not all 16
 - Per Hamel's precedent: patch by finding existing calibrated studies for each biome, not deriving from scratch — tropical forest already has candidates, **flooded grasslands & savannas has a direct hit (Oliveira et al. 2016, Brazilian Cerrado — the closest ecological analog to the Llanos/Orinoquía)**, mangroves still a gap
-- Patch those three, keep GCN250 for everything else
+- **Important correction from Becky**: the goal isn't GCN250's finished raster (locked to 2015 land cover) — it's the underlying lookup table/method, reusable on our own 1992/2020/future LULC. Covered next slide — real progress since Tuesday.
 
 ::: {.notes}
-**This is the actual question for Becky, don't pre-answer it**: does "baseline + targeted patch on ~3 biomes" satisfy the original "build subregional tables" concern, or is the full from-scratch build still wanted regardless of time cost? Present the tradeoff, then stop talking and let her decide.
+[Speaker notes not recovered from screenshot — this slide's content was substantially rewritten from the Tuesday version, so the old notes below no longer fully apply. Reconstruct before presenting if needed: this is where to name the flooded-grasslands patch as a personal offer tied to the Orinoquía/Llanos PhD background, and a natural opening to ask Becky about her grasslands working group.]
+:::
 
-If asked how GCN250 (a raster) actually plugs into InVEST (which wants a lucode-indexed table): summarizing GCN250's values per lucode × soil group into table form, not feeding the raster in directly. Also worth mentioning: reusing GCN250's own ESA-CCI-to-NEH-630 crosswalk as this pipeline's lucode scheme.
+## The CN lookup table — now in hand {.smaller}
 
-Reminder: this decision is CN-only. Kc (FAO-56 for cropland, NDVI regression for everything else) is unaffected either way.
+- Obtained GCN250's actual ESA-class-level lookup: **LC_ID → CN by soil group (A-D)**, 38 rows, applies directly to *our own* 1992/2020 ESA CCI-LC rasters — GCN250's finished raster itself is no longer needed
+- Built via `CN_k = Σ(CN_i × FC_i)`: each ESA class's CN is a weighted blend of Plant Functional Type base values (e.g. Tree Broadleaf Evergreen, Grassland, Bare soil), sourced from NEH-630
+- **Verified, not just transcribed**: cross-checked rows against the formula — e.g. "Grassland" (54/71/81/86) resolves exactly to 60% Natural Grass + 40% Bare soil
+- **Found the exact LC IDs for our three patch biomes**: LC 50 (tropical evergreen forest, CN 31/56/70/77), LC 170 (likely mangroves, CN 46/65/76/82), LC 180 (likely flooded grasslands/savannas, CN 57/72/82/86 — the number Oliveira et al.'s Cerrado value would override)
 
-**Personal note, worth saying out loud here, not just in passing**: offer to personally lead the flooded-grasslands/savannas patch — this sits directly on top of the PhD research background (land cover change in the Orinoquía/Llanos). Worth naming explicitly rather than letting it pass as just another bullet. Natural opening to ask Becky about her grasslands working group and whether there's room to connect there — genuine interest, not a favor being asked, and directly backed by real expertise plus the Oliveira et al. 2016 find.
+::: {.notes}
+[Speaker notes not recovered from screenshot — new slide since Tuesday, added for the Friday check-in.]
+:::
+
+## A catch worth flagging: flood-pulse dynamics, not just CN {.smaller}
+
+- Mangrove CN literature search came up empty across three angles — genuine gap, not a search miss
+- **The real reason: mangrove hydrology is tide-dominated, and Llanos/Orinoquía-type flooded savanna hydrology is flood-pulse-dominated** (Junk, Bayley & Sparks 1989) — both governed by routed floodwater, not local rainfall-runoff, which is the entire premise CN rests on
+- **This casts doubt on the Oliveira et al. 2016 Cerrado value as the right analog for the flooded-grasslands patch** — Cerrado/Altillanura is well-drained (checked directly, confirmed non-flooded), while the WWF biome in question specifically means the *flooded* sabanas inundables
+- **Found a fourth related category**: Amazon várzea/igapó flooded forest (120-210+ days/year flooded) is its own ESA class, LC 160 — distinct from LC 50, the clean tropical-forest patch target
+- **Net result, cleaner not messier**: LC 50 stays a clean patch case; LC 160, 170, 180 (all of GCN250's explicitly "flooded" classes) form one shared group needing the same structural treatment, not three separate searches
+
+::: {.notes}
+[Speaker notes not recovered from screenshot — new slide, added 2026-07-24. This is the user's own domain-expertise catch (Orinoquía/Llanos land-cover-change PhD background): started as a mangrove CN literature search that came up empty, then the user's own background reframed it into a bigger structural finding rather than three separate per-biome searches. Worth presenting as "what a supervised literature review looks like" — judgment applied on top of the search, not delegated to it.]
 :::
 
 ## The other real decision: is "one global run" even right? {.smaller}
@@ -95,34 +122,36 @@ Second real ask for Becky, and this one wasn't scoped going in — it came direc
 
 ::: {.columns}
 ::: {.column width="50%"}
-**Resolved this week**
+**Resolved**
 
 - Soil hydrologic group (HYSOGs250m) — confirmed available
 - Non-crop Kc via NDVI regression — confirmed still valid in 2020s literature
 - `kc_calculator.xlsx` reviewed — confirms same regional issue exists for Kc, reinforces the NDVI route
 - NDVI (MOD13A3), watersheds (HydroBASINS), precipitation (CHIRPS) — candidate sources identified
+- **CN baseline lookup table obtained and verified** (two slides back) — the core technical blocker from Tuesday
+- Tropical-forest patch candidates found and confirmed clean (Calero Mosquera et al. 2021, Fábrega et al. 2012)
+- <!-- LINE PARTIALLY CUT OFF IN SCREENSHOT, reconstructed from context --> Flood-pulse structural distinction identified: LC 160/170/180 need shared treatment, not three separate searches
 :::
 ::: {.column width="50%"}
 **Still open**
 
-- The CN decision and the scale question (previous slides)
+- **The flood-pulse treatment for LC 160/170/180** — recommendation drafted, not yet confirmed with Becky
+- The scale-of-run question (one global model vs. basin-mosaic) — not yet raised with Becky
 - **Climate data source & provenance** — ties directly to the existing open WORKLOG.md question on the SDR/NDR climate input
 - CHIRPS has a real gap: no coverage above 60°N/below 60°S — need CHELSA or similar for boreal/tundra biomes
-- Building the lucode master table; downloading NDVI/HydroBASINS
+- Building the lucode master table (apply the new CN table to our own LULC); downloading NDVI/HydroBASINS
 :::
 :::
 
 ::: {.notes}
-Third real ask for Becky: the precipitation/ET0 provenance question overlaps an already-open blocker on the main paper (fixed WorldClim vs. era-specific climate input). Worth resolving as one conversation instead of two.
-
-Keep this slide quick — it's a status check, not the centerpiece. Don't linger.
+[Speaker notes not recovered from screenshot — status slide, largely self-explanatory. The bottom-left bullet under "Resolved" was cut off by the taskbar in the recovered screenshot and has been reconstructed from the flood-pulse slide's own "net result" framing — check wording before presenting.]
 :::
 
 ## Next steps {.smaller}
 
-- Confirm CN approach, the scale-of-run question, and climate-data source with Becky today
-- Search for calibrated regional precedent for the mangrove and flooded-grassland biome patches (Pantanal/Llanos hydrology literature, per Hamel's own strategy)
-- Build the lucode master table (reusing GCN250's own crosswalk)
+- Confirm the flood-pulse treatment for LC 160/170/180 with Becky (near-saturated CN vs. continued literature search)
+- Raise the scale-of-run question and climate-data source with Becky
+- Apply the new CN lookup table to this pipeline's own 1992/2020 ESA CCI-LC rasters (the concrete data-engineering step this table now unlocks)
 - Acquire NDVI, HydroBASINS, and the settled precipitation source
 - Documentation stays standalone in `docs/swy/` — not merged into the paper/book until the model is actually built and validated
 
