@@ -1,5 +1,61 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-07-29 (evening close-out, cont.)
+
+#### Native change figure: fixed basemap being hidden by opaque near-zero fill (recurrence of a previously-solved problem)
+
+User flagged the basemap (added earlier this session) was still invisible in several panels — correctly diagnosed as opaque near-white fill at near-zero values painting over the entire land footprint, not a basemap-loading problem. This is the exact same issue already solved once before, in `scripts/mapping/make_paper_supplement_maps.py` (the Becky-requested per-service paper supplement, session 18): "opaque near-white 'no change' pixels cover the entire land footprint and the map reads as colored blobs floating with no geographic reference at all."
+
+**Fix, ported directly from that script's approach**: fade alpha toward 0 for near-zero values instead of leaving them fully opaque. `fade_threshold <- 0.08 * limits[2]` (8% of the symmetric 1st/99th-percentile limit, same fraction the Python version uses), `alpha <- pmin(abs(value) / fade_threshold, 1)`, mapped via `aes(fill = value, alpha = alpha) + scale_alpha_identity(guide = "none")`. Only cells with a real, non-trivial change stay opaque; true no-data cells were already absent from the plotted data frame (terra's `as.data.frame()` drops NA by default), so the two together now make "no data" and "no meaningful change" both correctly show the gray basemap, while real change is clearly visible against it.
+
+**Verified**: regenerated and visually confirmed — country-border basemap now visible through what were previously large washed-out near-white regions (N Ret Ratio, Sed Ret Ratio, Pollination, Nature Access most affected, being globally-computed indices with many small/near-zero values). Coastal Risk panels remain mostly gray, correctly (sparse real data, not a rendering artifact — see earlier entry).
+
+**Lesson for future map scripts in this project**: any diverging color scale plotted over a basemap needs this same alpha-fade treatment, not just a `na.value` fix for genuinely-missing data — a solid `mid = "white"` color at the scale's zero point is exactly as opaque as any other mapped color and will hide a basemap just as completely. Worth checking `make_faceted_maps.R` and any other basemap+diverging-scale script for the same latent issue if picked up again.
+
+### 2026-07-29 (evening close-out)
+
+#### Native change figure: 4-row layout (Becky's suggestion) + goods/damages direction re-verified
+
+Two small follow-ups to the Phase 5.1/5.2 native-change-figure work above, same session:
+
+**Layout**: switched from 5 rows (Pollination and Nature Access each full-width with an empty spacer) to 4 rows (Pollination and Nature Access sharing the 4th row) — per Becky's own recommendation. `row_pairs` in `scripts/mapping/make_native_change_figure.R` updated; composite `ggsave` height reduced 36in -> 29in to match. **Regenerated and visually confirmed** (background run completed after session sign-off, checked before close-out): 4 rows render correctly, Pollination/Nature Access share row 4 side-by-side, no wasted space, colors/direction unchanged from the 5-row version.
+
+**Direction check, explicitly re-verified against the live pipeline config, not just cross-script consistency**: confirmed `goods`/`damages` in the new script match `analysis/hotspot_extraction.qmd`'s actual `HOTS_CFG$loss`/`HOTS_CFG$gain` (the config that drives real hotspot extraction) exactly — same 5-vs-3 split, same members (`loss` = `Nature_Access, Pollination, N_Ret_Ratio, Sed_Ret_Ratio, C_Risk_Red_Ratio` = "goods"; `gain` = `Sed_export, N_export, C_Risk` = "damages"). Worth the extra check specifically because this is the same class of bug that made `compare_exposure_serviceshed.R` (deleted earlier this session) wrong — its `loss_services`/`gain_services` were this exact list, inverted.
+
+### 2026-07-29 (later still, cont. 2)
+
+#### Phase 5.1 + 5.2: new native-10km, paired export/retention change figure
+
+New script `scripts/mapping/make_native_change_figure.R`, replacing (as a new, separate deliverable — see below) the dissolved-by-biome `map_biome_{pct,abs}.png` with a figure plotted directly off `10k_change_calc.gpkg`'s native grid, no dissolve step anywhere. Rows paired export next to retention/reduction-ratio for the 3 services that have one (Nitrogen, Sediment, Coastal), ordered nitrogen → sediment → coastal → pollination → nature access; Pollination and Nature Access (no retention analog — confirmed no such column was ever modeled for either) get single full-width-equivalent rows.
+
+**Performance**: a first-pass vector `geom_sf` render of one full 1.37M-cell panel took ~145s (98s of that in the render/save step alone) — infeasible for an 8-service, pct+abs figure (~20 min). Switched to rasterizing each column to 10km via `terra::rasterize` (same resolution `gdal_rasterize_hotspots.sh` already uses for Rich's deliverables, just done in-process via terra instead of the CLI, since `gdal_rasterize`/`ogr2ogr` aren't on this machine's PATH — terra bundles its own GDAL) and plotting with `geom_tile`. Cut per-panel cost to ~15s after a one-time ~65s load/filter/transform, confirmed visually identical to the vector version on a test panel. ~5x faster overall.
+
+**Two rounds of user feedback, both addressed**:
+1. No basemap meant sparse-data services (Coastal Risk: 80,040 of 1,522,073 cells — a narrow shoreline-only phenomenon, not a bug, same root cause already documented for the access-map split) rendered as near-blank whitespace, indistinguishable from broken. Added the same custom basemap `make_5service_overlap_maps.R` uses (`cartographic_ee_r264_correspondence.gpkg`, EPSG:8857, gray fill) under every panel.
+2. The combined composite was compressing real detail: the raster itself carries ~3406×1667 pixels of native resolution per panel, but the initial composite (12"×22"@300dpi, 2 columns) was rendering each panel well below that. Bumped the composite to 20"×36"@300dpi (overview only, still not 1:1), and added standalone per-service panel exports (`outputs/maps/native10km_panels/`) at exact native raster resolution (1 raster cell = 1 output pixel) so any single service can be zoomed into at full detail.
+
+**User question, confirmed correct**: whether the "sign flip from averaging heterogeneous cells" failure mode (distinct from the Mongolia geographic-bleed artifact, though same root cause) could occur in this new figure. Confirmed no: the old biome/region/income/country maps compute a **mean value per polygon** before dissolving (`generate_map_gpkgs.py` reads `mean_val`/`sym_pct_change` from `{grp}_map_data.csv`), which can sign-flip if a group's few large increases outweigh many small decreases. The native10km figure has no aggregation step anywhere — each pixel is one grid cell's own value; `terra::rasterize()`'s default polygon behavior is "last write wins" (pick one), not "average," so no cross-cell blending occurs at any point in this pipeline.
+
+**Deliberately not wired into paper_draft.qmd or the book chapters** — new output filenames (`map_native10km_{pct,abs}.png`), not a silent overwrite of `map_biome_{pct,abs}.png`, so the old biome-dissolved map (and its "WWF Biome" captions) stay valid and unchanged until the paper/book are ready to switch — per the standing instruction to leave the paper alone until this redesign settles. Swapping the reference is a pending paper edit, added to the existing tracked list.
+
+**Files added**: `scripts/mapping/make_native_change_figure.R`. **Outputs**: `outputs/maps/map_native10km_{pct,abs}.png`, `outputs/maps/native10km_panels/*.png` (16 files, one per service × metric).
+
+### 2026-07-29 (later still, cont.)
+
+#### Removed dead `compare_exposure_serviceshed.R`; generalized the live multiplier-effect scripts to auto-discover new beneficiary categories (prep for Rich's water/access rerun)
+
+While waiting on Rich's beneficiary rerun, started preparing the pipeline to absorb his upcoming water-hotspot/access-hotspot beneficiary folders (Phase 3) without needing another code edit when they land.
+
+**Found `analysis/compare_exposure_serviceshed.R` is dead code, not a fast-follow candidate.** It reads a per-folder CSV (`list.files(folder, pattern = "\\.csv$")`) that hasn't existed since `Python_scripts/extraction_script.py` replaced that layout — the 4 `hotspot_beneficiaries/` folders now contain only Rich's raw `.tif` rasters, zonal-stats'd by `extraction_script.py` into one compiled file, `outputs/tables/exposure_comparison_compiled.csv`. That compiled file is what `analysis/plot_multiplier_effect.R` (the real, live Figure 9 generator, already carrying the 2026-07-28 Global-row fix) actually reads. `compare_exposure_serviceshed.R`'s own output (`exposure_comparison.csv`, no `_compiled`) is referenced nowhere else in the repo, and git history shows only the single commit that introduced it. Also confirmed, in passing: the plan doc's previously-flagged inverted `loss_services`/`gain_services` bug in this file is real (both the damage-service trio and the retention-ratio trio were assigned to the wrong extraction branch, backwards relative to the canonical goods/damages direction used everywhere else) but moot, since the code path never actually executes against current data. **Deleted** (`git rm`), per user confirmation after checking for references.
+
+**Generalized the two scripts that are actually live:**
+- `Python_scripts/extraction_script.py`: `subfolders` was a hardcoded list of the 4 known folder names. Changed to auto-discover (`sorted(p.name for p in base_dir.iterdir() if p.is_dir())`) — confirmed byte-for-byte equivalent to the old hardcoded list against current data. New folders Rich drops in (water hotspot, access hotspot) will be picked up automatically on the next run, no code change needed.
+- `analysis/plot_multiplier_effect.R`'s compound (global) dumbbell section: replaced the hardcoded `overlap_mapping`/`Label` `case_when()` (both assumed exactly the 4 nested "N or more services" tiers) with a `category_defs` list mapping each `overlap_category` to a label, a source gpkg (`8service` = existing `hotspots_global_pct.gpkg`/`hotspot_count`, `5service` = `hotspots_global_5service_pct.gpkg`/`count_water`/`count_access`/`combined_cross`), and a threshold. The loop now iterates over whatever categories are actually present in `exposure_comparison_compiled.csv`; a category with no matching `category_defs` entry is skipped with a message rather than guessed at or silently dropped. Pre-populated `category_defs` with entries for `"water hotspot"`, `"access hotspot"`, and `"combined hotspot"` using the 5-service gpkg's `count_water`/`count_access`/`combined_cross` columns — exact folder-name strings are a guess pending Rich's actual naming, so these may need a one-line key rename once his folders arrive, but the rest of the logic needs no further changes.
+
+**Regression-verified**: reran `plot_multiplier_effect.R` end-to-end after the refactor — `git diff --stat outputs/` showed **zero byte differences** across every regenerated PNG and CSV (including `downstream_exposure_dumbbell_compound.png`, i.e. Figure 9 itself), confirming the generalization is a clean no-op for the 4 categories that exist today.
+
+**Files changed**: `Python_scripts/extraction_script.py`, `analysis/plot_multiplier_effect.R`. **Removed**: `analysis/compare_exposure_serviceshed.R`.
+
 ### 2026-07-29 (later still)
 
 #### Phase 5.3: mangrove/biome row-offset check — ruled out, not a bug

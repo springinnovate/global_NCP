@@ -5,6 +5,26 @@ date: "2026-07-28"
 branch: "feature/hotspot-5service-redesign"
 ---
 
+## ⚠️ NEXT SESSION — READ THIS FIRST
+
+1. **Monthly progress report — do this FIRST, before anything else.** No other task, question,
+   or "quick check" should start before this is done. (Details/location of the report weren't
+   specified in this session — first step tomorrow is locating it.)
+2. ~~Verify the native-change-figure regeneration~~ — done: confirmed after session sign-off,
+   4-row layout renders correctly (see WORKLOG "2026-07-29 (evening close-out)"). Nothing to
+   check here tomorrow.
+3. Then reach out to Becky with today's progress (she's on vacation, said to reach out when
+   necessary; this is a progress update, not a question needing her sign-off): the 5-service
+   overlap maps + summary stats (already sent), the Figure 9 bug fix, the Phase 5.3 mangrove/biome
+   check (ruled out), and the new native-10km paired change figure. Slack draft for the
+   color-scheme explanation is already written (see chat history / can be re-derived from the
+   "orange/teal" reasoning in Phase 5.2 below) — still needs the fuller progress summary wrapped
+   around it.
+4. Everything else in this doc (subregional reruns, housekeeping items, waiting on Rich) resumes
+   after 1-3, not before.
+
+---
+
 ## Why this exists
 
 Becky and Steve met last week (Jerónimo not present, Steve's first time weighing in) and raised
@@ -50,9 +70,45 @@ failure pattern as the historical `seq_len()` bugs. Both known artifacts in the 
 change maps (this one and the Mongolia one) now trace to biome-level aggregation itself, not a
 join/ID bug — see WORKLOG (2026-07-29, "Phase 5.3" entry) for full detail.
 
-**Not started yet**: Phase 5.1/5.2 (figure restructuring), subregional (income/region/biome/
-country) hotspot reruns, Rich's beneficiary rerun (blocked on his reply), the KS/Gini analysis
-(blocked on Rich), and both housekeeping items (grid file naming, script consolidation).
+**Update (2026-07-29, later still, cont.)**: while waiting on Rich, did prep work so his water-
+hotspot/access-hotspot beneficiary folders can be absorbed without another code edit. Found
+`analysis/compare_exposure_serviceshed.R` was dead code (read a per-folder CSV layout that
+`Python_scripts/extraction_script.py` replaced months ago; its own output was referenced nowhere
+else in the repo) and removed it — a small piece of housekeeping item 3 done early. Generalized
+the two scripts that are actually live: `extraction_script.py` now auto-discovers
+`hotspot_beneficiaries/` subfolders instead of a hardcoded 4-item list, and
+`plot_multiplier_effect.R`'s compound dumbbell section now drives its category handling off a
+`category_defs` table (pre-populated with water/access/combined entries pointing at the 5-service
+gpkg) instead of a hardcoded `case_when()`. Regression-verified: reran the script, zero byte
+differences in any output vs. before the change. Full detail in WORKLOG (2026-07-29, "Removed
+dead compare_exposure_serviceshed.R" entry).
+
+**Update (2026-07-29, later still, cont. 2)**: Phase 5.1 + 5.2 are done. New script
+`scripts/mapping/make_native_change_figure.R` plots `10k_change_calc.gpkg`'s native grid directly
+(no dissolve step -- eliminates the Mongolia-class artifact and, separately, the mean-value
+sign-flip risk that dissolved maps carry) in paired export/retention rows (nitrogen -> sediment ->
+coastal -> pollination -> nature access). Rasterized via `terra` for ~5x the speed of a direct
+vector render; basemap added so sparse-data services (Coastal Risk) don't look broken; standalone
+per-service panels saved at native pixel resolution for zooming. Output filenames are new
+(`map_native10km_*.png`), not a silent overwrite -- `map_biome_*.png` and its "WWF Biome" captions
+are untouched. Full detail in WORKLOG (2026-07-29, "Phase 5.1 + 5.2" entry).
+
+**Update (2026-07-29, evening close-out)**: native change figure switched to a 4-row layout
+(Pollination + Nature Access sharing a row, per Becky's suggestion) instead of 5; goods/damages
+color direction re-verified against the live `HOTS_CFG$loss`/`HOTS_CFG$gain` in
+`hotspot_extraction.qmd` (not just cross-script consistency). Regeneration completed and was
+visually confirmed correct after session sign-off. See WORKLOG.
+
+**Update (2026-07-29, evening close-out, cont.)**: fixed a recurrence of a previously-solved
+problem — opaque near-white fill at near-zero values was hiding the basemap in several panels
+(N Ret Ratio, Sed Ret Ratio, Pollination, Nature Access worst affected). Same fade-to-transparent
+fix already used in `make_paper_supplement_maps.py`, ported to this script. Regenerated and
+visually confirmed. **Phase 5.1/5.2 fully done, nothing outstanding on this figure.** Flagged in
+WORKLOG as a pattern to check for in any other basemap+diverging-scale script.
+
+**Not started yet**: subregional (income/region/biome/country) hotspot reruns, Rich's beneficiary
+rerun (blocked on his reply), the KS/Gini analysis (blocked on Rich), and the rest of both
+housekeeping items (grid file naming, remaining script consolidation).
 
 **In progress**: Phase 1 (5-service extraction, global scope) — done via a new standalone script,
 `scripts/extract_hotspots_5service.R`. Produced `data/processed/hotspots_5service/{pct,abs}/
@@ -93,6 +149,11 @@ Becky has weighed in on the open structural questions. Do these as one batch onc
    Risk) undersells its own best signal — worth a sentence noting Access+Pollination is the real,
    broad terrestrial story (12,106 cells) while Access+Coastal Risk is a genuine but narrow
    shoreline phenomenon (967 cells), rather than presenting them as one blended category.
+6. **Swap the main change figure reference from `map_biome_{pct,abs}.png` to
+   `map_native10km_{pct,abs}.png`** in `paper_draft.qmd` (lines ~226/228) and
+   `03-global-patterns-WHAT.qmd` (lines ~37/39) once ready — new figure is built and verified
+   (Phase 5.1/5.2, 2026-07-29), captions will need updating too since "WWF Biome" no longer
+   describes the new figure's content.
 
 ---
 
@@ -141,7 +202,10 @@ Becky has weighed in on the open structural questions. Do these as one batch onc
    notebook or kept as a permanent, well-documented script; and (b) delete anything that was
    truly one-off/diagnostic and has served its purpose. Don't let the repo accumulate an
    ever-growing pile of similarly-named scratch scripts — that's the same class of problem as
-   item 1 above, just for code instead of data files.
+   item 1 above, just for code instead of data files. **Partial progress (2026-07-29):**
+   `analysis/compare_exposure_serviceshed.R` identified as dead (superseded by
+   `extraction_script.py` + `plot_multiplier_effect.R`, referenced nowhere else) and removed —
+   see WORKLOG. Rest of the pass still open.
 
 ---
 
@@ -311,7 +375,8 @@ beneficiary masks instead of the old hotspot_count.
 
 ## Phase 5 — Figure/map changes (can run in parallel with Phases 1-2)
 
-1. **Replace biome-level change maps with 10km-native change maps.** Reason given: biome
+1. **Replace biome-level change maps with 10km-native change maps — DONE (2026-07-29).** See
+   `scripts/mapping/make_native_change_figure.R` and WORKLOG. Reason given: biome
    aggregation misrepresents fine-scale results (e.g., Coastal Risk appearing to affect
    Mongolia). **Gap resolved (2026-07-29): the missing generator script is
    `zonal_stats_toolkit/generate_map_gpkgs.py`** (the sibling repo at `/c/projects/
@@ -323,7 +388,7 @@ beneficiary masks instead of the old hotspot_count.
    signal that belongs to a different desert on another continent. This is exactly the
    representational limitation 10km-native maps are meant to fix — not something to debug
    further, just confirms the redesign direction is right.
-2. **Main change figure restructured**: paired rows, export next to retention for each service
+2. **Main change figure restructured — DONE (2026-07-29), same script as item 1.** Paired rows, export next to retention for each service
    (e.g., N export | N retention), red = increases in bad things / green = enhancement, ordered
    nitrogen → sediment → coastal → pollination → nature access. Note: this figure still shows
    retention for context even though retention is dropped from the *hotspot definition* — two
@@ -364,8 +429,8 @@ beneficiary masks instead of the old hotspot_count.
 3. Phase 1: 5-service hotspot re-extraction + 3 new overlap categories.
 4. Phase 2: regenerate maps (highest time-pressure item — Rich is blocked on this).
 5. ~~Phase 5.3: biome/mangrove row-offset check~~ — done, 2026-07-29, ruled out (not a bug).
-6. Phase 5.1/5.2: 10km-native change maps + restructured export/retention figure (can run in
-   parallel, lower urgency than Phase 2).
+6. ~~Phase 5.1/5.2: 10km-native change maps + restructured export/retention figure~~ — done,
+   2026-07-29.
 7. Send Rich the water/access rasters; he writes the 2 new beneficiary configs and reruns.
 8. Phase 4: Gini/HDI KS test on the new beneficiary masks (blocked on step 7).
 

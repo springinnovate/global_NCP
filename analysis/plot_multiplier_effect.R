@@ -150,35 +150,77 @@ for (grp_col in groupings) {
 # 6. Compound Risk Dumbbell Plot (Global Aggregated)
 message("Generating Compound Risk (Aggregated) Dumbbell Plot...")
 
-overlap_mapping <- list(
-  "all hotspots" = 1,
-  "2 or more overlapping" = 2,
-  "3 or more overlapping" = 3,
-  "4 or more overlapping" = 4
+# Load the 5-service hotspot gpkg alongside the 8-service one already loaded
+# above, so water/access/combined-cross categories have a local-population
+# source to draw from once Rich delivers those beneficiary folders.
+gpkg_5service_path <- here("data", "processed", "hotspots_5service", "pct", "global", "hotspots_global_5service_pct.gpkg")
+hotspots_5service_df <- if (file.exists(gpkg_5service_path)) {
+  st_read(gpkg_5service_path, quiet = TRUE) %>%
+    st_drop_geometry() %>%
+    mutate(fid = as.character(grid_fid))
+} else {
+  message("  -> 5-service hotspot gpkg not found (", gpkg_5service_path, "); water/access/combined categories will be skipped if present.")
+  NULL
+}
+
+# Local (in-situ) population definition for each overlap_category this
+# script knows how to handle -- which source gpkg's identity space to use,
+# which column qualifies a cell, and the display label. `overlap_category`
+# values come from whatever folders extraction_script.py discovered under
+# hotspot_beneficiaries/ (see exposure_comparison_compiled.csv); a category
+# present in that data without a matching entry here is skipped with a
+# message rather than guessed at, so adding a new beneficiary category (e.g.
+# Rich's forthcoming water-hotspot/access-hotspot folders) is a one-line
+# addition to this list, not a rewrite of the logic below.
+category_defs <- list(
+  "all hotspots"          = list(label = ">= 1 Service",           source = "8service", col = "hotspot_count",  min_val = 1),
+  "2 or more overlapping" = list(label = ">= 2 Services",          source = "8service", col = "hotspot_count",  min_val = 2),
+  "3 or more overlapping" = list(label = ">= 3 Services",          source = "8service", col = "hotspot_count",  min_val = 3),
+  "4 or more overlapping" = list(label = ">= 4 Services",          source = "8service", col = "hotspot_count",  min_val = 4),
+  "water hotspot"         = list(label = "Water Hotspot",          source = "5service", col = "count_water",    min_val = 1),
+  "access hotspot"        = list(label = "Access Hotspot",         source = "5service", col = "count_access",   min_val = 1),
+  "combined hotspot"      = list(label = "Combined Cross-Category", source = "5service", col = "combined_cross", min_val = 1)
 )
 
-compound_local <- lapply(names(overlap_mapping), function(cat_name) {
-  threshold <- overlap_mapping[[cat_name]]
-  
-  if (gpkg_valid && "hotspot_count" %in% names(hotspots_df)) {
-    valid_fids <- hotspots_df %>% 
-      filter(hotspot_count >= threshold) %>% 
-      pull(fid) %>% unique() %>% as.character()
-  } else {
-    if (exists("counts")) {
-      valid_fids <- grid_sf$fid[counts >= threshold & !is.na(counts)] %>% as.character()
+overlap_categories_present <- unique(df$overlap_category)
+overlap_categories_present <- overlap_categories_present[overlap_categories_present != "Global"]
+
+compound_local <- lapply(overlap_categories_present, function(cat_name) {
+  defn <- category_defs[[cat_name]]
+  if (is.null(defn)) {
+    message("  -> No local-population definition for overlap_category '", cat_name, "'; skipping (add an entry to category_defs to include it).")
+    return(NULL)
+  }
+
+  if (defn$source == "8service") {
+    if (gpkg_valid && defn$col %in% names(hotspots_df)) {
+      valid_fids <- hotspots_df %>%
+        filter(.data[[defn$col]] >= defn$min_val) %>%
+        pull(fid) %>% unique() %>% as.character()
+    } else if (exists("counts")) {
+      valid_fids <- grid_sf$fid[counts >= defn$min_val & !is.na(counts)] %>% as.character()
     } else {
       valid_fids <- character(0)
     }
+  } else if (defn$source == "5service") {
+    if (is.null(hotspots_5service_df) || !defn$col %in% names(hotspots_5service_df)) {
+      message("  -> 5-service column '", defn$col, "' unavailable; skipping '", cat_name, "'.")
+      return(NULL)
+    }
+    valid_fids <- hotspots_5service_df %>%
+      filter(as.numeric(.data[[defn$col]]) >= defn$min_val) %>%
+      pull(fid) %>% unique()
+  } else {
+    return(NULL)
   }
-  
+
   local_pop <- grid_df %>%
     filter(fid %in% valid_fids) %>%
     pull(.data[[pop_var]]) %>%
     sum(na.rm = TRUE)
-    
-  tibble(overlap_category = cat_name, `Local Residents` = local_pop)
-}) %>% bind_rows()
+
+  tibble(overlap_category = cat_name, Label = defn$label, `Local Residents` = local_pop)
+}) %>% compact() %>% bind_rows()
 
 ## BUG FIX (2026-07-28): exposure_comparison_compiled.csv carries a
 ## synthesized `country == "Global"` row per overlap_category/exposure_type
@@ -200,17 +242,14 @@ compound_connected <- df %>%
   group_by(overlap_category) %>%
   summarise(`Connected Beneficiaries` = sum(population, na.rm = TRUE), .groups = "drop")
   
+# Label already assigned per-category above (defn$label); order the factor
+# levels by category_defs' own insertion order (nested tiers first, then
+# water/access/combined) rather than a separate hardcoded level vector, so a
+# newly-added category_defs entry is ordered sensibly without a second edit.
+label_order <- vapply(category_defs, function(d) d$label, character(1))
 compound_plot_data <- compound_local %>%
   left_join(compound_connected, by = "overlap_category") %>%
-  mutate(
-    Label = case_when(
-      overlap_category == "all hotspots" ~ ">= 1 Service",
-      overlap_category == "2 or more overlapping" ~ ">= 2 Services",
-      overlap_category == "3 or more overlapping" ~ ">= 3 Services",
-      overlap_category == "4 or more overlapping" ~ ">= 4 Services"
-    ),
-    Label = factor(Label, levels = c(">= 1 Service", ">= 2 Services", ">= 3 Services", ">= 4 Services"))
-  )
+  mutate(Label = factor(Label, levels = intersect(label_order, Label)))
   
 p_compound <- ggplot(compound_plot_data) +
   geom_segment(
