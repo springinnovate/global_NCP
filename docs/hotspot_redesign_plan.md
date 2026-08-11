@@ -7,21 +7,32 @@ branch: "feature/hotspot-5service-redesign"
 
 ## ⚠️ NEXT SESSION — READ THIS FIRST
 
-1. **Monthly progress report — do this FIRST, before anything else.** No other task, question,
-   or "quick check" should start before this is done. (Details/location of the report weren't
-   specified in this session — first step tomorrow is locating it.)
+1. ~~Monthly progress report~~ — drafted (6-column format: successes, upcoming priorities,
+   challenges/opportunities, publications, speaking engagements, excited-about). Covers this
+   month's work across three threads: the Global NCP hotspot redesign, SWY literature review, and
+   the IADB-WWF workshop series. **Not confirmed whether the user has copied the final version
+   into the actual report/spreadsheet yet** — check before assuming this is fully closed out.
 2. ~~Verify the native-change-figure regeneration~~ — done: confirmed after session sign-off,
    4-row layout renders correctly (see WORKLOG "2026-07-29 (evening close-out)"). Nothing to
-   check here tomorrow.
-3. Then reach out to Becky with today's progress (she's on vacation, said to reach out when
-   necessary; this is a progress update, not a question needing her sign-off): the 5-service
-   overlap maps + summary stats (already sent), the Figure 9 bug fix, the Phase 5.3 mangrove/biome
-   check (ruled out), and the new native-10km paired change figure. Slack draft for the
-   color-scheme explanation is already written (see chat history / can be re-derived from the
-   "orange/teal" reasoning in Phase 5.2 below) — still needs the fuller progress summary wrapped
-   around it.
-4. Everything else in this doc (subregional reruns, housekeeping items, waiting on Rich) resumes
-   after 1-3, not before.
+   check here.
+3. ~~Reach out to Becky with today's progress~~ — **done**: user sent the native-10km map outputs
+   to Becky (`outputs/maps/map_native10km_{pct,abs}.png`, plus the individual per-service panel
+   files in `outputs/maps/native10km_panels/`). Not confirmed whether the fuller written progress
+   summary (5-service maps recap, Figure 9 fix, Phase 5.3 ruled out) or the orange/teal
+   color-scheme explanation accompanied the maps or still needs to follow separately — check with
+   the user if it matters, but this is no longer a blocking item either way.
+4. ~~Subregional (income/region/biome/country) hotspot reruns~~ — **partially done, 2026-07-30**:
+   area/coverage/share + multi-service hotness stats rerun on the corrected 5-service definition
+   (`hotspot_area_stats.csv`, `hotspot_multiservice_stats.csv`, all 219 regional-subset CSVs
+   regenerated). Population exposure (HDI/GDP/Gini) deliberately skipped this round — same
+   heaviest-chunk deferral as before, and conceptually distinct from Rich's pending buffered-
+   beneficiary rerun. Along the way, fixed a real syntax bug (stray `<` in `HOTS_CFG`, never
+   caught because the chunk had been `eval: false` since June) and the notebook's stale 8-service
+   config. The summed `n_total` denominator (1,302,099) initially looked like it might be the same
+   stale figure flagged below in "pending major paper edits" item #1 — traced fully same-day and
+   confirmed legitimate, a different (and correct) denominator for a different question than the
+   1,372,621 global-coverage figure; see WORKLOG (2026-07-30) follow-up entry. Not a blocker.
+   Remaining: housekeeping items, waiting on Rich.
 
 ---
 
@@ -106,9 +117,18 @@ fix already used in `make_paper_supplement_maps.py`, ported to this script. Rege
 visually confirmed. **Phase 5.1/5.2 fully done, nothing outstanding on this figure.** Flagged in
 WORKLOG as a pattern to check for in any other basemap+diverging-scale script.
 
-**Not started yet**: subregional (income/region/biome/country) hotspot reruns, Rich's beneficiary
-rerun (blocked on his reply), the KS/Gini analysis (blocked on Rich), and the rest of both
-housekeeping items (grid file naming, remaining script consolidation).
+**Update (2026-07-30)**: Subregional (income/region/biome/country) hotspot reruns — **area/hotness
+part done**, population-exposure part deliberately deferred again. See "NEXT SESSION" block above
+and WORKLOG (2026-07-30) for the syntax bug + stale config found and fixed along the way. The
+1,302,099-vs-1,372,621 denominator question (below, item #1) was resolved same-day — both numbers
+are legitimate, for different purposes; not a live bug.
+
+**Update (2026-08-06)**: Rich's beneficiary rerun (Phase 3) is done, data in hand and verified
+(pct metric confirmed throughout). Phase 4 (Gini/HDI/GDP disproportionality test) is now
+unblocked and is the next real piece of work — see Phase 4 section below for the plan.
+
+**Not started yet**: subregional population exposure (HDI/GDP/Gini), Phase 4 (Gini/HDI/GDP test
+on beneficiary masks — unblocked, not started), grid file naming housekeeping item.
 
 **In progress**: Phase 1 (5-service extraction, global scope) — done via a new standalone script,
 `scripts/extract_hotspots_5service.R`. Produced `data/processed/hotspots_5service/{pct,abs}/
@@ -139,10 +159,27 @@ Becky has weighed in on the open structural questions. Do these as one batch onc
    Antarctica/Seven Seas/Lakes/Rock & Ice exclusion used throughout this analysis. Needs a proper
    recompute of the paper's hotspot-coverage percentage once the final (5-service) hotspot count
    is in hand — full detail in WORKLOG (2026-07-29 entry).
+   **Confirmed still live (2026-08-05, while drafting the AGU abstract)**: `paper_draft.qmd` line
+   231 still states "252,215 unique cells... (19.37% of evaluated cells)". Correct figure using
+   the verified 1,372,621 denominator: **252,215 / 1,372,621 = 18.37%** (18.4% used in the AGU
+   abstract, `docs/manuscript/agu_abstract_2026.md`). Not fixed in the paper draft itself yet —
+   still deliberately deferred per this item's original plan (recompute once the 5-service count
+   is final, since the percentage changes again under that definition), but now has the precise
+   corrected number on record so it doesn't need re-deriving next time.
 2. **LC-change/attribution section removal from the paper** — pending Becky's confirmation (message
    sent, not yet answered). Book keeps this content regardless.
-3. **5-service methodology section** — staged, not inserted: `docs/paper_5service_methodology_staging.md`
-   has candidate paragraphs ready to drop in once numbers are final and Becky's confirmed framing.
+3. **5-service methodology section — approach changed (2026-08-06).** Instead of staying staged in
+   `docs/paper_5service_methodology_staging.md` (which the user found awkward — content that never
+   actually gets used), forked a real second paper draft: `docs/manuscript/paper_draft_5service.qmd`,
+   a full copy of `paper_draft.qmd` with a status callout marking it in-progress. Original
+   `paper_draft.qmd` is untouched — matches what's safe in the pre-redesign branch. Abstract
+   already rewritten with real, verified 5-service numbers (hotspot count/land share, water/access/
+   combined-cross breakdown, beneficiary exposure, regional/income disparity — see WORKLOG
+   2026-08-06), explicitly flagging LC-conversion attribution and Phase 4 as not yet rerun under
+   this definition rather than reusing stale 8-service numbers. Body chapters still copied
+   unmodified from the 8-service original — need a full pass once Phase 4 lands and Becky confirms
+   the open structural questions. The staging doc can be retired once this file is the actual
+   working draft.
 4. **`audit_claims.R` full rerun** — every hotspot-count-derived number in the paper needs
    re-verifying once the 5-service definition is finalized (see reconciliation table below).
 5. **Access map insight for the paper/book text**: the 3-way access map (Access+Pollination+Coastal
@@ -154,10 +191,35 @@ Becky has weighed in on the open structural questions. Do these as one batch onc
    `03-global-patterns-WHAT.qmd` (lines ~37/39) once ready — new figure is built and verified
    (Phase 5.1/5.2, 2026-07-29), captions will need updating too since "WWF Biome" no longer
    describes the new figure's content.
+7. **GDP and Gini gridded-data citations are unresolved, not just unstated — new item (2026-08-05).**
+   `02-methods.qmd` line 66 has a confirmed HDI citation (Sherman et al. 2026) and population is
+   well-established (GHS-POP), but GDP is marked "citation TBD — verify source" (`01-problem.qmd`
+   line 126, candidate: Kummu et al. 2018, not confirmed) and Gini has no citation at all yet
+   (`02-methods.qmd` line 68: "citation — to verify: source of `rast_adm1_gini_disp_2020`").
+   Per the user: this isn't a principled omission, the data was obtained from somewhere at the
+   time and the source was never tracked back down since — needs an actual research pass to
+   confirm/cite both before the paper can go out, not just a wording fix. Not blocking the AGU
+   abstract (abstract-level detail doesn't need full source citations, unlike a full paper under
+   peer review), but a real gap in `paper_draft.qmd`'s reference list and the two methods chapters
+   above.
 
 ---
 
-## Three housekeeping items to close out before this redesign is considered "done" (not blocking tonight's Rich handoff, but don't let them get lost)
+## Five housekeeping items to close out before this redesign is considered "done" (not blocking tonight's Rich handoff, but don't let them get lost)
+
+0. **R-package hygiene (NAMESPACE/`.Rd` drift) — new item (2026-08-03), explicitly low priority.**
+   `devtools::document()` hasn't been run in months; `NAMESPACE` now has real entries for functions
+   that no longer exist in `R/` source (`identify_hotspots`, `make_hotspots`, `align_rasters`, plus
+   some non-function garbage like `export("(simple,")`, likely a mangled roxygen comment
+   somewhere) — visible as an "Objects listed as exports, but not present in namespace" warning on
+   every `devtools::load_all()` call. Traced during the combos-documentation work (item 2 below);
+   deliberately **not** fixed then, since running `document()` cleanly would delete ~19 unrelated
+   `.Rd` files and rewrite `NAMESPACE` well beyond that task's scope — see WORKLOG (2026-08-03).
+   Root cause per the user: this repo was originally scaffolded as an R package, but has grown far
+   beyond that shape; full package hygiene isn't a current priority and a proper package
+   restructure is a possible future project, not now. Not blocking anything — `devtools::load_all()`
+   sources everything directly regardless of `NAMESPACE` state, which is why this has been silently
+   fine for months. Fix whenever it becomes actually annoying, not before.
 
 1. **Grid file naming/consolidation.** This repo has several similarly-named, undocumented
    grid-like gpkgs (`landgrid_1_clean_enriched_4326.gpkg` — no ID column — `10k_change_calc.gpkg`,
@@ -171,27 +233,21 @@ Becky has weighed in on the open structural questions. Do these as one batch onc
    (renaming under time pressure risks breaking references across dozens of scripts) — flagged
    so it doesn't quietly disappear.
 
-2. **Document the `combos` mechanism as a first-class, user-facing capability — new item (2026-07-29).**
-   Tonight's work (water/access/combined-cross, then the two pairwise refinements) was only
-   possible because `10k_change_calc.gpkg`'s identity is now solid — that's the actual payoff of
-   getting the grid-ID foundation right. But right now, "how to build a custom service grouping"
-   only exists as tribal knowledge from this session, not as documentation a future user (without
-   this conversation) could follow. Needs, as one deliverable:
-   - **A written how-to** (candidate location: `docs/methodology.md` or a new
-     `docs/hotspot_service_grouping.md`): what `HOTS_CFG$combos` is, how a named list of service
-     vectors becomes a `count_<name>` column automatically, and — the part that ISN'T automatic —
-     how to derive an AND/cross-category combo (like `combined_cross`) that the native mechanism
-     doesn't support natively. Use tonight's water/access/combined example as the worked
-     illustration.
-   - **An explicit, reusable tool, not just prose**: right now, deriving a cross-category column
-     is a hand-written `mutate(new_col = count_A > 0 & count_B > 0)` line specific to each case
-     (see `scripts/extract_hotspots_5service.R`). Worth turning into a small, documented helper
-     function (e.g., in `R/get_hotspots.R` alongside `extract_hotspots()`) that takes two (or
-     more) combo names and returns the AND column, so a future user calls a function instead of
-     re-deriving the pattern from scratch.
-   - **This should be scoped together with housekeeping item 1 above (the config-duplication
-     consolidation)** — a clean, documented combos tool is undermined if a new user still has to
-     know to update 7 separate files to add a new service grouping. Do both in the same pass.
+2. **Document the `combos` mechanism as a first-class, user-facing capability — DONE (2026-08-03).**
+   - **Written how-to**: added to `docs/methodology.md`, new "Multi-Service Overlap Combos" subsection
+     under "Change Metrics & Hotspot Definition" — what `HOTS_CFG$combos` is, how a named list of
+     service vectors becomes a `count_<name>` column automatically, and the water/access worked
+     example from the 5-service redesign.
+   - **Reusable helper, not just prose**: added `derive_cross_combo()` to `R/get_hotspots.R` —
+     takes two (or more) combo names and returns the AND-derived column, replacing the hand-written
+     `mutate(new_col = count_A > 0 & count_B > 0)` pattern in `scripts/extract_hotspots_5service.R`.
+     Smoke-tested against a toy data frame, confirmed correct. Exported via `NAMESPACE` (added by
+     hand, not via a full `devtools::document()` — see WORKLOG for why), `man/derive_cross_combo.Rd`
+     generated properly.
+   - **Deliberately NOT bundled with the 7-file service-config consolidation** mentioned in this
+     item's original scope — that's a separate, larger, riskier task (touches config in 7 files at
+     once, the same failure class as past grid-ID incidents) and wasn't part of what was picked up
+     this session. Still open, on its own.
 
 3. **Script consolidation/cleanup.** This session (and the sessions before it) have accumulated
    standalone diagnostic/one-off scripts (`scripts/extract_hotspots_5service.R`,
@@ -205,7 +261,49 @@ Becky has weighed in on the open structural questions. Do these as one batch onc
    item 1 above, just for code instead of data files. **Partial progress (2026-07-29):**
    `analysis/compare_exposure_serviceshed.R` identified as dead (superseded by
    `extraction_script.py` + `plot_multiplier_effect.R`, referenced nowhere else) and removed —
-   see WORKLOG. Rest of the pass still open.
+   see WORKLOG. **Done (2026-07-30):** audited every remaining standalone script — none turned
+   out to be genuinely dead/one-off (the `check_*.R` scripts mentioned above no longer exist in
+   the repo); this was actually a documentation gap, not a deletion job. Added ~12 missing
+   entries to `scripts/README.md`, fixed a stale entry (`audit_claims.R`/`export_reclass_table.R`
+   wrongly listed as archived when both are active), and removed one unrelated stray file
+   (`Python_scripts/photo_processing.py`, a real-estate photo resizer with no connection to this
+   project). See WORKLOG (2026-07-30, "Housekeeping item 3"). **This item is now closed.**
+
+4. **`data/` vs `outputs/` split is undocumented and arbitrary — new item (2026-08-05), not started,
+   scoped down after discussion same day (see below).**
+   Two parallel "tables" directories exist with no written rule for which analysis outputs go in
+   which: `data/processed/tables/` (gitignored, 11 entries — `hotspot_area_stats.csv`,
+   `ks_results_hot_vs_non.csv`, `lcc_*` summaries, the 219-file `regional_subsets/`, plus a
+   `_deprecated/` folder — evidence this exact staleness problem already happened once and was
+   hand-managed rather than fixed) and `outputs/tables/` (git-tracked, 11 entries — `multiplier_summary_*`,
+   `exposure_comparison*`, `lcc_reclassification_table.csv`, and the new `hotspot_5service_category_shares_*`
+   files from 2026-08-05). The only real distinction findable is that `data/` is entirely gitignored
+   and `outputs/` is git-tracked (`.gitignore` line 43) — but that's never written down as the actual
+   rule anywhere, so every script picks a location by feel, not convention. Same root cause as
+   housekeeping items 1 and 3 (undocumented parallel structures inviting silent drift), just for
+   directory layout instead of grid files or scripts.
+
+   **Scoping discussion (2026-08-05):** first instinct was "move all the tables to the tracked
+   folder since they're small" — checked, and they are small (`data/processed/tables/` is 1.4MB
+   total including all 219 `regional_subsets/` files; `outputs/tables/` is also 1.4MB) so size was
+   never actually the constraint. But a bulk move isn't the right fix anyway — the real concern,
+   per the user, is **consistency, traceability, and avoiding duplicate/stale versions of the same
+   thing**, not git-tracking everything. A blanket move would also add real risk: **16 files
+   reference `data/processed/tables/` paths**, including several actual manuscript chapters
+   (`docs/manuscript/chapters/04-hotspot-WHERE.qmd`, `06-hotspot-WHO.qmd`, `07-regional-profiles.qmd`)
+   — not something to rename casually.
+
+   **Revised plan**: keep the existing two-tier split (it's already roughly right) but (a) write
+   it down explicitly in `docs/methodology.md`'s "Output Directory Structure" section — `data/` =
+   pipeline-stage/regenerable intermediate outputs (high file-churn per rerun, e.g. the 219
+   `regional_subsets/` files, not worth git-tracking), `outputs/` = curated/final/citable
+   deliverables meant for the paper/stakeholders — and (b) do a reconciliation pass checking for
+   actual near-duplicate concepts living in both places under different names. One concrete
+   candidate found while comparing the two folders, **not yet verified**:
+   `data/processed/tables/hotspot_pop_exposure.csv` vs `outputs/tables/regional_pop_exposure.csv` —
+   similar enough names that it's not obvious without reading both generating scripts whether
+   these are genuinely different analyses or a near-duplicate under two names.
+   Deliberately not started — flagged per the user so it doesn't get lost, same as items 0-1.
 
 ---
 
@@ -361,15 +459,47 @@ a form his pipeline can point a config at.
 **Output Becky wants once Rich reruns**: a table of beneficiary counts by overlap level, plus
 downstream/access/combined beneficiary masks.
 
+**Phase 3 is DONE (2026-08-06).** Rich returned all 7 categories (water, access, combined-cross,
+and 5 nested hotspot-count tiers) — see `data/processed/hotspots_5service/rasters_5_var/` and his
+actual configs in `data/jeronimo_2026_07_beneficiaries_analysis_configs/`. Which metric (pct/abs)
+he used was initially unclear (both were sent to him in the same folder, undifferentiated — see
+WORKLOG 2026-08-05) but is now confirmed: **every config uses the `pct` metric**, verified
+directly against all 7 YAML files, not just his chat summary. Buffer logic also verified correct
+against Becky's original spec. Area-percentage and population-exposure numbers already computed —
+see WORKLOG (2026-08-05, "Becky's follow-up questions") and
+`outputs/tables/hotspot_5service_beneficiary_area_pct.csv`.
+
 ---
 
 ## Phase 4 — Gini/HDI analysis on beneficiary masks
 
-Blocked until Phase 3 completes (needs Rich's rerun output). Once available: KS test (or
-equivalent) for whether hotspot-adjacent populations skew toward inequality (Gini) and lower
-HDI, likely restricted to 3+ overlaps (~20% of world population per the notes) — this reuses the
-existing KS/Cliff's Delta machinery already built for the WHO chapter, just against the new
-beneficiary masks instead of the old hotspot_count.
+**DONE (2026-08-07).** Becky's ask: apply the union coverage masks
+(`full_raster_extent_union_coverage.tif` per category) to the HDI, Gini, and GDP rasters to test
+whether beneficiary areas (combined cross-category, or 3+/4+ tiers) are disproportionately high
+or low compared to outside. Built as planned: zonal-extracted the fine-resolution (~30 arcsec)
+union coverage masks onto the 10km analysis grid (`Python_scripts/zonal_extract_beneficiary_masks.py`,
+run inside Rich's Docker environment — see WORKLOG for the local-toolchain detour), producing a
+per-`grid_fid` coverage fraction, thresholded at ≥0.5 for a binary "inside beneficiary mask" flag,
+then ran the existing KS/Cliff's Delta machinery (`R/ks_hotspots.R::run_ks_hot_vs_non()`, same
+function the WHO chapter uses) via a new notebook, `analysis/KS_tests_beneficiary_masks.qmd`.
+
+**Validated against an independent reference** before trusting any KS result: the zonal-extracted
+coverage, aggregated back to % of land area, matches the already-published fine-resolution area
+percentages (`outputs/tables/hotspot_5service_beneficiary_area_pct.csv`, 2026-08-05, computed via
+a completely different code path — `terra::expanse()` directly on the rasters, no grid, no
+exactextract) to within 0.5 percentage points for all 3 target categories. Full detail in WORKLOG
+(2026-08-07).
+
+**Headline result**: beneficiary-mask areas (combined-cross, 3+, 4+ tiers) are strongly,
+significantly wealthier and more populated than the rest of the landscape (Cliff's δ ≈ 0.48–0.53
+for both GDP and population, large effect; p_adj effectively 0 for all 12 service × variable
+combinations tested, no exceptions) — consistent with buffers concentrating around where people
+already are. Gini shows a smaller but real effect in the same direction (δ ≈ 0.22–0.33,
+small–medium, significant at every tier) — beneficiary areas skew toward *more* unequal regions,
+not less, and the effect *grows* with tier exclusivity rather than weakening. HDI shows the
+weakest signal by far (δ ≈ 0.04–0.10, negligible–small) — beneficiary status is not strongly tied
+to human development level one way or the other. Full table: `data/processed/tables/
+ks_results_beneficiary_masks.csv`; plots under `outputs/plots/ks_beneficiary_masks/`.
 
 ---
 
@@ -432,14 +562,19 @@ beneficiary masks instead of the old hotspot_count.
 6. ~~Phase 5.1/5.2: 10km-native change maps + restructured export/retention figure~~ — done,
    2026-07-29.
 7. Send Rich the water/access rasters; he writes the 2 new beneficiary configs and reruns.
-8. Phase 4: Gini/HDI KS test on the new beneficiary masks (blocked on step 7).
+8. ~~Phase 4: Gini/HDI KS test on the new beneficiary masks~~ — done, 2026-08-07.
 
 ---
 
 ## Open questions to fold into the message back to Becky
 
-1. Confirm the actual downstream buffer distance in current use (50km per this repo's docs, or
-   500km per the meeting notes) — ask Rich directly.
+1. ~~Confirm the actual downstream buffer distance in current use (50km per this repo's docs, or
+   500km per the meeting notes) — ask Rich directly.~~ **RESOLVED (2026-08-07)**: checked
+   directly against Rich's actual configs rather than asking — `max_downstream_distance_m: 50000`
+   (50km) and `max_hours: 1.0` (1-hour travel-time) are both explicit, consistent parameters
+   across all 7 config files (`data/jeronimo_2026_07_beneficiaries_analysis_configs/*.yaml`).
+   50km is correct; the 500km figure from the meeting notes doesn't match anything in the actual
+   run configuration.
 2. Confirm which output (figure/sheet) produced the 96%/10B+ numbers, to verify the
    nested-tier double-counting hypothesis before assuming it's the explanation.
 3. Whether to consolidate the 7-file service-config duplication now (recommended, given this

@@ -1,5 +1,582 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-08-11 (later) — Coastal Risk denominator bug: root cause, scoped Colombia fix, pipeline fix
+
+Picked back up the Coastal Risk 0.12x flag left open in the CLEC/Sandra thread (see entry below,
+"Colombia country-cut groundwork"). Traced the root cause in `analysis/hotspot_synthesis.qmd`
+(the `calc-intensity` chunk, ~line 317): `n_total` for every service was being counted off the
+full global land grid (`grid_df`), not the set of cells where that service actually has valid
+data. That's correct for Pollination/Sed_export/N_export/Nature_Access (valid on ~1.38-1.40M of
+~1.4M land cells, effectively the whole grid) but wrong for Coastal Risk, which is only valid on
+a narrow coastal fringe — confirmed directly from `plt_long.rds`: exactly 80,040 rows for C_Risk
+globally (and 0 of them NA — `plt_long` simply omits ineligible fid×service pairs rather than
+storing them as NA). Because `expected_share = n_total / sum(n_total)` reused the same
+land-grid-based `n_total` for every service, Colombia's "expected" Coastal Risk share was computed
+as its share of *total land area* (0.87%) rather than its share of the *actual global coastal-cell
+pool* — Colombia is disproportionately interior (Amazon/Andes/Llanos), so this inflated the
+expectation and made the real disparity look worse than it is.
+
+**Scoped fix (for today's CLEC/Sandra materials only)** — ad-hoc R query direct against
+`plt_long.rds`, filtered to non-NA/valid C_Risk cells, same exclusions (`income_grp != "2. High
+income: nonOECD"`, `exclude_regions`) as the main pipeline: Colombia has 182 valid Coastal Risk
+cells globally out of 41,635 valid worldwide (post-exclusions). Corrected relative_intensity =
+**0.24x** (up from the buggy 0.12x), corrected pct_area (coverage within Colombia's own coastal
+cells) = 2.20% (4 of 182). Still <1.0x — Coastal Risk is genuinely not a disproportionality story
+for Colombia even corrected — so this doesn't change the plan to lead the CLEC/Sandra materials
+with Pollination (1.83x) and Sediment export (1.51x), which were never affected by this bug (it's
+specific to Coastal Risk's sparse geography, not a general area_stats problem). Script not saved to
+repo (ad-hoc diagnostic, per standing preference).
+
+**Pipeline fix** (same session, applied directly since the code change was small): patched the
+`calc-intensity` chunk to build each service's per-group cell count from `plt_long`'s actual
+fid×service pairs (`valid_cells_by_svc`, inner-joined into the grouping grid) instead of the full
+`grid_df`. This is a real fix, not scoped to Colombia — it corrects `n_total`/`pct_area`/
+`expected_share`/`relative_intensity` for Coastal Risk across every grouping (region, income,
+biome, country), and incidentally also corrects the same class of bug for `C_Risk_Red_Ratio`,
+`N_Ret_Ratio`, and `Sed_Ret_Ratio` (also geographically-restricted services, per `plt_long` row
+counts — 80,040 / 1,020,987 / 1,036,796 respectively vs. ~1.40M for the full-coverage services),
+though those aren't part of the 5-service headline pipeline. Triggered a full
+`quarto render analysis/hotspot_synthesis.qmd` in the background to regenerate
+`hotspot_area_stats.csv` (all groupings) and the ~20 intensity/coverage/share plots under
+`outputs/plots/intensity/`.
+
+**Verified**: render completed clean (all 26 chunks, `analysis/hotspot_synthesis.html`).
+`hotspot_area_stats_Colombia.csv` now matches the scoped calc exactly (n_total=182, pct_area=2.20%,
+expected_share=0.437%, relative_intensity=0.240x). Side effect caught: Nature_Access wasn't 100%
+full-coverage either (11,378→11,376 valid cells for Colombia) — same class of bug, much smaller
+magnitude, now also corrected. Checked `docs/manuscript/*.qmd` and `docs/presentations/*.qmd` for
+any cited Coastal Risk relative_intensity ratio (the region/country disproportionality metric this
+bug affects) — none found; existing Coastal Risk mentions there are all from the separate
+HDI/Cliff's-delta socioeconomic-correlate analysis (`paper_draft.qmd`/`02-methods.qmd`), which is
+unaffected. No downstream correction needed elsewhere right now.
+
+### 2026-08-11 — Phase 4 report finalized and shared with Becky and Rich; thread closed
+
+Multi-session polish pass on `docs/reports/phase4_beneficiary_disproportionality_report.qmd` (user
+hand-edited throughout, several rounds of Claude fixes/additions on top): added the two-stage
+AND/OR flowchart (static PNG, not live Mermaid — portability requirement), a 4-way tabbed map
+comparison (downstream/travel-time/union/intersection, CSS-only tabs, no JS), the union-vs-
+intersection statistical robustness check (Cliff's delta barely moves for GDP/Population/Gini,
+confirms HDI's null result), numeric backing added to the Key Findings cards, and a GDP-flat-
+vs-Gini-rising interpretive note (different dimensions — average wealth vs. within-place
+inequality — diverging exactly at the most compound-risk tier). Clarified the diagram is
+specifically the union version, and that the maps use ~0.93km source-raster resolution
+deliberately (not the 10km statistical grid) so buffer geometry stays visible.
+
+**Report shared with Becky and Rich (2026-08-11).** Ball is in their court — open items still
+awaiting their input: (1) Rich's confirmation on the 50km downstream buffer's lateral width and
+whether the distance itself is right; (2) Becky's call on how "people reached" should be framed
+given the union-vs-intersection gap; (3) whether the intersection-based numbers become the
+headline in the paper or stay a robustness footnote.
+
+**Render workflow going forward**: `quarto render docs/reports/
+phase4_beneficiary_disproportionality_report.qmd --to html` from the repo root — regenerates the
+same portable, self-contained file (`embed-resources: true`, zero external dependencies) at
+`docs/reports/phase4_beneficiary_disproportionality_report.html`. Source is real markdown +
+`phase4_report_styles.css`; only the SVG bar/distribution charts and the map-tabs widget are raw
+HTML blocks (data-driven — regenerate via the Python scripts referenced in-file rather than
+hand-editing coordinates).
+
+**Also flagged, not yet worked**: `docs/manuscript/paper_draft_5service.qmd` needs a real revision
+pass — user's own assessment is that it currently has "a lot of AI slop" and needs substantial
+work before it's submission-ready. Not started this session; noted here so it isn't lost.
+
+**Next**: this thread (5-service hotspot redesign / Phase 4) is closed pending Becky/Rich's
+response. Active work shifts to the Sandra Valenzuela meeting prep and the CLEC congress
+module/workshop submission — see `docs/applications/clec_sandra_sprint_plan.md` and
+`docs/applications/colombia_capability_portfolio.md` (both already tracking this thread from
+2026-08-07) — picked up fresh in a new session per the user's own token-budget call.
+
+### 2026-08-10 — Intersection-based KS test run for all 3 categories; qmd source built for the report
+
+**Ran the actual statistical comparison, not just area.** Built intersection rasters (pixel-level
+AND of downstream+travel-time, geo-aligned via `rasterio.windows.from_bounds`) for all 3 report
+categories (combined-cross, 3+, 4+), zonal-extracted onto the 10km grid locally (RasterioRasterSource,
+no Docker — already validated equivalent), reran KS + Cliff's delta against HDI/Gini/GDP/Population.
+~11 min total, backgrounded.
+
+**Result**: GDP, Population, and Gini are robust to the union-vs-intersection choice (deltas barely
+move, Gini actually *strengthens* under intersection: 0.33→0.38 at the 4+ tier). **HDI is not
+robust** — already the weakest finding under union (δ 0.04–0.10), it shrinks further under
+intersection and flips sign at the 4+ tier (δ -0.0097) — reinforces the original "no meaningful
+relationship" caveat rather than undermining it. Full table:
+`data/processed/tables/union_vs_intersection_comparison.csv`.
+
+**Built a Quarto source** (`docs/reports/phase4_beneficiary_disproportionality_report.qmd` +
+`phase4_report_styles.css`) for the report, since the hand-authored HTML was hard to navigate for
+manual edits. Prose/tables/callouts in real markdown (fenced divs for the custom-styled blocks,
+real blockquote for Becky's quoted ask); only the 8 SVG bar/distribution-chart panels stay as raw
+HTML (data-driven, regenerate rather than hand-edit if numbers change). `quarto render ... --to
+html` with `embed-resources: true` reproduces the exact same self-contained, portable file at the
+same path — confirmed output is byte-comparable in size and content markers to the hand-authored
+version. Redeployed to the same artifact URL after adding the intersection-comparison table.
+
+**Files added**: `docs/reports/phase4_beneficiary_disproportionality_report.qmd`,
+`docs/reports/phase4_report_styles.css`,
+`data/processed/tables/intersection_mask_coverage_10km.csv`,
+`data/processed/tables/ks_results_beneficiary_masks_INTERSECTION.csv`,
+`data/processed/tables/union_vs_intersection_comparison.csv`, plus
+`derived_intersection_downstream_AND_traveltime_coverage.tif` in the `tier_3plus`/`tier_4plus`
+beneficiary folders (combined-cross's was already written 2026-08-07, regenerated here for a
+nodata-flag consistency fix — see same-day entry below).
+
+### 2026-08-07 (cont. 6) — Union vs. intersection check (real, not cosmetic) + report expanded for a broader audience
+
+User's sharp catch: Stage 1 selects combined-cross-category cells using AND (water hotspot AND
+access hotspot, same cell), but Stage 2's beneficiary buffer combines the two resulting masks
+(downstream, travel-time) using OR — a real inconsistency worth checking empirically, not just
+theoretically. Since downstream reach follows the river network and travel-time reach follows
+roads, expected intersection ("reached by both") to be substantially smaller than union ("reached
+by either"), because those two networks are geometrically unrelated except very close to the
+source.
+
+**Two real bugs caught and fixed while checking this, in sequence** — worth recording precisely
+since both were self-caught before any number was reported:
+1. First attempt compared `full_raster_extent_downstream_50k_coverage.tif` (15,881 rows) against
+   `..._within_travel_time_coverage.tif` and `..._union_coverage.tif` (16,113 rows each) using raw
+   pixel-row indices — silently misaligned by ~117 rows / ~1° latitude. Caught because the
+   individual downstream-only and travel-time-only areas happened to match the known-good
+   reference table closely by coincidence, but the union didn't — a real discrepancy, not noise.
+2. Second attempt fixed the alignment (bounds-based windowing via `rasterio.windows.from_bounds`)
+   but hardcoded pixel size as 0.01° instead of reading the actual resolution (1/120° =
+   0.008333...°) — inflated every area by exactly (0.01/0.008333)² = 1.44×, confirmed by the ratio
+   matching precisely.
+3. Third attempt: correct on both counts, all three components (downstream-only, travel-time-only,
+   union) now match the reference table within ~0.4% — validated before trusting the result.
+
+**Result**: intersection area for combined cross-category is 14.1M km² (10.28% of land) vs. the
+union's 32.5M km² (23.65% of land) — intersection is only 43% the size of the union. Substantively
+different, not a rounding difference. **Not yet checked for the 3+/4+ tiers** — same structural
+question applies (both use the same downstream-OR-travel-time combination), just not verified.
+
+Wrote the validated intersection mask to a new file, `derived_intersection_downstream_AND_
+traveltime_coverage.tif`, into the same `combined_cross_category_beneficiaries` folder (name
+prefixed `derived_` so it's never confused with one of Rich's original outputs) — user wants to
+inspect it directly in QGIS.
+
+**Confirmed the coverage/population file pairing** per user's question: each mask type (`type:
+travel_time_population` in the configs) produces two paired rasters — `_coverage.tif` (binary
+0/1 buffer flag) and `_population.tif` (actual LandScan population values, already masked/clipped
+to the buffer — sum directly, no separate coverage × population multiplication needed). Same
+pairing across all masks in all 8 category folders.
+
+**Read all 8 of Rich's configs directly** (not just the 3 used in the report) to build a complete
+reference table — shared inputs (LandScan Global 2023 for population, ASTER GDEM, HydroSHEDS
+level-6 subwatersheds, friction_surface_2019 for travel time) and per-folder condition
+raster/expression/masks. Notably: **the beneficiary "people reached" figures use a different
+population dataset (LandScan 2023) than the HDI/Gini/GDP test's own population variable
+(GHS_POP_E2020_GLOBE_sum)** — worth naming explicitly so nobody assumes it's the same number
+twice. Full table added to `docs/hotspots_rasters_data_dictionary.md`.
+
+**Report expanded for a non-Rich/Becky audience**, per explicit user request ("assume we need to
+share this with more people, not necessarily so savvy with the depth of the data"): added the
+full 8-category menu (which 3 were used and why — purely because Becky named exactly those three,
+nothing else), the LandScan-vs-GHS_POP population-source note, and the union-vs-intersection
+callout with the empirical 43% result, framed as an open decision rather than a resolved one.
+Redeployed to the same artifact URL.
+
+**Files added**: `data/processed/hotspots_5service/rasters_5_var/output_..._combined_cross_
+category_beneficiaries/derived_intersection_downstream_AND_traveltime_coverage.tif`. **Files
+changed**: `docs/hotspots_rasters_data_dictionary.md` (new detailed input table + union/
+intersection + spatial-alignment-caution sections), `docs/reports/
+phase4_beneficiary_disproportionality_report.html`.
+
+### 2026-08-07 (cont. 5) — Made the report actually portable: replaced live Mermaid with a static image
+
+User wants to Slack the report file directly to Becky and Rich, not just share the claude.ai
+link. Caught a real problem before that could go out: the category-logic flowchart used
+`<pre class="mermaid">`, which only renders because the claude.ai artifact viewer injects Mermaid
+support server-side — a plain browser (or Slack's own file preview) has no Mermaid.js loaded and
+would show raw text instead of a diagram. Confirmed this was the *only* non-portable element
+(`grep`'d the whole file for `cdn`/`<script src`/`mermaid` — zero other hits, every image was
+already base64-embedded).
+
+Rebuilt the same flowchart as a static matplotlib figure (boxes, AND/OR hexagon gates, arrows —
+hand-laid-out coordinates, same two-stage logic as the Mermaid version) rather than trying to
+embed the Mermaid.js library inline, which would have bloated the file for uncertain
+cross-browser reliability. Verified visually before embedding. Replaced the `<pre class="mermaid">`
+block with the rendered PNG (base64), removed the now-dead `pre.mermaid` CSS rule.
+
+**File is now genuinely self-contained**: zero external dependencies (confirmed via grep), ~937KB,
+safe to attach as an actual file in Slack — not just the claude.ai link. Republished from the same
+repo path, same URL as before (`91cc70fd-08ea-4503-8df6-009a990a687d`).
+
+**Files added**: `docs/reports/diagram_category_logic.png` (source asset, also embedded in the
+report).
+
+### 2026-08-07 (cont. 4) — Report moved into the repo, two new visuals, tone pass for an expert (Rich) audience
+
+**Relocated the report from the ephemeral scratchpad into the repo**: `docs/reports/
+phase4_beneficiary_disproportionality_report.html` — user wanted a real, stable file to open and
+edit directly. Republishing an Artifact from a different file path mints a new URL (confirmed via
+the tool's own docs, not assumed) — old link (`00787df4-...`) is now stale and was never shared,
+so no harm; new canonical link is `91cc70fd-08ea-4503-8df6-009a990a687d`. Will keep publishing
+from the repo path going forward, not the scratchpad copy.
+
+**Two new visuals added, both requested directly**:
+1. **Maps of the actual downstream mask** (combined cross-category, 50km-downstream component
+   only — deliberately excluding the travel-time component so the water-pathway geometry isn't
+   confounded by the access-pathway one). Global overview (decimated 6x via manual numpy max-pool,
+   `Resampling.max` isn't valid for plain reads, only warp operations — had to fix that) plus a
+   native-resolution zoomed inset over the Amazon/Andes river systems. Both built from the
+   existing fine-resolution `full_raster_extent_downstream_50k_coverage.tif`, no new zonal
+   extraction. Basemap: `data/vector_basedata/cartographic_ee_r264_correspondence.gpkg` (country
+   boundaries, EPSG:4326, matches the raster CRS directly). **Genuinely informative once rendered**:
+   the pattern is clearly dendritic/drainage-network-following (not random blobs unrelated to
+   hydrology), but individual traces have real width, and in high-hotspot-density areas so many
+   traces overlap that it reads as a solid mass — visual evidence bearing on both halves of the
+   open question to Rich at once.
+2. **Distribution comparison chart** (GDP, Population, Gini, HDI) — q10/median/q90 range, inside
+   vs. outside the mask, per category. This is what the KS test actually operates on, not just
+   the single Cliff's delta summary already in the report. Log-scale panels for GDP/Population
+   (linear would make q10≈0 vs q90 in the hundreds of millions unreadable), linear for Gini/HDI.
+   Computed pixel positions in Python from `ks_results_beneficiary_masks.csv`'s existing quantile
+   columns (no new statistics run), then hand-built the SVG — same approach as the earlier
+   Cliff's-delta chart.
+
+**Tone pass, prompted directly by the user**: caught narrating Rich's own tool back to him
+("This determines how 'generous' 50km really is in practice" and similar) — same over-explaining
+pattern already flagged once before in this project's history for an expert audience (see
+`project_idb_wwf_workshop` memory, "blockquote felt patronizing"). Trimmed the Rich-question
+callout to the two bare questions, no mechanism narration. Also condensed the "reach numbers"
+callout from a dense paragraph into a 4-point list per explicit request ("more technical / point
+by point"). Removed the "— Becky, Slack, 2026-08-05/06" citation line under her quoted question,
+also per direct request.
+
+**Files added**: `docs/reports/phase4_beneficiary_disproportionality_report.html` (canonical,
+replaces the scratchpad copy), `docs/reports/map_downstream_global.png`,
+`docs/reports/map_downstream_inset.png`.
+
+### 2026-08-07 (cont. 3) — Added the category-logic diagram to the Becky report itself
+
+Same two-stage AND/OR Mermaid diagram just added to `docs/hotspots_rasters_data_dictionary.md`
+also added directly to the Becky-facing HTML report (`<pre class="mermaid">`, rendered natively by
+the artifact platform, no library embed needed), right after the "What was tested" term
+definitions. Wrapped in a fixed-light-background card (`.diagram-card`) rather than the page's
+themed surface, since Mermaid's default rendering assumes a light background — keeps it legible
+regardless of the viewer's light/dark setting. Redeployed to the same artifact URL.
+
+Also wrote a strict Monday-Wednesday sprint plan for a separate, unrelated thread (CLEC congress
+abstract + Tremie course response + Sandra Valenzuela meeting materials, all converging on
+2026-08-12) — see `docs/applications/clec_sandra_sprint_plan.md`, not part of this hotspot
+redesign work, tracked there and in memory instead of here.
+
+### 2026-08-07 (cont. 2) — Caught and fixed a real self-contradiction in the report's own callouts
+
+User flagged, correctly, that the "upper bound" callout asserted the buffer is "wide enough to
+cover nearly the whole populated map almost by construction" — a claim about *mechanism* (buffer
+width) — while the adjacent "open question" callout added minutes earlier honestly said the
+lateral width is unconfirmed and is exactly what needs asking Rich. Direct contradiction: one
+callout presented as settled fact the very thing the other flagged as unknown.
+
+What's actually verified is only the *empirical outcome* (these categories reach a large share of
+land/population — real, computed numbers, not in question). What's not verified is *why* —
+buffer width is one possible explanation, but an equally plausible one is that ~190,000 dispersed
+hotspot cells, each contributing even a narrow downstream/travel-time trace, sum to a large
+combined footprint once unioned across the whole map. Rewrote the callout to state only the
+verified fact and name both candidate explanations as open, rather than asserting the width-based
+one. Redeployed.
+
+### 2026-08-07 (cont.) — Becky report: buffer-generosity callout added; Colombia country-cut groundwork
+
+While the user reviewed the Phase 4 artifact, added a caveat callout he specifically asked for:
+the 50km-downstream/travel-time buffers are generous enough that even the restrictive categories
+(combined-cross, 3+, 4+) partly inherit the same "covers nearly the whole populated map almost by
+construction" effect already flagged elsewhere in this project's history for the 1+/access-only
+tiers — added directly to the report next to the 4.1B/2.3B/872M reach figures so it isn't read as
+a precise headcount. Redeployed to the same artifact URL.
+
+**Verified the 50km/1-hour buffer parameters directly against Rich's configs**, prompted by the
+user asking whether "50km" was ever actually confirmed or just repeated from memory — it hadn't
+been: `docs/hotspot_redesign_plan.md`'s own "open questions" section had flagged a real,
+never-resolved 50km-vs-500km discrepancy since Phase 3. Checked all 7 config files directly:
+`max_downstream_distance_m: 50000` and `max_hours: 1.0`, consistent everywhere, water-only configs
+correctly lack the travel-time param and vice versa. 50km confirmed correct; 500km doesn't match
+anything in the actual run configuration. Marked resolved in the plan doc. Added the missing
+1-hour travel-time figure to the report (previously only said "travel-time buffer" with no
+duration) and redeployed.
+
+**Follow-up methodological question, raised by the user, not yet resolved**: is 50km downstream
+too generous? Tried to find the actual buffer-generation tool (`workflow_runner.py`) to check
+whether "downstream distance" is a flow-path distance along the drainage network or a simple
+radial buffer — not present in this repo or in the Docker image (`therealspring/
+global_ncp-computational-environment`), lives only on Rich's side, so this couldn't be verified
+directly. Inferred from the config (`dem_raster_path` + `subwatershed_vector_path` as required
+inputs) that it's very likely flow-path-based, not radial — a simple circular buffer wouldn't need
+a DEM or a subwatershed layer. Added as an open, two-part question to the report rather than
+asserting an answer: (1) confirm the actual geometry with Rich, (2) independent of that, whether a
+tighter distance (e.g. 25km) is worth testing as a sensitivity check, since river confluences
+dilute a hotspot's real signal well before 50km in many systems.
+
+**Also clarified a real point of confusion, same session**: the beneficiary categories split into
+two independent axes (which pathway — water/access/combined — vs. how many of the 5 services
+total, tiers 1-5), which share overlapping vocabulary and are easy to conflate. Documented as a
+synthesis matrix in `docs/hotspots_rasters_data_dictionary.md` (new section), including the
+explicit fact that Becky's Phase 4 report tested only 3 of the 8 possible categories
+(combined_cross, 3+, 4+ — not water-only, access-only, or tiers 1+/2+/5+).
+
+**Colombia country-cut groundwork** (separate thread, `docs/applications/
+colombia_capability_portfolio.md` — CLEC congress + Sandra Valenzuela meeting prep, both Aug 12):
+confirmed no new pipeline run is needed — `data/processed/tables/regional_subsets/nev_name/
+hotspot_area_stats_Colombia.csv` already has Colombia broken out under the current 5-service
+definition (11,378 land cells; Pollination 1.83x and Sediment export 1.51x relative intensity are
+the standout disproportions; Coastal Risk's 0.12x is flagged as likely a denominator artifact,
+needs checking before external use). Computed Colombia-specific beneficiary population reach by
+joining this week's `beneficiary_mask_coverage_10km.csv` to Colombia's grid cells (no new zonal
+extraction — pure aggregation): combined cross-category reaches 75.8% of Colombia's population
+(38.1M), the 4+ tier reaches 35.5% (17.9M) — flagged the same buffer-generosity caveat here too.
+Output: `data/processed/tables/colombia_beneficiary_population.csv`.
+
+### 2026-08-07 — Phase 4 built and closed: HDI/Gini/GDP KS test on Rich's beneficiary masks
+
+Picked up Phase 4 (unblocked 2026-08-06): Becky's direct ask to test whether beneficiary areas
+(combined cross-category, 3+/4+ nested tiers) are socioeconomically disproportionate vs. the rest
+of the landscape. Ended up being two separable pieces of work: a local-toolchain detour (this
+machine had never run this project's heavy zonal-extraction step before), then the actual build.
+
+#### Toolchain: local venv couldn't run exactextract/GDAL — traced to a machine change, resolved via Rich's Docker image
+
+`Python_scripts/summary_pipeline_landgrid.py` imports `exactextract` and GDAL's `osgeo` Python
+bindings — neither was installed in this machine's `.venv`. Root cause, per the user: this
+project's heavy geoprocessing (zonal stats, rasterization) used to run on an external server
+("lilling"), not this machine; that server is no longer available for this purpose, so any of that
+workload now has to run locally. `pip install exactextract` worked fine (pure wheel, 0.3.0). `pip
+install gdal` failed — no prebuilt wheel for Python 3.14 on Windows, and compiling needs MSVC
+Build Tools this machine doesn't have.
+
+**Checked the repo's own documentation before improvising further** (`README.md` lines 16-52,
+276-300; root `Dockerfile`; `environment.yml`): this is a solved, documented problem. The project
+ships a `Dockerfile` (micromamba + conda-forge `geopy311` env: `exactextract=0.2.2`,
+`gdal=3.10.3git`, `geopandas=1.0.1`, `rasterio=1.4.3`, plus the `ecoshard`/`taskgraph` deps
+`summary_pipeline_landgrid.py` needs) built into a published image,
+`therealspring/global_ncp-computational-environment:latest` — Rich's image (`therealspring` /
+`springinnovate` in the `Dockerfile`'s `ecoshard` clone). Docker Desktop was installed but the
+daemon wasn't running; started it, and the image was **already pulled locally** (`docker images`
+shows it dated 2025-05-19) — no download needed. Verified the container's env matches
+`environment.yml` exactly (`exactextract 0.2.2`, `gdal 3.10.3`, `geopandas 1.0.1`, `rasterio
+1.4.3`). Machine has plenty of headroom for this (22 logical cores / 47.5GB RAM vs. the
+container's actual usage of ~1 core / ~1GB) — closing other apps wouldn't have changed anything;
+the bottleneck was the script's sequential per-category loop, not resource contention.
+
+**Windows/Git-Bash + Docker gotcha, worth remembering**: `docker run -v "C:/...:/workspace"` fails
+with `the working directory 'C:/Program Files/Git/workspace' is invalid` unless
+`MSYS_NO_PATHCONV=1` is set first — Git Bash's automatic POSIX-path conversion mangles the
+container-side `/workspace` path. Every `docker run` in this session used
+`MSYS_NO_PATHCONV=1 docker run ...`.
+
+#### Two real bugs in the raw approach, both caught before trusting any output
+
+1. **`full_raster_extent_union_coverage.tif` ships with `nodata=0`, which is also the "not
+   covered" pixel value.** GDAL (and therefore `exact_extract`) silently excludes nodata pixels
+   from any statistic — so a naive `mean` zonal stat would only average over the always-1 "valid"
+   pixels and return 1.0 for any polygon touching the mask at all, never a true fraction. Fixed by
+   wrapping each source raster in a tiny hand-built VRT (`<VRTDataset>`/`<SimpleSource>`, no
+   `<NoDataValue>` element) before extraction — both 0 and 1 then count as real data, and `mean`
+   becomes the true area-weighted fraction of each polygon covered by the mask. Confirmed via
+   `rasterio.open(vrt).nodata is None` and a decimated pixel-value check before trusting it
+   further.
+2. **`exactextract`'s `GDALRasterSource` needs `osgeo` bindings even when given a path string** —
+   traced by reading its `__init__` source, not just the docstring (which implies a path alone is
+   enough). Used `RasterioRasterSource` instead (works identically, no `osgeo` dependency); result
+   values matched exactly between a local no-`osgeo` test and the same call re-run inside Docker
+   (same bbox, same polygon count, same `mean` distribution) — confirms the substitution is a
+   pure implementation-detail swap, not a behavior change.
+
+**Grid-identity care, given this project's 4 prior incidents of exactly this failure mode**
+(`landgrid_1_clean_enriched_4326.gpkg` has no real ID column; `summary_pipeline_landgrid.py`'s own
+`zonal_stats()` falls back to a positional `fid` whenever the input vector lacks a column literally
+named `"fid"`). Deliberately did **not** reuse `summary_pipeline_landgrid.py` unmodified — it would
+have silently discarded `10k_change_calc.gpkg`'s real `grid_fid` column and substituted a
+positional index. Wrote a dedicated script instead
+(`Python_scripts/zonal_extract_beneficiary_masks.py`) that explicitly carries `grid_fid` through
+`exact_extract`'s `include_cols` and never falls back to row position, and asserted `grid_fid` is
+unique before extracting.
+
+#### Full run + validation
+
+Ran all 8 of Rich's beneficiary categories (water, access, combined-cross, and nested tiers
+1+ through 5+ — not the 5 ecosystem services, a separate axis entirely) against the full
+1,522,073-cell grid inside the Docker container, ~28 minutes total
+(`data/processed/tables/beneficiary_mask_coverage_10km.csv`, 12,176,584 rows = 8 × 1,522,073,
+confirmed exact). Did all 8 rather than only the 3 Becky asked about because the marginal cost per
+raster is the same and it gives 5 extra independent validation targets for free.
+
+**Validated against the already-published, independently-computed fine-resolution area
+percentages** (`outputs/tables/hotspot_5service_beneficiary_area_pct.csv`, 2026-08-05 — computed
+via `terra::expanse()` directly on the rasters, no grid, no `exactextract`, completely different
+code path). Aggregated the 10km zonal results to % of land area (both as area-weighted mean
+coverage fraction and as % of cells flagged ≥0.5) and compared: all 8 categories land within
+0.04–1.8 percentage points of the independent reference, and the 3 target categories are the
+tightest matches (combined-cross −0.5pp, 3+ −0.3pp, 4+ −0.09pp on the mean-coverage measure). This
+is a clean pass, not a coincidence — built a hard `stop()` into the KS notebook itself
+(`analysis/KS_tests_beneficiary_masks.qmd`, `validate-coverage` chunk) that halts the whole
+render if any target category drifts >5pp from this reference, so a future grid-identity
+regression would fail loudly rather than silently producing a wrong headline number.
+
+#### KS test: new notebook, one real bug caught before results were final
+
+Built `analysis/KS_tests_beneficiary_masks.qmd`, reusing `run_ks_hot_vs_non()` from
+`R/ks_hotspots.R` (the same function `analysis/KS_tests_hotspots.qmd` uses for the WHO chapter) —
+substituted the grouping variable: instead of a service's extreme-change hotspot definition, it's
+the beneficiary coverage fraction thresholded at ≥0.5 (majority rule) into an in-mask/out-of-mask
+flag, one row per category × grid cell. Comparison is **direct in-mask vs. everywhere else**, not
+the WHO chapter's "median background" tail comparison — there's no equivalent "typical change"
+concept for a spatial buffer-membership flag, and Becky's question was simply mask vs. outside.
+
+First render aborted on a real bug in the validation chunk: `mutate(diff_meancov_vs_ref =
+mean_coverage_pct - ref_pct)` referenced a column `ref_pct` that didn't exist (the join actually
+produced `ref_pct_of_land`, per an earlier `select()` rename) — R silently resolved `ref_pct` to
+the outer-scope *data frame* of the same name instead of erroring on a missing column, giving
+`non-numeric argument to binary operator`. Fixed the column reference; re-ran clean. PDF output
+also failed (no TinyTeX on this machine) — rendered to HTML instead, R-chunk execution and outputs
+identical either way.
+
+**Headline results** (`data/processed/tables/ks_results_beneficiary_masks.csv`,
+`outputs/plots/ks_beneficiary_masks/`): beneficiary-mask areas (combined-cross, 3+, 4+) are
+strongly and significantly **wealthier and more populated** than the rest of the landscape —
+GDP and population both show Cliff's δ ≈ 0.48–0.53 (large effect), p_adj (two-sided, BH-adjusted)
+effectively 0 for every category. **Gini** shows a smaller but real effect in the same direction
+(δ ≈ 0.22–0.33, small–medium) — beneficiary areas skew toward *more* unequal regions, not less.
+**p_adj is effectively 0 (highly significant) for all 12 service × variable combinations tested,
+without exception** — Gini's actual pattern is that *effect size* grows with tier exclusivity
+(δ 0.22 → 0.22 → 0.33 from combined-cross → 3+ → 4+), not that significance weakens.
+
+*Caught and corrected before this went any further*: an earlier draft of this entry (and of the
+plan-doc Phase 4 summary, and of what was told to the user) claimed the 4+ Gini result was
+"borderline, p_adj=0.057" — a genuine misread of the CSV column order. That 0.057 value is
+`p_hot_greater_adj`, a stricter *one-sided* directional test (specifically: is beneficiary-Gini
+stochastically greater across the *entire* distribution, not just on average), not `p_adj`, the
+primary two-sided significance measure used everywhere else in this analysis. Re-verified all
+three significance columns (`p_adj`, `p_hot_greater_adj`, `p_hot_less_adj`) directly against the
+CSV before writing anything Becky-facing. **HDI** shows the weakest signal by far (δ ≈ 0.04–0.10,
+negligible–small) — beneficiary status isn't strongly tied to human development level in either
+direction. One technical oddity worth a future look, not disqualifying today's results: the
+`tier_4plus`/HDI row's one-sided p-values (`p_hot_greater_adj`, `p_hot_less_adj`) both came out ~0,
+unlike every other row where they're complementary (~1/~0) — plausible given KS's sensitivity to
+distribution *shape* (not just location) at very large n (n_non=917,690), consistent with the
+row's unusually large D (0.124) paired with a small Cliff's delta (0.035, i.e. a shape difference
+more than a location shift), but flagging since it doesn't match the pattern of the other 11 rows.
+
+**Files added**: `Python_scripts/zonal_extract_beneficiary_masks.py`,
+`analysis/KS_tests_beneficiary_masks.qmd`, `data/processed/tables/beneficiary_mask_coverage_10km.csv`
+(gitignored), `data/processed/tables/ks_results_beneficiary_masks.csv` (gitignored),
+`outputs/plots/ks_beneficiary_masks/**`. **Files changed**: `docs/hotspot_redesign_plan.md`
+(Phase 4 marked done with results summary).
+
+### 2026-08-06 (cont. 2 — forked a real 5-service paper draft, rewrote its abstract with verified numbers)
+
+Per the user: the staging-doc approach (`docs/paper_5service_methodology_staging.md`) felt awkward — candidate paragraphs that never actually land anywhere. Forked a real second paper draft instead: `docs/manuscript/paper_draft_5service.qmd` (`cp` of `paper_draft.qmd`), original left completely untouched. Added a status callout at the top marking it in-progress and listing exactly what's updated vs. still-copied-8-service-text.
+
+**Rewrote the abstract with real 5-service numbers, not reused 8-service ones** — checked each figure against actual verified data rather than adapting the old text by feel:
+- Hotspot count/land share: 189,927 cells, 13.84% of the 1,372,621-cell land base (`189927/1372621`, computed fresh) — genuinely different from the 8-service paper's 252,215/18.4%.
+- Water/access/combined-cross land-area breakdown (8.1%/9.3%/3.5%): from `outputs/tables/hotspot_5service_category_shares_pct.csv` (2026-08-05).
+- Beneficiary exposure (3.1B/7.1B/4.1B): from Rich's rerun, `outputs/tables/hotspot_5service_beneficiary_area_pct.csv` — deliberately used the water-downstream, access-travel-time, and combined-union numbers respectively, matching each category's actual buffer type.
+- Regional/income disparity (LAC 1.55×, East Asia-Pacific 1.20×, lower-middle-income 1.69× vs. high-income OECD): computed fresh from `data/processed/tables/hotspot_area_stats.csv` (the 2026-07-30 subregional rerun), averaging `relative_intensity` across the 5 services per group — **not** the old 8-service paper's 1.6× figure, which doesn't hold under the new service set (real answer is 1.69×, close but not identical).
+
+**Explicitly flagged as pending, not silently reused or omitted**: land-cover-conversion attribution and the Phase 4 Gini/HDI/GDP test haven't been rerun under the 5-service definition at all — the abstract has a bracketed `[PENDING]` marker instead of either the old 8-service attribution numbers (which would be wrong here) or no mention at all (which would hide a real gap).
+
+**Not done**: body chapters past the abstract are still an unmodified copy of the 8-service text — real work still ahead once Phase 4 lands.
+
+**Files added**: `docs/manuscript/paper_draft_5service.qmd`. **Files changed**: `docs/hotspot_redesign_plan.md` (pending-edits item 3 updated).
+
+**Follow-up fixes, same session**: rendered the new file (`quarto render ... --to html`, clean, no errors — `paper_draft_5service.html`); removed the "migrated from 8 to 5 services" narrative from the abstract (reads as having always assessed 5 services, not a redesign-in-progress story — that framing stays in the status callout, not the abstract); then rewrote the abstract's prose register per user feedback ("too baroque, too Claude-y" compared to the AGU abstract) — cut nested parentheticals, the bold `[PENDING]` bracket flag, and the semicolon-heavy triple-parallel sentence structure, matching the AGU abstract's plainer, more declarative cadence. Same numbers throughout, just tighter prose.
+
+### 2026-08-06 (cont.)
+
+#### Pct/abs ambiguity resolved: Rich confirmed pct used for all 7 categories, verified against his actual config files
+
+Rich replied on Slack: "I used the combined_cross_pct.tif files... I think this pipeline I have just treats these as a mask, so I'm not sure there would be a difference one way or the other if the pixels are all still defined in the same spot," and attached his actual analysis configs (`data/jeronimo_2026_07_beneficiaries_analysis_configs/*.yaml`, 7 files).
+
+**Didn't just take the chat message at face value** — read all 7 YAML configs directly. Every `condition_raster_path` across all 7 categories (water, access, combined-cross, and all 5 nested hotspot-count tiers) points to a `_pct` file (`count_water_pct.tif`, `count_access_pct.tif`, `combined_cross_pct.tif`, `hotspot_count_pct_2026_07_29_18_49_00.tif`) — **zero references to any `_abs` file**. This fully resolves the ambiguity flagged 2026-08-05: Rich used the `pct` metric consistently for everything, matching the user's stated intent (pct for main text, abs as annex benchmark) and matching what this repo's own percent-area analysis already used. No rework needed anywhere — everything already lines up.
+
+**Also verified while in there**: the buffer logic in each config matches Becky's original spec exactly — water-only config has only a `downstream_50k` mask (no travel-time), access-only config has only a `within_travel_time` mask (no downstream), and both the combined-cross-category and all 5 nested hotspot-count tiers correctly include both mask types combined with OR logic. Threshold expressions on the hotspot-count tiers (`value > 0` through `value > 4` for the 1+ through 5+ tiers) correctly match the nested tier definitions.
+
+**Files changed**: none (verification only). Closes the open item from the 2026-08-05 entry below.
+
+### 2026-08-05 (cont. — Becky's follow-up questions on the beneficiary numbers)
+
+#### Discovered a real pct/abs ambiguity in what was sent to Rich; computed beneficiary-raster area percentages
+
+Becky replied to the percent-area table + charts with three things: (1) asked which metric (pct/abs) was actually passed to Rich, since she wants "the one we keep in the main" to match; (2) asked for % of land area (not just population) for all the beneficiary rasters, expecting values between the hotspot-footprint % and the population %, as a sanity check; (3) asked to start the HDI/Gini/GDP disproportionality test using the union coverage masks (combined + 3+/4+ tiers).
+
+**(1) Metric ambiguity, real and unresolved.** Checked the repo for a record of which metric was transferred to Rich — no definitive answer findable (both `pct` and `abs` rasters exist locally, and `docs/hotspot_5service_rasters_README.md` documents both being generated without specifying which subset was actually transferred). User then pulled up a screenshot of the actual shared Google Drive folder: **both `pct` and `abs` versions were uploaded on 2026-07-28, side by side, with no label distinguishing them**, and Rich's returned output folder names don't record which one his pipeline read either. Also found the same Drive folder still has leftover single-service rasters from 2026-05-27 (the pre-redesign 8-service era — `Sed_export_pct.tif`, `N_Ret_Ratio_pct.tif`, etc.), unrelated to this handoff and a further source of potential confusion. **Cannot confirm which metric Rich's pipeline actually used — this needs to go back to Rich directly, not get asserted to Becky.**
+
+**Wrote a Rich-facing data dictionary**, `docs/hotspots_rasters_data_dictionary_for_rich.md` — trims the internal README down to what Rich needs: which 8 files are the current Jul 28 5-service batch, which files to ignore (the May 27 leftovers), an explicit ask for him to confirm which metric his pipeline read per output folder, and a recommendation to clean up the shared folder going forward so this doesn't recur.
+
+**(2) Beneficiary-raster area percentages, computed** — `outputs/tables/hotspot_5service_beneficiary_area_pct.csv`. Used `terra::expanse(byValue=TRUE)` on each `*_coverage.tif` (fine-resolution, ~30 arcsec, lon/lat WGS84, so this is true latitude-weighted area, not naive pixel counting) across all 22 coverage rasters (union/downstream/travel-time, wherever each exists per category) across the 7 categories Rich returned, ~8-10s per file. Denominator: same 1,372,621-cell / 137,262,100 km² land base used throughout this analysis, so these are directly comparable to the already-reported hotspot-footprint percentages. **Confirms Becky's prediction exactly** — a clean, monotonic funnel at every tier: hotspot footprint % → beneficiary buffer area % (3-7x larger) → population % (larger still, meaning the buffers/hotspots disproportionately reach population-dense areas on top of already covering a large area). E.g. water: 8.07% → 30.93% → ~39% of population; access: 9.26% → 36.65% → ~89%; combined: 3.50% → 23.56% → ~51%; nested 1+ through 5+: 13.84%→56.80%→~93% down to 0.001%→0.03%→~0.07%.
+
+**(3) HDI/Gini/GDP disproportionality test (Phase 4)** — scoped, not started. Plan: zonal-extract Rich's fine-resolution union coverage masks (combined-cross-category + 3+/4+ tiers) onto the existing 10km analysis grid (reusing the same `exactextract`-based approach `summary_pipeline_landgrid.py` already uses for everything else), producing a per-fid "inside beneficiary mask" flag, then reuse the existing `analysis/KS_tests_hotspots.qmd` machinery (already built for the WHO chapter, already tests HDI/Gini/GDP/population via two-sample KS + Cliff's Delta) with that flag substituted for the old hotspot definition. Deliberately not started this session — real build, not a quick turnaround, and this session was already substantial.
+
+**Drafted (not sent) a response to Becky** covering all three points — saved to scratchpad, not the repo, for the user to review/edit before sending.
+
+**Files added**: `docs/hotspots_rasters_data_dictionary_for_rich.md`, `outputs/tables/hotspot_5service_beneficiary_area_pct.csv`.
+
+### 2026-08-05
+
+#### Rich's beneficiary data identified + Becky's low-hanging-fruit ask (max hotspot count, percent-area table)
+
+Rich's water-hotspot/access-hotspot beneficiary rerun (Phase 3) is back — user placed it in `data/processed/hotspots_5service/rasters_5_var/` (the `rasters/` folder that was originally handed to Rich was renamed to `rasters_old/` to make room). 7 output subfolders, one per category: `water_overlap_downstream`, `access_overlap_travel_time`, `combined_cross_category`, and nested `hotspot_count_{1,2,3,4,5}plus` tiers (generalizing the old 8-service 2/3/4/all scheme to 5 tiers). Each has population/coverage `.tif`s (only the relevant buffer type per category — water folder has no travel-time raster, access folder has no downstream raster, matching spec exactly) plus one summary CSV.
+
+**Pulled headline numbers from Rich's summary CSVs** (union of downstream+travel-time buffers, world pop ~8B): 1+ services = 7.38B, 2+ = 4.59B, 3+ = 2.26B, 4+ = 872M, 5+ (all 5 at once) = 5.86M; water-only = 3.09B, access-only = 7.05B, combined cross-category = 4.10B. **Flagged to user**: the 7.38B "1+" figure is the same shape of number as the already-known "96%/10B+" caveat in the plan doc — generous 50km/travel-time buffers around ~190K dispersed hotspot cells will cover nearly the whole inhabited planet almost by construction, so it's not a meaningful headline claim on its own. The 4+/5+ tiers are the actually defensible, striking numbers.
+
+**Becky's Slack ask, addressed**: she asked whether `hotspot_count_5plus_beneficiaries` existing is a bug ("shouldn't max be 5?"), and separately asked for percent-area (or percent of valid pixels) per hotspot category. Verified directly against the source rasters (`data/processed/hotspots_5service/rasters_old/hotspot_count_{pct,abs}.tif`): value range is exactly 1–5 for both metrics, confirming Jerónimo's Slack answer to her was correct — max is 5, and only 14 cells (pct metric) / 25 cells (abs metric) actually hit it.
+
+**Produced the percent-area table she asked for**, computed directly from the source gpkg (not the raster, to avoid rounding): `outputs/tables/hotspot_5service_category_shares_{pct,abs}.csv` (renamed 2026-08-05 from `..._category_pct_{pct,abs}.csv` — the original name had "pct" doing double duty, once for "percent-area table" and once for the `pct`-vs-`abs` hotspot metric, which read as confusing/suspicious; "shares" now means the table, the trailing `_pct`/`_abs` still means the metric) — n_cells, % of the 189,927/191,759 hotspot cells, and % of total valid land area (1,372,621 cells — same exclusion definition `extract_hotspots_5service.R` uses, and it matches the plan doc's already-independently-verified 1,372,621 figure exactly) for: water overlap, access overlap, combined cross-category, and both the exact-tier and nested-tier (1+ through 5+) breakdowns.
+
+**Two simple charts** (not wired into the paper/book, just for the Slack reply): `outputs/plots/becky_5service_category_pct.png` (water/access/combined, % of land area) and `outputs/plots/becky_5service_tier_pct.png` (exact 1–5 tier breakdown, % of land area). Kept deliberately simple (single-color horizontal bars, direct value labels, no legend needed) to match "not too fancy" — consistent with this repo's existing hotspot-plot convention (`#E83737` red fill) rather than a new style.
+
+**Files added**: `outputs/tables/hotspot_5service_category_shares_{pct,abs}.csv`, `outputs/plots/becky_5service_category_pct.png`, `outputs/plots/becky_5service_tier_pct.png`. Nothing in `R/`, `analysis/`, or `scripts/` changed — this was pure analysis/reporting off already-existing outputs.
+
+**AGU abstract, separately**: deadline is today, 23:59 EDT (22:59 Bogotá). Decided to adapt the paper's existing, already-vetted 8-service abstract (`docs/manuscript/paper_draft.qmd`, lines 33-39: 252,215 hotspot cells, 3.1B/7.6B beneficiaries, 34.2%/65.8% attribution gap) to AGU format, rather than rushing the still-in-progress 5-service numbers (Phase 4 KS/Gini not done yet) into a submission under deadline pressure. Not started — need AGU session/word-limit details from the user's portal first. User has a prior AGU ID/submission to reuse.
+
+### 2026-08-03
+
+#### Housekeeping item 2: documented the `combos` mechanism + added `derive_cross_combo()` helper
+
+Second housekeeping item from the redesign plan, picked up right after item 3 (script consolidation, prior entry). Scoped down deliberately to just the two deliverables the plan item actually named — **not** the 7-file service-config consolidation the same plan item also mentioned bundling in, which is separate, larger, and riskier (touches config in 7 places at once, the same failure class as past grid-ID incidents), and wasn't what was picked up this session.
+
+**Docs**: added a "Multi-Service Overlap Combos" subsection to `docs/methodology.md` (under "Change Metrics & Hotspot Definition") explaining `HOTS_CFG$combos` — how a named list of service vectors becomes a `count_<name>` column automatically via `extract_hotspots()`, using the 5-service redesign's water/access split as the worked example.
+
+**Helper function**: added `derive_cross_combo(data, combo_names, new_col = NULL)` to `R/get_hotspots.R` — takes two or more combo names (matching `count_<name>` columns already produced by `extract_hotspots()`) and returns an AND-derived 0/1 column, generalizing the `combined_cross = count_water > 0 & count_access > 0` pattern that `scripts/extract_hotspots_5service.R` wrote out by hand. Errors clearly if a requested combo name has no matching count column. Smoke-tested against a 6-row toy data frame with known expected output — matched exactly.
+
+**Documentation-generation near-miss, worth flagging**: ran `devtools::document()` to generate the new function's `.Rd` file and NAMESPACE entry, as this package normally expects. It deleted 19 unrelated `.Rd` files and rewrote large parts of `NAMESPACE` — turns out this package's `NAMESPACE` already has real, pre-existing entries for functions that don't exist in current source (`identify_hotspots`, `make_hotspots`, `align_rasters`, and even non-function garbage like `export("(simple,")` — likely a mangled roxygen comment somewhere), consistent with the "Objects listed as exports, but not present in namespace" warning that's been showing up on every `devtools::load_all()` call this whole redesign (visible in every script's stderr, never actually investigated). Running `document()` would have "fixed" this by syncing everything to current source — but that's a much bigger, unreviewed change than today's task called for. **Reverted** (`git checkout -- man/ NAMESPACE`, then manually deleted the stray newly-generated `.Rd` files it left behind) and instead added only the one needed line to `NAMESPACE` by hand (`export(derive_cross_combo)`) and kept only `man/derive_cross_combo.Rd` (plus `man/filter_multidim.Rd`, which turned out to have no doc file at all despite already being `@export`-tagged and in active use since Phase 2 — a small, directly-related gap worth keeping fixed, unlike the other 19). **The broader NAMESPACE/`.Rd` drift is real and still unresolved** — flagged here rather than fixed, since fixing it properly needs its own reviewed pass, not a side effect of adding one function.
+
+**Files changed**: `docs/methodology.md`, `R/get_hotspots.R` (new `derive_cross_combo()` function), `NAMESPACE` (one line), `man/derive_cross_combo.Rd` (new), `man/filter_multidim.Rd` (new, pre-existing gap).
+
+### 2026-07-30 (cont.)
+
+#### Housekeeping item 3 (script consolidation): audited all standalone scripts — found a documentation gap, not dead code
+
+Picked up the "script consolidation/cleanup" housekeeping item from the redesign plan. Inventoried every standalone script in `scripts/`, `scripts/mapping/`, and `Python_scripts/` against the two READMEs and git history.
+
+**Finding: no genuinely dead/one-off scripts left to remove.** Every script that wasn't already documented traced back to a real, deliberate fix or deliverable when checked against its own header comment and commit history — the 5-service redesign scripts (`extract_hotspots_5service.R`, `gdal_rasterize_hotspots_5service.R`, `make_5service_overlap_maps.R`, `make_5service_overlap_summary.R`), the grid-crosswalk and attribution-union fixes (`build_lc_grid_fid_crosswalk.R`, `compute_attribution_true_union.R`, `make_lcc_true_overlap_map.R`), and the IDB-WWF workshop deck maps (`make_global_thumbnail_maps.R`, `make_lac_critical_assets_map.R`, `make_lac_hotspot_map.R`). The `check_*.R` ad-hoc scratch scripts the plan doc mentioned no longer exist in the repo at all. So this pass was really a **documentation gap**, not a deletion job — `scripts/README.md` just hadn't been updated to list ~12 scripts that had already earned their keep. Fixed: added all of them to the appropriate tables.
+
+**Found and fixed a stale/misleading README entry, unrelated to the above**: `scripts/README.md`'s "archive/" table listed `audit_claims.R` and `export_reclass_table.R` as archived ("one-off, results already produced") — but neither file is actually in `scripts/archive/`; both are active files in the top-level `scripts/` folder, correctly documented in that same README's "Validation" and "Reference data" tables above. Looks like a copy-paste leftover from an earlier README restructure. Removed the two stale rows from the archive table.
+
+**Found and removed an unrelated stray file**: `Python_scripts/photo_processing.py` was a real-estate photo batch-resizer (HEIC→JPG via Pillow/pillow-heif) with no connection to this project at all, committed 2026-05-14, referenced nowhere. Removed (`git rm`) per user confirmation.
+
+**Files changed**: `scripts/README.md` (removed 2 stale rows, added 12 missing entries). **Removed**: `Python_scripts/photo_processing.py`.
+
+### 2026-07-30
+
+#### Subregional hotspot reruns: fixed a syntax bug + stale 8-service config in `hotspot_synthesis.qmd`, reran area/hotness stats + 219 regional subset CSVs on the 5-service definition
+
+Picked up the "not started yet" subregional (income/region/biome/country) hotspot rerun item from the redesign plan. This is separate infrastructure from Phase 1/2's global 5-service extraction — `analysis/hotspot_synthesis.qmd` + `scripts/generate_regional_subsets.R`, built in Phase 2 (2026-06-18) to break hotspot area/share/relative-intensity and multi-service "hotness" stats down by `income_grp`, `region_wb`, `WWF_biome`, and `nev_name` (country) into 219 CSVs. It had never been touched since the 8→5 service redesign started.
+
+**Found, while reading the file to update it: a real syntax bug.** `HOTS_CFG` (line 233) had a stray literal `<` character before the `groupings` entry — `<   groupings = c(...)`. This is invalid R and would have thrown a syntax error the moment the chunk actually ran. It survived undetected only because every heavy chunk in this notebook has been `eval: false` since June — nothing had actually executed the config block since whenever the typo was introduced.
+
+**Also found: the notebook's `HOTS_CFG` was still the old 8-service definition** (`loss` included `N_Ret_Ratio`, `Sed_Ret_Ratio`, `C_Risk_Red_Ratio` — the 3 services dropped in the redesign). Updated it to match the already-validated live 5-service config from `scripts/extract_hotspots_5service.R` exactly: `loss = c("Nature_Access","Pollination")`, `gain = c("Sed_export","N_export","C_Risk")`, `combos = list(water = c("N_export","Sed_export"), access = c("Nature_Access","Pollination","C_Risk"))`, `svc_order` trimmed to the 5 kept services. Also updated the `config-summary` display chunk's combo labels (`Degradation Combo`/`Recovery Combo` → `Water Combo`/`Access Combo`) to match.
+
+Confirmed `combos` isn't actually consumed by this notebook's `calc-overlap`/"hotness" stats (those are driven purely by `HOTS_CFG$loss`/`gain` via `extract_hotspots()`'s per-fid hotspot count, independent of the `combos` argument) — so the combo rename is a correctness/consistency fix for the config-summary table, not something that changes any computed number.
+
+**User chose a minimal rerun scope**: area/coverage/share stats + multi-service hotness only, skipping the HDI/GDP/Gini population-exposure chunk (the heaviest one, previously deferred for the same reason, and conceptually distinct from Rich's pending buffered-beneficiary rerun rather than a prerequisite for it). Set `eval: true` on `load-data`, `global-filters`, `config-summary`, `extract-hotspots`, `calc-intensity`, `plot-intensity`, `calc-overlap`, `plot-overlap`; left `calc-pop-exposure`/`plot-pop-exposure` at `eval: false`.
+
+**Rendered successfully** (`quarto render analysis/hotspot_synthesis.qmd`, ~750MB grid + 147MB cached `plt_long.rds`, backgrounded). Verified `hotspot_area_stats.csv` now lists exactly the 5 kept services (`C_Risk, N_export, Nature_Access, Pollination, Sed_export`) with no trace of the dropped retention/ratio services. Reran `scripts/generate_regional_subsets.R` — regenerated all 219 CSVs under `data/processed/tables/regional_subsets/` in place (4 income groups, 7 regions, 14 biomes, 186 countries), all with fresh mtimes.
+
+**Follow-up (same day): traced the 1,302,099 figure fully — it is correct, not the same issue as the book-script bug.** Reproduced it exactly, independently, cell-for-cell: full grid (1,522,073) → drop `income_grp == "2. High income: nonOECD"` per the notebook's own deliberate `global-filters` chunk (1,355,270 remain) → drop cells with no valid `income_grp` at all (1,302,099). Exact match, no fudging. The earlier flag (that this matches the "wrong, not just old" figure from `extract_book_data_fills.py`'s `/8` average) turned out to be a false alarm: that script's bug diagnosis assumed `n_total` varies per service in `hotspot_area_stats.csv` (Coastal Risk ~80K vs ~1.3M), but in the actual table this notebook produces, `n_total` is constant across all services within a group — so dividing an 8x-repeated sum by 8 was never actually wrong for *this* table, even though the diagnosis attached to it was. **1,372,621** (total valid land, no classification required) and **1,302,099** (land with a valid, non-ambiguous income classification) are two different, both-legitimate denominators for two different questions, not one true number with a stale impostor. No fix needed; corrected here so this doesn't get re-flagged as a live bug next time someone reads this file.
+
+**Files changed**: `analysis/hotspot_synthesis.qmd` (config fix + eval flags). **Regenerated** (gitignored, not tracked): `data/processed/tables/hotspot_area_stats.csv`, `hotspot_multiservice_stats.csv`, `data/processed/tables/regional_subsets/**` (219 files), `hotspot_synthesis.html`, associated `intensity*`/`hotness_*` plots under `out_plots()`.
+
 ### 2026-07-29 (evening close-out, cont.)
 
 #### Native change figure: fixed basemap being hidden by opaque near-zero fill (recurrence of a previously-solved problem)

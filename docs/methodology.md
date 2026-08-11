@@ -175,6 +175,25 @@ The threshold for identifying hotspots is defined centrally in `HOTS_CFG` (`anal
 *   **Comparability:** Comparisons are strictly within-service. A top 5% decline in Service A isn't necessarily comparable in absolute magnitude to a top 5% decline in Service B.
 *   **Not Evidence of Cause:** Being a hotspot flags that "this cell's change is unusually large," but it does not inherently prove *why* the value is extreme. To discuss drivers, we use additional robust analyses (LCC attribution and KS profiling).
 
+### Multi-Service Overlap Combos (`HOTS_CFG$combos`)
+`extract_hotspots()` (`R/get_hotspots.R`) accepts an optional `combos` argument: a named list of character vectors, each listing a subset of services that form a logical grouping. For each combo, the function automatically adds a `count_<name>` column to its output — the number of that combo's services flagged as a hotspot in that cell (0 up to the length of the vector).
+
+**Worked example — the 5-service redesign's water/access split** (`scripts/extract_hotspots_5service.R`):
+```r
+combos = list(
+  water  = c("N_export", "Sed_export"),
+  access = c("Nature_Access", "Pollination", "C_Risk")
+)
+```
+This produces `count_water` (0–2) and `count_access` (0–3) with no other code changes — `extract_hotspots()` does the counting internally.
+
+**What the native mechanism does *not* do**: ask whether a cell is a hotspot in combo A *and* combo B simultaneously (a cross-category AND, as opposed to a within-combo count). The 5-service redesign's `combined_cross` category (at least one water-service hotspot *and* at least one access-service hotspot in the same cell) needed this, and was originally written out by hand as a one-line `mutate()`. That pattern is now a reusable helper, `derive_cross_combo()` (`R/get_hotspots.R`), so a future combo like this doesn't need re-deriving from scratch:
+```r
+hs <- extract_hotspots(df = plt_long, ..., combos = combos)
+derive_cross_combo(hs$summary_df, c("water", "access"), new_col = "combined_cross")
+```
+It generalizes to more than two combos (ANDs across all named combos) and errors clearly if a requested combo name has no matching `count_<name>` column.
+
 ### Symmetric Percentage Change (SPC)
 To address mathematical artifacts where the sign of percentage change differs from absolute change (common when baselines are negative or near-zero), this analysis uses a **symmetric percentage change** calculation (`pct_mode="symm"`). This ensures that the direction of the percentage change always aligns with the absolute difference ($t_1 - t_0$).
 

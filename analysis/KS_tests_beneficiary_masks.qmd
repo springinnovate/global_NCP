@@ -1,0 +1,384 @@
+---
+title: "Beneficiary-Mask Socioeconomic Disproportionality (HDI / Gini / GDP)"
+subtitle: "v1.3.4 — Phase 4, 5-service redesign"
+analysis_version: "v1.3.4"
+date: now
+date-format: "YYYY-MM-DD HH:mm zzz"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    geometry: margin=1in
+    df-print: kable
+editor: source
+params:
+  input_gpkg: "10k_change_calc.gpkg"
+  coverage_csv: "tables/beneficiary_mask_coverage_10km.csv"
+  output_suffix: ""
+---
+
+## Overview
+
+Becky's ask (Slack, 2026-08-05/06): apply Rich's beneficiary union-coverage masks —
+`combined_cross_category` and the `3+`/`4+` nested hotspot-count tiers — to the HDI,
+Gini, and GDP rasters, to test whether beneficiary areas are socioeconomically
+disproportionate compared to everywhere else.
+
+This notebook reuses the exact two-sample KS + Cliff's Delta machinery built for the
+WHO chapter (`analysis/KS_tests_hotspots.qmd`, `run_ks_hot_vs_non()` in
+`R/ks_hotspots.R`), with one substitution: the grouping variable is not a
+service's extreme-change hotspot definition, it is a spatial "inside the beneficiary
+buffer mask" flag, produced by zonal-extracting Rich's fine-resolution
+(~30 arcsec) `full_raster_extent_union_coverage.tif` masks onto the 10km analysis
+grid (`Python_scripts/zonal_extract_beneficiary_masks.py`, run inside Rich's Docker
+environment).
+
+**Comparison is direct in-mask vs. out-of-mask**, not the WHO chapter's "median
+background" tail comparison — there is no analogous "typical change" concept for a
+spatial buffer-membership flag; Becky's question is simply mask vs. everywhere else.
+
+**Threshold**: `full_raster_extent_union_coverage.tif` gives a fine-resolution
+0/1 mask; zonal-extracting it onto a coarser 10km cell gives a *fraction* of that
+cell's area covered by the mask. A 10km cell is flagged "inside" the beneficiary
+area if that fraction is ≥ 0.5 (majority rule) — see `KS_CFG$coverage_threshold`
+below to adjust.
+
+## Setup
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+#| echo: false
+
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(stringr)
+library(ggplot2)
+library(readr)
+library(scales)
+library(sf)
+library(here)
+library(devtools)
+
+knitr::opts_knit$set(root.dir = here::here())
+source(here::here("R","paths.R"))
+devtools::load_all(quiet = TRUE)
+
+options(dplyr.summarise.inform = FALSE)
+Sys.setenv(GDAL_NUM_THREADS = "ALL_CPUS", PROJ_NETWORK = "ON")
+set.seed(1)
+```
+
+## Config
+
+```{r}
+#| label: config
+#| echo: true
+
+KS_CFG <- list(
+  categories = c(
+    combined_cross = "combined_cross",
+    tier_3plus     = "tier_3plus",
+    tier_4plus     = "tier_4plus"
+  ),
+  coverage_threshold = 0.5,
+  vars_to_test = c(
+    "rast_gdpTot_1990_2020_30arcsec_2020_sum",
+    "GHS_POP_E2020_GLOBE_sum",
+    "hdi_raster_predictions_2020_mean",
+    "rast_adm1_gini_disp_2020_mean"
+  ),
+  sampling          = "none",
+  nonhot_cap        = 100000L,
+  permute_n         = 0,
+  compute_one_sided = TRUE,
+  adjust_method     = "BH",
+  transform_default = "auto",
+  transform_by_var = c(
+    "rast_gdpTot_1990_2020_30arcsec_2020_sum" = "log1p",
+    "GHS_POP_E2020_GLOBE_sum"                 = "log1p"
+  ),
+  ecdf_top_k             = 3,
+  ecdf_service_selection = "all",
+  out_table = file.path(data_dir(), "processed", "tables",
+                         paste0("ks_results_beneficiary_masks", params$output_suffix, ".csv")),
+  out_dir   = out_plots(paste0("ks_beneficiary_masks", params$output_suffix))
+)
+```
+
+## Load grid + coverage fractions, apply standard land-base filters
+
+Same exclusions used throughout this project's grid-based analyses (Antarctica /
+Seven seas / Lakes / Rock & Ice) so the land base here matches the already-verified
+1,372,621-cell denominator used elsewhere in the 5-service redesign.
+
+```{r}
+#| label: load-grid
+#| message: false
+#| warning: false
+
+gpkg <- file.path(data_dir(), "processed", params$input_gpkg)
+stopifnot(file.exists(gpkg))
+
+lyrs <- sf::st_layers(gpkg)$name
+grid_sf <- sf::st_read(gpkg, layer = lyrs[1], quiet = TRUE)
+grid <- sf::st_drop_geometry(grid_sf)
+stopifnot("grid_fid" %in% names(grid), grid$grid_fid |> duplicated() |> any() == FALSE)
+
+if ("continent" %in% names(grid)) {
+  grid <- dplyr::filter(grid, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))
+}
+if ("WWF_biome" %in% names(grid)) {
+  grid <- dplyr::filter(grid, !WWF_biome %in% c("Lakes", "Rock & Ice"))
+}
+
+n_land_cells <- nrow(grid)
+message("Land base after standard exclusions: ", n_land_cells, " cells")
+```
+
+## Load beneficiary-mask coverage fractions
+
+```{r}
+#| label: load-coverage
+#| message: false
+#| warning: false
+
+coverage <- readr::read_csv(file.path(data_dir(), "processed", params$coverage_csv),
+                             show_col_types = FALSE)
+stopifnot(all(c("grid_fid","category","coverage_frac") %in% names(coverage)))
+
+# sanity: every requested category actually present
+missing_cats <- setdiff(unname(KS_CFG$categories), unique(coverage$category))
+if (length(missing_cats)) stop("Missing categories in coverage CSV: ", paste(missing_cats, collapse = ", "))
+```
+
+## Validation: cross-check against the independently-computed fine-resolution area %
+
+Before trusting this join, cross-check it against `outputs/tables/
+hotspot_5service_beneficiary_area_pct.csv` (2026-08-05), computed via a completely
+independent path — `terra::expanse()` directly on the fine-resolution rasters, no
+10km grid, no exact_extract, no Python zonal-stats pipeline at all. Because the
+analysis grid is equal-area, `% of land cells flagged` (post-threshold) and the raw
+area-weighted mean coverage fraction (pre-threshold) should both land close to that
+reference number. A large mismatch would mean the grid_fid join is wrong — this
+project's history has 4 prior incidents of exactly that failure mode, so this check
+is load-bearing, not decorative.
+
+```{r}
+#| label: validate-coverage
+#| message: false
+#| warning: false
+
+ref_pct <- readr::read_csv(project_dir("outputs","tables","hotspot_5service_beneficiary_area_pct.csv"),
+                            show_col_types = FALSE) |>
+  dplyr::filter(buffer_type == "union") |>
+  dplyr::mutate(category_short = dplyr::case_match(
+    category,
+    "combined_cross_category_beneficiaries" ~ "combined_cross",
+    "hotspot_count_3plus_beneficiaries"     ~ "tier_3plus",
+    "hotspot_count_4plus_beneficiaries"     ~ "tier_4plus",
+    "hotspot_count_1plus_beneficiaries"     ~ "tier_1plus",
+    "hotspot_count_2plus_beneficiaries"     ~ "tier_2plus",
+    "hotspot_count_5plus_beneficiaries"     ~ "tier_5plus",
+    "water_overlap_downstream_beneficiaries"     ~ "water",
+    "access_overlap_travel_time_beneficiaries"   ~ "access",
+    .default = NA_character_
+  )) |>
+  dplyr::select(category_short, ref_pct_of_land = pct_of_total_land)
+
+check <- coverage |>
+  dplyr::semi_join(grid, by = "grid_fid") |>
+  dplyr::group_by(category) |>
+  dplyr::summarise(
+    n_land_cells      = dplyr::n(),
+    mean_coverage_pct = 100 * mean(coverage_frac, na.rm = TRUE),
+    pct_flagged_ge50  = 100 * mean(coverage_frac >= KS_CFG$coverage_threshold, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::left_join(ref_pct, by = c("category" = "category_short")) |>
+  dplyr::mutate(
+    diff_meancov_vs_ref = mean_coverage_pct - ref_pct_of_land,
+    diff_flagged_vs_ref = pct_flagged_ge50  - ref_pct_of_land
+  )
+
+knitr::kable(check, digits = 2)
+
+# hard stop if any target category is wildly off (>5 pct-point) from the
+# independent reference -- would indicate a grid-identity bug, not just
+# expected 10km-vs-30arcsec discretization noise
+target_cats <- unname(KS_CFG$categories)
+bad <- check |> dplyr::filter(category %in% target_cats, abs(diff_meancov_vs_ref) > 5)
+if (nrow(bad) > 0) {
+  print(bad)
+  stop("Coverage validation failed: >5pp mismatch vs independent area-pct reference for a target category.")
+}
+message("Validation passed: all target categories within 5pp of the independent area-pct reference.")
+```
+
+## Build hotspot / non-hotspot tables (in-mask vs. out-of-mask)
+
+```{r}
+#| label: build-groups
+#| message: false
+#| warning: false
+
+grid_vars <- grid |>
+  dplyr::select(grid_fid, dplyr::any_of(KS_CFG$vars_to_test))
+
+stack <- purrr::map_dfr(names(KS_CFG$categories), function(cat_label) {
+  cat_id <- KS_CFG$categories[[cat_label]]
+  cov_cat <- coverage |>
+    dplyr::filter(category == cat_id) |>
+    dplyr::select(grid_fid, coverage_frac)
+
+  grid_vars |>
+    dplyr::inner_join(cov_cat, by = "grid_fid") |>
+    dplyr::mutate(
+      service = cat_id,
+      flag = coverage_frac >= KS_CFG$coverage_threshold
+    )
+})
+
+hotspots_df     <- dplyr::filter(stack, flag)
+non_hotspots_df <- dplyr::filter(stack, !flag)
+
+stopifnot(nrow(hotspots_df) > 0, nrow(non_hotspots_df) > 0)
+
+dplyr::count(stack, service, flag)
+```
+
+## KS tests: beneficiary-mask vs. non-mask
+
+```{r}
+#| label: run-ks
+#| message: false
+#| warning: false
+
+dir.create(dirname(KS_CFG$out_table), recursive = TRUE, showWarnings = FALSE)
+ks_res <- run_ks_hot_vs_non(
+  hotspots_df      = hotspots_df,
+  inverse_df       = non_hotspots_df,
+  vars             = KS_CFG$vars_to_test,
+  sampling         = KS_CFG$sampling,
+  nonhot_cap       = KS_CFG$nonhot_cap,
+  permute_n        = KS_CFG$permute_n,
+  compute_one_sided= KS_CFG$compute_one_sided,
+  adjust_method    = KS_CFG$adjust_method,
+  out_csv          = KS_CFG$out_table
+)
+
+dplyr::glimpse(ks_res, width = 120)
+```
+
+## Visualizations and exports
+
+```{r}
+#| label: ks-plots
+#| message: false
+#| warning: false
+#| echo: false
+
+ks_plot_dir <- KS_CFG$out_dir
+if (dir.exists(ks_plot_dir)) unlink(list.files(ks_plot_dir, full.names = TRUE), recursive = TRUE)
+dir.create(ks_plot_dir, recursive = TRUE, showWarnings = FALSE)
+
+heat_path <- file.path(ks_plot_dir, "ks_heatmap.png")
+ggplot2::ggsave(
+  heat_path,
+  plot_ks_heatmap(ks_res, fill_limits = c(0, NA), reorder = FALSE) +
+    ggplot2::scale_fill_viridis_c(name = "KS Statistic (D)", option = "magma"),
+  width = 8, height = 5, dpi = 300, bg = "white"
+)
+
+for (v in KS_CFG$vars_to_test) {
+  safe_v <- gsub("[^A-Za-z0-9_]+", "_", v)
+  p_bar <- plot_ks_bars(ks_res, v, top_k = length(KS_CFG$categories))
+  ggplot2::ggsave(file.path(ks_plot_dir, paste0("ks_bars_", safe_v, ".png")),
+                   p_bar, width = 7, height = 5, dpi = 300, bg = "white")
+}
+
+ecdf_dir <- file.path(ks_plot_dir, "ecdf")
+dir.create(ecdf_dir, recursive = TRUE, showWarnings = FALSE)
+ecdf_files <- save_ecdf_grids(
+  hotspots_df, non_hotspots_df,
+  vars               = KS_CFG$vars_to_test,
+  ks_res             = ks_res,
+  service_selection  = KS_CFG$ecdf_service_selection,
+  transform_default  = KS_CFG$transform_default,
+  transform_by_var   = KS_CFG$transform_by_var,
+  out_dir            = ecdf_dir,
+  prefix             = "ecdf",
+  width = 9, height = 6, dpi = 300, use_ragg = FALSE, verbose = FALSE
+)
+
+dir_path <- file.path(ks_plot_dir, "directionality_cliffs_delta.png")
+ks_res_plot <- ks_res |>
+  dplyr::mutate(var_label = gsub("_", " ", var)) |>
+  dplyr::mutate(var_label = stringr::str_wrap(var_label, 40))
+
+signed_pow4 <- scales::trans_new(
+  "signed_pow4",
+  transform = function(x) sign(x) * abs(x)^0.25,
+  inverse = function(x) sign(x) * abs(x)^4
+)
+
+p_direction <- ggplot(ks_res_plot, aes(x = service, y = cliffs_delta, fill = cliffs_delta)) +
+  geom_bar(stat = "identity", position = "identity") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0,
+                        name = "Cliff's Delta", trans = signed_pow4) +
+  facet_wrap(~ var_label, ncol = 2, scales = "free_y") +
+  coord_flip() +
+  labs(
+    title = "Directionality of Beneficiary-Mask Effects (Cliff's Delta)",
+    subtitle = "Cliff's Delta > 0 (red): beneficiary-mask cells have higher values.\nCliff's Delta < 0 (blue): beneficiary-mask cells have lower values.",
+    x = "Beneficiary mask category", y = "Cliff's Delta (Effect Size)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(strip.text = element_text(size = 8))
+
+ggsave(dir_path, p_direction, width = 10, height = 7, dpi = 300, bg = "white")
+```
+
+## Results table
+
+```{r}
+#| label: ks-table
+#| echo: false
+
+ks_clean <- ks_res |>
+  dplyr::mutate(
+    Variable = dplyr::case_when(
+      grepl("gdpTot", var) ~ "GDP",
+      grepl("POP", var)    ~ "Population",
+      grepl("hdi", var)    ~ "HDI",
+      grepl("gini", var)   ~ "Gini Index",
+      TRUE ~ var
+    )
+  ) |>
+  dplyr::select(Category = service, Variable, KS_Stat_D = D, Cliffs_Delta = cliffs_delta,
+                p_adj, mean_hot, mean_non, median_hot, median_non, n_hot, n_non) |>
+  dplyr::arrange(Variable, dplyr::desc(abs(Cliffs_Delta)))
+
+knitr::kable(ks_clean, digits = 3)
+```
+
+## Preview
+
+```{r}
+#| label: ks-preview
+#| echo: false
+#| results: 'asis'
+
+pngs <- list.files(ks_plot_dir, pattern = "\\.png$", recursive = TRUE, full.names = FALSE)
+if (length(pngs)) {
+  rel_dir <- file.path("..", "outputs", "plots", paste0("ks_beneficiary_masks", params$output_suffix))
+  rel_paths <- file.path(rel_dir, pngs)
+  md <- paste(sprintf("![](%s)", rel_paths), collapse = "\n\n")
+  knitr::asis_output(md)
+} else {
+  knitr::asis_output("> No KS plots were generated; check upstream chunks.")
+}
+```

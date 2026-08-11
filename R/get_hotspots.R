@@ -405,3 +405,63 @@ filter_multidim <- function(
   }
   data
 }
+
+
+#' Derive a cross-category "AND" column from two or more combo count columns
+#'
+#' `extract_hotspots()`'s `combos` argument produces one `count_<name>` column
+#' per named service group — "how many of this group's services are hotspots
+#' in this cell." That mechanism only ever counts *within* one named group; it
+#' has no built-in way to ask "is this cell a hotspot in combo A AND also in
+#' combo B" across two different combos. This helper adds that one derived
+#' step so it doesn't have to be re-derived by hand per case — see the
+#' `combined_cross` column in `scripts/extract_hotspots_5service.R`, which
+#' wrote this exact pattern out manually before this function existed.
+#'
+#' @param data A data frame containing one `count_<name>` column per combo
+#'   named in `combo_names`, as produced by `extract_hotspots(..., combos = )`.
+#' @param combo_names Character vector of two or more combo names — the same
+#'   keys used in the `combos` list passed to `extract_hotspots()` (without
+#'   the `count_` prefix). The derived column is `1` where *every* named combo
+#'   has at least one hotspot service present in that cell, `0` otherwise.
+#' @param new_col Name for the derived column. Defaults to `combo_names`
+#'   pasted together with `"_x_"` (e.g. `"water_x_access"`).
+#'
+#' @return `data` with one additional integer (0/1) column, `new_col`.
+#'
+#' @examples
+#' \dontrun{
+#' hs <- extract_hotspots(
+#'   df = plt_long, value_col = "pct_chg",
+#'   loss_services = c("Nature_Access", "Pollination"),
+#'   gain_services = c("Sed_export", "N_export", "C_Risk"),
+#'   combos = list(
+#'     water  = c("N_export", "Sed_export"),
+#'     access = c("Nature_Access", "Pollination", "C_Risk")
+#'   ),
+#'   id_cols = c("fid")
+#' )
+#' derive_cross_combo(hs$summary_df, c("water", "access"), new_col = "combined_cross")
+#' }
+#'
+#' @seealso [extract_hotspots()]
+#' @export
+derive_cross_combo <- function(data, combo_names, new_col = NULL) {
+  stopifnot(
+    "`combo_names` must have at least 2 entries" = length(combo_names) >= 2
+  )
+
+  count_cols <- paste0("count_", combo_names)
+  missing <- setdiff(count_cols, names(data))
+  if (length(missing) > 0) {
+    stop(
+      "Missing combo count column(s): ", paste(missing, collapse = ", "),
+      " -- check that `combo_names` match the keys used in extract_hotspots()'s `combos` argument."
+    )
+  }
+
+  if (is.null(new_col)) new_col <- paste(combo_names, collapse = "_x_")
+
+  data[[new_col]] <- as.integer(Reduce(`&`, lapply(count_cols, function(cc) data[[cc]] > 0)))
+  data
+}

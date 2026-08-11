@@ -112,3 +112,93 @@ ecology/SES layer, (3) Colombia/LAC regional grounding — with the connecting t
 "translator between biophysical evidence and the institutional/political conditions that
 determine whether it gets used." Worth its own session to flesh out once the immediate workshop
 pressure is behind you — don't over-scope this now.
+
+---
+
+## CLEC congress (Tremaine Gregory) + Wednesday Aug 12 stacked day (added 2026-08-07)
+
+**Trigger**: email from Tremaine Gregory ("Tremie"), WWF's Lead Sustainable Infrastructure
+Scientist, Forests, and IDB-WWF workshop contact — she's on the scientific committee of the
+inaugural **Congreso Latinoamericano de Ecología de Carreteras (CLEC)**, Medellín, Colombia,
+**November 9–13, 2026** (field visit + post-conference course included). Abstract submission
+(oral or poster) deadline: **August 12, 2026** — the submission portal is
+`clec-lactwg.org/borradores/` but it returns HTTP 403 to automated fetches (bot-protected);
+submission requirements (word limits, format, tracks) need to come from the user directly or a
+manual visit, not yet captured here. Tremie offered to review any draft submission.
+
+**Two distinct asks from Tremie, different timelines**:
+1. Submit a CLEC abstract — due **2026-08-12**.
+2. **Design a course** for the CLEC post-conference course slot — a mid-term objective (event is
+   in November), but Tremie needs a response/commitment draft soon, not November.
+
+**The same day, Aug 12, is already stacked**: lunch with a WWF colleague (used as a practice run),
+immediately followed by the already-confirmed **Sandra Valenzuela / WWF Colombia meeting**
+(see [[project_capability_portfolio_pitch]] memory — this meeting is tied to the user's
+postdoc-ending-October employment question, the highest-stakes single event in this whole
+thread). Deliberate strategy: build **one core deliverable** — a Colombia-scoped,
+**Spanish-language** presentation of the hotspot/beneficiary-exposure methodology — that serves
+all three purposes at once: the CLEC abstract content, the colleague-lunch practice run, and the
+Sandra meeting itself.
+
+**Why Colombia + roads is a natural fit, not a stretch**: WWF Colombia's Green Road Infrastructure
+(GRI) guidelines work (10-year policy journey, mandatory since 2024) is already the strongest
+positioning hook from Workshop 3 (see above) — "understand landscape, ecological corridors, and
+connectivity before any project decision." A CLEC abstract applying the ES-hotspot +
+beneficiary-exposure pipeline to Colombian road/infrastructure planning is a direct, credible
+extension of that hook, not a new pitch invented for this deadline.
+
+**Scoping question, open**: the global 10km-grid pipeline currently only has Colombia inside the
+LAC regional aggregate — no country-level cut exists yet (same honest-gap framing as the rest of
+this doc). User's own read: the global-scale cut may be "too broad" for this audience; the same
+pipeline architecture supports rerunning at country-level/finer resolution if needed (see
+`README.md`'s reproducibility notes and Phase 4's Docker-based zonal-extraction build this week,
+which proved the toolchain can run country-scale zonal work locally now that "lilling" is
+unavailable). Not decided yet whether a full country-level rerun is warranted for Aug 12 or
+whether the existing LAC-cut + Colombia-specific narrative framing is sufficient for this
+timeline — needs a decision before drafting starts.
+
+**Material to draw from** (per user's explicit instruction to keep all of this in context):
+- `docs/manuscript/paper_draft_5service.qmd` — verified 5-service abstract numbers (hotspot count/
+  land share, beneficiary exposure, regional disparity).
+- `docs/manuscript/` book chapters (methodology, WHO/WHERE/WHY structure).
+- `docs/presentations/idb_wwf_workshop1_case_study.qmd` — existing IADB deck (English), LAC-zoomed
+  maps, opportunities/risks framing, already reviewed by Becky.
+- **This week's Phase 4 result** (`analysis/KS_tests_beneficiary_masks.qmd`,
+  `data/processed/tables/ks_results_beneficiary_masks.csv`) — beneficiary areas are significantly
+  wealthier, more populated, and more unequal (Gini) than the rest of the landscape; content-ready
+  pending the user's own review before it goes to Becky (see main plan doc,
+  `docs/hotspot_redesign_plan.md`, Phase 4 section).
+- `sandra_email_draft.md` referenced in memory as already sent (2026-07-16) — not found at its
+  expected path in this repo as of 2026-08-07; needs locating or was sent from outside the repo
+  (OneDrive/email client) — flag to user rather than assume lost.
+
+**The course brochure already exists in draft — this is not a from-scratch design task.**
+User shared screenshots (2026-08-07) of the actual draft brochure, "**Infraestructura Vial
+Alineada con la Biodiversidad**," organized by LAC-TWG / IUCN-CCSG with ITM-PECIV and RECOSFA
+(Colombian road-ecology program/network). Nov 14–15, 2026 — Day 1 theoretical, Day 2 field trip —
+directly following CLEC (Nov 9–13), confirming this is the same "post-conference course" from
+Tremie's email. 50–60 participants: civil engineering/biology/wildlife-management students and
+professionals, road builders and concessionaires, INVIAS, Ministry of Transport, Ministry of
+Environment, ANI, territorial environmental managers and decision-makers. 4 teaching modalities
+(theoretical sessions, roundtables, field trip, case studies) across ~13 modules; case studies
+already slated: Autopista al Mar 1, Cundinamarca corridors, Valle del Magdalena, and connections
+to Colombia's national vulnerability map.
+
+**The concrete entry point**: **Módulo 5 — "Priorización de intervenciones: hotspots, modelos
+predictivos y conectividad"** is a near-literal match to this project's own hotspot pipeline —
+not a stretch-fit, the module title could describe this repo. The teaching-faculty table lists 9
+named instructors (Brazil, Costa Rica, Argentina, Colombia, Ecuador institutions) and **one open
+slot, #10, "Docente invitado(a) de la región" — still "Sin definir."** The Colombian anchor
+instructor is Juan Carlos Jaramillo Fayad (ITM, co-coordinator RECOSFA, co-president LAC-TWG
+Colombia; listed specialty: MaxEnt modeling, governance, the flagship Colombian course content) —
+adjacent to, not competing with, the predictive-modeling/hotspot-prioritization content the user
+would bring.
+
+**User's own read, stated directly**: this is a genuinely strategic opportunity for the
+employment-continuation question (see "Employment stakes" in [[project_capability_portfolio_pitch]]
+memory) — landing a real, named role in this course (co-teaching Módulo 5, or filling the open
+regional-guest slot) is a stronger, more durable outcome than a one-off conference abstract.
+
+**Status**: not started. User is finishing his own review of the Becky/Phase 4 report and wants to
+discuss scope (country-level rerun vs. existing LAC cut; abstract vs. course-design response to
+Tremie; presentation structure) before drafting begins.

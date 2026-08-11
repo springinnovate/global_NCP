@@ -137,7 +137,7 @@ if (length(old_hotness) > 0) {
 ```{r}
 #| label: load-data
 #| echo: false
-#| eval: false
+#| eval: true
 
 # Helper function to find and rename a column from a list of candidates
 standardize_col_name <- function(df, new_name, candidates) {
@@ -193,7 +193,7 @@ if (length(missing_cols) > 0) {
 ```{r}
 #| label: global-filters
 #| echo: false
-#| eval: false
+#| eval: true
 
 # --- GLOBAL FILTER: Exclude "High income: nonOECD" from all analyses in this script ---
 if ("income_grp" %in% names(grid_df)) {
@@ -220,7 +220,7 @@ if ("income_grp" %in% names(grid_df)) {
 #| label: config-summary
 #| echo: false
 #| results: 'asis'
-#| eval: false
+#| eval: true
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
@@ -228,17 +228,16 @@ HOTS_CFG <- list(
   pct_cutoff      = 0.05,
   threshold_mode  = "percent",
   rule_mode       = "vectors",
-  loss = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
-  gain = c("Sed_export","N_export","C_Risk"),
-<   groupings = c("income_grp", "region_wb", "WWF_biome", "nev_name"),
+  loss = c("Nature_Access", "Pollination"),
+  gain = c("Sed_export", "N_export", "C_Risk"),
+  groupings = c("income_grp", "region_wb", "WWF_biome", "nev_name"),
   combos = list(
-    deg_combo = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
-    rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+    water  = c("N_export", "Sed_export"),
+    access = c("Nature_Access", "Pollination", "C_Risk")
   ),
   svc_order = c(
-    "C_Risk","N_export","Sed_export",
-    "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-    "Pollination","Nature_Access"
+    "C_Risk", "N_export", "Sed_export",
+    "Pollination", "Nature_Access"
   )
 )
 
@@ -257,8 +256,8 @@ config_summary_df <- tibble::tribble(
   "Rule Mode", HOTS_CFG$rule_mode,
   "Loss Services", paste(HOTS_CFG$loss, collapse = ", "),
   "Gain Services", paste(HOTS_CFG$gain, collapse = ", "),
-  "Degradation Combo", paste(HOTS_CFG$combos$deg_combo, collapse = ", "),
-  "Recovery Combo", paste(HOTS_CFG$combos$rec_combo, collapse = ", "),
+  "Water Combo", paste(HOTS_CFG$combos$water, collapse = ", "),
+  "Access Combo", paste(HOTS_CFG$combos$access, collapse = ", "),
   "Grouping Variables", paste(HOTS_CFG$groupings, collapse = ", "),
   "Service Order", paste(HOTS_CFG$svc_order, collapse = ", ")
 )
@@ -284,7 +283,7 @@ valid_groupings <- intersect(HOTS_CFG$groupings, names(grid_df))
 ```{r}
 #| label: extract-hotspots
 #| echo: false
-#| eval: false
+#| eval: true
 
 hs_global_obj <- extract_hotspots(
   df = plt_long,
@@ -304,7 +303,7 @@ hs_global_obj <- extract_hotspots(
 ```{r}
 #| label: calc-intensity
 #| echo: false
-#| eval: false
+#| eval: true
 
 hs_flags <- hs_global_obj$hotspots_df %>%
   dplyr::select(fid, service) %>%
@@ -313,13 +312,25 @@ hs_flags <- hs_global_obj$hotspots_df %>%
 global_totals <- hs_flags %>%
   dplyr::count(service, name = "global_n_hot")
 
+# Cells actually eligible for each service (i.e. present in plt_long for that
+# service). Some services (Coastal Risk + its retention-ratio counterparts)
+# are only geographically valid on a narrow subset of land cells; denominators
+# must be built from this eligible set, not the full land grid, or
+# expected_share/relative_intensity get computed against land area a service
+# could never occupy in the first place (see WORKLOG.md, 2026-08-11, Coastal
+# Risk denominator bug).
+valid_cells_by_svc <- plt_long %>%
+  dplyr::select(fid, service) %>%
+  dplyr::distinct() %>%
+  dplyr::mutate(service = as.character(service))
+
 area_stats_list <- list()
 
 for (g in valid_groupings) {
   stats_all <- lapply(HOTS_CFG$svc_order, function(svc) {
-    grid_svc <- grid_df %>%
-      dplyr::select(fid, dplyr::all_of(g)) %>%
-      dplyr::mutate(service = as.character(svc)) %>%
+    grid_svc <- valid_cells_by_svc %>%
+      dplyr::filter(service == svc) %>%
+      dplyr::inner_join(grid_df %>% dplyr::select(fid, dplyr::all_of(g)), by = "fid") %>%
       dplyr::left_join(hs_flags %>% dplyr::filter(service == svc) %>% dplyr::mutate(service = as.character(service)), by = c("fid", "service")) %>%
       dplyr::mutate(is_hotspot = tidyr::replace_na(is_hotspot, 0)) %>%
       # Apply master exclusions
@@ -364,7 +375,7 @@ message("Hotspot area statistics saved to: ", out_csv_path)
 #| label: plot-intensity
 #| message: false
 #| echo: false
-#| eval: false
+#| eval: true
 
 
 biome_labels <- c(
@@ -496,7 +507,7 @@ for (g_var in valid_groupings) {
 ```{r}
 #| label: calc-overlap
 #| echo: false
-#| eval: false
+#| eval: true
 
 hotspot_counts <- hs_global_obj$hotspots_df %>%
   dplyr::group_by(fid) %>%
@@ -542,7 +553,7 @@ readr::write_csv(hotness_stats, out_csv)
 ```{r}
 #| label: plot-overlap
 #| echo: false
-#| eval: false
+#| eval: true
 
 plot_hotness <- function(df, g_var) {
   d_plot <- df %>% dplyr::filter(grouping == g_var) %>% dplyr::slice_head(n = 15) %>%

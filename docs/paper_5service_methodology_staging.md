@@ -53,11 +53,18 @@ choose one framing) might eventually say.
    both; the paper likely can't afford to show both in full — needs her call on emphasis.
 2. **Where retention ratios go in the paper if dropped from hotspot detection** — mentioned in
    passing (per the candidate paragraph above) or given their own subsection?
-3. **The actual updated headline numbers** — hotspot count, population exposure, all regional/
-   income/biome breakdowns — none of this exists yet for the 5-service definition beyond the
-   global raw counts (189,927 pct-metric hotspots; see `docs/hotspot_5service_rasters_README.md`
-   for the full current numbers). Everything downstream of that (maps, beneficiary reruns, KS/
-   Gini analysis) is still pending.
+3. **The actual updated headline numbers** — status as of 2026-07-30:
+   - Global raw hotspot counts: done (189,927 pct-metric hotspots; see
+     `docs/hotspot_5service_rasters_README.md`).
+   - Global maps (water/access/combined overlap, native-10km paired change figure): done.
+   - Regional/income/biome/country area-coverage, global-share, relative-intensity, and
+     multi-service "hotness" breakdowns: **done** (`data/processed/tables/hotspot_area_stats.csv`,
+     `hotspot_multiservice_stats.csv`, 219 per-group CSVs under
+     `data/processed/tables/regional_subsets/`). Not yet pulled into paragraph form here.
+   - Population exposure by income/HDI/GDP/Gini, subregional: **deliberately deferred**, not
+     started for the 5-service definition.
+   - Beneficiary counts from Rich's water-hotspot/access-hotspot rerun, and the Gini/HDI KS test:
+     still blocked on his reply (see Phase 3/4 in `docs/hotspot_redesign_plan.md`).
 4. **Whether the water/access/combined framing gets its own figure/table in the paper**, or is
    folded into the existing hotspot-count discussion as an additional lens.
 
