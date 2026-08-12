@@ -116,6 +116,23 @@ table.terms td:last-child { color: var(--ink-2); }
 .validation-note ul { margin: 8px 0 0; padding-left: 18px; }
 .validation-note li { margin-top: 4px; }
 
+/* CSS-only tabs (same pattern as phase4_report_styles.css) -- no JS, stays portable */
+.chart-tabs { margin-top: 14px; }
+.chart-tabs input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+.chart-tabs .tab-labels { display: flex; flex-wrap: wrap; gap: 4px; }
+.chart-tabs label {
+  cursor: pointer; padding: 8px 16px; border: 1px solid var(--border); border-radius: 3px 3px 0 0;
+  font-size: 13px; font-weight: 600; color: var(--ink-2); background: var(--surface); user-select: none;
+}
+.chart-tabs input:checked + label { background: var(--wwf-green); color: #fff; border-color: var(--wwf-green); }
+.chart-tabs .tab-panel { display: none; border: 1px solid var(--border); border-top: none; padding: 16px; border-radius: 0 0 3px 3px; }
+#tab-focus:checked ~ .panels .panel-focus,
+#tab-others:checked ~ .panels .panel-others,
+#tab-biome-focus:checked ~ .panels .panel-biome-focus,
+#tab-biome-others:checked ~ .panels .panel-biome-others,
+#tab-ben-zone:checked ~ .panels .panel-ben-zone,
+#tab-ben-pop:checked ~ .panels .panel-ben-pop { display: block; }
+
 .map-card { border: 1px solid var(--border); border-radius: 3px; overflow: hidden; margin-top: 10px; }
 .map-card img { width: 100%; display: block; border-radius: 3px; }
 .map-card + p.map-caption, p.map-caption { font-size: 11.5px; color: var(--muted); margin: 6px 0 0; }

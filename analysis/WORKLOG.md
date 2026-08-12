@@ -1,5 +1,68 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-08-12 — Colombia CLEC/Sandra report matured into a real "priority" analysis; abstract finalized and shared with Laín
+
+Continuation of the Colombia CLEC congress / Sandra Valenzuela (WWF Colombia) thread from
+yesterday. Big-picture arc of today's session: the Colombia report (`docs/reports/
+colombia_clec_report.qmd`) went from "two layers shown side by side" to an actual integrated
+priority analysis, and the CLEC abstract (`docs/applications/clec_abstract_draft.md`) went
+through several rounds of precision fixes before being shared.
+
+**Critical natural assets got the same statistical treatment hotspots already had.** New scripts
+`scripts/mapping/make_colombia_priority_overlap.R` and `make_colombia_cna_stats.R`: Colombia
+holds **2.57% of the world's critical natural assets while being only 0.88% of eligible global
+land — 2.93× relative intensity**, stronger than any hotspot-of-change finding. Within Colombia,
+**páramo/montane biomes lead at 1.64×** (sabanas/Llanos second, 1.34×), reinforcing the
+"páramos that supply Bogotá" framing already used elsewhere.
+
+**The actual prioritization signal is the overlap, not the two layers separately** — a point the
+IADB workshop deck's own notes had already made but never computed. New: **57.9% of Colombia's
+hotspots of change also fall inside a critical natural asset** (824 of 1,423 cells) — the real
+"avoid this first" signal, now the lead finding in both the report and the Sandra deck.
+
+**Corrected a real attribution error, traced across the whole session's materials**: had been
+calling the road-infrastructure policy "Infraestructura Vial Alineada con la Biodiversidad (GRI)"
+and attributing it to WWF Colombia — wrong on both counts. The actual policy is the
+**Lineamientos de Infraestructura Verde Vial (LIVV)**, a Mintransporte-led interministerial policy
+(with Minambiente, ANI, INVIAS, DNP), where WWF Colombia and FCDS are credited as technical
+support, not authors. ("Infraestructura Vial Alineada con la Biodiversidad" is actually the title
+of the separate CLEC post-conference course brochure — a different thing entirely.) Fixed
+everywhere: report, deck, abstract. Also verified via live web search that "jerarquía de
+mitigación de impactos" (impact mitigation hierarchy) is real, LIVV-documented terminology
+(confirmed against a WWF Colombia article on the LIVV pilot, El Retorno–Calamar) — not, as
+initially drafted, an invented "road ecology" framework.
+
+**Beneficiary map fixed for a real accuracy problem**: the reach-zone map's teal layer was being
+captioned as "population" when it's actually just the geographic buffer mask population gets
+overlaid onto — not population itself. Fixed the caption, and added a genuine population-density
+panel (`colombia_beneficiary_population_map.png`, using the previously-unused
+`full_raster_extent_union_population.tif`) as a second tab, so the report now shows both the mask
+and actual population density, not one mislabeled as the other.
+
+**Two new deliverables**: `docs/reports/colombia_clec_report_en.qmd` (full English translation of
+the report, prose-only — charts keep their Spanish labels, per explicit scope decision, to avoid
+re-running ~10 R scripts under today's time pressure) and `docs/applications/clec_abstract_en.qmd`
+(faithful English translation of the abstract, explicitly not word-capped — exists to mirror the
+Spanish accurately, not to meet the 300-word submission limit). Both render to `.docx` via
+`quarto render --to docx` for easy sharing outside the repo.
+
+**Abstract went through several precision passes** (terminology: "hotspots de cambio," not bare
+"hotspots"; the LIVV/mitigation-hierarchy fix above; fixed a stray gerund-led sentence and a
+missing em-dash from live edits; defined "categoría cruzada combinada" inline instead of dropping
+undefined jargon; connected an orphaned sentence about sediment export back to the road-relevance
+point). Final Spanish version: 294 words (limit 300) — verified directly against the actual
+paragraph text, not just the file's own count note (which had drifted stale mid-session more than
+once; worth double-checking word count from the source text directly, not trusting a comment).
+
+**Status**: Spanish abstract (`docs/applications/clec_abstract_es.docx`) shared with Laín Efrén
+Prado (co-author, WWF Colombia) today. English version (`clec_abstract_en.docx`) being prepared
+to show Becky before final submission — CLEC deadline is today (2026-08-12), submission portal
+`clec-lactwg.org/inscripcion-y-resumenes/`. Still open: institutional-name format unconfirmed
+against the actual form, Becky's preferred author-name format unconfirmed, and the
+Colombia-specific HDI/Gini/GDP beneficiary-disproportionality analysis (parallel to the Phase 4
+report) is flagged as a TODO directly in `colombia_clec_report.qmd` near the "Quién" section —
+deferred until after today's noon meeting.
+
 ### 2026-08-11 (later) — Coastal Risk denominator bug: root cause, scoped Colombia fix, pipeline fix
 
 Picked back up the Coastal Risk 0.12x flag left open in the CLEC/Sandra thread (see entry below,

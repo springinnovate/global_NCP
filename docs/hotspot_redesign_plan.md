@@ -233,6 +233,15 @@ Becky has weighed in on the open structural questions. Do these as one batch onc
    (renaming under time pressure risks breaking references across dozens of scripts) — flagged
    so it doesn't quietly disappear.
 
+   **Same root cause, fresh instance (2026-08-11/12):** the ID column name itself is inconsistent
+   across otherwise-related files — `10k_change_calc.gpkg` and the per-country hotspot gpkgs
+   (`data/processed/hotspots/pct/nev_name/*.gpkg`) use `grid_fid`, while `plt_long.rds` carries
+   both `fid` *and* `grid_fid` as separate columns. Cost real time twice while building the
+   Colombia CLEC/Sandra scripts this session (wrong assumption `fid` was the universal ID,
+   caught only when a join silently failed). Same underlying problem as the grid-file
+   proliferation above — needs to be resolved together as one definitive pass (canonical grid
+   file + canonical ID column name, documented), not patched file-by-file as scripts hit it.
+
 2. **Document the `combos` mechanism as a first-class, user-facing capability — DONE (2026-08-03).**
    - **Written how-to**: added to `docs/methodology.md`, new "Multi-Service Overlap Combos" subsection
      under "Change Metrics & Hotspot Definition" — what `HOTS_CFG$combos` is, how a named list of
@@ -304,6 +313,25 @@ Becky has weighed in on the open structural questions. Do these as one batch onc
    similar enough names that it's not obvious without reading both generating scripts whether
    these are genuinely different analyses or a near-duplicate under two names.
    Deliberately not started — flagged per the user so it doesn't get lost, same as items 0-1.
+
+5. **Country-report toolbox — new item (2026-08-12), not started.** The Colombia CLEC/Sandra
+   session (2026-08-11/12) produced 5 standalone, Colombia-hardcoded scripts:
+   `scripts/mapping/make_colombia_report_maps.R` (change panels, hotspot map, beneficiary map),
+   `make_colombia_relative_intensity_chart.R` (share-vs-expected and coverage bar charts, split
+   focus/others), `make_colombia_biome_analysis.R` (intra-country biome breakdown), `make_colombia_
+   critical_assets_map.R`, and `make_colombia_priority_overlap.R` (critical assets ∩ hotspots of
+   change). Each duplicates the same grid-loading (`10k_change_calc.gpkg` filtered to one country),
+   WWF color palette, and output-path logic, hardcoded to `nev_name == "Colombia"` — none of it is
+   reusable for another country/region without rebuilding from scratch. User flagged this directly:
+   "are we going to have a set toolbox of functions to create maps in which we only give e.g. the
+   target country/polygon variables and it generates the maps?" — yes, that's the right shape.
+   **Scope for the eventual pass**: extract a parameterized function (or small set of functions,
+   one per map/chart type) taking a country/polygon filter and the standard set of variables, that
+   reproduces this exact map/chart set for any country. Needs real design thought (which parts stay
+   fixed vs. parameterized — service list, biome grouping, focus-vs-other split — and how a country
+   with a different biome/service composition than Colombia should degrade gracefully), so
+   deliberately not done alongside the CLEC/Sandra deadline. Same underlying pattern as items 1 and
+   3 above (undocumented one-off proliferation), just for country-scoped analysis scripts.
 
 ---
 

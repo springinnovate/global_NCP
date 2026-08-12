@@ -99,7 +99,9 @@ print(stats %>% filter(service %in% c("Pollination", "Sed_export")) %>%
         select(service, WWF_biome, n_total, n_hot, expected_share_intra, pct_share_intra, relative_intensity_intra))
 
 # ------------------------------------------------------------------------------
-# 4. Chart: relative intensity by biome, for the 2 headline services
+# 4. Chart: relative intensity by biome, split focus (Pollination, Sed_export)
+#    vs. others (N_export, Nature_Access, C_Risk) -- matches the report's
+#    tabbed treatment of the statistical-analysis section.
 # ------------------------------------------------------------------------------
 
 biome_short <- c(
@@ -111,37 +113,48 @@ biome_short <- c(
   "Mangroves" = "Manglares"
 )
 
-plot_df <- stats %>%
-  filter(service %in% c("Pollination", "Sed_export"), n_total >= 50) %>%
-  mutate(
-    biome_es = recode(WWF_biome, !!!biome_short),
-    service_es = recode(service, Pollination = "Polinización", Sed_export = "Exportación de sedimentos")
-  )
+svc_es <- c(
+  Pollination = "Polinización", Sed_export = "Exportación de sedimentos",
+  N_export = "Exportación de nitrógeno", Nature_Access = "Acceso a la naturaleza",
+  C_Risk = "Riesgo costero"
+)
 
-p <- ggplot(plot_df, aes(x = relative_intensity_intra, y = reorder(biome_es, relative_intensity_intra), fill = relative_intensity_intra > 1)) +
-  geom_col(width = 0.65) +
-  geom_vline(xintercept = 1, linetype = "dashed", color = "gray40") +
-  geom_text(aes(label = sprintf("%.2f×", relative_intensity_intra)), hjust = -0.15, size = 3.3, color = "gray20") +
-  scale_fill_manual(values = c("TRUE" = wwf_orange, "FALSE" = wwf_teal), guide = "none") +
-  facet_wrap(~ service_es, ncol = 1, scales = "free_y") +
-  scale_x_continuous(expand = expansion(mult = c(0, 0.25))) +
-  labs(
-    title = "¿Qué bioma concentra los hotspots de cambio dentro de Colombia?",
-    subtitle = "Intensidad relativa intra-Colombia: participación del bioma en los hotspots de cambio de Colombia\nvs. su participación en el área elegible de Colombia para ese servicio (biomas con ≥50 celdas elegibles)",
-    x = NULL, y = NULL
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    plot.title = element_text(face = "bold", size = 13.5, color = wwf_dark_green),
-    plot.subtitle = element_text(size = 9.5, color = "gray30", margin = margin(b = 10)),
-    strip.text = element_text(face = "bold", size = 11, color = wwf_dark_green),
-    panel.grid.minor = element_blank(),
-    panel.grid.major.y = element_blank(),
-    axis.text.y = element_text(size = 10)
-  )
+make_biome_chart <- function(svcs, out_file) {
+  plot_df <- stats %>%
+    filter(service %in% svcs, n_total >= 50) %>%
+    mutate(
+      biome_es = recode(WWF_biome, !!!biome_short),
+      service_es = factor(recode(service, !!!svc_es), levels = svc_es[svcs])
+    )
 
-ggsave(file.path(out_dir, "colombia_biome_relative_intensity.png"), p, width = 9, height = 7, dpi = 200, bg = "white")
-message("Saved biome relative-intensity chart.")
+  p <- ggplot(plot_df, aes(x = relative_intensity_intra, y = reorder(biome_es, relative_intensity_intra), fill = relative_intensity_intra > 1)) +
+    geom_col(width = 0.65) +
+    geom_vline(xintercept = 1, linetype = "dashed", color = "gray40") +
+    geom_text(aes(label = sprintf("%.2f×", relative_intensity_intra)), hjust = -0.15, size = 3.3, color = "gray20") +
+    scale_fill_manual(values = c("TRUE" = wwf_orange, "FALSE" = wwf_teal), guide = "none") +
+    facet_wrap(~ service_es, ncol = 1, scales = "free_y") +
+    scale_x_continuous(expand = expansion(mult = c(0, 0.25))) +
+    labs(
+      title = "¿Qué bioma concentra los hotspots de cambio dentro de Colombia?",
+      subtitle = paste(strwrap("Intensidad relativa intra-Colombia: participación del bioma en los hotspots de cambio de Colombia vs. su participación en el área elegible de Colombia para ese servicio (biomas con ≥50 celdas elegibles)", width = 78), collapse = "\n"),
+      x = NULL, y = NULL
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+      plot.title = element_text(face = "bold", size = 13.5, color = wwf_dark_green),
+      plot.subtitle = element_text(size = 9.5, color = "gray30", margin = margin(b = 10)),
+      strip.text = element_text(face = "bold", size = 11, color = wwf_dark_green),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.y = element_blank(),
+      axis.text.y = element_text(size = 10)
+    )
+
+  ggsave(file.path(out_dir, out_file), p, width = 9, height = max(3.5, length(svcs) * 3.2), dpi = 200, bg = "white")
+  message("Saved: ", out_file)
+}
+
+make_biome_chart(c("Pollination", "Sed_export"), "colombia_biome_relative_intensity_focus.png")
+make_biome_chart(c("N_export", "Nature_Access", "C_Risk"), "colombia_biome_relative_intensity_others.png")
 
 # ------------------------------------------------------------------------------
 # 5. Reference map: Colombia's biomes (for context)

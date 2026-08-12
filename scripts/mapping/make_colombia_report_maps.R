@@ -61,10 +61,10 @@ svc_defs <- list(
 get_color_scale <- function(direction, limits) {
   if (direction == "good") {
     scale_fill_gradient2(low = wwf_orange, mid = "white", high = wwf_teal,
-                          midpoint = 0, limits = limits, name = "% change", na.value = "gray95")
+                          midpoint = 0, limits = limits, name = "% cambio", na.value = "gray95")
   } else {
     scale_fill_gradient2(low = wwf_teal, mid = "white", high = wwf_orange,
-                          midpoint = 0, limits = limits, name = "% change", na.value = "gray95")
+                          midpoint = 0, limits = limits, name = "% cambio", na.value = "gray95")
   }
 }
 
@@ -105,8 +105,8 @@ for (nm in names(panels)) {
 
 combined_change <- wrap_plots(panels, ncol = 3) +
   plot_annotation(
-    title = "Colombia — Ecosystem Service Change, 1992–2020",
-    subtitle = "Percentage change per 10km grid cell (5 tracked services)",
+    title = "Colombia — Cambio en servicios ecosistémicos, 1992–2020",
+    subtitle = "Cambio porcentual por celda de 10km (5 servicios evaluados)",
     theme = theme(
       plot.title = element_text(size = 16, face = "bold", hjust = 0.5, color = wwf_dark_green),
       plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray30")
@@ -141,10 +141,10 @@ names(ramp) <- c("1", "2", "3", "4–5")
 p_hs <- ggplot() +
   geom_sf(data = colombia_boundary, fill = "gray97", color = "gray70", linewidth = 0.3) +
   geom_sf(data = hs5, aes(fill = hotspot_label), color = NA) +
-  scale_fill_manual(name = "Overlapping\nES hotspots", values = ramp, na.value = "gray90", drop = FALSE) +
+  scale_fill_manual(name = "Hotspots de\ncambio superpuestos", values = ramp, na.value = "gray90", drop = FALSE) +
   labs(
-    title = "Colombia — Compound Ecosystem Service Hotspots",
-    subtitle = "Cells with extreme decline in ≥1 of 5 tracked services, 1992–2020"
+    title = "Colombia — Hotspots de cambio compuestos",
+    subtitle = "Celdas con cambio extremo en ≥1 de 5 servicios evaluados, 1992–2020"
   ) +
   theme_void() +
   theme(
@@ -185,13 +185,13 @@ if (file.exists(coverage_tif)) {
   p_ben <- ggplot() +
     geom_sf(data = colombia_boundary, fill = "gray97", color = "gray70", linewidth = 0.3) +
     geom_raster(data = df_cov, aes(x = x, y = y), fill = wwf_teal, alpha = 0.55) +
-    geom_sf(data = hs5, aes(color = hotspot_label), fill = NA, size = 0.05, show.legend = FALSE) +
-    scale_color_manual(values = ramp) +
+    geom_sf(data = hs5, aes(fill = hotspot_label), color = NA, show.legend = FALSE) +
+    scale_fill_manual(values = ramp) +
     coord_sf(xlim = c(col_bbox["xmin"], col_bbox["xmax"]),
              ylim = c(col_bbox["ymin"], col_bbox["ymax"]), expand = FALSE) +
     labs(
-      title = "Colombia — Beneficiary Reach",
-      subtitle = "Teal: within 50km downstream or 1hr travel-time of a combined-cross-category hotspot\n(reaches 75.8% of Colombia's population, 38.1M people)"
+      title = "Colombia — Reach Zone (not population)",
+      subtitle = "Teal: the 50km-downstream / 1hr-travel-time reach zone around a combined-cross-category hotspot\n(this mask, overlaid on population data, is what yields 75.8% / 38.1M people -- see population panel for density)"
     ) +
     theme_void() +
     theme(
@@ -200,6 +200,46 @@ if (file.exists(coverage_tif)) {
     )
   ggsave(file.path(out_dir, "colombia_beneficiary_map.png"), p_ben, width = 9, height = 10.5, dpi = 200, bg = "white")
   message("Saved beneficiary-reach map.")
+
+  # ----------------------------------------------------------------------------
+  # 4b. Population-density map WITHIN the reach zone (the actual "population_tif"
+  #     file was loaded above but never used -- this is what it's for: showing
+  #     where people actually are inside the reach mask, not just the mask itself)
+  # ----------------------------------------------------------------------------
+  if (file.exists(population_tif)) {
+    message("Building population-density map...")
+    r_pop <- rast(population_tif)
+    r_pop_col <- crop(r_pop, ext_col)
+
+    df_pop <- as.data.frame(r_pop_col, xy = TRUE)
+    names(df_pop)[3] <- "population"
+    df_pop <- df_pop %>% filter(population > 0)
+
+    p_pop <- ggplot() +
+      geom_sf(data = colombia_boundary, fill = "gray97", color = "gray70", linewidth = 0.3) +
+      geom_raster(data = df_pop, aes(x = x, y = y, fill = population)) +
+      scale_fill_gradientn(
+        name = "Población\npor celda",
+        colours = c("#E8F5E9", wwf_teal, wwf_dark_green),
+        trans = "log10", labels = scales::comma, na.value = NA
+      ) +
+      coord_sf(xlim = c(col_bbox["xmin"], col_bbox["xmax"]),
+               ylim = c(col_bbox["ymin"], col_bbox["ymax"]), expand = FALSE) +
+      labs(
+        title = "Colombia — Densidad de población dentro de la zona de alcance",
+        subtitle = "Población real (escala logarítmica) dentro del área de 50km aguas abajo / 1hr de tiempo de viaje"
+      ) +
+      theme_void() +
+      theme(
+        plot.title = element_text(size = 14.5, face = "bold", hjust = 0.5, color = wwf_dark_green),
+        plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray30"),
+        legend.position = "right"
+      )
+    ggsave(file.path(out_dir, "colombia_beneficiary_population_map.png"), p_pop, width = 9, height = 10.5, dpi = 200, bg = "white")
+    message("Saved population-density map.")
+  } else {
+    message("  SKIP population map: ", population_tif, " not found")
+  }
 } else {
   message("  SKIP beneficiary map: ", coverage_tif, " not found")
 }
