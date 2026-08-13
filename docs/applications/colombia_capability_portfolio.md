@@ -147,15 +147,14 @@ connectivity before any project decision." A CLEC abstract applying the ES-hotsp
 beneficiary-exposure pipeline to Colombian road/infrastructure planning is a direct, credible
 extension of that hook, not a new pitch invented for this deadline.
 
-**Scoping question, open**: the global 10km-grid pipeline currently only has Colombia inside the
-LAC regional aggregate — no country-level cut exists yet (same honest-gap framing as the rest of
-this doc). User's own read: the global-scale cut may be "too broad" for this audience; the same
-pipeline architecture supports rerunning at country-level/finer resolution if needed (see
-`README.md`'s reproducibility notes and Phase 4's Docker-based zonal-extraction build this week,
-which proved the toolchain can run country-scale zonal work locally now that "lilling" is
-unavailable). Not decided yet whether a full country-level rerun is warranted for Aug 12 or
-whether the existing LAC-cut + Colombia-specific narrative framing is sufficient for this
-timeline — needs a decision before drafting starts.
+**Scoping question — resolved (2026-08-11/12)**: built the full country-level cut, not the
+LAC-aggregate framing. Colombia-specific report (`docs/reports/colombia_clec_report.qmd`,
+Spanish, HTML with basic interactivity), a Spanish revealjs deck for Sandra
+(`docs/presentations/sandra_valenzuela_colombia_case.qmd`), and 5 Colombia-hardcoded scripts
+(critical-assets overlap, biome breakdown, hotspot map, beneficiary map, relative-intensity
+charts) — all on the same standardized methodology already shown globally. Confirms the pipeline
+reruns cleanly at country scale, as hoped. Not yet generalized to other countries — logged as a
+housekeeping item ("country-report toolbox") in `docs/hotspot_redesign_plan.md`, not started.
 
 **Material to draw from** (per user's explicit instruction to keep all of this in context):
 - `docs/manuscript/paper_draft_5service.qmd` — verified 5-service abstract numbers (hotspot count/
@@ -199,6 +198,16 @@ employment-continuation question (see "Employment stakes" in [[project_capabilit
 memory) — landing a real, named role in this course (co-teaching Módulo 5, or filling the open
 regional-guest slot) is a stronger, more durable outcome than a one-off conference abstract.
 
-**Status**: not started. User is finishing his own review of the Becky/Phase 4 report and wants to
-discuss scope (country-level rerun vs. existing LAC cut; abstract vs. course-design response to
-Tremie; presentation structure) before drafting begins.
+**Status (updated 2026-08-12)**: Abstract finished (294/300 words, ES+EN, already shared with
+Laín; English version headed to Becky before final submission). Colombia report and Sandra deck
+both finished — deck updated same-day with an institutional reporting-offer paragraph (recurring
+beneficiary/critical-asset/decline reports scoped to WWF Colombia's own conservation roadmap),
+sourced directly from Becky's internal feedback. **The Sandra meeting is today.**
+
+Tremie reply is drafted (`tremie_reply_email_draft.md`) — confirms CLEC abstract submission and
+expresses real interest in Módulo 5 without over-committing before a fuller November conversation.
+Ready to send, not yet sent as of this writing. **This is the one live loose end from this whole
+thread**: the doc's own read (below) is that landing a named course role is a stronger, more
+durable outcome for the employment-continuation question than the abstract alone — don't let it
+quietly slip past the "soon, not November" window Tremie actually asked for just because the
+Sandra meeting absorbed all the urgency this week.
