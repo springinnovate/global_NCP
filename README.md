@@ -464,6 +464,31 @@ See `docs/runbook.md` for the full execution guide and `docs/methodology.md` for
 
 ---
 
+# External Data: Critical Natural Assets (Chaplin-Kramer et al. 2022)
+
+Used in the Colombia country-report work (`scripts/mapping/make_colombia_critical_assets_map.R`
+and related). This repo only holds the **aggregated** raster
+(`data/external/critical_natural_assets/local_NCP_all_targets/local_NCP_land_all_targets_md5_7ccece.tif`).
+
+**Source (verified 2026-08-19)**: paper's own OSF data repository, `https://osf.io/r5xz7/`
+(cited in the paper's Data Availability statement, nature.com/articles/s41559-022-01934-5) — not
+a Dryad repository despite the hashed filenames suggesting one. That OSF project's `data/NCP
+layers/` folder holds the **individual per-service "realized" rasters** (pollination, coastal
+protection, nitrogen retention ×2 buffer distances, sediment deposition ×2 buffer distances,
+nature access ×4 urban/rural × 60/360min variants) plus a `potential service layers` subfolder
+(theoretical-maximum versions; two of those three files are 2-3GB each). None of the individual
+layers are downloaded into this repo yet — see `docs/HANDOFF_2026-08-19.md` for the direct
+per-file OSF download links if/when they're needed.
+
+Methodology (from the OSF project's own README): 14 NCP layers (12 local-scale + 2 global-scale:
+carbon storage, moisture recycling) at ~2km resolution, compiled by Rachel Neugarten and Becky
+Chaplin-Kramer, optimized with the R package `prioritizr` on an Eckert IV equal-area grid at
+multiple resolutions (1/5/10/100km). "Critical" cells sustain 90% of total current NCP magnitude;
+headline finding is that this covers only 30% of global land area for the 12 local NCPs (44% if
+the 2 global NCPs are included).
+
+---
+
 # Future Directions
 
 -   **Multi-temporal analysis:** Extend to 3+ snapshots (e.g., 1992, 2000, 2010, 2020) to capture trajectories, recovery events, and rate of change — not just net difference.

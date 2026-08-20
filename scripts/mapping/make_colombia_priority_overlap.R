@@ -82,6 +82,17 @@ grid_col$is_critical <- grid_col$frac_critical >= 0.5
 
 message("  -> ", sum(grid_col$is_critical), " critical-natural-asset cells (>=50% of area)")
 
+# Continuous priority rank (1-20), not just the binary >2 flag -- the binary
+# threshold alone flattens a real intensity gradient. Empirically (2026-08-13
+# check), Orinoquia's critical cells skew heavily toward "barely above
+# threshold" (66.8% rank<5) vs. the rest of Colombia (25.1% rank<5), so a flat
+# green fill overrepresents how critical that region actually is relative to
+# e.g. the paramo cluster. Used below to modulate fill opacity so cell-level
+# intensity remains visible instead of being collapsed into a single hue.
+mean_rank <- terra::extract(r_col, grid_col_vect, fun = mean, na.rm = TRUE, ID = FALSE)
+grid_col$mean_rank <- mean_rank[[1]]
+grid_col$mean_rank[is.na(grid_col$mean_rank)] <- 0
+
 # ------------------------------------------------------------------------------
 # 3. Cross-tab and the headline overlap statistic
 # ------------------------------------------------------------------------------
@@ -129,19 +140,26 @@ cat_colors <- c(
 cat_levels <- c("Prioridad (ambos)", "Solo activo crítico", "Solo hotspot de cambio", "Ninguno")
 grid_col$category <- factor(grid_col$category, levels = cat_levels)
 
+subtitle_txt <- sprintf("%.1f%% de los hotspots de cambio de Colombia caen dentro de un activo natural crítico — la señal de mayor prioridad para la planificación vial", pct_hotspot_also_critical)
+subtitle_txt <- paste(strwrap(subtitle_txt, width = 55), collapse = "\n")
+
 p <- ggplot(grid_col) +
-  geom_sf(aes(fill = category), color = NA) +
+  geom_sf(aes(fill = category, alpha = mean_rank), color = NA) +
   scale_fill_manual(values = cat_colors, name = NULL) +
+  scale_alpha(range = c(0.3, 1), guide = "none") +
   labs(
     title = "Colombia — Dónde coinciden valor y cambio",
-    subtitle = sprintf("%.1f%% del área con activos naturales críticos también es un hotspot de cambio — la señal de mayor prioridad para la planificación vial", pct_critical_also_hotspot)
+    subtitle = subtitle_txt,
+    caption = "El tono más claro/oscuro dentro de cada color refleja el rango de prioridad subyacente (1-20):\nun cruce con tono claro es apenas crítico, uno oscuro es fuertemente crítico."
   ) +
   theme_void() +
   theme(
     plot.title = element_text(size = 15, face = "bold", hjust = 0.5, color = wwf_dark_green),
-    plot.subtitle = element_text(size = 9.5, hjust = 0.5, color = "gray30"),
+    plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray30", lineheight = 1.2),
+    plot.caption = element_text(size = 8, hjust = 0.5, color = "gray45", margin = margin(t = 10)),
     legend.position = "right",
-    legend.text = element_text(size = 9.5)
+    legend.text = element_text(size = 9.5),
+    plot.margin = margin(10, 10, 10, 10)
   )
 
 ggsave(file.path(out_dir, "colombia_priority_overlap_map.png"), p, width = 9.5, height = 10, dpi = 200, bg = "white")
