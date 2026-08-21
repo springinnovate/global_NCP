@@ -43,9 +43,9 @@ execute:
 - Ha producido herramientas de código abierto para integrar el valor de la naturaleza en la toma de decisiones — p. ej. **InVEST**, RIOS, OPAL, ROOT y MESH.
 - Global Science:
   - **CONVEI** — consorcio WWF/NASA/NOAA/USGS que valora datos de observación de la Tierra para la toma de decisiones, PI **Rebecca Chaplin-Kramer** — Global Biodiversity Lead Scientist.
-  - **NatCap TEEMs** (U. of Minnesota) — modelos que integran economía, comercio y servicios ecosistémicos; lidera el proyecto de metodología para estimar el **GEP Global** (Producto Ecosistémico Bruto, el equivalente al PIB para el valor de la naturaleza).
+  - **NatCap TEEMs** (U. of Minnesota) — modelos que integran economía, comercio y servicios ecosistémicos; lidera el proyecto de metodología para estimar el **GEP Global** (Producto Ecosistémico Bruto — un índice modelado sobre el PIB, para el valor de los servicios ecosistémicos).
   - **Conservation Navigator** — datos y análisis curados para apoyar la toma de decisiones de conservación.
-- Marco general: **Roadmap 2030**, estrategia de WWF centrada en conservación con liderazgo local.
+- Marco general: **Roadmap 2030**.
 
 
 ::: {.notes}
@@ -112,6 +112,22 @@ Bullets rediseñados (2026-08-19) para priorizar capacidades sobre detalle técn
 Sobre la frase de apertura (2026-08-13): confirmado en la página oficial de WWF sobre la Alianza Natural Capital (worldwildlife.org/our-work/science/the-natural-capital-alliance) que WWF es una de las instituciones socias nombradas explícitamente (junto a Stanford —sede—, University of Minnesota, The Nature Conservancy, la Academia China de Ciencias, Natural Capital Insights y el Stockholm Resilience Centre), no solo un colaborador informal. Científicos de WWF ayudaron a desarrollar InVEST y otras herramientas de la alianza (RIOS, OPAL, ROOT, MESH). Lo que NO está confirmado ni debe afirmarse en la reunión: los detalles internos de cómo este puesto postdoctoral específico se estructura formalmente como parte del aporte de WWF a la alianza — eso es una pregunta interna para Becky, no algo público. Si Sandra pregunta por el rol personal dentro de la alianza, responder en términos generales (parte del equipo de Ciencia Global de WWF que aplica las herramientas de NatCap) sin inventar detalles sobre la estructura formal del puesto.
 :::
 
+## Activos críticos, servicio por servicio {.smaller}
+
+::: {style="text-align:center;"}
+![](../../outputs/plots/colombia_report/colombia_cna_5panel.png){style="height:648px; width:auto; max-width:1134px;"}
+:::
+
+::: {.notes}
+Antes del agregado, así se ve el activo crítico de cada servicio por separado — misma metodología (umbral 90%, optimización `prioritizr`), aplicada a un solo servicio a la vez.
+
+Slide nuevo (agregado 2026-08-20), puente hacia la diapositiva de "Oportunidad" que sigue — mismo patrón que el slide de cambio bruto antes de "Dónde": mostrar la textura completa, servicio por servicio, antes del número agregado (2,93×). Fuente: las 5 soluciones individuales de `prioritizr` del propio repositorio de datos del paper (OSF r5xz7, carpeta `solutions`), no un cálculo nuevo de este proyecto — ver `data/external/critical_natural_assets/per_service_solutions/README.md` para el mapeo de códigos de letra a servicio.
+
+Notar la variación real entre servicios: retención de nitrógeno cubre casi todo el país (la más permisiva de las 5), protección costera casi nada (Colombia tiene poca costa relativa a su área total), polinización y retención de sedimentos se concentran en el eje andino. Esto es exactamente lo que un agregado de 12 NCP oculta — el 2,93× de la siguiente diapositiva es un promedio de patrones muy distintos entre sí, no todos los servicios "empujan" igual.
+
+No profundizar demasiado aquí si el tiempo aprieta — el punto es visual/textural, no otro conjunto de cifras para memorizar.
+:::
+
 ## Oportunidad: activos naturales críticos {.smaller}
 
 ::: {.columns}
@@ -157,7 +173,33 @@ Explicación completa del paper (verificada 2026-08-19 contra nature.com/article
 - **Datos originales**: el ráster agregado que usa este proyecto (todas las NCP combinadas) está en `data/external/critical_natural_assets/`. Las 10 capas individuales "realized" (una por servicio/variante — polinización, protección costera, retención de nitrógeno a 50km y 500km, exportación de sedimentos a 50km y 500km, y acceso a la naturaleza en 4 variantes urbano/rural × 60min/360min) también están disponibles en OSF, no descargadas todavía en este repositorio (ver más abajo).
 :::
 
-## Dónde: Colombia concentra hotspots de cambio, no solo por su tamaño {.smaller}
+## Ahora, el cambio en los NCP {.smaller}
+
+::: {style="text-align:center;"}
+![](../../outputs/plots/colombia_report/global_change_5panel_es.png){style="height:504px; width:auto; max-width:1260px;"}
+:::
+
+::: {.notes}
+Slide nuevo (agregado 2026-08-20), pareja del slide de Colombia que sigue — mismo pipeline, misma metodología, mostrado primero a escala global y luego con el zoom puesto sobre Colombia. El punto es demostrar "así trabajamos" de forma visual antes de decirlo en palabras: no es un análisis diseñado para Colombia y luego generalizado, es al revés — un pipeline global aplicado a un país específico.
+
+Fuente: mismo cálculo que colombia_change_5panel.png (siguiente slide), sin filtrar a Colombia — 1.372.447 celdas globales tras excluir Antártida/océano abierto/lagos/roca-hielo.
+
+Si preguntan qué es SPC (corregido 2026-08-20, antes decía "cambio bruto" — impreciso, esto NO es una magnitud física sin procesar): "cambio porcentual simétrico" = (T2020 − T1992) / ((|T2020|+|T1992|)/2) × 100. Se usa en vez de un porcentaje simple sobre la línea base porque servicios con línea base cercana a cero producen porcentajes infinitos o inestables con la fórmula tradicional; el SPC está acotado entre -200% y +200%, así que es comparable entre servicios con escalas muy distintas. Es la misma métrica sobre la que se define el hotspot (el 5% más severo por magnitud de SPC).
+:::
+
+## Aplicado a Colombia {.smaller}
+
+::: {style="text-align:center;"}
+![](../../outputs/plots/colombia_report/colombia_change_5panel.png){style="height:620px; width:auto; max-width:1188px;"}
+:::
+
+::: {.notes}
+Slide nuevo (agregado 2026-08-20), puente entre la definición de "activo crítico" y la de "hotspot de cambio" — antes de mostrar solo el 5% más severo (el siguiente slide), esto muestra la señal completa sin filtrar: cambio porcentual por celda para los 5 servicios evaluados, todo Colombia. Da textura y credibilidad al paso de extracción de hotspots que sigue — no es una caja negra, se puede ver el patrón espacial completo detrás del umbral.
+
+Verde/teal = mejora; naranja = deterioro (la dirección varía por servicio — ver nota de direccionalidad en el siguiente slide). No es necesario explicar cada panel en detalle; el punto es mostrar la textura espacial general antes de pasar al umbral de hotspot.
+:::
+
+## Colombia concentra hotspots de cambio {.smaller}
 
 ::: {.columns}
 ::: {.column width="55%"}
@@ -174,7 +216,7 @@ Explicación completa del paper (verificada 2026-08-19 contra nature.com/article
 </div>
 ```
 - **Hotspot de cambio** = celda donde un servicio se deterioró con mayor severidad entre 1992 y 2020 (percentil 5% más severo) — *no* una celda de mayor provisión.
-- Concentración más fuerte en el **eje cafetero, los Andes centrales y el piedemonte de la Orinoquía**.
+- Concentración más fuerte en **Meta, Caquetá y Antioquia** — casi empatados, muy por encima de cualquier otro departamento.
 
 ```{=html}
 <table class="mini-table">
@@ -200,6 +242,8 @@ Punto central: esto no es "Colombia es grande, por eso tiene muchos hotspots" �
 Si preguntan por qué solo 2 de los 5 servicios muestran esta sobrerrepresentación: Exportación de nitrógeno es esencialmente proporcional (0,90% vs 0,87%); Acceso a la naturaleza y Riesgo costero están de hecho subrepresentados en Colombia respecto al resto del mundo — ser honesto sobre esto fortalece la credibilidad del hallazgo en los otros dos.
 
 Nota de direccionalidad: para Exportación de sedimentos, Exportación de nitrógeno y Riesgo costero, la dirección perjudicial es un AUMENTO, no una disminución — si alguien dice "sedimentos disminuyó" en la conversación, es lo contrario de lo que muestra el hallazgo.
+
+Corrección 2026-08-20: el texto anterior decía "eje cafetero, Andes centrales y piedemonte de la Orinoquía" — nunca verificado contra los datos reales, y resultó impreciso. Verificado hoy con un spatial join real (centroide de cada celda hotspot contra departamentos de Colombia, `rnaturalearth`): de 1.423 celdas hotspot nacionales, **Meta = 259, Caquetá = 204, Antioquia = 178** — el siguiente departamento (Guaviare) tiene solo 84. El eje cafetero no aparece entre los 15 departamentos con más celdas. Script de verificación no versionado (ejecutado ad-hoc en sesión), repetible con `data/processed/hotspots/pct/nev_name/hotspots_nev_name_Colombia_pct.gpkg` si se necesita reconfirmar.
 :::
 
 ## Priorización: Donde coinciden valor y cambio {.smaller}
@@ -231,6 +275,8 @@ Números exactos: 5.797 celdas de activo crítico (51,0% de Colombia), 1.423 cel
 
 Metodología si preguntan: se usó la misma regla de mayoría (≥50% del área de la celda) ya usada para las máscaras de beneficiarios en el reporte interno de Becky — no una regla nueva inventada para este slide.
 
+Si preguntan si tiene sentido metodológico cruzar activo crítico con hotspot de cambio (agregado 2026-08-20, verificado contra el texto del paper — Chaplin-Kramer et al. 2022): sí, es la misma lógica clásica de "valor × amenaza" usada en priorización de conservación desde los hotspots de biodiversidad de Myers (endemismo-valor ∩ pérdida de hábitat-amenaza) — no es una combinación arbitraria. Un matiz honesto si insisten: el activo crítico YA incorpora beneficiarios (población aguas abajo acumulada en la celda de retención para sedimento/nitrógeno, población en 1hr de viaje para acceso a la naturaleza, radio de vuelo de polinizadores/distancia de protección costera para polinización/protección costera — confirmado en el texto del paper, no es solo magnitud biofísica in situ). El hotspot de cambio de este proyecto NO tiene esa ponderación por beneficiarios — es puramente % de cambio local. El cruce entonces dice "un lugar cuyo valor ya refleja gente real servida también está cambiando rápido" — no literalmente "esos beneficiarios específicos están siendo afectados" (eso es lo que intenta responder por separado el slide "Quién", con su propio cálculo de exposición poblacional, no reconciliado formalmente con la ponderación interna del activo crítico). Punto pendiente de comentar con Becky, no una falla del análisis.
+
 Sobre el sombreado por intensidad (agregado 2026-08-13): el mapa ya no usa un verde/rojo plano para "crítico" — la opacidad de cada celda refleja su rango de prioridad real (escala 1-20 del ráster de Chaplin-Kramer et al.), no solo si cruza el umbral binario (>2). Origen del cambio: al revisar el mapa de oportunidad (slide anterior) se notó que la Orinoquía se veía con tonos claros ahí, pero aparecía como verde sólido en este mapa cruzado — una verificación empírica confirmó que 66,8% de las celdas "críticas" de la Orinoquía apenas superan el umbral (rango <5), frente a 25,1% en el resto de Colombia; solo 5,9% de las celdas críticas de la Orinoquía son fuertemente críticas (rango ≥10), frente a 38,0% en el resto del país. Si preguntan por qué la Orinoquía se ve más pálida que los Andes: esa es exactamente la razón — es una región real pero con una señal de criticidad más marginal, no un error del mapa.
 :::
 
@@ -256,9 +302,9 @@ Sobre el sombreado por intensidad (agregado 2026-08-13): el mapa ya no usa un ve
   </div>
 </div>
 ```
-- **Dentro** de Colombia, ¿qué bioma concentra desproporcionadamente sus propios hotspots de cambio?
-- **Exportación de sedimentos** concentra en bosque húmedo tropical y manglares — erosión/sedimentación en cuencas boscosas y zonas costeras.
-- **Polinización** concentra en sabanas/Llanos, no en bosque húmedo (proporcional) — presión sobre paisajes agrícolas y de pastizal en la frontera de la Orinoquía.
+- **En Colombia**, ¿qué bioma concentra hotspots de cambio desproporcionadamente?
+- **Exportación de sedimentos** se concentra en bosque húmedo tropical y manglares — erosión/sedimentación en cuencas boscosas y zonas costeras.
+- **Polinización** concentra en sabanas/Llanos — presión sobre paisajes agrícolas y de pastizal en la Orinoquía.
 :::
 ::: {.column width="60%"}
 ![](../../outputs/plots/colombia_report/colombia_biome_relative_intensity_focus.png){style="max-height:820px; width:auto; max-width:100%;"}
@@ -271,7 +317,7 @@ Este slide muestra que "dónde" no es una sola historia — dos servicios sobrer
 Si preguntan por el mapa de biomas de referencia (no incluido en este slide por espacio): está en el reporte completo, `docs/reports/colombia_clec_report.qmd`.
 :::
 
-## Quién: el alcance llega a 3 de cada 4 colombianos {.smaller}
+## Quién: los hotspots de cambio afectan a 3 de cada 4 colombianos {.smaller}
 
 ::: {.columns}
 ::: {.column width="55%"}
@@ -279,17 +325,26 @@ Si preguntan por el mapa de biomas de referencia (no incluido en este slide por 
 <div class="stat-row">
   <div class="stat-callout">
     <span class="stat-value">75,8%</span>
-    <span class="stat-label">de la población colombiana en la zona de alcance</span>
+    <span class="stat-label">de la población colombiana expuesta a un hotspot de cambio</span>
   </div>
   <div class="stat-callout accent">
     <span class="stat-value">38,1M</span>
-    <span class="stat-label">personas</span>
+    <span class="stat-label">personas expuestas</span>
+  </div>
+</div>
+<div class="stat-row">
+  <div class="stat-callout">
+    <span class="stat-value">35,5%</span>
+    <span class="stat-label">expuesta al nivel más intenso (4-5 servicios simultáneos)</span>
+  </div>
+  <div class="stat-callout accent">
+    <span class="stat-value">17,9M</span>
+    <span class="stat-label">personas en ese nivel</span>
   </div>
 </div>
 ```
-- Aplicando buffers estandarizados (**50km río abajo** o **1 hora de tiempo de viaje**) a los hotspots de cambio de categoría cruzada combinada, el área de influencia alcanza a esa parte de la población colombiana.
-- El nivel más estricto (4 o más de 5 servicios con cambio extremo simultáneo) alcanza al **35,5% — 17,9 millones de personas**.
-- Los mismos parámetros de alcance usados en todo el análisis global — sin ajustes especiales para Colombia.
+- El área de influencia de los hotspots de cambio. Buffers estandarizados: **50km río abajo** o **1 hora de tiempo de viaje**.
+
 :::
 ::: {.column width="45%"}
 ![](../../outputs/plots/colombia_report/colombia_beneficiary_population_map.png){style="max-height:620px; width:auto; max-width:100%;"}
@@ -304,32 +359,64 @@ Este mapa muestra densidad de población REAL (escala logarítmica) dentro de la
 Relación de co-ocurrencia, no causal — si preguntan, ser explícito: esto muestra dónde está la gente respecto a los hotspots de cambio, no prueba causalidad entre infraestructura y ese cambio.
 :::
 
-## Un ejemplo concreto: infraestructura vial {.smaller}
+## Caso específico: infraestructura vial {.smaller}
 
-- De los sectores donde aplica esta priorización, la infraestructura vial ya tiene un vínculo directo: la **Exportación de sedimentos** —uno de los dos servicios con mayor concentración de hotspots de cambio en Colombia— está directamente relacionada con erosión y escorrentía inducidas por construcción vial.
-- La lógica de evitar el daño desde la etapa de planificación coincide con los **Lineamientos de Infraestructura Verde Vial (LIVV)** — política interministerial colombiana (Mintransporte, Minambiente, ANI, INVIAS, DNP) con apoyo técnico de WWF Colombia y FCDS.
-- Esta capa de evidencia puede funcionar como una señal de riesgo estandarizada y repetible para la selección temprana de corredores — no reemplaza el trabajo de campo de los LIVV, lo antecede.
+```{=html}
+<div class="stat-row">
+  <div class="stat-callout">
+    <span class="stat-value">1,32%</span>
+    <span class="stat-label">de Colombia en hotspots de exportación de sedimentos — vs. 0,87% esperado por azar</span>
+  </div>
+</div>
+```
+- **Exportación de sedimentos** es uno de los servicios con mayor concentración de hotspots en Colombia — directamente ligada a erosión y escorrentía inducidas por construcción vial y cambios de coberturas.
+- **Oportunidad**: aplicar la metodologia para apoyar la evaluación de los impactos de corredores viales propuestos en términos de servicios ecosistémicos.
+- Articualción con **LIVV**: una señal de riesgo estandarizada y repetible para la selección de corredores.
 
 ::: {.notes}
-Este es el slide que convierte el hallazgo técnico en una propuesta de valor para WWF Colombia específicamente — importante ser precisos: los LIVV son una política nacional liderada por Mintransporte, no un documento de WWF; el rol de WWF (junto con FCDS) fue apoyo técnico. El pitch no es "reemplacen su proceso" sino "aquí hay una capa de evidencia estandarizada que puede alimentar la etapa más temprana de ese proceso, antes de que se involucren los equipos de campo" — y WWF Colombia ya tiene una relación técnica establecida con esa política, lo cual es la entrada natural.
+Este es el slide que convierte el hallazgo técnico en una propuesta de valor para WWF Colombia — reencuadrado 2026-08-20 de "ya existe un vínculo" (observación pasiva) a "podemos evaluar esto antes de construir" (oportunidad activa), a pedido explícito. No hace falta explicar qué son los LIVV ni quién los lidera — Sandra ya lo sabe. El pitch es: esta capa de evidencia puede alimentar la etapa más temprana de selección de corredores, antes de que se involucren los equipos de campo — no reemplaza ese proceso, lo antecede.
 
 Si preguntan por ejemplos concretos: Autopista al Mar 1, corredores de Cundinamarca, Valle del Magdalena — estos ya están listados como casos de estudio en el curso post-CLEC, mencionar solo si la conversación lo amerita, no forzarlo.
 :::
 
-## La oferta {.smaller}
+## Propuesta {.smaller}
 
 Colombia hoy existe únicamente dentro del agregado regional de América Latina y el Caribe — este es el primer corte con foco específicamente colombiano.
 
-**La oferta concreta**: con el tiempo adecuado, podemos producir un corte Colombia-nacional del análisis de prioridad (activos críticos ∩ hotspots de cambio) a mayor detalle — Llanos/Orinoquía, zona de transición amazónica, páramos que abastecen a Bogotá — con la misma metodología estandarizada, y leído a través de una perspectiva de dinámicas de frontera agrícola con base en mi propia investigación doctoral sobre cambio de cobertura y uso del suelo en la Altillanura/Orinoquía colombiana, actualmente en preparación para publicación.
+::: {.columns}
+::: {.column width="55%"}
+```{=html}
+<div class="stat-row">
+  <div class="stat-callout accent">
+    <span class="stat-value">23%</span>
+    <span class="stat-label">de las celdas dentro de mi propia área de estudio (Piedmont/Altillanura) son hotspots de cambio — casi el doble del 12,5% nacional</span>
+  </div>
+</div>
+```
+:::
+::: {.column width="45%"}
+![](../../outputs/plots/colombia_report/colombia_hotspot_map.png){style="max-height:480px; width:auto; max-width:100%;"}
 
-Más allá de este corte específico, el mismo pipeline puede sostener una **reportería continua para WWF Colombia** — informes recurrentes de beneficiarios, superposición con activos naturales críticos, y servicios en declive — enfocados específicamente en la huella de actividades de su hoja de ruta de conservación liderada localmente.
+::: {style="text-align:center; font-size:0.55em; color:#666; margin-top:-8px;"}
+El mismo mapa nacional de la diapositiva "Dónde" — Meta es el departamento con más celdas de cambio del país, y mi propia área de estudio (Piedmont/Altillanura) queda dentro de él.
+:::
+:::
+:::
 
 ::: {.notes}
-Cierre — esta es la diapositiva del "ask." No sobre-especificar el cronograma; dejar que Sandra defina el ritmo de la conversación. El punto de la investigación doctoral propia en la Orinoquía es lo que diferencia esta oferta de "otro consultor con un mapa" — es una combinación poco común de modelación biofísica global y experiencia directa con cambio de cobertura en la frontera agrícola de la región.
+Cierre — esta es la diapositiva del "ask," y se dejó deliberadamente liviana (reencuadrada 2026-08-20 a pedido explícito): el resto del deck ya construyó el caso, esta diapositiva es un gancho para que la conversación fluya, no un segundo argumento escrito. No sobre-especificar el cronograma; dejar que Sandra defina el ritmo de la conversación.
 
-Si preguntan por más detalle de esta investigación: doctorado en Geografía (Temple University, defendido en 2025), clasificación de cobertura del suelo con random forest, trayectorias de cambio multitemporal, y evaluación de precisión estilo Olofsson, enfocado en la dinámica de expansión agrícola (palma, ganadería) en la Altillanura. El capítulo sobre dinámicas de frontera está en preparación para someterse a publicación — no mencionar cifras específicas todavía, el análisis aún no está en su forma final.
+Puntos para desarrollar en voz alta, no en el slide:
+- **Oferta personal**: con el tiempo adecuado, un corte Colombia-nacional a mayor detalle — Llanos/Orinoquía, transición amazónica, páramos que abastecen a Bogotá — con la misma metodología estandarizada, leído a través de mi propia investigación doctoral sobre frontera agrícola (accesibilidad e idoneidad del suelo) en el Piedmont/Altillanura de la Orinoquía.
+- **Oferta institucional**: más allá de ese corte, el mismo pipeline puede sostener reportería continua para WWF Colombia — beneficiarios, superposición con activos naturales críticos, servicios en declive — enfocada en la huella de su hoja de ruta de conservación liderada localmente. Viene directamente de la reunión interna con Becky: el complemento institucional a la oferta personal — no depende de una sola persona.
 
-El segundo párrafo (reportería continua) viene directamente de la reunión interna con Becky de hoy — lo ve como el complemento institucional a la oferta personal de arriba: no solo "yo puedo profundizar este análisis," sino "el equipo de Ciencia Global de WWF puede sostener reportes recurrentes alineados con la agenda de conservación de WWF Colombia." Ambas cosas se refuerzan: la oferta personal demuestra la capacidad técnica específica; la oferta institucional demuestra que no depende de una sola persona.
+El punto de la investigación doctoral propia en la Orinoquía es lo que diferencia esta oferta de "otro consultor con un mapa" — es una combinación poco común de modelación biofísica global y experiencia directa con cambio de cobertura en la frontera agrícola de la región.
+
+Si preguntan por más detalle de esta investigación: doctorado en Geografía (Temple University, defendido en 2025), clasificación de cobertura del suelo con random forest, trayectorias de cambio multitemporal, y evaluación de precisión estilo Olofsson, enfocado en la dinámica de expansión agrícola (palma, ganadería) en el **Piedmont/Altillanura** — precisión real, no toda la Orinoquía: excluye deliberadamente las sabanas inundables de Casanare/Arauca, una distinción metodológica, no una simplificación. El hallazgo más sólido y ya defendido (Capítulo 2 de la tesis, el de mayor prioridad, meta: listo para someter a publicación a fin de 2026): la accesibilidad y la idoneidad del suelo explican los patrones observados de expansión agrícola. No mencionar cifras nuevas del rebuild del pipeline en curso — solo lo ya defendido en el texto de la tesis es citable hoy (verificado 2026-08-19 contra `LC_orinoquia/docs/orinoquia_dissertation_handoff.md` — no improvisar más allá de esto).
+
+Sobre el estadístico del área de estudio (corregido dos veces 2026-08-20, cadena completa documentada aquí porque es fácil repetir el mismo error): (1) la versión original decía "2 métodos, 1 geografía," afirmando que el hotspot map y la tesis señalaban "la misma geografía" de forma limpia e independiente — nunca verificado. (2) Primera corrección: spatial join contra departamentos de Colombia mostró que Meta SÍ es el departamento #1 en celdas hotspot nacional (259 de 1.423 = 18%) — pero el usuario correctamente señaló que Meta es un departamento grande (873 celdas totales en la grilla) y que esto podría ser solo un artefacto de tamaño, no concentración real. (3) Segunda corrección, la que quedó: se probaron dos cosas más. Primero, la tasa normalizada por tamaño (hotspots ÷ celdas totales del departamento) — Meta sigue liderando (29,7%), así que NO es solo artefacto de tamaño. Segundo, y más importante: se cruzaron las celdas hotspot contra el polígono REAL del área de estudio de la tesis (`LC_orinoquia/vectors/msk_pm_crs.geojson`, no un corte por latitud inventado) — de las 259 celdas hotspot "del Meta," solo **26 caen dentro del polígono real de Piedmont/Altillanura** (1,83% del total nacional, no 18%); las otras 233 están en el sur del Meta, cerca de la frontera con Caquetá/Guaviare, fuera del área que la tesis realmente estudia. Dentro del polígono real, la tasa de hotspots es 23% (26 de 113 celdas) vs. 12,5% nacional — un hallazgo real, verificado, y modesto, no la cifra departamental inflada. Si preguntan por qué el mapa nacional se sigue usando como imagen si el hallazgo es tan local: es honesto — el mapa da contexto nacional (dónde está Colombia en el patrón global), el 23% es un hallazgo aparte, más pequeño, dentro de esa imagen. No inflar uno para que combine mejor con el otro.
+
+Nota metodológica para reutilizar esta verificación en el futuro: análisis de clustering (k-means, k=2) sobre las celdas de alta concentración (≥3 de 5 servicios) confirma la observación visual del usuario — hay genuinamente DOS clústeres nacionales dominantes, no tres: uno centrado en (-74,3°, 2,0°) que mezcla el sur del Meta con Caquetá/Guaviare/Putumayo (arco de deforestación amazónico), y otro centrado en (-74,3°, 6,7°) en Antioquia/Santander (Magdalena Medio/nordeste antioqueño). El departamento "Meta" como etiqueta administrativa oculta que la mayoría de sus celdas hotspot pertenecen geográficamente al primer clúster (sur), no a una zona distinta de piedemonte.
 
 Si la conversación se mueve hacia empleo/continuidad: mantener el tono como una propuesta de proyecto conjunto, no una solicitud personal — la propuesta se sostiene por sí misma en términos de valor para WWF Colombia.
 :::

@@ -1,5 +1,99 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-08-20 (later) — Geographic claim in Sandra deck was wrong; verified and fixed, new audit script built
+
+A pre-existing, never-verified claim on the "Dónde"/"Where" slide ("concentración más fuerte en el eje
+cafetero, los Andes centrales y el piedemonte de la Orinoquía") turned out to be inaccurate — caught
+because the user's own on-the-ground GIS read suggested the real clusters were around Caquetá and
+Magdalena Medio instead. Verified properly with a real spatial join (point-in-polygon against Colombian
+departments, `rnaturalearth`/`rnaturalearthhires`, not a nearest-feature approximation): of 1,423 national
+hotspot cells, **Meta = 259, Caquetá = 204, Antioquia = 178** — nothing else comes close (next is Guaviare
+at 84); the coffee axis doesn't appear in the top 15 departments at all. Fixed on both ES/EN decks' "Dónde"
+slide bullet.
+
+A second round of scrutiny (user correctly pushed back that Meta/Caquetá/Antioquia are large departments,
+so raw count could be a size artifact, and that the pattern looked like two clusters, not three) led to a
+deeper check that also caught a second, related overclaim on the closing "Propuesta"/"The offer" slide
+(originally "2 métodos, 1 geografía," asserting the hotspot map and the user's own dissertation independently
+confirmed the same geography). Verified: (1) size-normalized rate confirms Meta genuinely leads even
+per-area (29.7%), not just by raw count; (2) k-means (k=2) on high-concentration cells confirms two real
+national clusters — one blending southern Meta with Caquetá/Guaviare/Putumayo (Amazon deforestation arc),
+one in Antioquia/Santander (Magdalena Medio) — "Meta" as an administrative label was hiding that most of
+its hotspot cells belong to the southern cluster, not a distinct Piedmont zone; (3) checked hotspot cells
+against the dissertation's actual study-area polygon (`LC_orinoquia/vectors/msk_pm_crs.geojson`), not an
+invented latitude cutoff — only **26 of 1,423 national hotspot cells (1.83%) fall inside the real
+Piedmont/Altillanura boundary**, not 18%. Within that boundary the hotspot rate is a real, still-meaningful
+23% vs. 12.5% nationally — closing slide now states this instead of the inflated department-wide figure.
+
+New reusable tool: `scripts/audit_hotspot_geography.R` — generalizes this whole verification chain (raw
+count by admin unit → size-normalized rate → point-in-polygon not nearest-feature → k-means cluster check →
+optional check against a specific study-area polygon) so the next geographic claim gets checked before
+it ships, not after. Follows the existing `audit_claims.R` convention (claim stated in a comment, computed
+value printed alongside it). Confirmed runs standalone end-to-end, reproduces the same numbers as the
+ad-hoc scratchpad version that found them first.
+
+Both decks re-rendered and screenshotted after each fix — no overflow, both confirmed clean.
+
+### 2026-08-20 — Sandra deck: full English translation, WWF-brand visual redesign, global↔Colombia demonstration slides
+
+Big-picture arc: the Sandra Valenzuela deck went from 10 Spanish-only slides to 13 slides in both
+Spanish and English, restyled to match the WWF PowerPoint template's own "big number in a rounded
+card" pattern instead of burying headline stats in bullet text, plus real content fixes caught by
+close review rather than just polish.
+
+**Visual system**: new `.stat-row`/`.stat-callout` and `.mini-table` CSS components in
+`wwf_theme.css`, applied throughout — 2.93×, 57.9%, 75.8%/38.1M etc. are now visual tiles;
+compact reference tables define the 5 headline services on both the "value" (Oportunidad) and
+"change" (Dónde) slides, same 5 underlying NCPs viewed through two lenses.
+
+**Three new slides**: "Critical assets, service by service" (6 new maps — 5 individual + combined
+— from the paper's own per-service `prioritizr` solutions staged 2026-08-19; script
+`scripts/mapping/make_colombia_cna_per_service_maps.R`) before Oportunidad; and a paired "global
+then Colombia" raw-change demonstration (`scripts/mapping/make_global_change_5panel.R`, reusing
+`make_native_change_figure.R`'s rasterize+geom_tile approach for the 1.37M-cell global run)
+before Dónde — visually proving the "same methodology, any scale" claim instead of just asserting
+it.
+
+**Real bugs, not just cosmetic**: the priority-overlap map caption was showing 14.2% instead of
+57.9% (the exact framing the deck's own notes warn against) — fixed in
+`make_colombia_priority_overlap.R`. GEP was mis-described as "the GDP equivalent for nature's
+value" — corrected to "modeled on GDP, for the value of ecosystem services" (verified against the
+paper's actual methods). "1,423 celdas" on the Priorización slide had no stated denominator — now
+explicit (hotspot-of-change cells specifically, 12.5% of Colombia, not "all of Colombia" as it
+read before).
+
+**Methodological question surfaced, not yet resolved**: verified against Chaplin-Kramer et al.'s
+actual methods text that critical-natural-asset criticality already incorporates
+beneficiaries (downstream population for retention services, travel-time population for nature
+access, flight/protection radius for pollination/coastal) — it is NOT pure in-situ biophysical
+magnitude, contrary to an assumption this session started with. This project's own
+hotspot-of-change metric carries no such weighting. Crossing the two is still methodologically
+sound (same "value × threat" logic as Myers' biodiversity hotspots) but the deck's separate
+"Quién" population-buffer step is an independent, unreconciled beneficiary computation from CNA's
+own internal one — flagged as a real question for Becky, not a deck problem. Full grounding in
+memory `project_becky_per_service_cna_idea.md`; tightened version now in the Priorización slide's
+notes (both languages).
+
+**Not done**: variable-intensity color ramp for the 5 new per-service CNA maps (currently flat
+binary fill; aggregate CNA map already does this via continuous 1-20 rank, but per-service
+solutions only have a binary 90%-target, no rank — fix requires the continuous "realized"
+magnitude layers instead, nature-access file matching still ambiguous). Also pending: the same
+visual treatment for `docs/reports/colombia_clec_report.qmd`, and the paper/SWY threads
+(untouched, as instructed). Full next-session plan in `docs/HANDOFF_2026-08-20.md`.
+
+### 2026-08-20 (continued) — Variable-intensity fix for the per-service CNA maps, built
+
+Closed out the "not done" item above. `make_colombia_cna_per_service_maps.R` now modulates fill
+opacity within each service's critical (green) cells using the continuous "realized" magnitude
+layers in `individual_layers/` (bilinear reprojection, 1st/99th-percentile clip, same pattern as
+`make_colombia_report_maps.R`'s change panels) — a disclosed different data source from the binary
+solution itself (magnitude of provision, not optimization priority rank), not a substitute
+pretending to be the aggregate map's rank. Nature access (no 1:1 realized-layer match) approximated
+as mean(rural_60, urban_60) per user decision — closest match to the solution's "within 1hr"
+framing. All 5 individual panels + combined 5-panel figure regenerated and visually verified: real
+within-service variation is now visible (e.g. dark Andean-spine clusters for pollination/sediment,
+gradient across nitrogen's eastern-plains halo) instead of the flat fill. README updated to match.
+
 ### 2026-08-12 — Colombia CLEC/Sandra report matured into a real "priority" analysis; abstract finalized and shared with Laín
 
 Continuation of the Colombia CLEC congress / Sandra Valenzuela (WWF Colombia) thread from

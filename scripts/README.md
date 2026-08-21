@@ -8,6 +8,7 @@ All scripts load `R/paths.R` for path management and write to `outputs/`.
 | Script | Purpose | When to re-run |
 |:---|:---|:---|
 | `audit_claims.R` | Validates key paper claims against actual data: income group disparity, regional disparity, attribution gap %, biome and country rankings. Writes to `outputs/audit_summary.txt`. | After any hotspot re-extraction or threshold change — acts as a regression test for core numbers. |
+| `audit_hotspot_geography.R` | Verifies where hotspot cells actually concentrate geographically — by admin-1 unit (raw count AND size-normalized rate, via proper point-in-polygon join), by k-means cluster count, and against a specific study-area polygon if one exists. Built 2026-08-20 after a deck claim ("eje cafetero, Andes centrales, piedemonte de la Orinoquía") turned out wrong when actually checked — a raw eyeball read of a hotspot map is not a verified geographic claim. | Before stating in any deliverable *where* hotspots concentrate, for any country/region. |
 
 ## Reference data
 
