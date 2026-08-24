@@ -42,7 +42,7 @@ format:
 
 | | |
 |---|---|
-| **Combined cross-category** | Cells that are simultaneously a water-pathway hotspot (nitrogen *or* sediment export) *and* an access-pathway hotspot (nature access, pollination, *or* coastal risk) — 23.6% of land, reaching ~4.1B people downstream or within travel-time range. |
+| **Combined cross-category** | Cells that are simultaneously a water-pathway hotspot (nitrogen *or* sediment export) *and* an access-pathway hotspot (nature access, pollination, *or* coastal risk). The 23.6% figure below is the **reach/beneficiary footprint** — land within 50km downstream or 1hr travel of one of these cells — not the hotspot cells themselves, which cover a much smaller 3.5% of land (see the paper draft abstract). The two are consistent, not contradictory: a buffer zone around a set of cells is always larger than the cells themselves. Both use the same underlying ~4.1B reach-population figure. |
 | **3+ / 4+ services** | Cells where 3 (or 4) or more of the 5 tracked services hit extreme change at once — 12.8% / 4.4% of land, reaching ~2.3B / ~872M people respectively. |
 | **Coverage rule** | A 10km cell counts as "inside" a beneficiary area if at least half its area falls within the downstream (50km) or travel-time (1 hour) buffer around a hotspot. |
 | **Test** | Two-sample Kolmogorov–Smirnov test, comparing the full distribution of each variable inside vs. outside the mask, plus Cliff's delta as the effect-size measure (0 = no difference, 1 = complete separation). |
@@ -384,9 +384,9 @@ All 12 differences are statistically significant at p < 0.001 (two-sided KS test
 
 ## Discussion
 
-**GDP and population** are the strongest signals by a wide margin (δ ≈ 0.48–0.53, the "large effect" band) — beneficiary cells roughly 3–5× higher in per-cell GDP and 2.5–3.5× higher in per-cell population than the rest. These masks already cover a large share of total land area. MBuffers are built around where hotspots are, and hotspots concentrate around where people already live and build economic activity.
+**GDP and population** are the strongest signals by a wide margin (δ ≈ 0.48–0.53, the "large effect" band) — beneficiary cells roughly 3–5× higher in per-cell GDP and 2.5–3.5× higher in per-cell population than the rest. These masks already cover a large share of total land area. Buffers are built around where hotspots are, and hotspots concentrate around where people already live and build economic activity.
 
-**Gini** is the least obvious result but  probably the most useful: beneficiary areas skew toward more unequal regions, not less, and — unlike GDP and population — that effect *grows* at the most exclusive tier (δ 0.22 at combined-cross and 3+, rising to 0.33 at 4+). The people gaining the most concentrated ecosystem-service benefit are disproportionately in places with more internal inequality, not fewer.
+**Gini** is the least obvious result but probably the most useful: beneficiary areas skew toward more unequal regions, not less, and — unlike GDP and population — that effect *grows* at the most exclusive tier (δ 0.22 at combined-cross and 3+, rising to 0.33 at 4+). The people gaining the most concentrated ecosystem-service benefit are disproportionately in places with more internal inequality, not fewer.
 
 **Why GDP flattens while Gini keeps climbing, at the same tier.** GDP measures average wealth level; Gini measures how unequally that wealth is distributed within a place — different dimensions. GDP's gap doesn't grow at the 4+ tier (δ 0.53 → 0.49) — the wealth relationship is already near its ceiling by "combined cross" / "3+," and the most severe compound-risk cells aren't concentrated *even more* in rich places. Gini's gap does grow (0.22 → 0.33) at that same tier. So the story isn't "compound risk concentrates in rich places" — GDP alone would show that as a strengthening trend too, and it doesn't. It's specifically "compound risk concentrates in unequal places," a distinct, more distributional signal that GDP by itself would miss entirely.
 

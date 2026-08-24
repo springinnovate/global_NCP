@@ -1,5 +1,5 @@
 ---
-title: "Global Ecosystem Service Time Series: A Spatiotemporal Analysis of Change, Exposure, and Attribution"
+title: "Global Change in Ecosystem Services: Hotspots of Decline, Exposure, and Attribution"
 subtitle: "5-Service Redesign Draft — IN PROGRESS, not for circulation"
 author:
   - "Jerónimo Rodríguez Escobar"
@@ -45,9 +45,9 @@ Original staging doc (`docs/paper_5service_methodology_staging.md`) can be retir
 is the actual working draft — no need to keep both.
 :::
 
-# Abstract
+# Abstract {.unnumbered}
 
-Global assessments report widespread deterioration in ecosystem service (ES) provision, but where decline is worst, which populations are most exposed, and how far impacts reach beyond their source remain poorly characterized at global scale. We assess five ecosystem services (Nitrogen Export, Sediment Export, Coastal Risk, Pollination, and Nature Access) across 1.3 million equal-area grid cells (100 km² each) worldwide, comparing conditions in 1992 and 2020 via Symmetric Percentage Change. We identify 189,927 hotspot cells, 13.8% of assessed land area, as the top 5% most severe change per service, grouped into three overlap categories: water, access, and a combined category spanning both.
+We provide a globally consistent, spatially explicit assessment of where ecosystem service (ES) decline is most severe, which populations are most exposed, and how far impacts reach beyond their source. We assess five ecosystem services (Nitrogen Export, Sediment Export, Coastal Risk, Pollination, and Nature Access) across 1.3 million equal-area grid cells (100 km² each) worldwide, comparing conditions in 1992 and 2020 via Symmetric Percentage Change. We identify 189,927 hotspot cells, 13.8% of assessed land area, as the top 5% most severe change per service, grouped into three overlap categories: water, access, and a combined category spanning both.
 
 Hotspots concentrate disproportionately in Latin America and East Asia–Pacific, with lower-middle-income countries bearing 1.69 times the intensity of high-income OECD countries. Water-overlap hotspots cover 8.1% of land and reach 3.1 billion people downstream; access-overlap hotspots cover 9.3% of land and reach 7.1 billion through travel time; the combined category covers 3.5% of land and reaches 4.1 billion. Land cover conversion attribution and the Gini, HDI, and GDP disproportionality test have not yet been rerun under this definition. These results provide a globally consistent basis for equity-weighted conservation prioritization.
 
@@ -57,15 +57,12 @@ Hotspots concentrate disproportionately in Latin America and East Asia–Pacific
 
 # Introduction
 
-## Ecosystem Services at Risk
-Ecosystem services represent the structural components, biophysical functions, and ecological processes through which natural landscapes generate direct and indirect benefits for human societies (Daily et al., 2009). Despite their fundamental role in supporting global economic stability, food security, and climate resilience, critical landscape functions; including wild pollination, hydrological regulation, and coastal risk mitigation, are undergoing unprecedented systemic declines worldwide (Millennium Ecosystem Assessment, 2005; IPBES, 2019). Millions of people depend directly on ecosystem services for food security, water supply, and climate regulation, with declining provision falling disproportionately on populations with limited adaptive capacity (Millennium Ecosystem Assessment, 2005; IPBES, 2019; Fedele et al., 2021). However, the geographic configurations of these changes, alongside the precise demographic characteristics of vulnerable populations, remain under-characterized at the global scale.
+Ecosystem services represent the structural components, biophysical functions, and ecological processes through which landscapes generate direct and indirect benefits for human societies (Daily et al., 2009). Despite their fundamental role in supporting global economic stability, food security, and climate resilience, critical landscape functions — including wild pollination, hydrological regulation, and coastal risk mitigation — are undergoing unprecedented systemic declines worldwide (Millennium Ecosystem Assessment, 2005; IPBES, 2019). Millions of people depend directly on ecosystem services for food security, water supply, and climate regulation, with declining provision falling disproportionately on populations with limited adaptive capacity (Millennium Ecosystem Assessment, 2005; IPBES, 2019; Fedele et al., 2021).
 
-## Spatial Prioritization Challenge
-Developing effective conservation and mitigation frameworks is fundamentally constrained by a compounding set of resource, institutional, and informational bottlenecks (Daily et al., 2009; Chaplin-Kramer et al., 2019). Conservation investments and climate adaptation funds are inherently finite and must be optimally allocated. The challenge extends beyond financial scarcity. Decision-makers lack comparable, high-resolution global metrics capable of diagnosing where ecosystem service capacity is declining most acutely (WHERE), which segments of human society are most exposed (WHO), and what biophysical or anthropogenic mechanisms drive observed losses (WHY) (Crossman et al., 2013; Naidoo et al., 2008; Willcock et al., 2023).
+Prior global assessments (Millennium Ecosystem Assessment, 2005; IPBES, 2019; Brauman et al., 2020; Chaplin-Kramer et al., 2019; Fedele et al., 2021) have established that ecosystem services are declining and that this decline threatens human well-being, but have not quantified where decline is most severe, who is most exposed, or how far its effects propagate, using consistent data and methods at global scale over multiple decades. [FLAG — needs a literature-review pass before finalizing, per Steve's comment: confirm no prior global, multi-decade, multi-service quantitative trends analysis exists at this resolution before stating this as a contribution.] This paper addresses that gap directly. We analyze global and regional trajectories of ecosystem service change using consistent data and methods spanning 1992–2020, and show a declining trend in the services assessed. We identify local hotspots of extreme decline and show that they concentrate geographically rather than occurring uniformly. We show who is most exposed to these declines — populations with limited adaptive capacity, not a random cross-section of the global population. Finally, we assess why declines occur, testing what share of ecosystem service decline co-occurs with detectable land cover conversion, and what that implies about the limits of land cover monitoring as a proxy for ecosystem service health.
 
-This diagnostic gap can result in misallocated resource flows, as broad national or continental aggregations can obscure the unequal distribution of environmental burdens across communities (Bullard, 1990). Without a standardized, high-resolution baseline tracking change through time, effective landscape-level intervention remains difficult to target. A reproducible global assessment connecting biophysical service models with satellite observations and fine-scale demographic grids can support spatially targeted conservation finance and land management decisions. This approach also provides the spatial diagnostics needed to advance Gross Ecosystem Product (GEP) accounting within the Natural Capital Project framework and to inform international biodiversity platforms such as IPBES [add sources].
+Decision-makers lack comparable, high-resolution global metrics capable of diagnosing where ecosystem service capacity is declining most acutely, which segments of human society are most exposed, and what mechanisms drive observed losses (Crossman et al., 2013; Naidoo et al., 2008; Willcock et al., 2023). This diagnostic gap can result in misallocated resource flows, as broad national or continental aggregations can obscure the unequal distribution of environmental burdens across communities (Bullard, 1990). Without a standardized, high-resolution baseline tracking change through time, effective landscape-level intervention remains difficult to target.
 
-## Research Objectives
 This study addresses four structurally linked research questions:
 
 1. **WHAT** — What are the global and macro-regional trajectories of ecosystem service provision change between 1992 and 2020?
@@ -96,7 +93,7 @@ $$\text{NRet} = \frac{N_{\text{retained}}}{N_{\text{retained}} + N_{\text{export
 where the denominator ($N_{\text{retained}} + N_{\text{export}}$) equals the total modeled nutrient load generated by the landscape. Normalizing by total load isolates the biological filtration efficiency of the landscape (riparian buffers, wetland interception, vegetative uptake) from confounds introduced by varying absolute fertilizer inputs or precipitation-driven leaching across agricultural contexts. In both cases, a declining ratio value—even absent changes in absolute export volumes—signals degradation of the landscape's intrinsic water-regulating function, making retention ratios more sensitive indicators of functional loss than export metrics alone.
 
 ### Ancillary Datasets and Harmonization
-To cross-examine biophysical changes with external socioeconomic and land-use drivers, we compiled and harmonized a suite of global gridded covariates to the 10-km IUCN grid template. Population exposure was extracted from the Global Human Settlement Layer (GHSL-POP), localized urban footprints from GHSL-BUILT, gross domestic product from the World Bank gridded economic layers, human development metrics from Sherman et al. (2026), who provide machine-learning-downscaled gridded HDI predictions at 10-km resolution, and agricultural landscape metrics (plot size) from Mehrabi et al. (2022).
+To cross-examine biophysical changes with external socioeconomic and land-use drivers, we compiled and harmonized a suite of global gridded covariates to the 10-km IUCN grid template. Population exposure was extracted from the Global Human Settlement Layer (GHSL-POP), built-up surface area — a proxy for urban land conversion and settlement density — from GHSL-BUILT, gross domestic product from the World Bank gridded economic layers, human development metrics from Sherman et al. (2026), who provide machine-learning-downscaled gridded HDI predictions at 10-km resolution, and agricultural landscape metrics (plot size) from Mehrabi et al. (2022).
 
 The 300-meter ESA CCI land cover dataset serves a dual role within this pipeline: as a primary input driving the underlying InVEST biophysical models and as the baseline for the downstream spatial attribution analysis. Full methodology for land cover change calculation is described in @sec-methods-lcc below. National boundaries, income groups, supranational regions, and cross-cutting global biomes were subsequently integrated via an expert-reviewed correspondence table (`ee_correspondence`).
 
@@ -234,13 +231,23 @@ The aggregated regional analysis shows a decoupling between absolute volumetric 
 
 ![Absolute and relative change in ecosystem services by Biome, calculated via the 'aggregate of differences' (Path A) to preserve true volumetric trends.](../../outputs/plots/output_plots_diff/biome_combined_diffs.png){#fig-regional-trajectories .quarto-figure-center}
 
-### Geographic Distribution by Biome
+### Global Pattern of Change
 
-The maps below illustrate the spatial distribution of these trajectories across global biomes, highlighting relative shifts in ecosystem service provision alongside absolute volumetric change.
+::: {.callout-note}
+**Replaced 2026-08-20, per Becky and Steve's review** (both independently asked for this: Becky's
+email — "include original resolution (or 10km) change maps, not broken down by zone"; SP19 — "can
+we show more detailed maps? If analysis is done at pixel level then why not show that?"). The
+previous version of this subsection showed only biome-aggregated choropleth maps; those obscure
+the pixel-level pattern the rest of the paper's zone summaries are built from. Region, income, and
+biome breakdowns now apply only to Figure 2 and the Annex bar charts, not to maps, per Becky's
+explicit direction. **Caveat**: this map uses the current 5-service definition (Nitrogen Export,
+Sediment Export, Coastal Risk, Pollination, Nature Access) — if the pending services-list
+clarification changes that definition, this map needs regenerating to match.
+:::
 
-![Faceted maps showing percentage ecosystem service change by WWF Biome.](../../outputs/maps/map_biome_pct.png){#fig-faceted-biome-pct .quarto-figure-center width="100%"}
+The map below shows raw, pixel-level percentage change per 10km grid cell for each of the five services, without aggregation to biome, region, or income group — the same underlying spatial pattern from which every regional, income-group, and biome summary elsewhere in this paper and its Annex is derived.
 
-![Faceted maps showing absolute ecosystem service change by WWF Biome.](../../outputs/maps/map_biome_abs.png){#fig-faceted-biome-abs .quarto-figure-center width="100%"}
+![Percentage change per 10km grid cell, 1992–2020, for each of the five services evaluated — unaggregated, not broken down by biome, region, or income group.](../../outputs/plots/colombia_report/global_change_5panel_en.png){#fig-global-pattern .quarto-figure-center width="100%"}
 
 ## Global Hotspot Distribution
 At the grid scale, we identified 252,215 unique cells experiencing at least one ecosystem service hotspot (19.37% of evaluated cells). These zones exhibit intense geographic clustering. When evaluated across ecological contexts, Mangroves stand out as the most severely impacted biome: coastal risk service hotspots occupy roughly 15 times more area than Mangroves' share of global land would account for (relative intensity, C_Risk: 15.25×; C_Risk_Red_Ratio: 15.19×), while terrestrial services such as pollination and nature access occupy roughly double what their land share would account for. Averaged across all eight services, Mangroves hold roughly 5 times more hotspot area than expected given their size—though this aggregate masks a strongly bimodal distribution driven by intense coastal vulnerability. (Relative intensity throughout this section is a biome's, region's, or income group's share of global hotspot cells divided by its share of global land area — 1.0 means its burden matches its size; detailed geographic breakdowns of these epicenters by World Bank Region—where Latin America and East Asia dominate—and by Income Group are provided in the Annex).
@@ -359,64 +366,6 @@ The resulting Compound Risk dumbbell chart (plotted on a logarithmic scale) uneq
 Serviceshed Multiplier Effect by Compound Risk. The chart tracks how population exposure scales logarithmically across locations experiencing 1, 2, 3, or 4+ simultaneous ecosystem service declines. (Detailed multiplier breakdowns faceted by Biome and Income Group are available in the Annex).
 :::
 
-## The Spatial Attribution Gap
-
-::: {.callout-important}
-**[FLAG FOR BECKY — required before submission, meeting scheduled 2026-07-09]**
-
-This is the paper's central WHY-chapter finding. Please review `scripts/compute_attribution_true_union.R` and `scripts/build_lc_grid_fid_crosswalk.R` and confirm the framing below holds before this section is treated as final. We should also discuss whether "WHY" is still the right label for this pillar of the book's four-question framework, given what this section actually tests (monitoring adequacy, not causal mechanism).
-
-**Numbers below corrected 2026-07-24** (a many-to-one crosswalk-join bug was inflating cell counts — see WORKLOG 2026-07-24). **Known follow-up, not yet done:** the same bug still affects `analysis/hotspot_extraction.qmd`'s per-service driver-overlap table and several driver-hotspot maps in this section — deferred until after this meeting, do not treat those specific figures/table as final either.
-:::
-
-To assess whether intense ecosystem service decline co-occurs with intense land cover conversion, we compared ES hotspot cells (top 5% of SPC change per service) against land cover conversion hotspot cells (top 5% of gross conversion magnitude per driver) within the same 10km equal-area grid. Because five distinct drivers each contribute a 5% tail, and these tails substantially overlap each other in space (forest clearing and cropland expansion, for instance, concentrate on the same deforestation frontiers), their union covers **9.0%** of the global grid — not the naive ~5% that spatial independence of a single driver would predict. This union is the correct chance baseline against which to judge co-occurrence with ES hotspots.
-
-Against that baseline, ES hotspot cells overlap with the LCC driver union at a rate of **34.2%** — a risk ratio of **7.4** relative to the 4.6% background rate observed among non-hotspot cells (equivalently, odds ratio 10.79, 95% CI 10.66–10.92; *p* < 0.001 on n > 1.51 million cells, and here the large sample size is not doing the work — the effect size itself is large). **At the top-5% severity threshold, ES hotspots are strongly and reliably more likely to occur where land cover conversion is most intense.**
-
-This positive association holds for every individual driver (@tbl-attribution-drivers), from Grassland Gain (risk ratio 4.2, the weakest) to Cropland Expansion (risk ratio 97.5, the strongest). There is no offsetting or mixed-sign pattern across drivers — every driver points the same direction.
-
-Even so, the remaining **65.8% of ES hotspot cells do not co-occur with any intense land cover conversion driver**. This does not imply those cells experienced zero land cover change; some may have undergone moderate conversion below the top-5% threshold. What it shows is that even a strong, reliable relationship between intense conversion and ES-hotspot co-occurrence — present for every driver we tested — only reaches about a third of the most severe ecosystem service declines. The gap is consistent with mechanisms that produce functional decline without triggering a categorical reclassification in the same cell: sub-pixel in-situ degradation, upstream routing cascades from conversion in adjacent cells, and climate-driven shifts in model inputs. Whether this reflects sub-pixel degradation, upstream routing cascades, climate-forcing, or some combination cannot be determined from this co-occurrence analysis alone; the Discussion addresses what controlled experiments would be required to partition these contributions.
-
-```{r}
-#| label: tbl-attribution-drivers
-#| tbl-cap: "Land Cover Conversion Drivers Intersecting Ecosystem Service Hotspots, and Risk Relative to Background"
-#| echo: false
-
-driver_overlap <- data.frame(
-  `Land Cover Driver` = c("Forest Loss", "Urban Expansion", "Grassland Gain", "Grassland Loss", "Cropland Expansion", "Union (any of 5 drivers)", "Attribution Gap (Below Top-5% LCC Threshold)"),
-  `% of ES Hotspots Overlapping` = c("16.9%", "3.1%", "8.9%", "9.5%", "16.7%", "34.2%", "65.8%"),
-  `Risk Ratio vs. Background` = c("25.4", "9.1", "4.2", "4.8", "97.5", "7.4", "—"),
-  check.names = FALSE
-)
-if (requireNamespace("DT", quietly = TRUE)) {
-  DT::datatable(
-    driver_overlap,
-    options = list(dom = 't', paging = FALSE, searching = TRUE),
-    rownames = FALSE
-  )
-} else {
-  knitr::kable(driver_overlap, align = c("l", "r", "r"))
-}
-```
-
-::: {.callout-note}
-**Reading the "Risk Ratio vs. Background" column (@tbl-attribution-drivers)**
-
-Risk ratio compares plain probabilities: (rate of overlap with that driver among ES hotspot cells) ÷ (rate of overlap among background, non-hotspot cells). A value of 1.0 means no association; a value of 7.4 (the union row) means ES hotspot cells are 7.4 times more likely to sit inside the five-driver conversion union than a randomly chosen non-hotspot cell. The same union comparison can equivalently be expressed as an odds ratio (10.79, 95% CI 10.66–10.92) — a related statistic that compares odds rather than probabilities, and comes out larger than the risk ratio once the outcome (34.2% overlap) is no longer rare. We report risk ratio throughout as the primary, more directly interpretable effect size; the odds ratio is noted here for readers who expect it from standard contingency-table analysis.
-:::
-
-![Global distribution of primary land cover conversion drivers (1992-2020), identifying areas of granular transitions such as deforestation for cropland, savannization, and urban expansion.](../../outputs/plots/maps/global_lcc_driver_map.png){#fig-lcc-drivers .quarto-figure-center width="100%"}
-
-::: {#fig-attribution-comparison layout-ncol=2}
-![All Ecosystem Service Decline Hotspots](../../outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png){width="100%"}
-
-![Land Cover Conversion Hotspots (all 5 drivers, regardless of ES-hotspot status)](../../outputs/plots/maps/global_lcc_driver_hotspots_map.png){width="100%"}
-
-Comparing the two footprints. The map on the left shows the total footprint of intense ecosystem service decline (225,113 cells). The map on the right shows the total footprint of intense land cover conversion from any of five drivers (136,468 cells) — it is not filtered to ES-hotspot status. The two footprints overlap substantially where they overlap at all (34.2% of ES hotspot cells fall inside the conversion footprint, against a 4.6% background rate), but the conversion footprint is considerably smaller than the ES-decline footprint, which is why 65.8% of ES hotspots fall outside it.
-:::
-
-![Heatmap showing the percentage of ecosystem service hotspots that geographically overlap with hotspots of land cover conversion. The large proportion of low values highlights the "attribution gap."](../../outputs/plots/drivers/heatmap_driver_overlap_pct.png){#fig-attribution-gap .quarto-figure-center}
-
 ---
 
 # Discussion
@@ -424,10 +373,14 @@ Comparing the two footprints. The map on the left shows the total footprint of i
 ## Geographic Clustering Enables Prioritization
 The intense geographic concentration of hotspots within Latin America and East Asia shows that global ecosystem service decline is highly non-uniform, identifying clear priorities for conservation investment. Targeted interventions in high-intensity nations—such as South Korea, Malaysia, Guatemala, and Jamaica—can maximize conservation return on investment. However, because hotspot configurations vary significantly by service type, uniform conservation frameworks are unlikely to perform; interventions must be tailored to the specific service profiles of each sub-region.
 
+Beyond conservation targeting, this same spatial diagnostic capability provides a foundation for emerging natural-capital accounting efforts — including Gross Ecosystem Product (GEP) accounting within the Natural Capital Project framework and the System of Environmental-Economic Accounting (SEEA) — and can inform international biodiversity platforms such as IPBES [add sources].
+
 ## Differentiated Vulnerability Tiers
 Socioeconomic profiling confirms that global environmental decline operates through distinct exposure pathways that cannot be managed uniformly. All hotspot types are concentrated in areas with substantially higher population density and total GDP than the matched background landscape (Cliff's Delta: +0.47 to +0.67), demonstrating that ecosystem service decline is not confined to remote or sparsely populated areas. The divergence emerges along development and inequality dimensions: coastal service hotspots (loss of coastal protection and risk buffering) occur disproportionately in higher-HDI settings (CD: +0.29 to +0.30), consistent with more economically developed zones where built infrastructure expansion is the plausible driver of habitat displacement. By contrast, terrestrial provisioning and export service hotspots (pollination decline, nature access loss, nitrogen and sediment export increases) cluster in lower-HDI, higher-inequality contexts (HDI CD: −0.01 to −0.08; GINI CD: +0.22 to +0.30), indicating that the populations most exposed to these losses tend to be less economically developed and more socially vulnerable. Conservation strategies must therefore be calibrated to these distinct socioeconomic realities rather than assuming a uniform exposure profile.
 
 ## The Sufficiency of Land Cover Monitoring as a Proxy for ES Provision Change
+
+*Full co-occurrence analysis, table, and maps in the Supplement (Spatial Attribution Gap: Land Cover Co-occurrence Analysis) — presented there for comparison, not as a causal attribution result.*
 
 Sixty-five point eight percent of hotspot cells do not co-occur with intense (top 5%) land cover conversion from any of five conversion drivers, at the 10km grid resolution used throughout this analysis. Many of these cells may still have undergone moderate LCC below that threshold. This is not because land cover conversion is unrelated to ES decline: the 34.2% of hotspot cells that do overlap represent a risk ratio of 7.4 relative to the 4.6% background co-occurrence rate observed elsewhere on the grid (equivalently, odds ratio 10.79), and every one of the five drivers individually shows a strong positive association (risk ratios 4.2–97.5), with no offsetting or negative-association driver. Categorical land cover conversion is therefore a reliable signal of ES-hotspot co-occurrence where it is present — but its reach is limited, identifying only about a third of the most severe ES decline. This finding is consistent with the view that land cover monitoring, while informative where it fires, is insufficient on its own for comprehensively tracking ecosystem service provision change. Sub-pixel degradation, upstream routing cascades, and climate forcing are plausible contributing mechanisms behind the remaining gap, but this co-occurrence analysis cannot establish their relative contribution or rule out other explanations. We emphasize that this attribution analysis identifies **spatial co-occurrence** between hotspots and LCC drivers, not causal attribution. An important structural limitation is that ESA CCI land cover data serves simultaneously as a primary input to the InVEST biophysical models and as the basis for the LCC overlay analysis. This endogeneity means the gap cannot be interpreted as an independent empirical partition between degradation-driven and conversion-driven change.
 
@@ -517,6 +470,71 @@ While this paper focuses on macro-regional patterns, the spatial extraction pipe
 # Annex: Supplemental Figures
 
 This annex contains supplemental figures that provide additional detail and context for the analyses presented in the main body of the paper.
+
+## Spatial Attribution Gap: Land Cover Co-occurrence Analysis
+
+::: {.callout-note}
+**Moved to Supplement 2026-08-20, per Becky and Steve's review.** This analysis identifies where
+intense ecosystem service decline spatially co-occurs with intense land cover conversion. It is
+presented here **for comparison only** — the two phenomena being co-located does not establish
+that one causes the other, and where a change *happens* is not necessarily where it *accrues* as
+a downstream change in service provision. Treat the numbers below as a descriptive spatial
+relationship, not a causal or attribution claim.
+
+**Numbers below corrected 2026-07-24** (a many-to-one crosswalk-join bug was inflating cell
+counts — see WORKLOG 2026-07-24). **Known follow-up, not yet done:** the same bug may still
+affect `analysis/hotspot_extraction.qmd`'s per-service driver-overlap table and some
+driver-hotspot maps in this section — re-verify those specific figures/table before treating them
+as final.
+:::
+
+To assess whether intense ecosystem service decline co-occurs with intense land cover conversion, we compared ES hotspot cells (top 5% of SPC change per service) against land cover conversion hotspot cells (top 5% of gross conversion magnitude per driver) within the same 10km equal-area grid. Because five distinct drivers each contribute a 5% tail, and these tails substantially overlap each other in space (forest clearing and cropland expansion, for instance, concentrate on the same deforestation frontiers), their union covers **9.0%** of the global grid — not the naive ~5% that spatial independence of a single driver would predict. This union is the correct chance baseline against which to judge co-occurrence with ES hotspots.
+
+Against that baseline, ES hotspot cells overlap with the LCC driver union at a rate of **34.2%** — a risk ratio of **7.4** relative to the 4.6% background rate observed among non-hotspot cells (equivalently, odds ratio 10.79, 95% CI 10.66–10.92; *p* < 0.001 on n > 1.51 million cells, and here the large sample size is not doing the work — the effect size itself is large). At the top-5% severity threshold, ES hotspots co-occur with intense land cover conversion at a rate well above background.
+
+This positive association holds for every individual driver (@tbl-attribution-drivers), from Grassland Gain (risk ratio 4.2, the weakest) to Cropland Expansion (risk ratio 97.5, the strongest). There is no offsetting or mixed-sign pattern across drivers — every driver points the same direction.
+
+Even so, the remaining **65.8% of ES hotspot cells do not co-occur with any intense land cover conversion driver**. This does not imply those cells experienced zero land cover change; some may have undergone moderate conversion below the top-5% threshold. What it shows is that even a strong co-occurrence relationship — present for every driver we tested — only reaches about a third of the most severe ecosystem service declines. The gap is consistent with mechanisms that produce functional decline without triggering a categorical reclassification in the same cell: sub-pixel in-situ degradation, upstream routing cascades from conversion in adjacent cells, and climate-driven shifts in model inputs. Whether this reflects sub-pixel degradation, upstream routing cascades, climate-forcing, or some combination cannot be determined from this co-occurrence analysis alone.
+
+```{r}
+#| label: tbl-attribution-drivers
+#| tbl-cap: "Land Cover Conversion Drivers Intersecting Ecosystem Service Hotspots, and Risk Relative to Background"
+#| echo: false
+
+driver_overlap <- data.frame(
+  `Land Cover Driver` = c("Forest Loss", "Urban Expansion", "Grassland Gain", "Grassland Loss", "Cropland Expansion", "Union (any of 5 drivers)", "Attribution Gap (Below Top-5% LCC Threshold)"),
+  `% of ES Hotspots Overlapping` = c("16.9%", "3.1%", "8.9%", "9.5%", "16.7%", "34.2%", "65.8%"),
+  `Risk Ratio vs. Background` = c("25.4", "9.1", "4.2", "4.8", "97.5", "7.4", "—"),
+  check.names = FALSE
+)
+if (requireNamespace("DT", quietly = TRUE)) {
+  DT::datatable(
+    driver_overlap,
+    options = list(dom = 't', paging = FALSE, searching = TRUE),
+    rownames = FALSE
+  )
+} else {
+  knitr::kable(driver_overlap, align = c("l", "r", "r"))
+}
+```
+
+::: {.callout-note}
+**Reading the "Risk Ratio vs. Background" column (@tbl-attribution-drivers)**
+
+Risk ratio compares plain probabilities: (rate of overlap with that driver among ES hotspot cells) ÷ (rate of overlap among background, non-hotspot cells). A value of 1.0 means no association; a value of 7.4 (the union row) means ES hotspot cells are 7.4 times more likely to sit inside the five-driver conversion union than a randomly chosen non-hotspot cell. The same union comparison can equivalently be expressed as an odds ratio (10.79, 95% CI 10.66–10.92) — a related statistic that compares odds rather than probabilities, and comes out larger than the risk ratio once the outcome (34.2% overlap) is no longer rare. We report risk ratio throughout as the primary, more directly interpretable effect size; the odds ratio is noted here for readers who expect it from standard contingency-table analysis.
+:::
+
+![Global distribution of primary land cover conversion drivers (1992-2020), identifying areas of granular transitions such as deforestation for cropland, savannization, and urban expansion.](../../outputs/plots/maps/global_lcc_driver_map.png){#fig-lcc-drivers .quarto-figure-center width="100%"}
+
+::: {#fig-attribution-comparison layout-ncol=2}
+![All Ecosystem Service Decline Hotspots](../../outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png){width="100%"}
+
+![Land Cover Conversion Hotspots (all 5 drivers, regardless of ES-hotspot status)](../../outputs/plots/maps/global_lcc_driver_hotspots_map.png){width="100%"}
+
+Comparing the two footprints. The map on the left shows the total footprint of intense ecosystem service decline (225,113 cells). The map on the right shows the total footprint of intense land cover conversion from any of five drivers (136,468 cells) — it is not filtered to ES-hotspot status. The two footprints overlap substantially where they overlap at all (34.2% of ES hotspot cells fall inside the conversion footprint, against a 4.6% background rate), but the conversion footprint is considerably smaller than the ES-decline footprint, which is why 65.8% of ES hotspots fall outside it.
+:::
+
+![Heatmap showing the percentage of ecosystem service hotspots that geographically overlap with hotspots of land cover conversion. The large proportion of low values highlights the "attribution gap."](../../outputs/plots/drivers/heatmap_driver_overlap_pct.png){#fig-attribution-gap .quarto-figure-center}
 
 ## Regional Trajectories by World Bank Region
 

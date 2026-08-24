@@ -1,5 +1,14 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-08-21 — Tremie follow-up sent (CLEC abstract confirmation + Módulo 5)
+
+Sent the overdue follow-up to Tremie: confirmed the CLEC abstract was submitted by the Aug 12
+deadline, and re-surfaced the Módulo 5 ("Priorización de intervenciones") course-design interest
+that had gone quiet for over a week. Both draft files (`docs/applications/
+tremie_reply_email_draft.md`, the pre-submission Aug 11 version, and `tremie_followup_2026-08-20.md`,
+the actual one sent) removed now that the email is out — no longer needed once sent, per this
+project's convention of not keeping stale communication drafts around.
+
 ### 2026-08-20 (later) — Geographic claim in Sandra deck was wrong; verified and fixed, new audit script built
 
 A pre-existing, never-verified claim on the "Dónde"/"Where" slide ("concentración más fuerte en el eje
