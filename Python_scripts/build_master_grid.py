@@ -30,7 +30,7 @@ def fix_geometries(gdf, name=""):
 def main():
     parser = argparse.ArgumentParser(description="Enrich, clean, and reproject base QGIS grid to EPSG:4326.")
     parser.add_argument("input_grid", type=str, help="Path to the raw QGIS land grid (e.g., landgrid_1.gpkg).")
-    parser.add_argument("--data-root", type=str, default=os.environ.get("GLOBAL_NCP_DATA", "/data"), help="Path to data directory.")
+    parser.add_argument("--data-root", type=str, default=os.environ.get("GLOBAL_NCP_DATA", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")), help="Path to data directory.")
     parser.add_argument("--output-file", type=str, default=None, help="Path to save the final EPSG:4326 GeoPackage.")
     args = parser.parse_args()
 

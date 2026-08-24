@@ -144,7 +144,7 @@ make_multi_plot <- function(df, grp_var) {
 #' @export
 make_country_intensity_plot <- function(df) {
   d <- df %>%
-    filter(grouping_var == "country") %>%
+    filter(grouping_var == "nev_name") %>%
     filter(!is.na(group))
 
   if (nrow(d) == 0) return(ggplot() + theme_void() + ggtitle("No data"))
@@ -187,7 +187,7 @@ make_country_intensity_plot <- function(df) {
 #' @export
 make_country_multi_plot <- function(df) {
   d <- df %>%
-    filter(grouping == "country") %>%
+    filter(grouping == "nev_name") %>%
     filter(!is.na(group))
 
   if (nrow(d) == 0) return(ggplot() + theme_void() + ggtitle("No data"))

@@ -1,0 +1,273 @@
+TY  - JOUR
+AU  - Kamble, Baburao
+AU  - Kilic, Ayse
+AU  - Hubbard, Kenneth
+PY  - 2013
+TI  - Estimating Crop Coefficients Using Remote Sensing-Based Vegetation Index
+JO  - Remote Sensing
+VL  - 5
+IS  - 4
+SP  - 1588
+EP  - 1602
+DO  - 10.3390/rs5041588
+UR  - https://www.mdpi.com/2072-4292/5/4/1588
+N1  - NDVI-based Kc regression (Kc = 1.457*NDVI - 0.1725, r2=0.90-0.91). Candidate method for non-crop vegetation Kc in the SWY biophysical table; confirmed still cited/replicated in 2020-2023 follow-up studies.
+ER  -
+
+TY  - RPRT
+AU  - Allen, Richard G.
+AU  - Pereira, Luis S.
+AU  - Raes, Dirk
+AU  - Smith, Martin
+PY  - 1998
+TI  - Crop evapotranspiration - Guidelines for computing crop water requirements
+T2  - FAO Irrigation and Drainage Paper 56
+PB  - Food and Agriculture Organization of the United Nations
+CY  - Rome
+UR  - http://www.fao.org/3/X0490E/x0490e0b.htm
+N1  - Standard reference for cropland Kc (crop coefficient) values, cited directly by InVEST SWY documentation.
+ER  -
+
+TY  - RPRT
+AU  - United States Department of Agriculture, Natural Resources Conservation Service
+PY  - 2007
+TI  - National Engineering Handbook, Part 630: Hydrology
+PB  - USDA-NRCS
+UR  - https://www.nrcs.usda.gov/
+N1  - Full SCS/NRCS curve number methodology reference (hydrologic soil group, cover type, treatment, hydrologic condition, antecedent runoff condition).
+ER  -
+
+TY  - RPRT
+AU  - United States Department of Agriculture, Natural Resources Conservation Service
+PY  - 1999
+TI  - Urban Hydrology for Small Watersheds
+T2  - Technical Release 55 (TR-55)
+PB  - USDA-NRCS
+UR  - https://www.nrc.gov/docs/ML1421/ML14219A437.pdf
+N1  - Origin of the standard curve number lookup tables by cover type and hydrologic soil group; US-derived, no global default recommended by InVEST's own documentation.
+ER  -
+
+TY  - JOUR
+AU  - Ross, C. Wade
+AU  - Prihodko, Lara
+AU  - Anchang, Julius
+AU  - Kumar, Sanath
+AU  - Ji, Wenjie
+AU  - Hanan, Niall P.
+PY  - 2018
+TI  - HYSOGs250m, global gridded hydrologic soil groups for curve-number-based runoff modeling
+JO  - Scientific Data
+VL  - 5
+SP  - 180091
+DO  - 10.1038/sdata.2018.91
+UR  - https://www.nature.com/articles/sdata201891
+N1  - Global 250m hydrologic soil group (A/B/C/D) raster. Confirmed 2026-07-16 still available via ORNL DAAC (DOI 10.3334/ORNLDAAC/1566) / NASA Earthdata. Resolves the soil hydrologic group input for SWY.
+ER  -
+
+TY  - JOUR
+AU  - Jaafar, Hadi H.
+AU  - Ahmad, Farah A.
+AU  - El Beyrouthy, Naji
+PY  - 2019
+TI  - GCN250, new global gridded curve numbers for hydrologic modeling and design
+JO  - Scientific Data
+VL  - 6
+SP  - 145
+DO  - 10.1038/s41597-019-0155-x
+UR  - https://www.nature.com/articles/s41597-019-0155-x
+N1  - Global 250m gridded curve-number product (ESA CCI-LC 2015 x NEH-630 crosswalk x HYSOGs250m), three antecedent-runoff-condition variants. Central to the SWY CN decision — see docs/swy/model_specification.md. Caveat: regional sensitivity comes from land-cover granularity + wetness scenario, not biome-specific values within a land-cover class; authors flag forested/humid tropical environments as least validated.
+ER  -
+
+TY  - JOUR
+AU  - Abbaspour, Karim C.
+AU  - Ashraf Vaghefi, Saeid
+AU  - Yang, Hong
+AU  - Srinivasan, Raghavan
+PY  - 2019
+TI  - Global soil, landuse, evapotranspiration, historical and future weather databases for SWAT applications
+JO  - Scientific Data
+VL  - 6
+SP  - 263
+DO  - 10.1038/s41597-019-0282-4
+UR  - https://www.nature.com/articles/s41597-019-0282-4
+N1  - Checked as a possible global CN shortcut via SWAT's own global databases; confirmed it does NOT provide curve number values, only land-cover-to-SWAT-crop-class crosswalks. Useful negative result, not a building block.
+ER  -
+
+TY  - JOUR
+AU  - Hamel, Perrine
+AU  - Valencia, Josue
+AU  - Schmitt, Rafael
+AU  - Shrestha, Mahesh
+AU  - Piman, Thanapon
+AU  - Sharp, Richard P.
+AU  - Francesconi, Wendy
+AU  - Guswa, Andrew J.
+PY  - 2020
+TI  - Modeling seasonal water yield for landscape management: Applications in Peru and Myanmar
+JO  - Journal of Environmental Management
+VL  - 270
+SP  - 110792
+DO  - 10.1016/j.jenvman.2020.110792
+UR  - https://www.sciencedirect.com/science/article/abs/pii/S0301479720307234
+N1  - Closest precedent found for InVEST SWY applied across genuinely different regions/landscapes in one study. Full text obtained and read 2026-07-17. Key findings: neither case study derived CN/Kc from literature tables from scratch -- Peru reused CN from an existing calibrated SWAT model of that exact basin (Uribe et al. 2013), Myanmar reused CN/Kc from an existing national ecosystem-service assessment (Mandle et al. 2017) -- the actual operational precedent for "how to build subregional tables" is to borrow from existing calibrated regional studies, not derive from TR-55 tables cold. CN sensitivity found to be dramatic: quickflow changed by factors of 10.1-13.1x between antecedent-moisture-condition settings in the Chindwin basin. Also found model reliability degrades at large basin scale -- their largest basin (114,000 km2) already showed spatial-variation problems, and their own conclusion recommends caution with absolute values in new geographies, with basins under 10,000 km2 best supported by their validation data. No true global-scale InVEST SWY application was found anywhere in this review -- worth treating "one global run" itself as an open question, not just the CN table.
+ER  -
+
+TY  - JOUR
+AU  - Guswa, Andrew J.
+AU  - Hamel, Perrine
+AU  - Meyer, Katherine
+PY  - 2018
+TI  - Curve Number Approach to Estimate Monthly and Annual Direct Runoff
+JO  - Journal of Hydrologic Engineering
+VL  - 23
+IS  - 2
+DO  - 10.1061/(ASCE)HE.1943-5584.0001606
+UR  - https://ascelibrary.org/doi/abs/10.1061/(ASCE)HE.1943-5584.0001606
+N1  - The actual methodological paper behind InVEST-SWY's monthly CN-based quickflow computation (cited directly in Hamel et al. 2020), more specific than the general InVEST User Guide. Tested against 544 watersheds in the contiguous United States -- another reminder that even the model's own core method was validated on US data, not tropical/global.
+ER  -
+
+TY  - JOUR
+AU  - Oliveira, Paulo Tarso S.
+AU  - Nearing, Mark A.
+AU  - Hawkins, Richard H.
+AU  - Stone, Jeffry J.
+AU  - Rodrigues, Dulce B. B.
+AU  - Panachuki, Eduardo
+AU  - Wendland, Edson
+PY  - 2016
+TI  - Curve number estimation from Brazilian Cerrado rainfall and runoff data
+JO  - Journal of Soil and Water Conservation
+VL  - 71
+IS  - 5
+SP  - 420
+EP  - 429
+DO  - 10.2489/jswc.71.5.420
+UR  - https://www.jswconline.org/content/71/5/420
+N1  - DIRECT HIT for the flooded grasslands/savannas biome patch. Real measured CN values from Cerrado (Brazilian Neotropical savanna -- the closest ecological analog to the Colombian Llanos/Orinoquia, same broad biome). Undisturbed Cerrado on hydrologic soil group B: CN ~81.2 bare soil comparison point; converted land uses given too (soybean CN ~78.7, sugarcane CN ~70.2), useful for understanding the undisturbed-vs-converted CN gap in this biome specifically -- directly relevant given this project's own driver-attribution/land-conversion focus.
+ER  -
+
+TY  - JOUR
+AU  - Nogales Pimentel, Jonathan
+AU  - Rogéliz Prada, Carlos Andrés
+AU  - Walschburger, Thomas
+PY  - 2021
+TI  - Hydrological modeling for multifunctional landscape planning in the Orinoquia region of Colombia
+JO  - Frontiers in Environmental Science
+VL  - 9
+SP  - 673215
+DO  - 10.3389/fenvs.2021.673215
+UR  - https://doi.org/10.3389/fenvs.2021.673215
+N1  - Real hydrological modeling specific to the Llanos/Orinoquia -- but NOT a CN source. Uses the ABCD model (Thomas 1981) plus a river-floodplain interaction model, calibrated against 57 gauging stations across 4,273 hydrological units; parameters regionalized by morphometric similarity, not vegetation/land-cover classification. Does not use the SCS curve number method at all. Valuable as regional precedent and a possible cross-validation reference once a CN-based patch exists for this biome, not as a direct parameter source -- don't conflate with Oliveira et al. 2016 above.
+ER  -
+
+TY  - ELEC
+AU  - Natural Capital Project
+PY  - 2026
+TI  - InVEST User Guide: Seasonal Water Yield
+PB  - Stanford University, University of Minnesota, Chinese Academy of Sciences, The Nature Conservancy, World Wildlife Fund, Stockholm Resilience Centre
+UR  - https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-userguide/latest/en/seasonal_water_yield.html
+N1  - Primary technical reference for all SWY input requirements, formats, and default parameters.
+ER  -
+
+TY  - JOUR
+AU  - Calero Mosquera, Daniela
+AU  - Hoyos Villada, Fanny
+AU  - Torres Prieto, Enrique
+PY  - 2021
+TI  - Runoff Curve Number (CN model) Evaluation Under Tropical Conditions
+JO  - Earth Sciences Research Journal
+VL  - 25
+IS  - 4
+SP  - 397
+EP  - 404
+UR  - https://revistas.unal.edu.co/index.php/esrj/article/view/95321
+N1  - Directly relevant to the CN decision's targeted biome patch (tropical moist broadleaf forest). Found the SCS-CN method overestimates runoff under tropical conditions and flags that initial abstraction coefficients were calibrated on US experimental watersheds, not tropical ones -- direct empirical support for why GCN250's own caution about forested/humid tropical validity matters in practice, not just in theory.
+ER  -
+
+TY  - JOUR
+AU  - Fábrega, D.
+PY  - 2012
+TI  - Rainfall - CN (Curve Number) relationships in a tropical rainforest microbasin within the Panamá Canal watershed
+JO  - Earth Sciences Research Journal (or Revista Facultad de Ingeniería -- venue not fully confirmed)
+UR  - http://www.scielo.org.co/scielo.php?script=sci_arttext&pid=S0120-62302012000100017
+N1  - VERIFY BEFORE FORMAL CITATION -- full author list and exact venue not confirmed via search, only lead author surname. Joint work by New Mexico Institute of Mining and Technology, University of Wyoming, and Universidad Tecnológica de Panamá on a 6.5 Ha tropical rainforest microbasin in the Río Chagres basin. Real measured CN values from a tropical rainforest catchment -- a candidate concrete data point for the biome patch, pending full verification.
+ER  -
+
+TY  - JOUR
+PY  - 2025
+TI  - Improving the Accuracy of Seasonal Crop Coefficients in Grapevine from Sentinel-2 Data
+JO  - Remote Sensing
+VL  - 17
+IS  - 19
+SP  - 3365
+DO  - 10.3390/rs17193365
+UR  - https://doi.org/10.3390/rs17193365
+N1  - VERIFY BEFORE FORMAL CITATION -- author list not confirmed (site blocked automated access). Recent (2025) NDVI-based Kc validation using spectral unmixing, reports transferability across regions/cultivars -- useful as evidence the Kamble et al. (2013) approach's underlying logic keeps holding up in current literature, though this specific study is a different crop (grapevine) and not directly a source of new global parameters.
+ER  -
+
+TY  - JOUR
+AU  - Lehner, Bernhard
+AU  - Grill, Gunther
+PY  - 2013
+TI  - Global river hydrography and network routing: baseline data and new approaches to study the world's large river systems
+JO  - Hydrological Processes
+VL  - 27
+IS  - 15
+SP  - 2171
+EP  - 2186
+DO  - 10.1002/hyp.9740
+UR  - https://doi.org/10.1002/hyp.9740
+N1  - Official citation for HydroSHEDS/HydroBASINS, the candidate global watershed/AOI input for the SWY run. Note: HydroSHEDS is a WWF-associated product.
+ER  -
+
+TY  - JOUR
+AU  - Funk, Chris
+AU  - Peterson, Pete
+AU  - Landsfeld, Martin
+AU  - Pedreros, Diego
+AU  - Verdin, James
+AU  - Shukla, Shraddhanand
+AU  - Husak, Gregory
+AU  - Rowland, Joel
+AU  - Harrison, Laura
+AU  - Hoell, Andrew
+AU  - Michaelsen, Joel
+PY  - 2015
+TI  - The climate hazards infrared precipitation with stations -- a new environmental record for monitoring extremes
+JO  - Scientific Data
+VL  - 2
+SP  - 150066
+DO  - 10.1038/sdata.2015.66
+UR  - https://www.nature.com/articles/sdata201566
+N1  - Citation for CHIRPS, the leading candidate for the monthly precipitation input. Reminder: CHIRPS coverage is 60N-60S only -- does not cover boreal/tundra biomes, see CHELSA below for that gap.
+ER  -
+
+TY  - JOUR
+AU  - Karger, Dirk Nikolaus
+AU  - Conrad, Olaf
+AU  - Böhner, Jürgen
+AU  - Kawohl, Tobias
+AU  - Kreft, Holger
+AU  - Soria-Auza, Rodrigo Wilber
+AU  - Zimmermann, Niklaus E.
+AU  - Linder, H. Peter
+AU  - Kessler, Michael
+PY  - 2017
+TI  - Climatologies at high resolution for the earth's land surface areas
+JO  - Scientific Data
+VL  - 4
+SP  - 170122
+DO  - 10.1038/sdata.2017.122
+UR  - https://www.nature.com/articles/sdata2017122
+N1  - Citation for CHELSA, the candidate fallback for precipitation/climate coverage above 60N/below 60S where CHIRPS has no data. Note: a fixed climatology (1979-2013), not era-specific -- same open provenance question as the existing WORKLOG.md blocker.
+ER  -
+
+TY  - DATA
+AU  - Didan, Kamel
+PY  - 2021
+TI  - MODIS/Terra Vegetation Indices Monthly L3 Global 1km SIN Grid V061
+PB  - NASA EOSDIS Land Processes Distributed Active Archive Center
+DO  - 10.5067/MODIS/MOD13A3.061
+UR  - https://doi.org/10.5067/MODIS/MOD13A3.061
+N1  - Citation for MOD13A3, the candidate NDVI source for the Kamble et al. (2013) Kc regression (non-crop vegetation fraction).
+ER  -

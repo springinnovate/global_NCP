@@ -1,0 +1,2234 @@
+% Options for packages loaded elsewhere
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames,x11names}{xcolor}
+%
+\documentclass[
+  letterpaper,
+  DIV=11,
+  numbers=noendperiod]{scrreprt}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{5}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+% Make \paragraph and \subparagraph free-standing
+\makeatletter
+\ifx\paragraph\undefined\else
+  \let\oldparagraph\paragraph
+  \renewcommand{\paragraph}{
+    \@ifstar
+      \xxxParagraphStar
+      \xxxParagraphNoStar
+  }
+  \newcommand{\xxxParagraphStar}[1]{\oldparagraph*{#1}\mbox{}}
+  \newcommand{\xxxParagraphNoStar}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+  \let\oldsubparagraph\subparagraph
+  \renewcommand{\subparagraph}{
+    \@ifstar
+      \xxxSubParagraphStar
+      \xxxSubParagraphNoStar
+  }
+  \newcommand{\xxxSubParagraphStar}[1]{\oldsubparagraph*{#1}\mbox{}}
+  \newcommand{\xxxSubParagraphNoStar}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+\makeatother
+
+
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+
+
+
+
+
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+
+
+ 
+
+
+\KOMAoption{captions}{tableheading}
+\makeatletter
+\@ifpackageloaded{bookmark}{}{\usepackage{bookmark}}
+\makeatother
+\makeatletter
+\@ifpackageloaded{caption}{}{\usepackage{caption}}
+\AtBeginDocument{%
+\ifdefined\contentsname
+  \renewcommand*\contentsname{Table of contents}
+\else
+  \newcommand\contentsname{Table of contents}
+\fi
+\ifdefined\listfigurename
+  \renewcommand*\listfigurename{List of Figures}
+\else
+  \newcommand\listfigurename{List of Figures}
+\fi
+\ifdefined\listtablename
+  \renewcommand*\listtablename{List of Tables}
+\else
+  \newcommand\listtablename{List of Tables}
+\fi
+\ifdefined\figurename
+  \renewcommand*\figurename{Figure}
+\else
+  \newcommand\figurename{Figure}
+\fi
+\ifdefined\tablename
+  \renewcommand*\tablename{Table}
+\else
+  \newcommand\tablename{Table}
+\fi
+}
+\@ifpackageloaded{float}{}{\usepackage{float}}
+\floatstyle{ruled}
+\@ifundefined{c@chapter}{\newfloat{codelisting}{h}{lop}}{\newfloat{codelisting}{h}{lop}[chapter]}
+\floatname{codelisting}{Listing}
+\newcommand*\listoflistings{\listof{codelisting}{List of Listings}}
+\makeatother
+\makeatletter
+\makeatother
+\makeatletter
+\@ifpackageloaded{caption}{}{\usepackage{caption}}
+\@ifpackageloaded{subcaption}{}{\usepackage{subcaption}}
+\makeatother
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Ecosystem Service Hotspots: A Global Policy Analysis},
+  pdfauthor={Jerónimo Rodríguez Escobar, Becky Chaplin-Kramer, Richard P. Sharp, [Other Authors]},
+  colorlinks=true,
+  linkcolor={blue},
+  filecolor={Maroon},
+  citecolor={Blue},
+  urlcolor={Blue},
+  pdfcreator={LaTeX via pandoc}}
+
+
+\title{Ecosystem Service Hotspots: A Global Policy Analysis}
+\usepackage{etoolbox}
+\makeatletter
+\providecommand{\subtitle}[1]{% add subtitle to \maketitle
+  \apptocmd{\@title}{\par {\large #1 \par}}{}{}
+}
+\makeatother
+\subtitle{Where nature is changing, who is affected, and what drives
+change}
+\author{Jerónimo Rodríguez Escobar, Becky Chaplin-Kramer, Richard P. Sharp, [Other Authors]}
+\date{2026-06-05}
+\begin{document}
+\maketitle
+
+\renewcommand*\contentsname{Table of contents}
+{
+\setcounter{tocdepth}{2}
+\tableofcontents
+}
+
+\bookmarksetup{startatroot}
+
+\chapter*{Preface}\label{preface}
+\addcontentsline{toc}{chapter}{Preface}
+
+\markboth{Preface}{Preface}
+
+\bookmarksetup{startatroot}
+
+\chapter*{Executive Summary}\label{executive-summary}
+\addcontentsline{toc}{chapter}{Executive Summary}
+
+\markboth{Executive Summary}{Executive Summary}
+
+This workflow brings together global data on ecosystem services, land
+cover, and people to help us understand where nature is changing, who is
+affected, and where action is most needed. It combines data processing,
+change detection, and hotspot mapping in a way that is transparent and
+reproducible.
+
+\textbf{Why does it matter?} By identifying areas of rapid change or
+high importance, this pipeline supports better decision-making for
+conservation, policy, and sustainable development.
+
+\section*{Glossary}\label{glossary}
+\addcontentsline{toc}{section}{Glossary}
+
+\markright{Glossary}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{AOO}: Area of Occupancy. A standard 10 km equal-area grid used
+  for spatial analysis.
+\item
+  \textbf{ES}: Ecosystem Services. Benefits people obtain from nature
+  (e.g., pollination, coastal protection).
+\item
+  \textbf{Hotspot}: A grid cell showing unusually high or low relative
+  change in ecosystem services (the extreme 5\% tail of the
+  distribution).
+\item
+  \textbf{KS Analysis}: Kolmogorov-Smirnov test, a statistical method
+  used here to compare the socioeconomic profiles of hotspots
+  vs.~non-hotspots.
+\item
+  \textbf{Zonal Statistics}: Calculations that summarize high-resolution
+  raster data within the boundaries of polygons (grid cells or regions).
+\end{itemize}
+
+\bookmarksetup{startatroot}
+
+\chapter*{Key Takeaways}\label{key-takeaways}
+\addcontentsline{toc}{chapter}{Key Takeaways}
+
+\markboth{Key Takeaways}{Key Takeaways}
+
+\subsection*{1. What is a ``Hotspot''? (Methodological
+Context)}\label{what-is-a-hotspot-methodological-context}
+\addcontentsline{toc}{subsection}{1. What is a ``Hotspot''?
+(Methodological Context)}
+
+Before interpreting the results, it is critical to understand how a
+hotspot is defined in this analysis: * \textbf{A Relative Extreme, Not
+an Absolute Threshold:} A hotspot is a grid cell that falls in the most
+extreme \textbf{5\% of relative change} (using Symmetric Percentage
+Change) globally for a specific service. * \textbf{Intensity Over
+Volume:} We use percentage change rather than absolute volume to
+normalize for the size of the baseline ecosystem. * \textbf{Focus on
+Decline:} For this phase of the analysis, hotspots represent
+\textbf{worry spots}---areas experiencing the steepest declines in
+service provision or the sharpest increases in environmental
+risk/damage.
+
+\subsection*{2. Geographic Clustering \& Compound
+Risk}\label{geographic-clustering-compound-risk}
+\addcontentsline{toc}{subsection}{2. Geographic Clustering \& Compound
+Risk}
+
+Hotspots of ecosystem service decline are not randomly distributed; they
+cluster heavily in the Global South, creating epicenters of
+\textbf{Compound Risk} where communities face multiple simultaneous
+ecological failures. * \textbf{The Epicenters of Hotness:} Latin America
+\& the Caribbean and East Asia \& the Pacific are the most intensely
+affected regions globally. * \textbf{Disproportionate Burden:} Latin
+America and Sub-Saharan Africa carry a vastly disproportionate share of
+the global damage compared to their landmass.
+
+\subsection*{3. Socioeconomic Profiling (Who is
+affected?)}\label{socioeconomic-profiling-who-is-affected}
+\addcontentsline{toc}{subsection}{3. Socioeconomic Profiling (Who is
+affected?)}
+
+Using Kolmogorov-Smirnov (KS) tests, we compared the socioeconomic
+profile of hotspots against the ``business-as-usual'' median landscape.
+* \textbf{The Urbanization / Wealth Correlation:} Declines in Nature
+Access, Coastal Risk Reduction, and Retention Ratios consistently occur
+in grid cells with higher Population Density, higher Built Area, and
+higher GDP than the global median. * \textbf{The Rural Divide:}
+Conversely, hotspots of Pollination loss and Sediment Export increases
+are uniquely concentrated in less urbanized, lower-density, and highly
+agricultural contexts.
+
+\subsection*{4. Land Cover Drivers (The ``Attribution
+Gap'')}\label{land-cover-drivers-the-attribution-gap}
+\addcontentsline{toc}{subsection}{4. Land Cover Drivers (The
+``Attribution Gap'')}
+
+To move beyond correlation, we assessed the direct overlap between ES
+hotspots and the top 5\% of physical Land Cover Conversion. *
+\textbf{The Attribution Gap:} A significant portion of ecosystem service
+hotspots do not overlap with major land conversion hotspots within the
+same 10km cell, pointing to the critical role of degradation or upstream
+drivers.
+
+\subsection*{5. Absolute Population
+Exposure}\label{absolute-population-exposure}
+\addcontentsline{toc}{subsection}{5. Absolute Population Exposure}
+
+While socioeconomic profiling reveals relative characteristics, absolute
+population provides the scale of human impact. * \textbf{Concentration
+in Middle-Income Nations:} The vast majority of people exposed to ES
+decline hotspots reside in Upper and Lower Middle-Income countries.
+
+\part{Part 1: Understanding the Challenge}
+
+\chapter{The Challenge}\label{the-challenge}
+
+Why ecosystem services matter and where we stand
+
+\hfill\break
+
+\section{Global Ecosystem Services Under
+Pressure}\label{global-ecosystem-services-under-pressure}
+
+The well-being of billions of people is intrinsically linked to the
+health of ecosystems. These life-support systems, often called
+\textbf{ecosystem services}, include:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Water purification and erosion control} -- Nitrogen and
+  sediment retention
+\item
+  \textbf{Food production} -- Pollination of crops; fisheries
+  productivity
+\item
+  \textbf{Climate regulation} -- Carbon sequestration; temperature
+  buffering
+\item
+  \textbf{Coastal protection} -- Mangroves and coral reefs reducing
+  storm surge impact
+\item
+  \textbf{Cultural value} -- Recreation, spiritual significance of
+  natural areas
+\end{itemize}
+
+Yet these life-support systems are \textbf{changing rapidly and
+unevenly} across the globe. Between 1992 and 2020:
+
+\begin{itemize}
+\tightlist
+\item
+  Forest cover declined by \textasciitilde X million hectares globally
+\item
+  Agricultural intensification accelerated in developing regions
+\item
+  Wetland conversion for urban/agricultural use reached critical levels
+\item
+  Climate change intensified rainfall variability and droughts
+\end{itemize}
+
+\textbf{The problem}: Ecosystem service decline is
+\textbf{geographically uneven}. Some regions face catastrophic loss
+while others remain relatively stable. Worse, the \textbf{burden falls
+disproportionately on low-income countries and vulnerable populations}
+least able to adapt.
+
+\section{Decision-Makers Face an Information
+Gap}\label{decision-makers-face-an-information-gap}
+
+Conservation and development professionals operate in a sea of data but
+often lack answers to three critical questions:
+
+\subsection{\texorpdfstring{🌍 \textbf{WHERE are ecosystem services
+declining
+most?}}{🌍 WHERE are ecosystem services declining most?}}\label{where-are-ecosystem-services-declining-most}
+
+Global datasets exist, but decision-makers need geographically explicit,
+actionable priorities. Where should conservation investment flow? Which
+landscapes require immediate intervention?
+
+\subsection{\texorpdfstring{👥 \textbf{WHO is
+affected?}}{👥 WHO is affected?}}\label{who-is-affected}
+
+Not all ecosystem service loss is equally consequential. Loss in
+low-income agricultural zones threatens food security; loss in urban
+regions threatens water supply. Understanding affected populations is
+crucial for equitable, effective policy.
+
+\subsection{\texorpdfstring{🔧 \textbf{WHY are services
+declining?}}{🔧 WHY are services declining?}}\label{why-are-services-declining}
+
+Is decline driven by land conversion (deforestation, urban sprawl) or
+land degradation (quality declining within remaining natural areas)? The
+answer determines the intervention strategy: - \textbf{Conversion-driven
+decline} → Protect remaining land, strengthen tenure rights -
+\textbf{Degradation-driven decline} → Improve land management, restore
+ecosystem function
+
+\section{Our Approach: A Three-Question
+Framework}\label{our-approach-a-three-question-framework}
+
+This book integrates global ecosystem service models, land cover data,
+and socioeconomic layers to answer WHERE/WHO/WHY systematically:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{WHERE Analysis} (Chapters 4-5)
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Identified hotspots: regions in the extreme top/bottom 5\% of
+    ecosystem service change
+  \item
+    Geographic patterns: which regions, income groups, and biomes bear
+    disproportionate burden
+  \item
+    Compound risk: areas where multiple services fail simultaneously
+  \end{itemize}
+\item
+  \textbf{WHO Analysis} (Chapter 6)
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Population exposure: how many people live in hotspot regions
+  \item
+    Socioeconomic profiles: are hotspot populations wealthy, poor,
+    rural, urban?
+  \item
+    Statistical validation: are hotspot populations truly different from
+    global norm
+  \end{itemize}
+\item
+  \textbf{WHY Analysis} (Chapter 7)
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Attribution: what \% of decline coincides with observed land cover
+    change
+  \item
+    Attribution gap: what portion of decline is unexplained (degradation
+    signal)
+  \item
+    Service-specific drivers: which mechanisms drive which services
+  \end{itemize}
+\end{enumerate}
+
+\section{Why This Analysis Matters}\label{why-this-analysis-matters}
+
+\textbf{For conservation organizations}: Direct limited resources to
+regions of greatest need, vulnerable populations
+
+\textbf{For governments}: Identify priorities for environmental policy,
+land-use planning, climate adaptation strategies
+
+\textbf{For international donors}: Allocate development aid
+strategically, considering both ecosystem and equity dimensions
+
+\textbf{For research}: Understand spatial and mechanistic patterns in
+ecosystem service change; ground-truth hypotheses
+
+\textbf{For corporations}: Manage supply chain risks; invest in
+nature-positive initiatives where impacts are greatest
+
+\section{How to Use This Book}\label{how-to-use-this-book}
+
+\textbf{Quick read (1-2 hours)}: - Chapter 1: Problem statement (this
+chapter) - Chapter 2: Methods overview - Chapter 3: Global summary -
+Chapter 8: Conclusions \& implications
+
+\textbf{Policy-focused deep dive (2-3 hours)}: - Chapters 1-3 + 8
+(above) - Then skip to Chapter 7 (Regional profiles) for your geography
+of interest
+
+\textbf{Complete analysis (4-5 hours)}: - Read all chapters in order -
+Explore interactive tables and figures - Consult Technical Appendix for
+methodological details
+
+\textbf{For researchers}: - Chapters 2 (methods), 6 (WHO/socioeconomic),
+7 (WHY/drivers) - Technical Appendix for full methodological detail and
+validation
+
+\section{Caveats \& Transparency}\label{caveats-transparency}
+
+This analysis synthesizes global data at 10-km resolution. Important
+limitations:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Coarse resolution} -- Sub-grid heterogeneity not captured;
+  local variation substantial
+\item
+  \textbf{Data quality varies} -- Ecosystem service models depend on
+  input data; validation is ongoing
+\item
+  \textbf{Temporal snapshot} -- 1992-2020 comparison; recent trends may
+  differ
+\item
+  \textbf{Attribution gap} -- \textasciitilde30-55\% of decline
+  unexplained; reflects knowledge gap not data gap
+\item
+  \textbf{Natural variation} -- Climate variability contributes to
+  observed changes; attribution to human drivers incomplete
+\end{itemize}
+
+We embrace these uncertainties. This analysis is a starting point for
+prioritization and hypothesis-driven research, not a definitive answer.
+
+\section{About the Analysis}\label{about-the-analysis}
+
+\textbf{Authors}: Jerónimo Rodríguez Escobar, Becky Chaplin-Kramer, Richard P. Sharp, [Other Authors]
+
+\textbf{Data sources}:
+\begin{itemize}
+\tightlist
+\item
+  InVEST ecosystem service models (Spring/Natural Capital Project methods; \url{https://essd.copernicus.org/articles/17/3473/2025/})
+\item
+  ESA Climate Change Initiative land cover
+\item
+  IUCN 10km equal-area grids: Murray, Nicholas (2017). Global 10 x 10-km grids suitable for use in IUCN Red List of Ecosystems assessments (vector and raster format). figshare. Dataset. \url{https://doi.org/10.6084/m9.figshare.4653439.v1}
+\item
+  Socioeconomic and demographic data: World Bank regions; Global Population Density grids; UN Human Development Index (HDI) (Sherman, L., Proctor, J., Druckenmiller, H., Tapia, H., \& Hsiang, S. (2026). Global high-resolution estimates of the UN Human Development Index using satellite imagery and machine learning. Nature Communications, 17(1), 1315. \url{https://doi.org/10.1038/s41467-026-68805-6})
+\end{itemize}
+
+\textbf{Methods}: Python-based zonal statistics → R processing → hotspot
+detection (top/bottom 5\% by Symmetric Percentage Change) →
+Kolmogorov-Smirnov statistical profiling
+
+\textbf{Reproducibility}: All code and intermediate outputs available;
+see Technical Appendix
+
+\section{What's Next}\label{whats-next}
+
+Chapter 2 walks through the simplified methodology. Then we dive into
+geographic (WHERE), socioeconomic (WHO), and mechanistic (WHY) analyses.
+
+\chapter{Our Approach}\label{our-approach}
+
+How we detected and analyzed ecosystem service hotspots
+
+\hfill\break
+
+\section{Data Sources}\label{data-sources}
+
+This analysis integrates four major datasets:
+
+\subsection{1. Ecosystem Service Models
+(InVEST)}\label{ecosystem-service-models-invest}
+
+\textbf{Source}: The Nature Conservancy's InVEST model suite
+\textbf{Coverage}: Global, 300m resolution, 1992 \& 2020 snapshots
+\textbf{Services modeled}: - Pollination (agricultural crop pollination)
+- Nitrogen Export \& Retention (water quality) - Sediment Export \&
+Retention (water quality) - Nature Access (recreation/cultural ecosystem
+services) - Coastal Protection (mangrove/coral reef storm buffering)
+
+\textbf{How it works}: InVEST uses land use, climate, and biophysical
+data to estimate ecosystem service supply. A full technical description
+is in the Technical Appendix.
+
+\subsection{2. Land Cover Data}\label{land-cover-data}
+
+\textbf{Source}: ESA Climate Change Initiative, 300m resolution
+\textbf{Classification}: Reclassified to Transformed (agriculture,
+urban, plantations) vs.~Natural (forests, grasslands, wetlands)
+\textbf{Purpose}: Explain ecosystem service change; attribute decline to
+land conversion vs.~degradation
+
+\subsection{3. Administrative Grid}\label{administrative-grid}
+
+\textbf{Source}: IUCN Oecism Opportunity Grid, 10km equal-area cells
+\textbf{Coverage}: \textasciitilde1.5M cells covering all land globally
+\textbf{Attributes}: Country, World Bank region, income group, WWF biome
+\textbf{Purpose}: Common spatial unit for all analysis; enables
+regional/income aggregation
+
+\subsection{4. Socioeconomic Layers}\label{socioeconomic-layers}
+
+\textbf{Sources}: World Bank, UNDP, CIESIN \textbf{Variables}:
+Population density, GDP per capita, Human Development Index, built area,
+agricultural intensity, Gini coefficient \textbf{Purpose}: Profile who
+lives in hotspot regions; test whether hotspot populations differ from
+global norm
+
+\section{The Two-Path Analysis}\label{the-two-path-analysis}
+
+We implement a \textbf{two-path analysis} to separate WHERE hotspots are
+from WHY they occur:
+
+\begin{verbatim}
+┌─────────────────────────────────────────────────────────────┐
+│ Path A: Global Trajectories (Pixel-level summary)           │
+│ What: Aggregate 300m InVEST rasters to understand          │
+│ global-level change trends by service                       │
+│ Output: Global summary statistics per service               │
+│ Use: Chapter 3 (global context)                             │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ Path B: Grid Analysis (Canonical for hotspots)              │
+│ What: Zonal statistics within IUCN 10km cells               │
+│ (difference of aggregates, not aggregate of differences)    │
+│ Process:                                                     │
+│   1. Aggregate 300m InVEST to 10km cell level (1992 & 2020)│
+│   2. Calculate change per cell (absolute & percentage)      │
+│   3. Identify hotspots: top/bottom 5% of distribution       │
+│   4. Aggregate hotspots to regions/countries/biomes         │
+│ Output: Hotspot locations, intensity, populations affected  │
+│ Use: Chapters 4-7 (geographic, socioeconomic, drivers)      │
+└─────────────────────────────────────────────────────────────┘
+\end{verbatim}
+
+\textbf{Why two paths?} Path A answers ``what happened globally''; Path
+B answers ``where did it happen'' with actionable spatial detail.
+
+\section{Change Metrics: From Absolute to Symmetric Percentage
+Change}\label{change-metrics-from-absolute-to-symmetric-percentage-change}
+
+\subsection{Absolute Change}\label{absolute-change}
+
+\textbf{Formula}: \(\Delta = T_{2020} - T_{1992}\)
+
+Simple subtraction. Problem: Services with different baselines are not
+comparable (1 unit drop in service with baseline 10 ≠ 1 unit drop in
+service with baseline 1000).
+
+\subsection{Percentage Change (Naive)}\label{percentage-change-naive}
+
+\textbf{Formula}:
+\(\text{PC} = \frac{T_{2020} - T_{1992}}{T_{1992}} \times 100\%\)
+
+Normalizes by baseline. Problem: \textbf{Zero-baseline services}
+(services that could have 0 value in 1992) produce infinite values.
+
+\subsection{\texorpdfstring{Symmetric Percentage Change (SPC) ✓
+\emph{Our
+choice}}{Symmetric Percentage Change (SPC) ✓ Our choice}}\label{symmetric-percentage-change-spc-our-choice}
+
+\textbf{Formula}:
+\(\text{SPC} = \frac{T_{2020} - T_{1992}}{(|T_{2020}| + |T_{1992}|) / 2} \times 100\%\)
+
+Handles zero-baselines by using the mean of absolute values as
+denominator. Symmetric treatment of gains/losses.
+
+\textbf{Example}: - Service goes from 100 → 200: SPC = +67\% (2/3
+increase) - Service goes from 100 → 0: SPC = -100\% (complete loss) -
+Service goes from 0 → 100: SPC = +100\% (from nothing to something)
+
+\textbf{Why SPC?} It prevents scale bias (large-baseline services
+dominating hotspot identification) and handles zero-baseline services
+elegantly.
+
+\section{Hotspot Definition}\label{hotspot-definition}
+
+\textbf{Hotspots} = Grid cells in the \textbf{top or bottom 5\%} of the
+SPC distribution for each service.
+
+\textbf{Rationale}: - Top 5\% = Locations with \textbf{most rapid
+DECLINE} (greatest concern) - Bottom 5\% = Locations with \textbf{most
+rapid RECOVERY} (positive learning) - 5\% threshold: Balance between
+statistical rigor and practical granularity
+
+\textbf{Result}: \textasciitilde75,000 hotspot cells per service (5\% of
+1.5M global cells)
+
+\section{Socioeconomic Profiling: Kolmogorov-Smirnov
+Tests}\label{socioeconomic-profiling-kolmogorov-smirnov-tests}
+
+We ask: \textbf{Are populations in hotspots statistically different from
+non-hotspot populations?}
+
+\textbf{Method}: Kolmogorov-Smirnov (KS) test compares cumulative
+distributions: - \textbf{Hotspot population}: All socioeconomic values
+in hotspot cells - \textbf{Non-hotspot population}: All values in
+non-hotspot cells
+
+\textbf{Output}: - \textbf{KS Statistic (D)}: Maximum vertical distance
+between curves (0-1 scale); larger = more different - \textbf{P-value}:
+Probability difference occurred by chance; p \textless{} 0.05 =
+significant - \textbf{Cliff's Delta}: Effect size (how meaningful is the
+difference, not just statistically significant)
+
+\textbf{Interpretation}: - Significant KS test + high Cliff's Delta =
+Hotspot populations meaningfully different (e.g., ``Pollination hotspots
+are predominantly rural/agricultural'') - Significant but low Cliff's
+Delta = Difference is small despite statistical significance
+
+\section{Attribution Analysis: Overlap with Land Cover
+Change}\label{attribution-analysis-overlap-with-land-cover-change}
+
+\textbf{Question}: What \% of ecosystem service hotspots overlap with
+observed land cover change?
+
+\textbf{Method}: 1. Identify all grid cells with converted land cover
+(natural → transformed, 1992→2020) 2. For each hotspot cell, check if it
+also has conversion 3. Calculate \% overlap
+
+\textbf{Result}: Heatmap showing which services' hotspots coincide with
+which LCC types (forest loss, cropland expansion, etc.)
+
+\textbf{Attribution Gap}: = 100\% - (\% overlap with any LCC type) -
+High gap (e.g., 50\%) → Service decline not fully explained by observed
+land conversion; suggests degradation signal - Low gap (e.g., 10\%) →
+Service decline primarily explained by land cover change
+
+\section{Quality Assurance}\label{quality-assurance}
+
+\textbf{Validation steps}: 1. Grid geometry verification (all
+\textasciitilde1.5M cells registered correctly) 2. Data integrity checks
+(no missing values in key attributes) 3. Sanity checks on InVEST values
+(within expected ranges; realistic spatial patterns) 4. Validation with
+literature (hotspot locations match known conservation priorities)
+
+\textbf{Uncertainties acknowledged}: - InVEST models depend on input
+data quality (see Technical Appendix) - 10-km resolution may mask
+sub-grid heterogeneity - 1992-2020 is a single temporal snapshot;
+intermediate dynamics unknown - Socioeconomic data at 10-km resolution
+may not capture local variation
+
+\section{Reproducibility}\label{reproducibility}
+
+All analysis is reproducible: - \textbf{Code}: R/Quarto notebooks
+(available on project repository) - \textbf{Data}: Processed CSVs and
+intermediate outputs in \texttt{/data/processed/} - \textbf{Full
+pipeline}: Python zonal statistics → R processing → hotspot detection -
+\textbf{See}: Technical Appendix for full methodological detail
+
+\section{Plain Language Summary}\label{plain-language-summary}
+
+\textbf{In brief}: We compared global ecosystem service models from 1992
+and 2020. We identified regions (hotspots) where services changed most
+dramatically. We then asked: ``Who lives there?'' (socioeconomic
+profiling) and ``Why?'' (land cover drivers). The result is a map of
+ecosystem service priorities for conservation and development policy.
+
+\section{Next Steps}\label{next-steps}
+
+Chapter 3 shows what changed globally. Chapters 4-7 drill into WHERE
+(geographic patterns), WHO (affected populations), and WHY (land cover
+drivers).
+
+\part{Part 2: Global State (WHAT)}
+
+\chapter{Global State (WHAT)}\label{sec-what}
+
+This chapter details the overarching global trajectories of ecosystem
+service provision between 1992 and 2020. By aggregating absolute volume
+and area changes across major geographic regions (World Bank Regions,
+WWF Biomes, and Income Groups), we establish the foundational
+understanding of \emph{what} has changed before diving into the
+localized extremes (hotspots).
+
+\section{Methodological Note: The ``Aggregate of
+Differences''}\label{methodological-note-the-aggregate-of-differences}
+
+To provide the clearest and most accurate narrative of total volume
+change, the regional summaries presented in this chapter are derived
+from the \textbf{``aggregate of differences''} approach (Path A).
+
+Unlike the 10km grid-based hotspot analysis (Path B), this method
+calculates the pixel-by-pixel difference first, and then summarizes
+those high-resolution differences directly to the large regional
+polygons. This bypasses the Modifiable Areal Unit Problem (MAUP) and
+prevents ``Simpson's Paradox'' sign-flips, ensuring that if a region
+lost total volume, the chart accurately reflects a negative absolute
+change.
+
+\emph{(For a detailed breakdown of the 10km grid-level aggregates and a
+discussion of spatial sign-flips, please see Chapter~\ref{sec-annex}).}
+
+\section{Regional Trajectories: Absolute Volume
+Change}\label{regional-trajectories-absolute-volume-change}
+
+The following charts display the absolute change in total service
+provision across major groupings. For volumetric services (e.g.,
+Nitrogen Export, Sediment Export), changes are scaled to the total area
+to reflect massive shifts in baseline ecosystems.
+
+\subsection{By World Bank Region}\label{by-world-bank-region}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_region_wb_abs.png}
+
+}
+
+\caption{\label{fig-abs-wb}Absolute Change in Ecosystem Services by
+World Bank Region}
+
+\end{figure}%
+
+\subsection{By Income Group}\label{by-income-group}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_income_grp_abs.png}
+
+}
+
+\caption{\label{fig-abs-income}Absolute Change in Ecosystem Services by
+Income Group}
+
+\end{figure}%
+
+\subsection{By WWF Biome}\label{by-wwf-biome}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_wwf_biome_abs.png}
+
+}
+
+\caption{\label{fig-abs-biome}Absolute Change in Ecosystem Services by
+WWF Biome}
+
+\end{figure}%
+
+\section{Regional Trajectories: Percentage
+Change}\label{regional-trajectories-percentage-change}
+
+While absolute change highlights where the largest volumetric losses or
+gains occurred (often biased toward massive ecosystems like the Amazon),
+percentage change highlights the intensity of the shift relative to the
+region's 1992 baseline.
+
+\subsection{By World Bank Region}\label{by-world-bank-region-1}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_region_wb_pct.png}
+
+}
+
+\caption{\label{fig-pct-wb}Percentage Change in Ecosystem Services by
+World Bank Region}
+
+\end{figure}%
+
+\subsection{By Income Group}\label{by-income-group-1}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_income_grp_pct.png}
+
+}
+
+\caption{\label{fig-pct-income}Percentage Change in Ecosystem Services
+by Income Group}
+
+\end{figure}%
+
+\subsection{By WWF Biome}\label{by-wwf-biome-1}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_wwf_biome_pct.png}
+
+}
+
+\caption{\label{fig-pct-biome}Percentage Change in Ecosystem Services by
+WWF Biome}
+
+\end{figure}%
+
+\section{Key Takeaways}\label{key-takeaways-1}
+
+\emph{(This section is reserved for the final interpretation phase. It
+will synthesize the core findings from the trajectory charts above.)}
+
+\part{Part 3: Geographic Analysis (WHERE)}
+
+\chapter{Geographic Analysis (WHERE)}\label{sec-where}
+
+Having established the global trajectories in the previous chapter, we
+now shift our focus to local extremes. Where is ecosystem service
+provision changing the most rapidly relative to local baselines?
+
+We identify \textbf{Hotspots} as the top and bottom 5\% of all 10km grid
+cells globally for each service, based on the Symmetric Percentage
+Change (SPC) metric. This approach normalizes for the vastly different
+baseline sizes of ecosystems across the globe, allowing us to highlight
+the most intense local landscape shifts.
+
+\section{The Hotspot Landscape}\label{the-hotspot-landscape}
+
+The following maps provide a ``first look'' at the global distribution
+of these extreme changes.
+
+\subsection{First Look: Absolute
+Hotspots}\label{first-look-absolute-hotspots}
+
+\emph{(Where the largest total volumes of services were lost or gained)}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/maps/first_look_map_abs.png}
+
+}
+
+\caption{\label{fig-map-abs}Global Distribution of Absolute Hotspots}
+
+\end{figure}%
+
+\subsection{First Look: Percentage Hotspots
+(Intensity)}\label{first-look-percentage-hotspots-intensity}
+
+\emph{(Where the most intense changes occurred relative to local
+baselines)}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/maps/first_look_map_pct.png}
+
+}
+
+\caption{\label{fig-map-pct}Global Distribution of Percentage Hotspots}
+
+\end{figure}%
+
+\section{Hotspot Coverage and Relative
+Intensity}\label{hotspot-coverage-and-relative-intensity}
+
+How much of each region's land area is experiencing an ecosystem service
+hotspot? And is that region disproportionately burdened compared to the
+global average?
+
+\subsection{Hotspot Coverage by Income
+Group}\label{hotspot-coverage-by-income-group}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/intensity/hotspot_coverage_income_grp.png}
+
+}
+
+\caption{\label{fig-cov-income}Area of Hotspots by Income Group}
+
+\end{figure}%
+
+\subsection{Hotspot Relative Intensity by Income
+Group}\label{hotspot-relative-intensity-by-income-group}
+
+\emph{(Values \textgreater{} 1 indicate a region has more hotspot area
+than expected given its total size)}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/intensity/hotspot_relative_intensity_income_grp.png}
+
+}
+
+\caption{\label{fig-rel-income}Relative Intensity of Hotspots by Income
+Group}
+
+\end{figure}%
+
+\section{Compound Risk: Multi-Service Hotspots
+(``Hotness'')}\label{compound-risk-multi-service-hotspots-hotness}
+
+A single declining service is a concern; multiple co-occurring declines
+represent severe compound risk. We refer to the count of overlapping
+negative hotspots in a single 10km cell as its ``Hotness''.
+
+\subsection{Compound Risk Map}\label{compound-risk-map}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png}
+
+}
+
+\caption{\label{fig-hotness-map}Global Compound Risk (Hotness) Map}
+
+\end{figure}%
+
+\subsection{Hotness Distribution by World Bank
+Region}\label{hotness-distribution-by-world-bank-region}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/hotness_dist_region_wb.png}
+
+}
+
+\caption{\label{fig-hotness-wb}Distribution of Overlapping Hotspots by
+Region}
+
+\end{figure}%
+
+\subsection{Hotness Distribution by WWF
+Biome}\label{hotness-distribution-by-wwf-biome}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/hotness_dist_wwf_biome.png}
+
+}
+
+\caption{\label{fig-hotness-biome}Distribution of Overlapping Hotspots
+by Biome}
+
+\end{figure}%
+
+\section{Hotspot Distribution Details
+(Boxplots)}\label{hotspot-distribution-details-boxplots}
+
+To understand the spread of extreme values within these hotspots, we
+look at their distribution across different regions.
+
+\subsection{Volumetric Services by Income
+Group}\label{volumetric-services-by-income-group}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/boxplots_unified/income_grp/boxplots_volumetric_pct.png}
+
+}
+
+\caption{\label{fig-box-vol}Boxplots of Percentage Hotspots (Volumetric
+Services) by Income Group}
+
+\end{figure}%
+
+\subsection{Coastal \& Ratio Services by Income
+Group}\label{coastal-ratio-services-by-income-group}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/boxplots_unified/income_grp/boxplots_coastal_pct.png}
+
+}
+
+\caption{\label{fig-box-coastal}Boxplots of Percentage Hotspots
+(Coastal) by Income Group}
+
+\end{figure}%
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/boxplots_unified/income_grp/boxplots_ratios_pct.png}
+
+}
+
+\caption{\label{fig-box-ratio}Boxplots of Percentage Hotspots (Ratios)
+by Income Group}
+
+\end{figure}%
+
+\section{Summary Statistics}\label{summary-statistics}
+
+The following tables provide the exact numerical breakdown of the
+hotspot spatial extraction.
+
+\subsection{Hotspot Area Statistics}\label{hotspot-area-statistics}
+
+{
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1077}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1769}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.0615}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.0462}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.0692}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1000}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.0769}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1000}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1154}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 18\tabcolsep) * \real{0.1462}}@{}}
+
+\caption{\label{tbl-area}Hotspot Area Coverage (Top 10 Rows)}
+
+\tabularnewline
+
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+service
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+group
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+n\_total
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+n\_hot
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+pct\_area
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+global\_n\_hot
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+pct\_share
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+grouping\_var
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+expected\_share
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+relative\_intensity
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Nature\_Access & 4. Lower middle income & 202537 & 16473 & 8.133329 &
+67764 & 24.30937 & income\_grp & 15.55465 & 1.562836 \\
+Pollination & 4. Lower middle income & 202537 & 15151 & 7.480608 & 67764
+& 22.35848 & income\_grp & 15.55465 & 1.437414 \\
+N\_export & 4. Lower middle income & 202537 & 13904 & 6.864918 & 67764 &
+20.51827 & income\_grp & 15.55465 & 1.319108 \\
+N\_Ret\_Ratio & 4. Lower middle income & 202537 & 13606 & 6.717785 &
+67764 & 20.07851 & income\_grp & 15.55465 & 1.290836 \\
+Sed\_Ret\_Ratio & 4. Lower middle income & 202537 & 13457 & 6.644218 &
+67764 & 19.85863 & income\_grp & 15.55465 & 1.276700 \\
+Sed\_Ret\_Ratio & 5. Low income & 171032 & 10530 & 6.156743 & 67764 &
+15.53922 & income\_grp & 13.13510 & 1.183031 \\
+Nature\_Access & 5. Low income & 171032 & 10390 & 6.074887 & 67764 &
+15.33263 & income\_grp & 13.13510 & 1.167302 \\
+Pollination & 5. Low income & 171032 & 10327 & 6.038051 & 67764 &
+15.23966 & income\_grp & 13.13510 & 1.160224 \\
+Sed\_export & 4. Lower middle income & 202537 & 11921 & 5.885838 & 67764
+& 17.59194 & income\_grp & 15.55465 & 1.130976 \\
+Sed\_export & 3. Upper middle income & 603578 & 35028 & 5.803392 & 67764
+& 51.69116 & income\_grp & 46.35423 & 1.115134 \\
+
+\end{longtable}
+
+}
+
+\subsection{Hotness Overview}\label{hotness-overview}
+
+{
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.3803}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1972}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1408}}
+  >{\raggedleft\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1268}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1549}}@{}}
+
+\caption{\label{tbl-hotness}Compound Risk Summary (Top 10 Rows)}
+
+\tabularnewline
+
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+group
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+mean\_hotspots
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+pct\_multi
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedleft
+n\_pixels
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+grouping
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+4. Lower middle income & 0.4263764 & 9.941393 & 202537 & income\_grp \\
+3. Upper middle income & 0.3337647 & 7.616414 & 603578 & income\_grp \\
+5. Low income & 0.3284941 & 7.444806 & 171032 & income\_grp \\
+1. High income: OECD & 0.2063659 & 4.607142 & 324952 & income\_grp \\
+Latin America \& Caribbean & 0.5340240 & 12.791508 & 203768 &
+region\_wb \\
+East Asia \& Pacific & 0.4522352 & 10.662405 & 245620 & region\_wb \\
+Sub-Saharan Africa & 0.3047145 & 6.882040 & 241193 & region\_wb \\
+South Asia & 0.2864890 & 5.940008 & 50707 & region\_wb \\
+Middle East \& North Africa & 0.2089373 & 5.101566 & 85954 &
+region\_wb \\
+Europe \& Central Asia & 0.1883946 & 3.915203 & 279679 & region\_wb \\
+
+\end{longtable}
+
+}
+
+\section{Key Takeaways}\label{key-takeaways-2}
+
+\emph{(This section is reserved for the final interpretation phase. It
+will synthesize the core findings from the spatial distribution,
+intensity, and compound risk charts above.)}
+
+\part{Part 4: Understanding Drivers (WHY)}
+
+\chapter{Understanding Drivers (WHY)}\label{understanding-drivers-why}
+
+\section{The Attribution Gap}\label{the-attribution-gap}
+
+To explain \emph{why} hotspots occur, we integrate Land Cover Change
+(LCC) metrics derived from our ESA/C3S data. Instead of simple net
+change, we look at the gross loss of natural land to determine how much
+of the ecosystem service decline is directly linked to land conversion
+versus underlying degradation.
+
+\subsection{Overlap Heatmaps}\label{overlap-heatmaps}
+
+The heatmaps below show what percentage of ecosystem service hotspots
+geographically overlap with the top 5\% of land cover conversion (e.g.,
+deforestation, urbanization).
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/drivers/heatmap_driver_overlap_pct.png}
+
+}
+
+\caption{Attribution Gap: ES Hotspots vs.~LCC Drivers (Percentage)}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/drivers/heatmap_driver_overlap_abs.png}
+
+}
+
+\caption{Attribution Gap: ES Hotspots vs.~LCC Drivers (Absolute)}
+
+\end{figure}%
+
+\subsection{Correlation Scatterplots}\label{correlation-scatterplots}
+
+The following scatterplots show the relationship between net natural
+land change and ecosystem service change.
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/drivers/scatter_Net_Natural_Change_pct.png}
+
+}
+
+\caption{ES Change vs.~Net Natural Change (Percentage)}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/drivers/scatter_Net_Natural_Change_abs.png}
+
+}
+
+\caption{ES Change vs.~Net Natural Change (Absolute)}
+
+\end{figure}%
+
+\part{Part 5: Socioeconomic Analysis (WHO)}
+
+\chapter{Socioeconomic Analysis (WHO)}\label{socioeconomic-analysis-who}
+
+\section{Absolute Population
+Exposure}\label{absolute-population-exposure-1}
+
+How many people are directly living within the top 5\% areas of
+ecosystem service decline? The charts below break down the exposed
+population by World Bank Income Group and the UN Human Development Index
+(HDI).
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/pop_exposure_income.png}
+
+}
+
+\caption{Absolute Population Exposure by Income Group}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/pop_exposure_hdi.png}
+
+}
+
+\caption{Absolute Population Exposure by HDI}
+
+\end{figure}%
+
+\section{Relative Socioeconomic
+Shift}\label{relative-socioeconomic-shift}
+
+We perform two-sample Kolmogorov-Smirnov (KS) tests to determine if the
+socioeconomic profiles of ecosystem service ``hotspots'' are
+statistically different from the background landscape.
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/ks/ks_heatmap.png}
+
+}
+
+\caption{KS Statistic Heatmap (Distribution Distance)}
+
+\end{figure}%
+
+\begin{figure}[H]
+
+{\centering \includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/ks/directionality_cliffs_delta.png}
+
+}
+
+\caption{Directionality of Hotspot Effects (Cliff's Delta)}
+
+\end{figure}%
+
+\chapter{Regional Profiles}\label{regional-profiles}
+
+\emph{(Detailed regional breakdown to be added).}
+
+\part{Part 6: Implications \& Action}
+
+\chapter{Implications \& Action}\label{implications-action}
+
+\emph{(Final conclusions and policy implications to be added).}
+
+\part{Technical Documentation}
+
+\chapter{Methodology: The Two-Path Analysis
+Structure}\label{methodology-the-two-path-analysis-structure}
+
+This document clarifies the dual-pathway approach used in the Global NCP
+project to analyze changes in ecosystem services between 1992 and 2020.
+Understanding this structure is crucial for interpreting the results, as
+summary statistics and hotspot analyses are derived from two distinct
+computational paths.
+
+\section{The Two Paths}\label{the-two-paths}
+
+The analysis is split into two parallel workflows:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Path A (Pixel-Level Change):} For raw change summaries.
+\item
+  \textbf{Path B (Grid-Level Change):} For hotspot identification and
+  regional synthesis.
+\end{enumerate}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Path A: Pixel-Level Change
+Calculation}\label{path-a-pixel-level-change-calculation}
+
+This path is designed to generate summary statistics (e.g., Mean, Max,
+Min) based on the most granular change possible.
+
+\textbf{Workflow:}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Pixel-wise Difference:} The script
+  \texttt{Python\_scripts/batch\_raster\_diff.py} takes the 1992 and
+  2020 rasters for a given service and calculates the difference
+  (\texttt{T2020\ -\ T1992}) for each corresponding pixel.
+\item
+  \textbf{Output:} The result is a new set of ``difference rasters''
+  that represent the absolute change at the native resolution of the
+  data.
+\end{enumerate}
+
+\textbf{Use Case:} This path is used when a straightforward,
+non-aggregated summary of the overall change across the landscape is
+required. \textbf{We use the outputs of this path (via the Python
+\texttt{zonal\_stats\_toolkit}) for the main text's regional trajectory
+charts (``WHAT'' section) to provide the clearest narrative of total
+volume change without spatial aggregation artifacts.}
+
+\subsection{Path B: Grid-Level Change Calculation (The Hotspot
+Path)}\label{path-b-grid-level-change-calculation-the-hotspot-path}
+
+This is the primary pathway for the main analysis, including hotspot
+identification and regional aggregation. The key distinction is that
+\textbf{aggregation precedes differencing}.
+
+\textbf{Workflow:}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Independent Aggregation:} The script
+  \texttt{summary\_pipeline\_landgrid.py} takes the raw 1992 and 2020
+  rasters and independently calculates zonal statistics for each of them
+  against the canonical 10km grid. The output is a single table
+  containing separate columns for the 1992 and 2020 values (e.g.,
+  \texttt{service\_1992\_mean}, \texttt{service\_2020\_mean}).
+\item
+  \textbf{Grid-Level Differencing:} The Quarto notebook
+  \texttt{analysis/process\_data.qmd} ingests the aggregated table from
+  the previous step. It then calculates the absolute and Symmetric
+  Percentage Change (SPC) between the 1992 and 2020 columns for each
+  grid cell.
+\item
+  \textbf{Hotspot Identification:} The notebook
+  \texttt{analysis/hotspot\_extraction.qmd} takes the final grid-level
+  change data and identifies hotspots.
+\end{enumerate}
+
+\textbf{Use Case:} This path underpins all hotspot detection, hotspot
+intensity, and socioeconomic exposure analyses (the ``WHERE'', ``WHY'',
+and ``WHO''). Its regional summaries of change (the 10km grid averages)
+are reserved for the \textbf{Annex} due to the complex aggregation
+artifacts described below.
+
+\subsection{Clarification: Rasterizing the Grid vs.~Resampling the
+Difference}\label{clarification-rasterizing-the-grid-vs.-resampling-the-difference}
+
+A crucial methodological distinction exists between the output of Path B
+and another potential approach.
+
+\begin{itemize}
+\item
+  \textbf{Rasterizing the Vector Grid (This Project's Method - Path B):}
+  We first aggregate the 1992 and 2020 high-resolution data to the 10km
+  vector grid, and \emph{then} calculate the difference for each grid
+  cell. The final rasters are created by ``burning'' the attribute
+  values from this final vector file (\texttt{10k\_change\_calc.gpkg})
+  into a GeoTIFF. This is the \textbf{``difference of the aggregates.''}
+\item
+  \textbf{Resampling the Difference Raster (Path A):} This would involve
+  taking the original high-resolution rasters, calculating the
+  pixel-by-pixel difference first (creating a ``difference raster''),
+  and then aggregating that result to a 10km grid (e.g., by resampling
+  or zonal statistics). This would be the \textbf{``aggregate of the
+  differences.''}
+\end{itemize}
+
+As noted below, these two paths are not always mathematically identical.
+This project has officially chosen \textbf{Path B} as the canonical
+method for the hotspot analysis. Therefore, the rasterization performed
+by \texttt{vector\_to\_raster.py} on the final GeoPackage is the correct
+and validated approach for this analysis.
+
+\subsection{\texorpdfstring{Modular Extraction and the \texttt{fid}
+Backbone}{Modular Extraction and the fid Backbone}}\label{modular-extraction-and-the-fid-backbone}
+
+A key design feature of Path B is its modularity. The Python extraction
+pipeline (\texttt{summary\_pipeline\_landgrid.py}) can be run multiple
+times independently (e.g., once for Ecosystem Services, once for
+Beneficiaries, once for Coastal Risk). Each run generates a separate
+GeoPackage in the workspace.
+
+Because every extraction is performed against the exact same canonical
+master grid (\texttt{landgrid\_1\_clean\_enriched\_4326.gpkg}), every
+output shares an identical, stable \texttt{fid} (Feature ID) backbone.
+
+To add new variables (e.g., a new year, a new modeled service, or a new
+socioeconomic raster) in the future: 1. Run the Python extraction for
+the new rasters. 2. The R consolidation script
+(\texttt{analysis/process\_data.qmd}) automatically loads the most
+recent extraction runs. 3. It performs a rapid, geometry-free tabular
+\texttt{left\_join} across all tables using the \texttt{fid}.
+
+This architecture completely prevents the need to re-run heavy,
+memory-intensive spatial joins or re-extract existing data when
+expanding the analysis.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\section{Why Might Results from Path A and Path B
+Differ?}\label{why-might-results-from-path-a-and-path-b-differ}
+
+The two paths may produce slightly different summary statistics due to a
+fundamental difference in the order of operations:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Path A} calculates the \textbf{aggregate of the differences}.
+\item
+  \textbf{Path B} calculates the \textbf{difference of the aggregates}.
+\end{itemize}
+
+These are not always mathematically identical, especially when dealing
+with non-linear metrics or complex spatial distributions. The grid-based
+approach (Path B) is considered the canonical method for the hotspot
+analysis.
+
+\section{Validation Analysis: Quantifying Methodological Differences
+with Path
+C}\label{validation-analysis-quantifying-methodological-differences-with-path-c}
+
+To explicitly quantify the difference between the two methodologies and
+validate the pipeline, a third analytical path (``Path C'') was
+implemented. This path served as a bridge, creating a spatially explicit
+grid based on the pixel-level differences.
+
+\textbf{Workflow:}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Start with Path A Output:} Used the pixel-level ``difference
+  rasters'' generated by
+  \texttt{Python\_scripts/batch\_raster\_diff.py}.
+\item
+  \textbf{Aggregate the Difference:} Using a zonal statistics process,
+  calculated statistics (e.g., \texttt{mean}, \texttt{sd}) for the pixel
+  values from the difference raster within each 10km grid cell.
+\end{enumerate}
+
+\textbf{Validation Outcome:}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Aggregate Consistency:} This validation confirmed that the
+  results are persistent and mathematically consistent between both
+  paths at the aggregate level. The grid of the ``aggregate of the
+  differences'' aligns with the Path B grid (``difference of the
+  aggregates''), confirming the robustness of the primary grid-level
+  hotspot methodology.
+\item
+  \textbf{Sub-Cell Variability:} By calculating the standard deviation
+  (\texttt{sd}) in the aggregation step, we were also able to quantify
+  the variability of change \emph{within} each 10km cell. This allows us
+  to identify areas of homogenous vs.~heterogeneous change, adding
+  valuable richness to the interpretation.
+\end{itemize}
+
+This approach provided the spatial representation of the pixel-based
+method while remaining computationally manageable, successfully proving
+the robustness of the core methodologies before proceeding with the
+final hotspot extractions.
+
+\section{Architectural Decision: Spatial Extraction
+Strategies}\label{architectural-decision-spatial-extraction-strategies}
+
+Through extensive testing and methodological validation, a distinct
+performance and stability divergence was identified between different
+zonal statistics engines based on spatial scale and geometry complexity.
+The project now officially employs a hybrid extraction strategy:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{For Large Regional Groupings (Complex Multipolygons):
+  \texttt{zonal\_stats\_toolkit} (Rasterized)}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{Use Case:} Aggregating global data by World Bank Regions,
+    Income Groups, or WWF Biomes.
+  \item
+    \textbf{Rationale:} These groupings form sprawling, highly complex
+    multipolygons containing thousands of islands, jagged edges, and
+    vertices. Using precise fractional extraction tools
+    (\texttt{exactextract} / C++ GEOS) on these shapes causes memory
+    leaks and segmentation faults, as the engine attempts to evaluate
+    massive geometric intersections. While exploding these polygons into
+    tens of thousands of simpler fragments (e.g., 85,000+ pieces)
+    prevents crashes, the sheer volume of separate extraction loop
+    operations destroys any speed advantage. By rasterizing the polygons
+    first (the \texttt{zonal\_stats\_toolkit} approach), we completely
+    bypass C++ geometry bottlenecks and reduce the problem to highly
+    efficient matrix math.
+  \end{itemize}
+\item
+  \textbf{For High-Resolution Grids (Simple Polygons):
+  \texttt{exactextract} (Exact Fractional)}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{Use Case:} Aggregating global data into the IUCN 10km
+    equal-area grid (millions of cells).
+  \item
+    \textbf{Rationale:} The 10km grid consists of completely uniform,
+    simple square geometries. \texttt{exactextract} is the undisputed
+    champion here, chewing through millions of simple shapes almost
+    instantly without ever hitting geometry complexity limits.
+  \end{itemize}
+\end{enumerate}
+
+This ``Best of Both Worlds'' architecture ensures stability and speed
+regardless of the spatial target.
+
+\emph{Note: The \texttt{zonal\_stats\_toolkit} is currently managed
+alongside the main pipeline in a multi-root VS Code workspace. Future
+updates will fully integrate this toolkit's codebase into the
+\texttt{global\_NCP} repository to unify version control.}
+
+\section{Spatial Alignment and The Fragment
+Bug}\label{spatial-alignment-and-the-fragment-bug}
+
+A major challenge in multi-stage spatial pipelines is maintaining exact
+1:1 row integrity between extracted statistics and the canonical master
+grid.
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{The Fragment Bug:} To bypass C++ GEOS bottlenecks during
+  Python zonal statistics extraction, complex master grid cells were
+  exploded into simpler fragments (e.g., \texttt{gdf.explode()}
+  resulting in \textasciitilde1.67M fragments for a 1.5M cell grid). If
+  joined directly to downstream datasets, this causes severe data
+  duplication (e.g., impossible overlapping hotspot counts per cell) and
+  geographic striping.
+\item
+  \textbf{The Re-aggregation Solution (v1.3.1):} The R pipeline
+  (\texttt{process\_data.qmd}) implements a mathematically rigorous
+  recovery step. It uses an \texttt{st\_intersects} spatial join
+  (mapping fragment centroids to the master grid) to trace every
+  fragment back to its pristine 10km parent cell. It then performs a
+  re-aggregation (\texttt{group\_by\ \%\textgreater{}\%\ summarise}),
+  collapsing the fragments back together. This ensures perfect geometric
+  alignment with the canonical grid and strictly bounds the data.
+\end{itemize}
+
+\section{Unit Standardization (Per
+Hectare)}\label{unit-standardization-per-hectare}
+
+To ensure that comparisons of ecosystem service provision are meaningful
+across the globe, all volumetric services (e.g., Nitrogen Export,
+Sediment Export) are standardized to a \textbf{per-hectare} basis. This
+crucial step corrects for the geometric distortion of raster pixels in
+unprojected coordinate systems, where pixel area decreases significantly
+with increasing latitude. Without this correction, high-latitude regions
+would be disproportionately represented in any analysis based on
+per-pixel values.
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Volumetric Variables:} Converted to \texttt{Unit\ /\ ha} by
+  dividing the raw pixel value by a corresponding pixel area raster
+  (\texttt{esa\_pixel\_area\_ha\_...}). This calculation is performed
+  \emph{before} the zonal statistics aggregation.
+\item
+  \textbf{Ratios \& Indices:} Left in their native units (e.g., 0-1
+  ratios, unitless indices) as area normalization does not apply.
+\end{itemize}
+
+This ensures that the zonal statistics (Mean/Sum) reflect physical
+densities comparable across regions.
+
+This per-hectare normalization is a key methodological improvement
+(v1.2.1) and is applied to the base year rasters that form the
+foundation of \textbf{Path B (Grid-Level Change)}.
+
+\section{Grid Geometry \& Reprojection
+Effects}\label{grid-geometry-reprojection-effects}
+
+A common source of confusion in global-scale GIS analysis is the visual
+and geometric distortion that occurs during reprojection. This section
+clarifies why the project's 10km grid cells may not appear as perfect
+squares and confirms the validity of their size.
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Geographic vs.~Projected Grids:} The original analysis grid is
+  defined in a geographic coordinate system (WGS 84, EPSG:4326), where
+  cells are defined by degrees of latitude and longitude. When this grid
+  is reprojected into an equal-area system (like Equal Earth, EPSG:8857)
+  for analysis, the shapes of the cells are necessarily distorted
+  (stretched and tilted) to preserve their area on a flat map.
+\item
+  \textbf{Bounding Box vs.~True Area:} As a result of this distortion,
+  measuring the \texttt{width} and \texttt{height} of a reprojected grid
+  cell's bounding box will \textbf{not} yield 10km x 10km. These
+  dimensions will vary depending on the cell's latitude.
+\item
+  \textbf{Area is the Invariant:} The critical property preserved by an
+  equal-area projection is the \textbf{area}. A dedicated validation
+  script (\texttt{Python\_scripts/verify\_grid\_area.py}) was developed
+  to measure the true geometric area of the reprojected grid cells.
+\item
+  \textbf{Validation Outcome:} This analysis definitively confirmed that
+  each grid cell in the reprojected analysis files (e.g.,
+  \texttt{...\_epsg8857.gpkg}) has an area of \textbf{100 km²} (10km x
+  10km), within a very small tolerance. This validates the integrity of
+  the project's spatial foundation and ensures that all area-based
+  calculations are correct.
+\end{itemize}
+
+\section{Data Preparation: Canonical Master Grid
+Generation}\label{data-preparation-canonical-master-grid-generation}
+
+Due to severe performance and geometry-validity bottlenecks encountered
+when performing massive spatial joins natively in R (the \texttt{sf}
+package), the creation of the canonical 10km master grid was migrated to
+a hybrid QGIS-Python workflow.
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Landmass Masking (QGIS):}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    The original global \texttt{AOOGrid} was loaded into QGIS.
+  \item
+    The WWF Biomes layer was dissolved to create a single global
+    landmass polygon.
+  \item
+    A ``Select by Location'' operation isolated all 10km grid cells
+    intersecting the landmass.
+  \item
+    The selection was exported as \texttt{landgrid\_1.gpkg}.
+  \end{itemize}
+\item
+  \textbf{Geometry Cleaning:}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    To resolve minor topological errors (e.g., self-intersecting rings
+    caused by clipping at coastlines and the dateline), the geometries
+    were validated and cleaned, resulting in
+    \texttt{landgrid\_1\_clean.gpkg}.
+  \end{itemize}
+\item
+  \textbf{Attribute Enrichment (Python):}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    The final stage is handled by
+    \texttt{Python\_scripts/enrich\_grid.py}.
+  \item
+    This script performs a highly optimized, centroid-based spatial join
+    to map WWF Biomes, Country, UN/World Bank Regions, and Income Group
+    attributes (from the \texttt{ee\_correspondence} dataset) onto the
+    grid.
+  \item
+    It inherently handles geometry validation
+    (\texttt{buffer(0).make\_valid()}) and deduplication, outputting the
+    final, analysis-ready \texttt{landgrid\_1\_clean\_enriched.gpkg}.
+  \end{itemize}
+\end{enumerate}
+
+\emph{Note: The legacy R script \texttt{analysis/prepare\_data.qmd} and
+standalone cleaning utilities like \texttt{clean\_grid.py} were fully
+deprecated in v1.3.4 in favor of this robust Python workflow.}
+
+\section{Data Preparation: Coastal Risk \&
+Protection}\label{data-preparation-coastal-risk-protection}
+
+Unlike the other ecosystem services which were natively provided as
+continuous global rasters, the Coastal Risk and Protection datasets were
+originally provided as high-resolution vector point/line geometries
+representing discrete coastal segments.
+
+Attempting vector-on-vector intersections between these intricate
+coastal lines and the 1.5-million cell master grid caused severe
+performance bottlenecks and \texttt{GEOSException} geometry crashes (due
+to the creation of microscopic sliver polygons). To ensure mathematical
+robustness and compatibility with the main pipeline, a specialized
+pre-processing workflow was utilized:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Vector Joining \& Ratio Calculation:} The script
+  \texttt{Python\_scripts/coastal\_protection\_join.py} merges the 1992
+  and 2020 coastal point layers based on their exact spatial locations
+  (WKB geometries). It calculates the absolute differences and
+  proportional risk reduction ratios (\texttt{Rt\_ratio}) natively in
+  the vector domain to prevent floating-point interpolation errors.
+\item
+  \textbf{Rasterization:} The script
+  \texttt{Python\_scripts/rasterize\_coastal.py} safely ``burns'' these
+  pre-calculated point values into high-resolution continuous rasters
+  (e.g., \texttt{Rt\_1992.tif}, \texttt{Rt\_ratio\_2020.tif}). This uses
+  tiled processing to handle the massive global coastline without memory
+  exhaustion.
+\item
+  \textbf{Grid Extraction:} The resulting coastal rasters are seamlessly
+  ingested by the standard \texttt{exactextract} pipeline
+  (\texttt{summary\_pipeline\_landgrid.py} via
+  \texttt{c\_protection\_synth.yaml}). This safely calculates the mean
+  coastal risk metrics for each 10km grid cell strictly through
+  raster-vector overlap, completely bypassing C-level geometric
+  intersection crashes.
+\end{enumerate}
+
+By performing the ratio math on the vectors, but the spatial aggregation
+on the rasters, we maintain perfect data fidelity without sacrificing
+pipeline stability.
+
+\section{Key Analysis Parameters}\label{key-analysis-parameters}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Hotspot Threshold:} The threshold for identifying hotspots is
+  defined in \texttt{analysis/hotspot\_extraction.qmd}. It is configured
+  in an R object named \texttt{HOTS\_CFG} with the parameter
+  \texttt{pct\_cutoff\ =\ 0.05}, representing the top/bottom 5\% of SPC
+  values.
+\end{itemize}
+
+\textbf{What a ``Hotspot'' Means in This Context:} * \textbf{Relative
+Extreme:} We call a cell a ``hotspot'' because its change sits in the
+most extreme 5\% \emph{within that specific service's own distribution}.
+It is a ranking label, not an absolute physical threshold. A cell can
+enter or leave the top 5\% even if its raw change isn't huge in absolute
+terms, simply because it is relative to the rest of the globe. *
+\textbf{Comparability:} Comparisons are strictly within-service. A top
+5\% decline in Service A isn't necessarily comparable in absolute
+magnitude to a top 5\% decline in Service B. * \textbf{Not Evidence of
+Cause:} Being a hotspot flags that ``this cell's change is unusually
+large (relative to peers),'' but it does not inherently prove \emph{why}
+the value is extreme. Hotspots are starting points for explanation, not
+conclusions. To discuss drivers, we use additional robust analyses (like
+LCC attribution and KS socioeconomic profiling). * \textbf{Quick
+Analogy:} Top 5\% finishers in two different marathons are both
+``elite,'' but their finishing times (absolute performance) and the
+reasons they're fast (training, course, weather) can differ. Similarly,
+hotspots are elite by rank, not necessarily a proof of shared cause or
+identical absolute loss.
+
+\section{Symmetric Percentage Change}\label{symmetric-percentage-change}
+
+To address mathematical artifacts where the sign of percentage change
+differs from absolute change (common when baselines are negative or
+near-zero), this analysis uses a \textbf{symmetric percentage change}
+calculation (\texttt{pct\_mode="symm"}). This ensures that the direction
+of the percentage change always aligns with the absolute difference
+(\(t_1 - t_0\)).
+
+\textbf{Distribution Limits:} The Symmetric Percentage Change (SPC)
+metric is bounded between \textbf{-200\%} (Total Loss) and
+\textbf{+200\%} (New Emergence). Consequently, extreme values and
+clustering at these boundaries, as well as bi-modal distributions (e.g.,
+in Sediment Export), are expected features of the metric rather than
+data artifacts.
+
+\subsection{Why SPC over Absolute Change for
+Attribution?}\label{why-spc-over-absolute-change-for-attribution}
+
+When assessing the relationship between Land Cover drivers and Ecosystem
+Service declines (e.g., scatterplots of Forest Loss vs.~ES Change),
+\textbf{Symmetric Percentage Change (SPC)} is strictly preferred over
+Absolute Change.
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Absolute Change} is inherently biased by the \emph{baseline
+  size} of the local ecosystem. A massive, dense forest that loses just
+  5\% of its area might show a huge absolute drop in Carbon simply
+  because of its initial size. Conversely, a small patch of forest that
+  is 100\% destroyed would show a tiny absolute drop. Analyzing Absolute
+  Change creates highly skewed, heteroskedastic outputs that largely
+  just map ``where the largest baseline ecosystems are.''
+\item
+  \textbf{Symmetric Percentage Change} normalizes this scale effect. It
+  isolates the \emph{intensity of the ecological shock} relative to the
+  local baseline. This ensures that a severe multi-service decline in a
+  small grid cell is properly recognized as a severe impact, making it
+  mathematically appropriate for correlating against land cover
+  conversion percentages.
+\end{itemize}
+
+\section{Addressing Aggregation Divergence (Simpson's
+Paradox)}\label{addressing-aggregation-divergence-simpsons-paradox}
+
+During regional aggregation, it is possible to observe a ``sign
+flip''---where regional bar plots display a negative \emph{Absolute
+Change} but a positive \emph{Symmetric Percentage Change} (SPC) for the
+same service. This is not a calculation error or a bug; it is a
+fundamental feature of aggregating spatial data, related to Simpson's
+Paradox and the Modifiable Areal Unit Problem (MAUP).
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Mean Absolute Change} captures the \textbf{Systemic Shift}.
+  Because it averages total physical units, it is heavily weighted by a
+  few high-volume grid cells (e.g., massive, dense forests). If those
+  highly productive cells lose a large volume of a service, the regional
+  absolute average turns negative.
+\item
+  \textbf{Mean Symmetric Percentage Change} captures the \textbf{Local
+  Landscape Shift}. Because percentage change treats every 10km
+  community (grid cell) equally regardless of its baseline volume, it
+  highlights widespread but low-intensity dynamics.
+\end{itemize}
+
+A sign flip reveals a specific geographic narrative: The \emph{total
+volume} of the service in the region is decreasing (driven by heavy
+localized losses), but the \emph{spatial footprint} of minor expansions
+or local service gains is spreading across a large number of
+low-baseline cells.
+
+\textbf{Communication Strategy (Main Text vs.~Annex):} Explaining
+Simpson's Paradox and spatial aggregation artifacts (MAUP) in the main
+text of a paper can severely distract from the core ecological findings.
+For this reason: * \textbf{Main Text:} We use \textbf{Path A}
+(raster-based regional zonal statistics via the
+\texttt{zonal\_stats\_toolkit}) to report the top-level regional
+changes. This path calculates total absolute change directly from the
+pixels, completely avoiding the MAUP/Simpson's paradox sign-flip issue,
+providing a clear and unambiguous ``WHAT'' narrative. * \textbf{Annex:}
+The regional trajectory charts derived from \textbf{Path B} (the 10km
+grid averages, which exhibit these sign flips) are included in the
+Methodological Annex. Path B remains the mathematically robust and
+required foundation for detecting local extremes (Hotspots), but its
+region-level averages are separated from the main text to preserve
+narrative clarity.
+
+\section{Aggregation Logic: Sum
+vs.~Mean}\label{aggregation-logic-sum-vs.-mean}
+
+A common question regarding Path B is the comparability of variables
+aggregated via \textbf{sum} (extensive variables like Nitrogen Export)
+versus those aggregated via \textbf{mean} (intensive variables like Risk
+Indices).
+
+\textbf{Why this approach is robust:}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Physical Correctness:} It is physically correct to sum total
+  loads and average representative conditions.
+\item
+  \textbf{Equal-Area Grid:} The analysis uses the IUCN equal-area grid.
+  Since cell area is constant, \(Sum\) and \(Mean\) are perfectly
+  proportional (\(Sum = Mean \times Area\)).
+\item
+  \textbf{Mathematical Identity:} For relative metrics used in this
+  analysis (percent change, percentile rankings, KS test statistics),
+  the results are identical regardless of whether sum or mean is used.
+\item
+  \textbf{Comparability:} Comparing relative magnitudes of change (e.g.,
+  percentage change) strips away the units, allowing valid comparisons
+  between total loads and average indices.
+\end{enumerate}
+
+\section{Visualization Semantic Rules
+(Maps)}\label{visualization-semantic-rules-maps}
+
+To maintain a consistent narrative across all presentations and figures,
+spatial maps of Ecosystem Service change adhere to a strict semantic
+color rule:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Universal Diverging Scale:} All maps use a diverging color
+  ramp anchored at zero (\texttt{midpoint\ =\ 0}).
+\item
+  \textbf{Semantic Meaning:} Red always indicates ecological or social
+  damage (loss of a good service, or increase in a detrimental risk).
+  Green always indicates improvement or healthy service provision.
+\item
+  \textbf{Sequential vs.~Diverging Data:} Even if a regional dataset
+  does not cross zero (e.g., all regions experience a decline), the
+  diverging scale is maintained to preserve the semantic meaning of the
+  colors. For example, an entirely negative map for a `good' service
+  will simply use the Red-to-White half of the scale, avoiding the
+  confusion of introducing sequential palettes (like viridis) that break
+  the ``Red=Bad'' cognitive mapping.
+\end{itemize}
+
+\section{Socioeconomic Profiling (KS
+Tests)}\label{socioeconomic-profiling-ks-tests}
+
+To understand the socioeconomic context of ecosystem service hotspots
+(e.g., Population, GDP, HDI), we utilize two-sample Kolmogorov-Smirnov
+(KS) tests.
+
+\textbf{Balanced Sampling Methodology:} A direct comparison of hotspots
+(the top/bottom 5\% of pixels) against the entire non-hotspot background
+(the remaining 95\%) suffers from severe sample size imbalance and
+includes pixels undergoing extreme changes in the \emph{opposite}
+direction. To ensure a fair and stable statistical comparison, the
+pipeline implements a ``median background'' sampling strategy: *
+Hotspots are compared strictly against the ``business-as-usual'' median
+5\% of the landscape (the 47.5th to 52.5th percentiles of change). This
+isolates the specific socioeconomic profile of extreme decline against
+typical, stable baseline conditions.
+
+\section{Land Cover Change
+Attribution}\label{land-cover-change-attribution}
+
+To explain \emph{why} hotspots occur, we integrate Land Cover Change
+(LCC) metrics derived from ESA CCI (1992) and C3S (2020) maps.
+
+\textbf{Methodology:} Instead of simple ``Net Change'' (which masks
+simultaneous loss and gain), we use the \textbf{\texttt{diffeR}
+methodology} (Pontius et al.) to calculate: * \textbf{Gross Loss:} The
+specific area of natural land lost to transformation. * \textbf{Gross
+Gain:} The area of natural land recovered. * \textbf{Exchange:} Shifts
+that don't affect the net total but represent dynamic turnover.
+
+These metrics are aggregated to the 10km grid and overlaid with ES
+hotspots to quantify the \textbf{``Attribution Gap''} (i.e., how much ES
+decline is directly linked to land conversion vs.~degradation). The
+analysis produces both a single, global attribution map showing the
+overall footprint of degradation, as well as a series of detailed maps
+breaking down the specific drivers for each of the 8 individual
+ecosystem service hotspots.
+
+\textbf{Granular Models:} To move beyond binary ``Natural
+vs.~Transformed'' analysis, we implement two specific driver models:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Forest Loss Model:}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{Reclassification:} Maps ESA classes to \textbf{Forest}
+    vs.~\textbf{Non-Forest}. Crucially, Flooded Trees (classes 160, 170)
+    are mapped to Forest to capture mangrove/swamp forest dynamics.
+  \item
+    \textbf{Metric:} Tracks Gross Loss of Forest cover.
+  \end{itemize}
+\item
+  \textbf{Expansion Model:}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \textbf{Reclassification:} Maps ESA classes to \textbf{Urban},
+    \textbf{Cropland}, and \textbf{Other}.
+  \item
+    \textbf{Metric:} Tracks the specific expansion of Urban and Cropland
+    areas into other land cover types.
+  \end{itemize}
+\end{enumerate}
+
+\textbf{Note on Rangelands:} Logic is updated to explicitly track
+Forest-to-Grassland transitions as a loss of primary natural cover.
+Categorizing Grasslands/Shrublands as
+\texttt{Transformed\ (Rangeland/Pasture)} prevents these critical
+conversions from being masked as `Natural-to-Natural' exchange.
+
+\chapter{Methodological Annex: 10km Grid Aggregation}\label{sec-annex}
+
+This annex provides supplemental detail on the primary spatial framework
+underpinning the hotspot analysis in this book: \textbf{The 10km
+Equal-Area Grid (Path B)}.
+
+\section{The Two-Path Analysis
+Structure}\label{the-two-path-analysis-structure}
+
+As detailed in the full technical methodology
+(\texttt{docs/methodology.md}), this project utilizes a dual-pathway
+approach to handle the complexities of global spatial data.
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Path A (Aggregate of Differences):} This path, presented in
+  Chapter~\ref{sec-what}, calculates pixel-by-pixel change first, and
+  then sums those changes to large regional polygons. It is used to
+  present the clearest picture of total volumetric shifts without
+  spatial aggregation artifacts.
+\item
+  \textbf{Path B (Difference of Aggregates):} This is the canonical path
+  for all hotspot detection, intensity mapping, attribution, and
+  socioeconomic profiling (Chapter~\ref{sec-where}, \textbf{?@sec-why},
+  \textbf{?@sec-who}). It aggregates the raw 1992 and 2020 data to the
+  10km grid first, and then calculates the difference for each grid
+  cell.
+\end{itemize}
+
+\section{The Modifiable Areal Unit Problem (MAUP) and
+``Sign-Flips''}\label{the-modifiable-areal-unit-problem-maup-and-sign-flips}
+
+When we average the cell-level changes from Path B up to regional
+scales, we sometimes observe a phenomenon related to Simpson's Paradox
+and the Modifiable Areal Unit Problem (MAUP): \textbf{Sign-Flips}.
+
+A ``sign-flip'' occurs when a region shows a negative \emph{Absolute
+Change} but a positive \emph{Symmetric Percentage Change} (SPC) for the
+same service.
+
+This is not an error; it reveals a specific geographic narrative: *
+\textbf{Mean Absolute Change} is heavily weighted by a few high-volume
+grid cells (e.g., massive, dense forests). If those highly productive
+cells lose a large volume of a service, the regional absolute average
+turns negative. * \textbf{Mean Symmetric Percentage Change} treats every
+10km community equally, regardless of its baseline volume. It highlights
+widespread, low-intensity dynamics.
+
+A sign-flip indicates that the \emph{total volume} of the service in the
+region is decreasing (driven by heavy localized losses), but the
+\emph{spatial footprint} of minor expansions or local service gains is
+spreading across a large number of low-baseline cells.
+
+\section{10km Grid Regional
+Aggregations}\label{km-grid-regional-aggregations}
+
+The following charts display the regional summaries calculated via Path
+B. Compare these with the Path A charts in Chapter~\ref{sec-what} to
+observe the subtle differences introduced by the 10km spatial
+aggregation framework.
+
+\subsection{By World Bank Region (10km
+Aggregation)}\label{by-world-bank-region-10km-aggregation}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_region_wb_abs.png}
+
+}
+
+\caption{\label{fig-annex-abs-wb}10km Grid Aggregation: Absolute Change
+by Region}
+
+\end{figure}%
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_region_wb_pct.png}
+
+}
+
+\caption{\label{fig-annex-pct-wb}10km Grid Aggregation: Percentage
+Change by Region}
+
+\end{figure}%
+
+\subsection{By Income Group (10km
+Aggregation)}\label{by-income-group-10km-aggregation}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_income_grp_abs.png}
+
+}
+
+\caption{\label{fig-annex-abs-inc}10km Grid Aggregation: Absolute Change
+by Income Group}
+
+\end{figure}%
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_income_grp_pct.png}
+
+}
+
+\caption{\label{fig-annex-pct-inc}10km Grid Aggregation: Percentage
+Change by Income Group}
+
+\end{figure}%
+
+\subsection{By WWF Biome (10km
+Aggregation)}\label{by-wwf-biome-10km-aggregation}
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_wwf_biome_abs.png}
+
+}
+
+\caption{\label{fig-annex-abs-biome}10km Grid Aggregation: Absolute
+Change by Biome}
+
+\end{figure}%
+
+\begin{figure}
+
+\centering{
+
+\includegraphics[width=1\linewidth,height=\textheight,keepaspectratio]{chapters/../outputs/plots/signed_bars/bars_signed_wwf_biome_pct.png}
+
+}
+
+\caption{\label{fig-annex-pct-biome}10km Grid Aggregation: Percentage
+Change by Biome}
+
+\end{figure}%
+
+
+
+
+\end{document}

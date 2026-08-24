@@ -302,3 +302,166 @@ extract_hotspots <- function(
     hotspots_sf     = hotspots_sf
   )
 }
+
+
+#' Run extract_hotspots() for every level of a grouping column
+#'
+#' Splits `plt_long` by each unique value of `grouping_col`, calls
+#' `extract_hotspots()` on each subset, and returns a named list of results.
+#' Mirrors the inline loop in `hotspot_extraction.qmd` as a reusable function.
+#'
+#' @param plt_long Long-format data frame with a `service` column and at least
+#'   one grouping column (e.g., `region_wb`, `income_grp`, `WWF_biome`).
+#' @param grouping_col Name of the column to split on (default `"region_wb"`).
+#' @param services Optional character vector; if supplied, rows are pre-filtered
+#'   to these services before extraction.
+#' @param exclude_vals Character vector of group values to skip (e.g.,
+#'   `"Antarctica"` for `region_wb`).
+#' @param ... Additional arguments forwarded to [extract_hotspots()].
+#'
+#' @return Named list (one element per group value) of `extract_hotspots()`
+#'   result lists.
+#'
+#' @seealso [extract_hotspots()], [filter_multidim()]
+#' @export
+extract_hotspots_by <- function(
+    plt_long,
+    grouping_col = "region_wb",
+    services     = NULL,
+    exclude_vals = character(0),
+    ...
+) {
+  stopifnot(grouping_col %in% names(plt_long))
+
+  vals <- as.character(stats::na.omit(unique(plt_long[[grouping_col]])))
+  vals <- setdiff(vals, exclude_vals)
+
+  if (!is.null(services)) {
+    plt_long <- dplyr::filter(plt_long, .data$service %in% services)
+  }
+
+  purrr::map(
+    stats::setNames(vals, vals),
+    function(v) {
+      sub_df <- dplyr::filter(plt_long, .data[[grouping_col]] == v)
+      extract_hotspots(sub_df, ...)
+    }
+  )
+}
+
+
+#' Filter a data frame by multiple geographic/socioeconomic dimensions
+#'
+#' Applies any combination of region, income group, biome, and country filters
+#' to `data`. Only criteria that are non-NULL are applied, so partial
+#' specifications work naturally. Designed for `plt_long` or the raw grid
+#' `sf` object where all grouping columns are present as attributes.
+#'
+#' For cross-cuts not available in the pre-computed summary CSVs (e.g.,
+#' "Sub-Saharan Africa + Low income"), apply this to the raw grid data first,
+#' then call [extract_hotspots()] or `agg_by_group()` on the result.
+#'
+#' @param data A data frame containing any subset of `region_wb`, `income_grp`,
+#'   `WWF_biome`, and `nev_name` columns.
+#' @param region_wb  Character vector; keep only rows where `region_wb` is in
+#'   this set. `NULL` = no filter.
+#' @param income_grp Character vector; keep rows matching these income groups.
+#' @param WWF_biome  Character vector; keep rows matching these biomes.
+#' @param country    Character vector; matched against the `nev_name` column.
+#'
+#' @return The filtered data frame (same class as `data`).
+#'
+#' @examples
+#' \dontrun{
+#' # Single dimension
+#' ssa <- filter_multidim(plt_long, region_wb = "Sub-Saharan Africa")
+#'
+#' # Cross-cut: Sub-Saharan Africa + Low income
+#' ssa_li <- filter_multidim(plt_long,
+#'                           region_wb  = "Sub-Saharan Africa",
+#'                           income_grp = "5. Low income")
+#' }
+#'
+#' @seealso [extract_hotspots_by()]
+#' @export
+filter_multidim <- function(
+    data,
+    region_wb  = NULL,
+    income_grp = NULL,
+    WWF_biome  = NULL,
+    country    = NULL
+) {
+  conds <- list(
+    region_wb  = region_wb,
+    income_grp = income_grp,
+    WWF_biome  = WWF_biome,
+    nev_name   = country
+  )
+  for (col in names(conds)) {
+    val <- conds[[col]]
+    if (!is.null(val) && col %in% names(data)) {
+      data <- dplyr::filter(data, .data[[col]] %in% val)
+    }
+  }
+  data
+}
+
+
+#' Derive a cross-category "AND" column from two or more combo count columns
+#'
+#' `extract_hotspots()`'s `combos` argument produces one `count_<name>` column
+#' per named service group — "how many of this group's services are hotspots
+#' in this cell." That mechanism only ever counts *within* one named group; it
+#' has no built-in way to ask "is this cell a hotspot in combo A AND also in
+#' combo B" across two different combos. This helper adds that one derived
+#' step so it doesn't have to be re-derived by hand per case — see the
+#' `combined_cross` column in `scripts/extract_hotspots_5service.R`, which
+#' wrote this exact pattern out manually before this function existed.
+#'
+#' @param data A data frame containing one `count_<name>` column per combo
+#'   named in `combo_names`, as produced by `extract_hotspots(..., combos = )`.
+#' @param combo_names Character vector of two or more combo names — the same
+#'   keys used in the `combos` list passed to `extract_hotspots()` (without
+#'   the `count_` prefix). The derived column is `1` where *every* named combo
+#'   has at least one hotspot service present in that cell, `0` otherwise.
+#' @param new_col Name for the derived column. Defaults to `combo_names`
+#'   pasted together with `"_x_"` (e.g. `"water_x_access"`).
+#'
+#' @return `data` with one additional integer (0/1) column, `new_col`.
+#'
+#' @examples
+#' \dontrun{
+#' hs <- extract_hotspots(
+#'   df = plt_long, value_col = "pct_chg",
+#'   loss_services = c("Nature_Access", "Pollination"),
+#'   gain_services = c("Sed_export", "N_export", "C_Risk"),
+#'   combos = list(
+#'     water  = c("N_export", "Sed_export"),
+#'     access = c("Nature_Access", "Pollination", "C_Risk")
+#'   ),
+#'   id_cols = c("fid")
+#' )
+#' derive_cross_combo(hs$summary_df, c("water", "access"), new_col = "combined_cross")
+#' }
+#'
+#' @seealso [extract_hotspots()]
+#' @export
+derive_cross_combo <- function(data, combo_names, new_col = NULL) {
+  stopifnot(
+    "`combo_names` must have at least 2 entries" = length(combo_names) >= 2
+  )
+
+  count_cols <- paste0("count_", combo_names)
+  missing <- setdiff(count_cols, names(data))
+  if (length(missing) > 0) {
+    stop(
+      "Missing combo count column(s): ", paste(missing, collapse = ", "),
+      " -- check that `combo_names` match the keys used in extract_hotspots()'s `combos` argument."
+    )
+  }
+
+  if (is.null(new_col)) new_col <- paste(combo_names, collapse = "_x_")
+
+  data[[new_col]] <- as.integer(Reduce(`&`, lapply(count_cols, function(cc) data[[cc]] > 0)))
+  data
+}

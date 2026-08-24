@@ -709,10 +709,10 @@ message("plt_long generated and cached to: ", rds_path)
 
 We identify per-service hotspots using a 5% percentile rule and **direction vectors**: - `loss_services` (e.g., Nature_Access, Pollination, N/Sed_Ret_Ratio, C_Risk_Red_Ratio) → we flag the **lowest** values; - `gain_services` (Sed_export, N_export, C_Risk) → we flag the **highest** values.
 **Definition of a Hotspot:**
-A hotspot is defined as a grid cell representing the **most detrimental 5% of change** globally for a given service.
+A hotspot is defined as being among the **5% of grid cells with the most detrimental change** globally for a given service.
 
-*   **For Beneficial Services** (e.g., Nature Access, Pollination, Retention Ratios): Hotspots are cells with the **steepest declines** (bottom 5% of the distribution).
-*   **For Detrimental Flows/Risks** (e.g., N/Sed Export, Coastal Risk): Hotspots are cells with the **steepest increases** (top 5% of the distribution).
+*   **For Beneficial Services** (e.g., Nature Access, Pollination, Retention Ratios): Hotspots are the 5% of cells with the **steepest declines** (the bottom 5% of grid cells by rank).
+*   **For Detrimental Flows/Risks** (e.g., N/Sed Export, Coastal Risk): Hotspots are the 5% of cells with the **steepest increases** (the top 5% of grid cells by rank).
 
 We run this **once globally** and then **once per subregion** (World Bank region, income group, WWF biome). For each run and for each metric (absolute and percent change) we write a compact **GPKG** containing only the hotspot cells, plus a CSV index:
 
@@ -898,8 +898,20 @@ if (file.exists(lc_gpkg)) {
   lc_sf <- sf::st_read(lc_gpkg, quiet = TRUE)
   lc_df <- sf::st_drop_geometry(lc_sf)
 
-  # Handle column rename from LC_change.qmd (fid -> grid_fid)
-  if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df)) {
+  # NOTE: 10k_lcc_granular_metrics.gpkg's own `grid_fid` is a row-index into a
+  # DIFFERENT source grid (AOOGrid_10x10km_land_4326_clean.gpkg, 1,691,819
+  # cells) than the master grid used for `geom_sf` (landgrid_1_clean_enriched_
+  # 4326.gpkg, 1,522,073 cells). The two schemes are unrelated despite the
+  # shared column name; joining on raw grid_fid pairs cells effectively at
+  # random. Remap through the spatial crosswalk before renaming to `fid`.
+  crosswalk_path <- file.path(data_dir(), "processed", "lc_grid_fid_to_master_fid_crosswalk.csv")
+  if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df) && file.exists(crosswalk_path)) {
+    crosswalk <- readr::read_csv(crosswalk_path, show_col_types = FALSE) %>% dplyr::filter(valid_match)
+    lc_df <- lc_df %>%
+      dplyr::inner_join(crosswalk %>% dplyr::select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
+      dplyr::select(-grid_fid) %>%
+      dplyr::rename(fid = master_fid)
+  } else if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df)) {
     lc_df <- dplyr::rename(lc_df, fid = grid_fid)
   }
 
@@ -1382,8 +1394,26 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
   lc_sf_full <- sf::st_read(lc_gpkg, quiet = TRUE)
   lc_df <- sf::st_drop_geometry(lc_sf_full)
 
-  # Handle column rename from LC_change.qmd (fid -> grid_fid)
-  if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df)) {
+  # NOTE: 10k_lcc_granular_metrics.gpkg's own `grid_fid` is a row-index into a
+  # DIFFERENT source grid (AOOGrid_10x10km_land_4326_clean.gpkg, 1,691,819
+  # cells) than the master grid used for `plt_long`/`geom_sf`
+  # (landgrid_1_clean_enriched_4326.gpkg, 1,522,073 cells). Remap through the
+  # spatial crosswalk to the master-grid fid before any fid-keyed join or
+  # comparison against plt_long/geom_sf -- otherwise the shared column name
+  # masks two unrelated id schemes and joins pair cells essentially at random.
+  crosswalk_path <- file.path(data_dir(), "processed", "lc_grid_fid_to_master_fid_crosswalk.csv")
+  if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df) && file.exists(crosswalk_path)) {
+    crosswalk <- readr::read_csv(crosswalk_path, show_col_types = FALSE) %>% dplyr::filter(valid_match)
+    lc_df <- lc_df %>%
+      dplyr::inner_join(crosswalk %>% dplyr::select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
+      dplyr::select(-grid_fid) %>%
+      dplyr::rename(fid = master_fid)
+    lc_sf_full <- lc_sf_full %>%
+      dplyr::inner_join(crosswalk %>% dplyr::select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
+      dplyr::select(-grid_fid) %>%
+      dplyr::rename(fid = master_fid)
+    message(sprintf("LC data remapped to master-grid fid via crosswalk: %d rows.", nrow(lc_df)))
+  } else if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df)) {
     lc_df <- dplyr::rename(lc_df, fid = grid_fid)
     lc_sf_full <- dplyr::rename(lc_sf_full, fid = grid_fid)
   }

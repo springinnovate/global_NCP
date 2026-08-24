@@ -53,7 +53,13 @@ def extract_population():
         logging.error(f"Vector file not found at {vector_path}")
         return
         
-    subfolders = ['2 or more overlapping', '3 or more overlapping', '4 or more overlapping', 'all hotspots']
+    # Auto-discover overlap-category subfolders instead of a hardcoded list --
+    # Rich delivers one folder per beneficiary category (today: the 4 nested
+    # "N or more services" tiers; upcoming: water-hotspot and access-hotspot,
+    # which aren't nested tiers at all). Dropping in a new folder is enough to
+    # have it picked up here; no code change needed.
+    subfolders = sorted(p.name for p in base_dir.iterdir() if p.is_dir())
+    logging.info(f"Discovered {len(subfolders)} overlap-category folders: {subfolders}")
     
     workspace_dir = Path("summary_pipeline_workspace/population_extraction_v3")
     workspace_dir.mkdir(parents=True, exist_ok=True)

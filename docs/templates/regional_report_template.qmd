@@ -1,0 +1,339 @@
+---
+title: "Regional Ecosystem Service Hotspot Profile"
+subtitle: "`r params$report_title`"
+author: "Global NCP Analysis"
+date: last-modified
+date-format: "YYYY-MM-DD"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: true
+    embed-resources: true
+    theme: cosmo
+params:
+  # Exactly one of these should be set; the others may be NULL.
+  # For cross-cuts (e.g. region + income), set both — requires raw grid data
+  # via the optional plt_long_path parameter.
+  grouping_var: "region_wb"           # "region_wb" | "income_grp" | "WWF_biome" | "nev_name"
+  group_val:    "Sub-Saharan Africa"  # exact value as it appears in hotspot_area_stats.csv
+  report_title: "Sub-Saharan Africa"
+  # Optional: path to raw long-format grid parquet/gpkg for cross-cut filtering.
+  # Leave NULL to use pre-computed CSVs only.
+  plt_long_path: NULL
+execute:
+  cache: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(here)
+library(scales)
+
+devtools::load_all(quiet = TRUE)
+invisible(lapply(
+  list.files(here::here("R"), pattern = "\\.R$", full.names = TRUE),
+  source
+))
+```
+
+```{r}
+#| label: load-data
+#| include: false
+
+subsets_root <- file.path(data_dir(), "processed", "tables", "regional_subsets")
+gv           <- params$grouping_var
+grp          <- params$group_val
+
+safe_name <- function(x) {
+  x <- gsub("[^A-Za-z0-9]+", "_", x)
+  x <- gsub("_+", "_", x)
+  gsub("^_|_$", "", x)
+}
+
+# --- hotspot_area_stats for this group ----------------------------------------
+area_path <- file.path(subsets_root, gv, paste0("hotspot_area_stats_", safe_name(grp), ".csv"))
+if (!file.exists(area_path)) {
+  # Fallback: filter the combined grouping-var CSV
+  combined_path <- file.path(subsets_root, gv, paste0("hotspot_area_stats_", gv, ".csv"))
+  if (file.exists(combined_path)) {
+    area_df <- read_csv(combined_path, show_col_types = FALSE) |>
+      filter(group == grp)
+  } else {
+    # Last resort: full table
+    area_df <- read_csv(
+      file.path(data_dir(), "processed", "tables", "hotspot_area_stats.csv"),
+      show_col_types = FALSE
+    ) |> filter(grouping_var == gv, group == grp)
+  }
+} else {
+  area_df <- read_csv(area_path, show_col_types = FALSE)
+}
+
+# --- hotspot_multiservice_stats -----------------------------------------------
+multi_path <- file.path(subsets_root, gv, paste0("hotspot_multi_stats_", gv, ".csv"))
+if (file.exists(multi_path)) {
+  multi_df <- read_csv(multi_path, show_col_types = FALSE) |>
+    filter(group == grp)
+} else {
+  multi_path2 <- file.path(data_dir(), "processed", "tables", "hotspot_multiservice_stats.csv")
+  multi_df <- if (file.exists(multi_path2)) {
+    read_csv(multi_path2, show_col_types = FALSE) |>
+      filter(grouping == gv, group == grp)
+  } else tibble()
+}
+
+# --- hotspot index (for GPKG paths) ------------------------------------------
+index_path <- file.path(data_dir(), "processed", "hotspots", "_hotspots_index.csv")
+hot_index  <- if (file.exists(index_path)) {
+  read_csv(index_path, show_col_types = FALSE) |>
+    filter(group_col == gv, group_val == grp)
+} else tibble()
+
+# --- population exposure (income_grp only) ------------------------------------
+pop_df <- tibble()
+if (gv == "income_grp") {
+  pop_path <- file.path(data_dir(), "processed", "tables", "hotspot_pop_exposure.csv")
+  if (file.exists(pop_path)) {
+    pop_df <- read_csv(pop_path, show_col_types = FALSE) |>
+      filter(income_grp == grp)
+  }
+}
+
+# --- driver overlap (global only) --------------------------------------------
+driver_path <- file.path(data_dir(), "processed", "tables", "lcc_es_hotspot_overlap_pct.csv")
+driver_df <- if (file.exists(driver_path)) {
+  read_csv(driver_path, show_col_types = FALSE)
+} else tibble()
+```
+
+## Hotspot Overview
+
+```{r}
+#| label: overview-table
+#| echo: false
+
+if (nrow(area_df) > 0) {
+  area_df |>
+    group_by(service) |>
+    summarise(
+      n_hot             = sum(n_hot),
+      n_total           = first(n_total),
+      pct_area          = first(pct_area),
+      relative_intensity = mean(relative_intensity),
+      .groups = "drop"
+    ) |>
+    arrange(desc(relative_intensity)) |>
+    mutate(
+      pct_area           = round(pct_area, 2),
+      relative_intensity = round(relative_intensity, 3)
+    ) |>
+    rename(
+      Service             = service,
+      `Hotspot cells`     = n_hot,
+      `Total cells`       = n_total,
+      `% Area`            = pct_area,
+      `Relative Intensity` = relative_intensity
+    ) |>
+    knitr::kable(align = "lrrrr")
+}
+```
+
+*Relative intensity > 1 means this group hosts a disproportionate share of global hotspots for that service.*
+
+## Service Intensity
+
+```{r}
+#| label: intensity-plot
+#| echo: false
+#| fig-width: 10
+#| fig-height: 6
+
+if (nrow(area_df) > 0) {
+  svc_order <- c(
+    "C_Risk", "N_export", "Sed_export",
+    "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
+    "Pollination", "Nature_Access"
+  )
+
+  area_df |>
+    mutate(service = factor(service, levels = svc_order)) |>
+    filter(!is.na(service)) |>
+    ggplot(aes(x = relative_intensity, y = reorder(service, relative_intensity),
+               fill = relative_intensity > 1)) +
+    geom_col() +
+    geom_vline(xintercept = 1, linetype = "dashed", color = "black", linewidth = 0.5) +
+    scale_fill_manual(values = c("TRUE" = "#E83737", "FALSE" = "gray70"), guide = "none") +
+    labs(
+      x     = "Relative Intensity (share of hotspots / share of area)",
+      y     = NULL,
+      title = paste0(grp, " — Hotspot Concentration by Service"),
+      subtitle = "Red bars = disproportionately high burden; dashed line = global parity"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+      panel.grid.minor  = element_blank(),
+      plot.title        = element_text(face = "bold"),
+      axis.text.y       = element_text(size = 12)
+    )
+}
+```
+
+## Multi-Service Overlap
+
+```{r}
+#| label: multi-plot
+#| echo: false
+#| fig-width: 7
+#| fig-height: 4
+
+if (nrow(multi_df) > 0 && "mean_hotspots" %in% names(multi_df)) {
+  multi_df |>
+    ggplot(aes(x = mean_hotspots, y = reorder(group, mean_hotspots), fill = mean_hotspots)) +
+    geom_col() +
+    scale_fill_distiller(palette = "YlOrRd", direction = 1, guide = "none") +
+    labs(
+      x     = "Mean overlapping hotspot services per cell",
+      y     = NULL,
+      title = "Compound Risk: Average Service Overlap"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(panel.grid.minor = element_blank(), plot.title = element_text(face = "bold"))
+} else {
+  cat("*Multi-service overlap data not available for this subgroup.*\n")
+}
+```
+
+## Population Exposure
+
+```{r}
+#| label: pop-exposure
+#| echo: false
+#| fig-width: 9
+#| fig-height: 5
+
+if (nrow(pop_df) > 0) {
+  svc_labels <- c(
+    C_Risk            = "Coastal Risk",
+    N_export          = "Nitrogen Export",
+    Sed_export        = "Sediment Export",
+    C_Risk_Red_Ratio  = "Coastal Risk Red. Ratio",
+    N_Ret_Ratio       = "N Retention Ratio",
+    Sed_Ret_Ratio     = "Sed Retention Ratio",
+    Pollination       = "Pollination",
+    Nature_Access     = "Nature Access"
+  )
+
+  pop_df |>
+    group_by(service) |>
+    summarise(exposed_population = sum(exposed_population, na.rm = TRUE), .groups = "drop") |>
+    mutate(service_label = recode(service, !!!svc_labels)) |>
+    ggplot(aes(x = reorder(service_label, exposed_population), y = exposed_population,
+               fill = exposed_population)) +
+    geom_col() +
+    coord_flip() +
+    scale_y_continuous(labels = label_number(scale = 1e-6, suffix = "M")) +
+    scale_fill_distiller(palette = "Reds", direction = 1, guide = "none") +
+    labs(
+      x     = NULL,
+      y     = "Exposed population",
+      title = paste0(grp, " — Population Exposed in Hotspots")
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(panel.grid.minor = element_blank(), plot.title = element_text(face = "bold"))
+} else {
+  cat(paste0(
+    "*Population exposure by income group is only pre-computed for the `income_grp` ",
+    "grouping variable. For other groupings, re-run `hotspot_synthesis.qmd` with the ",
+    "raw grid to generate cross-tabulated exposure.*\n"
+  ))
+}
+```
+
+## Land Cover Driver Attribution
+
+```{r}
+#| label: driver-plot
+#| echo: false
+#| fig-width: 9
+#| fig-height: 5
+
+if (nrow(driver_df) > 0) {
+  svc_labels <- c(
+    C_Risk            = "Coastal Risk",
+    N_export          = "Nitrogen Export",
+    Sed_export        = "Sediment Export",
+    C_Risk_Red_Ratio  = "Coastal Risk Red. Ratio",
+    N_Ret_Ratio       = "N Retention Ratio",
+    Sed_Ret_Ratio     = "Sed Retention Ratio",
+    Pollination       = "Pollination",
+    Nature_Access     = "Nature Access"
+  )
+
+  driver_df |>
+    mutate(service_label = recode(service, !!!svc_labels)) |>
+    ggplot(aes(x = reorder(driver, pct_overlap), y = pct_overlap, fill = pct_overlap)) +
+    geom_col() +
+    coord_flip() +
+    facet_wrap(~service_label, scales = "free_x", ncol = 2) +
+    scale_fill_distiller(palette = "Blues", direction = 1, guide = "none") +
+    labs(
+      x     = NULL,
+      y     = "% of hotspot cells overlapping with driver",
+      title = "Land Cover Change Attribution (global)",
+      subtitle = "Note: driver attribution is global; subregional breakdown requires raw grid data"
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      panel.grid.minor = element_blank(),
+      plot.title       = element_text(face = "bold"),
+      strip.text       = element_text(face = "bold")
+    )
+}
+```
+
+## Hotspot Index
+
+```{r}
+#| label: gpkg-table
+#| echo: false
+
+if (nrow(hot_index) > 0) {
+  hot_index |>
+    select(metric, n_hot, n_total, pct_hot) |>
+    mutate(
+      pct_hot = round(pct_hot, 3),
+      n_hot   = format(n_hot, big.mark = ","),
+      n_total = format(n_total, big.mark = ",")
+    ) |>
+    rename(
+      Metric       = metric,
+      `Hotspot cells` = n_hot,
+      `Total cells`   = n_total,
+      `% Hotspot`     = pct_hot
+    ) |>
+    knitr::kable()
+} else {
+  cat("*No hotspot index entries found for this group.*\n")
+}
+```
+
+---
+
+*Rendered: `r format(Sys.time(), "%Y-%m-%d %H:%M %Z")`*
+
+*To regenerate for a different group:*
+
+```bash
+quarto render docs/templates/regional_report_template.qmd \
+  -P grouping_var:income_grp \
+  -P group_val:"5. Low income" \
+  -P report_title:"Low Income Countries"
+```

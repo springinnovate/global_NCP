@@ -1,4 +1,4 @@
-# Methodology & Analytical Framework
+﻿# Methodology & Analytical Framework
 
 This document details the overarching methodology, spatial framework, and computational architecture used in the Global NCP project to analyze changes in ecosystem service provision between 1992 and 2020.
 
@@ -12,9 +12,23 @@ Before calculating any changes or identifying hotspots, the underlying spatial a
 To ensure that comparisons of ecosystem service provision are meaningful across the globe, all volumetric services (e.g., Nitrogen Export, Sediment Export) are standardized to a **per-hectare** basis. This step corrects for the geometric distortion of raster pixels in unprojected coordinate systems.
 
 *   **Volumetric Variables:** Converted to `Unit / ha` by dividing the raw pixel value by a corresponding pixel area raster (`esa_pixel_area_ha_...`). This calculation is performed *before* any zonal statistics or spatial aggregation occurs.
-*   **Ratios & Indices:** Left in their native units (e.g., 0-1 ratios, unitless indices) as area normalization does not apply.
+*   **Ratios & Indices:** Left in their native units (e.g., 0-1 ratios, unitless indices) as area normalization does not apply — the area term cancels in ratio calculations, and applying it to index variables would introduce spurious latitudinal gradients.
+*   **Coastal Risk — resolved.** Shore-point outputs converted to 300m raster via `Python_scripts/rasterize_coastal.py` (spatial mean per pixel). InVEST produces: `Rt` (energy reaching shore with habitat), `Rt_nohab_all` (without habitat), `Rt_service` (habitat contribution), `Rt_ratio` (proportional risk reduction). Only `Rt` → **`C_Risk`** and `Rt_ratio` → **`C_Risk_Red_Ratio`** enter the hotspot analysis. `C_Risk` is a per-linear-metre shore metric (e.g. MJ/m) — not area-based — so per-hectare correction does not apply. `C_Risk_Red_Ratio` is dimensionless. `Rt_service` and `Rt_nohab_all` are rasterised but unused in the main analysis.
 
 This ensures that all downstream zonal statistics reflect physical densities that are comparable across regions.
+
+### Aggregation Statistic: Mean for All Variables at Grid-Cell Level
+
+**Decision:** All raster variables are extracted to the 10km grid using the **mean** aggregation statistic (`op_stats: [mean]` in `analysis_configs/services_slim.yaml`). This applies uniformly to volumetric services, ratios, and indices.
+
+**Rationale:** Since all input rasters are already in per-hectare units (sourced from `base_years_ha/`), the mean within each grid cell represents the average per-ha rate or concentration across that 100km² cell. This is:
+- A valid, comparable metric across cells regardless of latitude or baseline volume
+- Consistent across all service types, eliminating the need to manage mixed `_sum`/`_mean` column naming in downstream R code
+- Appropriate for hotspot detection, which ranks relative rates, not absolute volumes
+
+**Implication:** Grid-cell mean values represent per-ha rates, not cell-level totals. Regional totals for volumetric services (e.g., total N export from Sub-Saharan Africa) are computed separately via Path A, which extracts directly from per-ha rasters to large regional polygons without passing through the grid.
+
+**Resolved technical debt** (was open when this section was first written, fixed since): `services_slim.yaml`'s `op_stats` now specifies `[mean]` only, and `Python_scripts/calculate_bitemporal_change.py`'s rename_map no longer contains `_sum` column references.
 
 ### Canonical Master Grid Generation
 Due to severe performance and geometry-validity bottlenecks encountered when performing massive spatial joins natively in R (the `sf` package), the creation of the canonical 100 sq km master grid was migrated to a hybrid QGIS-Python workflow.
@@ -27,7 +41,7 @@ Due to severe performance and geometry-validity bottlenecks encountered when per
 2.  **Geometry Cleaning:**
     *   To resolve minor topological errors (e.g., self-intersecting rings caused by clipping at coastlines and the dateline), the geometries were validated and cleaned, resulting in `landgrid_1_clean.gpkg`.
 3.  **Attribute Enrichment (Python):**
-    *   The final stage is handled by `Python_scripts/enrich_grid.py`.
+    *   The final stage is handled by `Python_scripts/build_master_grid.py`.
     *   This script performs a highly optimized, centroid-based spatial join to map WWF Biomes, Country, UN/World Bank Regions, and Income Group attributes (from the `ee_correspondence` dataset) onto the grid.
     *   It inherently handles geometry validation (`buffer(0).make_valid()`) and deduplication, outputting the final, analysis-ready `landgrid_1_clean_enriched.gpkg`.
 
@@ -44,7 +58,7 @@ By dropping these cells, we guarantee that the final analysis compares a mathema
 
 *   **Geographic vs. Projected Grids:** The original analysis grid is defined in a geographic coordinate system (WGS 84, EPSG:4326). When reprojected into an equal-area system (like Equal Earth, EPSG:8857) for analysis, the shapes of the cells stretch and tilt to preserve their area on a flat map.
 *   **Bounding Box vs. True Area:** As a result, measuring the `width` and `height` of a reprojected grid cell's bounding box will **not** yield 10km x 10km. 
-*   **Area is the Invariant:** A validation script (`Python_scripts/verify_grid_area.py`) measured the true geometric area of the reprojected grid cells, definitively confirming that each cell has an area of **100 km²** (10km x 10km).
+*   **Area is the Invariant:** A validation script (`Python_scripts/verify_grid_area.py`) measured the true geometric area of the reprojected grid cells, definitively confirming that each cell has an area of **100 kmÂ²** (10km x 10km).
 
 ### Data Preparation: Coastal Risk & Protection
 The Coastal Risk and Protection datasets are originally provided as high-resolution vector line geometries representing discrete coastal locations. 
@@ -59,7 +73,9 @@ To ensure mathematical robustness, a specialized pre-processing workflow was uti
 
 ## 2. The Dual-Pathway Analysis Structure
 
-Global spatial analysis often suffers from scale artifacts (like the Modifiable Areal Unit Problem). To accurately answer both "What happened globally?" and "Where are the local hotspots?", this project splits the analysis into two parallel workflows.
+The two questions this project addresses — *how much did ES change regionally?* and *where is change most concentrated?* — require different aggregation strategies. Path A compares pixels first, then aggregates results to regions. Path B aggregates pixels to grid cells first, then computes change. Using the wrong order for either question introduces systematic bias (detailed below).
+
+Note on the grid: the IUCN AOO 10km grid is an **equal-area** projection, not a lat/lon grid. Every cell covers exactly 100 km² regardless of latitude, making cross-regional comparisons fair without polar distortion.
 
 ### Path A: True Regional Trajectories (The "WHAT")
 This path is designed to generate summary statistics for large macro-regions (e.g., Biomes, World Bank Regions) bypassing the 100 sq km grid entirely.
@@ -155,9 +171,28 @@ A challenge in multi-stage spatial pipelines is maintaining exact 1:1 row integr
 ### Key Analysis Parameters (What is a Hotspot?)
 The threshold for identifying hotspots is defined centrally in `HOTS_CFG` (`analysis/hotspot_extraction.qmd`) using the parameter `pct_cutoff = 0.05`.
 
-*   **Relative Extreme:** A cell is cosndierd a "hotspot" if its change sits in the most extreme 5% *within that specific service's own distribution*. It is a ranking label, not an absolute physical threshold. A cell can enter or leave the top 5% even if its raw change isn't huge in absolute terms, simply because it is relative to the rest of the globe.
+*   **Relative Extreme:** A cell is considered a "hotspot" if its change places it among the 5% of grid cells with the most extreme changes *within that specific service's own distribution*. It is a ranking label (the worst 5% of cells), not an absolute physical threshold. A cell can enter or leave the top 5% even if its raw change isn't huge in absolute terms, simply because it is relative to the rest of the globe.
 *   **Comparability:** Comparisons are strictly within-service. A top 5% decline in Service A isn't necessarily comparable in absolute magnitude to a top 5% decline in Service B.
 *   **Not Evidence of Cause:** Being a hotspot flags that "this cell's change is unusually large," but it does not inherently prove *why* the value is extreme. To discuss drivers, we use additional robust analyses (LCC attribution and KS profiling).
+
+### Multi-Service Overlap Combos (`HOTS_CFG$combos`)
+`extract_hotspots()` (`R/get_hotspots.R`) accepts an optional `combos` argument: a named list of character vectors, each listing a subset of services that form a logical grouping. For each combo, the function automatically adds a `count_<name>` column to its output — the number of that combo's services flagged as a hotspot in that cell (0 up to the length of the vector).
+
+**Worked example — the 5-service redesign's water/access split** (`scripts/extract_hotspots_5service.R`):
+```r
+combos = list(
+  water  = c("N_export", "Sed_export"),
+  access = c("Nature_Access", "Pollination", "C_Risk")
+)
+```
+This produces `count_water` (0–2) and `count_access` (0–3) with no other code changes — `extract_hotspots()` does the counting internally.
+
+**What the native mechanism does *not* do**: ask whether a cell is a hotspot in combo A *and* combo B simultaneously (a cross-category AND, as opposed to a within-combo count). The 5-service redesign's `combined_cross` category (at least one water-service hotspot *and* at least one access-service hotspot in the same cell) needed this, and was originally written out by hand as a one-line `mutate()`. That pattern is now a reusable helper, `derive_cross_combo()` (`R/get_hotspots.R`), so a future combo like this doesn't need re-deriving from scratch:
+```r
+hs <- extract_hotspots(df = plt_long, ..., combos = combos)
+derive_cross_combo(hs$summary_df, c("water", "access"), new_col = "combined_cross")
+```
+It generalizes to more than two combos (ANDs across all named combos) and errors clearly if a requested combo name has no matching `count_<name>` column.
 
 ### Symmetric Percentage Change (SPC)
 To address mathematical artifacts where the sign of percentage change differs from absolute change (common when baselines are negative or near-zero), this analysis uses a **symmetric percentage change** calculation (`pct_mode="symm"`). This ensures that the direction of the percentage change always aligns with the absolute difference ($t_1 - t_0$).
@@ -184,11 +219,16 @@ A question regarding Path B is the comparability of variables aggregated via **s
 ## 5. Analytical Modules
 
 ### Socioeconomic Profiling (KS Tests)
-To understand the socioeconomic context of ecosystem service hotspots (e.g., Population, GDP, HDI), we utilize two-sample Kolmogorov-Smirnov (KS) tests.
+To characterise the socioeconomic context of hotspot cells, we compare distributions of four covariates (population density, GDP, HDI, Gini coefficient) inside hotspot cells against a background of typical stable conditions using two-sample Kolmogorov-Smirnov (KS) tests, complemented by Cliff's Delta (δ) effect sizes.
 
-**Balanced Sampling Methodology:**
-A direct comparison of hotspots (the top/bottom 5% of pixels) against the entire non-hotspot background (the remaining 95%) suffers from severe sample size imbalance and includes pixels undergoing extreme changes in the *opposite* direction. To ensure a fair and stable statistical comparison, the pipeline implements a "median background" sampling strategy:
-* Hotspots are compared strictly against the "business-as-usual" median 5% of the landscape (the 47.5th to 52.5th percentiles of change). This isolates the specific socioeconomic profile of extreme decline against typical, stable baseline conditions.
+**Why the median background?**
+Hotspot cells are compared against the *median 5%* of each service's change distribution (47.5th–52.5th percentile), not the full non-hotspot set. Reason: comparing against all 95% of non-hotspot cells would include cells at the opposite extreme (large service gains), which would confound the comparison. The median background represents typical, stable conditions — the right reference for "what's distinctive about acute decline?"
+
+**Why Cliff's Delta, not just p-values?**
+With ~1.5 million grid cells, even a negligibly small difference between hotspot and background distributions will produce a statistically significant p-value. This doesn't mean the difference is practically meaningful. Cliff's Delta (δ) measures the *probability* that a randomly drawn hotspot cell has a higher covariate value than a randomly drawn background cell, independently of sample size. δ = 0 means complete overlap; δ = ±1 means complete separation.
+
+**Why FDR correction — and what 39/40 means:**
+Running 40 tests at once (8 services × 5 covariates) means roughly 2 would appear significant by chance alone at a standard 5% threshold. Benjamini-Hochberg False Discovery Rate correction adjusts the significance bar across all 40 tests together, limiting the proportion of significant results that are likely to be false alarms. That **39 of 40 combinations remain significant after correction** means the socioeconomic signal is robust — the correction barely changed anything. The one non-significant result (Coastal Risk Reduction Ratio × agricultural plot intensity, $p_{adj}$ = 0.48, δ ≈ 0.001) also makes ecological sense: coastal protection hotspots are structurally decoupled from small-plot agricultural landscapes.
 
 ### Population Exposure and the Serviceshed Multiplier Effect
 To assess the human impact of ecosystem service hotspots, the pipeline quantifies both direct and indirect population exposure, establishing a "Serviceshed Multiplier Effect."
@@ -198,10 +238,30 @@ To assess the human impact of ecosystem service hotspots, the pipeline quantifie
 2. **Connected Beneficiaries (The Multiplier):** We trace exposure beyond the immediate degraded zone using two specialized geospatial delivery pathways:
    * **Hydrological Footprint:** Populations living down-gradient that rely on the upstream landscape for water purification, sediment retention, and flow regulation.
    * **Access-Based Travel Footprint:** Populations living within physical travel distances that rely on local nature for recreation, wild pollination, and access to natural capital.
-3. **Compound Risk Analysis:** To evaluate how this exposure behaves under escalating ecological failure, populations are grouped by their localized **Compound Risk**—the number of simultaneous overlapping hotspots in a single cell (ranging from $\ge 1$ to $\ge 4$). 
+3. **Compound Risk Analysis:** To evaluate how this exposure behaves under escalating ecological failure, populations are grouped by their localized **Compound Risk** — the number of simultaneous overlapping hotspots in a single cell, recorded as `hotspot_count` in `hotspots_global_pct.gpkg` (ranging from 1 to 8). Compound hotspot subsets are stored in `data/processed/hotspots/hotspot_beneficiaries/` (subfolders: `all hotspots/`, `2 or more overlapping/`, `3 or more overlapping/`, `4 or more overlapping/`).
+
+**Service-weighted vs. distinct population counts**
+
+The intermediate table `hotspot_pop_exposure.csv` stores population stratified by (service × income group × HDI × GDP × GINI). Summing `exposed_population` across all 8 services yields ~5,286 million — a **service-weighted sum** where a person in a cell qualifying as a hotspot for k services is counted k times. This is the correct input for socioeconomic stratification plots (e.g., exposure by income group per service) but is not a count of distinct individuals.
+
+To obtain **distinct people** in at least one hotspot cell, join `hotspot_count ≥ 1` rows from `hotspots_global_pct.gpkg` to `GHS_POP_E2020_GLOBE_sum` from `10k_change_calc.gpkg` and sum once per unique cell: **~3,065 million** (verified 2026-06-22).
+
+**Verified numbers (audited 2026-06-22, branch task/housekeeping)**
+
+All figures derived from: `hotspots_global_pct.gpkg` (`hotspot_count` field) joined to `10k_change_calc.gpkg` (`GHS_POP_E2020_GLOBE_sum`), and beneficiary CSVs in `hotspot_beneficiaries/`.
+
+| Population tier | Filter | Cells | GHS-POP in-situ | Connected (union) | Multiplier |
+|---|---|---|---|---|---|
+| Any hotspot (1+ services) | `hotspot_count ≥ 1` | 225,113 | **3,065 M** | 7,584 M | **2.5×** |
+| Compound (2+ services) | `hotspot_count ≥ 2` | 85,599 | **1,212 M** | 6,011 M | **~5×** |
+| High compound (3+ services) | `hotspot_count ≥ 3` | 41,025 | **445 M** | 3,756 M | **~8×** |
+
+Beneficiary source files: `jeronimo_hotspots_all_beneficiaries_2026_06_01_12_09_23.csv` (all hotspots), `jeronimo_2hotspot_beneficiaries_2026_06_02_11_17_05.csv` (2+), `jeronimo_3hotspot_beneficiaries_2026_06_02_10_54_22.csv` (3+).
+
+The `hotspot_count` distribution in the current GeoPackage: 1 service = 139,514 cells; 2 = 44,574; 3 = 19,211; 4 = 12,835; 5 = 7,427; 6 = 1,504; 7 = 47; 8 = 1.
 
 **Analytical Purpose:** 
-This framework allows us to test whether intense, compounding environmental crises remain geographically contained. By plotting the exposed populations on a logarithmic scale across escalating compound risk tiers, we measure the multiplier gap between *Local Residents* and total *Connected Beneficiaries*. This mathematically tracks how highly localized environmental degradation cascades into systemic regional vulnerabilities.
+This framework allows us to test whether intense, compounding environmental crises remain geographically contained. By plotting the exposed populations across escalating compound risk tiers, we measure the multiplier gap between *Local Residents* and total *Connected Beneficiaries*. This mathematically tracks how highly localized environmental degradation cascades into systemic regional vulnerabilities.
 
 ### Land Cover Change Attribution
 To explain *why* hotspots occur, we integrate Land Cover Change (LCC) metrics derived from ESA CCI (1992) and C3S (2020) maps.
@@ -212,22 +272,101 @@ Instead of simple "Net Change" (which masks simultaneous loss and gain), we use 
 *   **Gross Gain:** The area of natural land recovered.
 *   **Exchange:** Shifts that don't affect the net total but represent dynamic turnover.
 
-These metrics are aggregated to the 100 sq km master grid and overlaid with ES hotspots to quantify the **"Attribution Gap"** (i.e., how much ES decline is directly linked to land conversion vs. degradation). The analysis produces both a single, global attribution map showing the overall footprint of degradation, as well as a series of detailed maps breaking down the specific drivers for each of the 8 individual ecosystem service hotspots.
+These metrics are aggregated to the 100 sq km master grid and overlaid with ES hotspots to quantify the **"Attribution Gap"**.
+
+> **Numbers below current as of 2026-07-08** (via `scripts/compute_attribution_true_union.R`, see
+> `docs/runbook.md` step 5 and the LCC grid crosswalk prerequisite it depends on). This section
+> previously cited a stale 24%/76% split computed before a grid-identity bug was fixed — see
+> `analysis/WORKLOG.md`'s 2026-07-07/2026-07-08 entries for the full incident. Verify against the current
+> book (`docs/manuscript/chapters/05-drivers-WHY.qmd`) or paper before citing if this file is more than a
+> few weeks old.
+
+**Symmetric threshold design (critical for correct interpretation)**
+
+The co-occurrence analysis uses a **symmetric 5%/5% threshold**: ES hotspot cells are defined as the top 5% of SPC change per service; LCC driver hotspot cells are defined as the top 5% of gross conversion magnitude per driver, across **five drivers** (Forest Loss, Cropland Expansion, Urban Expansion, Grassland Loss, Grassland Gain — see Granular Models below). Both thresholds operate within the same 10km equal-area grid.
+
+**34.5% of ES hotspot cells co-occur** with at least one of the five LCC driver hotspots (the union across drivers) — a **strong, highly significant positive association** (odds ratio 12.17 for the union; risk ratios 3.9–36.6 per individual driver), far above what spatial independence would predict.
+
+The **Attribution Gap of 65.5%** means that most ES hotspot cells do **not** co-occur with any extreme (top 5%) LCC driver cell. This must not be read as "65.5% of cells had no land cover change" — it means those cells did not co-occur with the *most intense* conversion cells. Moderate or low-level land cover change may still be present in those cells but below the top-5% threshold. Framed as a *stronger* version of the chapter's thesis, not a weaker one: where land-cover conversion is detected at this intensity, it is a reliable indicator of ES-hotspot co-occurrence — but categorical monitoring alone misses the majority of cases.
+
+This is a **spatial co-occurrence analysis, not causal attribution**. An important structural constraint is that ESA CCI land cover data serves simultaneously as a primary input to InVEST biophysical models and as the basis for the LCC overlay. This endogeneity means the gap cannot be treated as an independent empirical partition between degradation-driven and conversion-driven change.
+
+The analysis produces both a single, global attribution map showing the overall footprint of degradation, as well as a series of detailed maps breaking down the specific drivers for each of the 8 individual ecosystem service hotspots.
 
 **Granular Models:**
-To move beyond binary "Natural vs. Transformed" analysis, we implement two specific driver models:
+To move beyond binary "Natural vs. Transformed" analysis, we implement driver-specific models across five drivers:
 1.  **Forest Loss Model:**
     *   **Reclassification:** Maps ESA classes to **Forest** vs. **Non-Forest**. Flooded Trees (classes 160, 170) are mapped to Forest to capture mangrove/swamp forest dynamics.
     *   **Metric:** Tracks Gross Loss of Forest cover.
 2.  **Expansion Model:**
     *   **Reclassification:** Maps ESA classes to **Urban**, **Cropland**, and **Other**.
-    *   **Metric:** Tracks the specific expansion of Urban and Cropland areas into other land cover types.
+    *   **Metric:** Tracks the specific expansion of Urban and Cropland areas into other land cover types (Urban Expansion and Cropland Expansion, tracked as separate drivers).
+3.  **Grassland Model:**
+    *   **Metric:** Tracks both Grassland Loss (conversion away from grassland/shrubland) and Grassland Gain (conversion into grassland/shrubland, e.g. from cleared forest) as two separate drivers — see the Rangelands note below for why these are tracked distinctly rather than folded into "Natural-to-Natural" exchange.
 
 **Note on Rangelands:** Logic is updated to explicitly track Forest-to-Grassland transitions as a loss of primary natural cover. Categorizing Grasslands/Shrublands as `Transformed (Rangeland/Pasture)` prevents these critical conversions from being masked as 'Natural-to-Natural' exchange.
 
 ---
 
-## 6. Outputs & Visualization
+## 6. Subregional & Filtering Infrastructure
+
+### Pre-computed subsets
+
+After `hotspot_synthesis.qmd` produces the global summary tables, its final chunk
+(`regional-subsets-export`) splits `hotspot_area_stats.csv` and
+`hotspot_multiservice_stats.csv` into per-group CSV files:
+
+```
+data/processed/tables/regional_subsets/
++-- region_wb/
+|   +-- hotspot_area_stats_region_wb.csv        (all 7 regions combined)
+|   +-- hotspot_area_stats_Sub_Saharan_Africa.csv
+|   +-- ...
++-- income_grp/
+|   +-- hotspot_area_stats_income_grp.csv
+|   +-- ...
++-- WWF_biome/
++-- nev_name/
+```
+
+These files need regenerating only when `hotspot_area_stats.csv` itself changes (new
+services, updated InVEST inputs, or a changed hotspot threshold). Run the chunk
+interactively in RStudio â€” it does not require `plt_long` or the GPKGs.
+
+### R filtering functions (`R/get_hotspots.R`)
+
+Two functions support on-demand filtering beyond the pre-computed groupings:
+
+**`extract_hotspots_by(plt_long, grouping_col, services, exclude_vals, ...)`**
+
+Wraps `extract_hotspots()` across all levels of a grouping column. Returns a named list
+(one entry per group value) of `extract_hotspots()` result lists. This formalizes the
+inline loop in `hotspot_extraction.qmd` as a reusable function for custom runs.
+
+**`filter_multidim(data, region_wb, income_grp, WWF_biome, country)`**
+
+Filters a data frame (typically `plt_long` or the raw grid `sf`) by any combination of
+the four geographic/socioeconomic dimensions. Columns that are `NULL` are ignored, so
+partial specifications work naturally. Use this when you need a cross-cut that is not
+available in the pre-computed CSVs (e.g., "Sub-Saharan Africa cells classified as Low income"):
+
+```r
+subset_df <- filter_multidim(plt_long,
+                             region_wb  = "Sub-Saharan Africa",
+                             income_grp = "5. Low income")
+hs <- extract_hotspots(subset_df, ...)
+```
+
+### Regional report template
+
+`docs/templates/regional_report_template.qmd` is a parameterized Quarto document that
+produces a self-contained HTML for any single grouping-variable value. It reads from the
+pre-computed `regional_subsets/` CSVs (with a fallback to the full table if subsets have
+not been generated yet). See `docs/runbook.md` for render commands.
+
+---
+
+## 7. Outputs & Visualization
 
 ### Output Directory Structure
 The project's graphical outputs are organized into specialized subdirectories within `outputs/plots/` (e.g., `maps/`, `drivers/`, `ks/`, `boxplots_unified/`, `signed_bars/`). 
@@ -239,7 +378,7 @@ The project's graphical outputs are organized into specialized subdirectories wi
 ### Visualization Semantic Rules (Maps)
 To maintain a consistent narrative across all presentations and figures, spatial maps of Ecosystem Service change adhere to a strict semantic color rule:
 *   **Universal Diverging Scale:** All maps use a diverging color ramp anchored at zero (`midpoint = 0`).
-*   **Semantic Meaning:** Red always indicates ecological or social damage (loss of a good service, or increase in a detrimental risk). Green always indicates improvement or healthy service provision.
+*   **Semantic Meaning:** As of 2026-07-09, **orange** (`#F07D00`) always indicates ecological or social damage (loss of a good service, or increase in a detrimental risk); **teal** (`#009191`) always indicates improvement or healthy service provision. This replaced an earlier red/green scheme (still visible in any figure rendered before 2026-07-09) that was not colorblind-safe — see `scripts/mapping/make_faceted_maps.R`'s `compute_service_limits()`/fill-scale logic for the current implementation. The semantic *direction* (damage vs. improvement) is unchanged, only the color pair.
 *   **Sequential vs. Diverging Data:** Even if a regional dataset does not cross zero (e.g., all regions experience a decline), the diverging scale is maintained to preserve the semantic meaning of the colors. 
 
 ### Hotspot Rasterization Workflow

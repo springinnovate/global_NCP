@@ -1,0 +1,290 @@
+/*-- scss:rules --*/
+
+/* ============================================================
+   WWF Global Science — RevealJS Custom Theme
+   Based on WWF US 2021 Presentation Template
+
+   Official palette (from theme XML):
+     #007930  WWF Green (accent2)
+     #7B8327  Olive (accent3)
+     #F5D200  Yellow (accent4)
+     #F07D00  Orange (accent5)
+     #009191  Teal (dk2)
+     #0071D5  Blue (accent1)
+     #DA1D51  Red (accent6)
+
+   Fonts: Open Sans Light / Open Sans (Google Fonts), Arial fallback
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&display=swap');
+
+:root {
+  --wwf-green:       #007930;
+  --wwf-dark-green:  #004D1E;  /* project dark, consistent with mermaid */
+  --wwf-olive:       #7B8327;
+  --wwf-orange:      #F07D00;
+  --wwf-yellow:      #F5D200;
+  --wwf-teal:        #009191;
+  --wwf-black:       #000000;
+  --wwf-white:       #FFFFFF;
+  --wwf-gray-light:  #F5F5F3;
+  --wwf-gray-mid:    #CCCCCC;
+}
+
+/* ── Base typography ───────────────────────────────────────── */
+.reveal {
+  font-family: 'Open Sans', Arial, sans-serif;
+  font-weight: 400;
+  color: var(--wwf-black);
+  background-color: var(--wwf-white);
+}
+
+/* ── Headings ──────────────────────────────────────────────── */
+.reveal h1 {
+  font-family: 'Open Sans', Arial, sans-serif;
+  font-weight: 300;         /* Open Sans Light */
+  font-size: 2.0em;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--wwf-white);  /* h1 appears on dark section slides */
+  line-height: 1.2;
+}
+
+.reveal h2 {
+  font-family: 'Open Sans', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 0.62em;
+  text-transform: none;
+  color: var(--wwf-black);
+  border-bottom: 3px solid var(--wwf-orange);
+  padding-bottom: 0.2em;
+  margin-bottom: 0.55em;
+  letter-spacing: -0.01em;
+}
+
+.reveal h3 {
+  font-family: 'Open Sans', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 0.82em;
+  color: var(--wwf-green);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.25em;
+}
+
+/* ── Dark-background section slides ────────────────────────── */
+.reveal section.has-dark-background h1 {
+  color: var(--wwf-white);
+  font-weight: 300;
+}
+.reveal section.has-dark-background h2 {
+  color: var(--wwf-white);
+  border-bottom-color: var(--wwf-orange);
+}
+.reveal section.has-dark-background h3 {
+  color: var(--wwf-yellow);
+}
+.reveal section.has-dark-background p,
+.reveal section.has-dark-background li,
+.reveal section.has-dark-background td,
+.reveal section.has-dark-background th {
+  color: var(--wwf-white);
+}
+.reveal section.has-dark-background strong {
+  color: var(--wwf-yellow);
+}
+
+/* ── Accent: bold text in orange (key numbers on white slides) */
+.reveal strong {
+  color: var(--wwf-orange);
+  font-weight: 700;
+}
+
+/* ── Links ─────────────────────────────────────────────────── */
+.reveal a {
+  color: var(--wwf-green);
+}
+.reveal a:hover {
+  color: var(--wwf-orange);
+}
+
+/* ── Progress bar — orange, matching brand ─────────────────── */
+.reveal .progress {
+  background: rgba(0, 121, 48, 0.12);
+  height: 4px;
+}
+.reveal .progress span {
+  background: var(--wwf-orange);
+}
+
+/* ── Slide number ──────────────────────────────────────────── */
+.reveal .slide-number {
+  font-family: 'Open Sans', Arial, sans-serif;
+  font-size: 0.42em;
+  color: var(--wwf-black);
+  background-color: rgba(255, 255, 255, 0.88);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* ── Footer ────────────────────────────────────────────────── */
+.reveal .footer {
+  font-family: 'Open Sans', Arial, sans-serif;
+  font-size: 0.42em;
+  font-weight: 300;
+  color: #888888;
+}
+
+/* ── Tables ────────────────────────────────────────────────── */
+.reveal table {
+  font-family: 'Open Sans', Arial, sans-serif;
+  font-size: 0.65em;
+  border-collapse: collapse;
+  width: 100%;
+}
+.reveal table thead th {
+  background-color: var(--wwf-green);
+  color: var(--wwf-white);
+  padding: 0.45em 0.7em;
+  text-align: left;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.reveal table tbody td {
+  padding: 0.38em 0.7em;
+  border-bottom: 1px solid #E0E0E0;
+  vertical-align: top;
+}
+.reveal table tbody tr:nth-child(even) {
+  background-color: #F2F7F3;
+}
+
+/* ── Images ────────────────────────────────────────────────── */
+.reveal img {
+  border: none !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16) !important;
+  border-radius: 3px;
+}
+
+/* ── Callout boxes ─────────────────────────────────────────── */
+.reveal .callout {
+  border-left: 5px solid var(--wwf-orange) !important;
+}
+
+/* ── Code ──────────────────────────────────────────────────── */
+.reveal code {
+  font-size: 0.75em;
+  background: #F0F0EE;
+  padding: 0.1em 0.3em;
+  border-radius: 2px;
+  color: var(--wwf-dark-green);
+}
+
+/* ── Mermaid diagrams ──────────────────────────────────────── */
+.reveal .mermaid svg {
+  max-height: 460px;
+}
+
+/* ── Logo sizing ────────────────────────────────────────────── */
+.reveal .slide-logo {
+  max-height: 50px !important;
+  width: auto;
+}
+
+/* ── Title slide ─────────────────────────────────────────────── */
+.reveal .title-slide h1,
+.reveal .title-slide .title {
+  font-weight: 300;
+  font-size: 2.2em;
+  color: var(--wwf-white);
+}
+.reveal .title-slide .subtitle {
+  color: rgba(255, 255, 255, 0.80);
+  font-size: 1.1em;
+  font-weight: 400;
+  margin-top: 0.3em;
+}
+.reveal .title-slide .author,
+.reveal .title-slide .date,
+.reveal .title-slide .affiliation {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.7em;
+}
+
+/* ── Bullet spacing ─────────────────────────────────────────── */
+.reveal ul, .reveal ol {
+  margin-top: 0.3em;
+}
+.reveal li {
+  margin-bottom: 0.25em;
+  font-size: 0.92em;
+}
+
+/* ── Column text sizing ─────────────────────────────────────── */
+.reveal .column p,
+.reveal .column li {
+  font-size: 0.765em;
+  line-height: 1.28;
+}
+
+/* ── Stat callout tiles ────────────────────────────────────────
+   Brand pattern from the WWF template (p.48/50: big number in a
+   rounded card) applied to headline figures instead of burying
+   them in bullet text. */
+.stat-row {
+  display: flex;
+  gap: 12px;
+  margin: 10px 0 16px 0;
+  flex-wrap: wrap;
+}
+.stat-callout {
+  background: var(--wwf-dark-green);
+  color: var(--wwf-white);
+  border-radius: 14px;
+  padding: 10px 18px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.stat-callout .stat-value {
+  display: block;
+  font-size: 1.9em;
+  font-weight: 800;
+  line-height: 1.05;
+  font-variant-numeric: proportional-nums;
+}
+.stat-callout .stat-label {
+  display: block;
+  font-size: 0.58em;
+  font-weight: 400;
+  opacity: 0.92;
+  margin-top: 3px;
+  line-height: 1.25;
+}
+.stat-callout.accent {
+  background: var(--wwf-orange);
+}
+
+/* ── Mini reference table ──────────────────────────────────────
+   Compact service-definition table used below bullet blocks. */
+.mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.52em;
+  margin-top: 8px;
+}
+.mini-table th {
+  background: var(--wwf-dark-green);
+  color: var(--wwf-white);
+  text-align: left;
+  padding: 3px 7px;
+  font-weight: 600;
+}
+.mini-table td {
+  padding: 3px 7px;
+  border-bottom: 1px solid var(--wwf-gray-mid);
+  vertical-align: top;
+  line-height: 1.15;
+}
+.mini-table tr:nth-child(even) td {
+  background: var(--wwf-gray-light);
+}

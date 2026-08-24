@@ -1,0 +1,63 @@
+::: {.callout-important}
+**Preliminary draft — for internal discussion only.** Do not cite, share, or distribute without permission from the authors.
+:::
+
+# Preface {.unnumbered}
+
+# Executive Summary
+
+This work provides a temporally explicit, globally consistent assessment of ecosystem service provision change between 1992 and 2020. Across eight biophysical services modeled with InVEST — spanning water quality regulation, pollination, coastal protection, and nature access — we track how provision has shifted over 28 years, where change is most severe relative to the local baseline, which populations and socioeconomic contexts face the greatest exposure, and how observed decline relates to land cover conversion.
+
+The assessment integrates biophysical models, satellite land cover records (ESA CCI and C3S), and gridded socioeconomic layers across 1.3 million equal-area grid cells worldwide. All analyses are reproducible through open-source R and Python workflows documented in this book.
+
+## Glossary
+- **AOO**: Area of Occupancy. A standard 10 km equal-area grid used for spatial analysis.
+- **Attribution Gap**: The proportion of ecosystem service hotspots that show no spatial overlap with detectable macro-scale land cover conversion, at the same 10km grid used for the hotspot analysis. Consistent with sub-pixel degradation, upstream routing cascades, or climate-forcing shifts — but the current analytical design cannot partition their relative contributions.
+- **Compound Risk**: The co-occurrence of multiple ecosystem service hotspots in a single geographic area (grid cell), compounding the ecological and social impact.
+- **ES**: Ecosystem Services. Benefits people obtain from nature (e.g., pollination, coastal protection).
+- **Hotspot**: A grid cell showing unusually high or low relative change in ecosystem services (the top 5% of grid cells by rank for a given service).
+- **KS Analysis**: Kolmogorov-Smirnov test, a statistical method used here to compare the socioeconomic profiles of hotspots vs. non-hotspots.
+- **LCC**: Land Cover Change (or Land Cover Conversion). Physical modifications to the Earth's surface (e.g., deforestation, agricultural expansion, urbanization).
+- **NCP**: Nature's Contributions to People. Often used interchangeably with Ecosystem Services, representing the benefits nature provides to humans.
+- **Relative Intensity**: A region's (or income group's, or biome's) share of global hotspot cells for a service, divided by its share of global land area. **1.0** means its hotspot burden exactly matches its size; **1.4×** means it holds 40% more of that service's hotspots than its land area would predict; **0.7×** means 30% less. It measures disproportionate burden, not absolute count — a small region can have a very high relative intensity while contributing few hotspot cells in total, and vice versa.
+- **Serviceshed Multiplier Effect**: The cascading human impact measured by comparing the number of distant connected beneficiaries (e.g., downstream or via travel) to the direct local residents within a degraded area.
+- **Symmetric Percentage Change (SPC)**: A modified percentage change calculation (bounded between -200% and +200%) that corrects for near-zero or negative baselines, ensuring the direction of percentage change always aligns with the absolute difference.
+- **Zonal Statistics**: Calculations that summarize high-resolution raster data within the boundaries of polygons (grid cells or regions).
+
+
+
+## What is a "Hotspot"? (Methodological Context)
+Before interpreting the results, it is critical to understand how a hotspot is defined in this analysis:
+
+- **A Relative Extreme, Not an Absolute Threshold:** A hotspot is defined as being among the *5% of grid cells with the most extreme relative change* (using Symmetric Percentage Change) globally for a specific service.
+- **Intensity Over Volume:** We use percentage change rather than absolute volume to normalize for the size of the baseline ecosystem.
+- **Focus on Decline:** For this phase of the analysis, hotspots represent **worry spots**—areas experiencing the steepest declines in service provision or the sharpest increases in environmental risk/damage.
+
+# Key Findings
+
+### 1. Geographic Clustering & Compound Risk
+Hotspots of ecosystem service decline are not randomly distributed; they cluster in low- and middle-income regions, creating epicenters of Compound Risk where populations face multiple simultaneous ecological failures.
+
+- **Geographic concentration:** Latin America & the Caribbean and East Asia & the Pacific lead on both metrics: they contain the most hotspot cells in absolute terms (109K and 111K respectively), and both hold a bigger share of global hotspots than their land area alone would predict — 40% more for LAC, 30% more for East Asia & Pacific (relative intensity 1.40× and 1.30× — see Glossary for how to read this metric). No other region exceeds its expected share.
+- **Income-group disparity:** Lower-middle-income countries hold 19% more of the world's hotspots than their land area would predict (relative intensity 1.19×) — nearly 1.6 times the corresponding figure for high-income OECD countries, who sit 26% below expected (0.74×). Sub-Saharan Africa has many hotspot cells in absolute terms (73K, third globally), but given its vast land area, its share of hotspots is actually somewhat below what its size would predict (0.78×, 22% below expected).
+
+### 2. Socioeconomic Profiling (Who is affected?)
+Using Kolmogorov-Smirnov (KS) tests, we compared the socioeconomic profile of hotspots against the "business-as-usual" median landscape. 39 out of 40 service-covariate combinations (97.5%) are highly significant after FDR correction.
+
+- **A pattern common to all services:** Wherever ES provision is declining most sharply, those areas sit in or near densely populated, economically active landscapes — consistently, across all eight services. This reflects the geography of where ecosystems and people overlap, not anything specific to any one service. (Cliff's Delta: population +0.47–0.66, GDP +0.49–0.67 across all services)
+- **Coastal services (C_Risk, C_Risk_Red_Ratio):** Co-occur with higher-HDI, more economically developed contexts — consistent with populated coastlines where urban expansion increases hazard exposure.
+- **Terrestrial provisioning and export services (Pollination, Nature Access, N_export, Sed_export):** Co-occur with lower HDI and substantially higher income inequality (GINI), indicating populations most exposed to these declines tend to have less adaptive capacity. Agricultural plot intensity does *not* distinguish these hotspots (Cliff's Delta ≈ 0).
+- **Retention ratio services (N_Ret_Ratio, Sed_Ret_Ratio):** A distinct third pattern — intermediate-to-higher HDI alongside *lower* GINI than background, not captured by either typology above.
+
+### 3. Spatial Co-occurrence with Land Cover Change (The "Attribution Gap")
+We assessed the spatial co-occurrence between ES hotspots and detectable land cover conversion (ESA CCI-derived, aggregated to the 10km hotspot grid) across five conversion drivers: Forest Loss, Cropland Expansion, Urban Expansion, Grassland Loss, and Grassland Gain.
+
+- **A strong, highly significant positive association:** ES hotspots overlap with intense (top 5%) land cover conversion from any of the five drivers combined at a rate of 34.2% — a risk ratio of 7.4 relative to the 4.6% background rate among non-hotspot cells (equivalently, odds ratio 10.8, 95% CI 10.7–10.9). Where land cover conversion is genuinely severe, it is a strong predictor of ES-hotspot co-occurrence, not a negligible one.
+- **The signal holds for every individual driver:** Cropland Expansion (risk ratio 97.5), Forest Loss (25.4), Urban Expansion (9.1), Grassland Loss (4.8), and Grassland Gain (4.2) are all strongly and positively associated with ES hotspots — there is no offsetting or mixed-sign pattern once the driver-hotspot cell identities are computed correctly (see @sec-why for full methodological detail).
+- **Attribution Gap:** Even so, 65.8% of ecosystem service hotspots show no spatial overlap with any of the five intense land cover conversion drivers. This is a coverage limitation, not an absence of relationship: categorical land cover monitoring, even defined as the union of all five driver types, still misses roughly two-thirds of where ES decline is most severe. This gap is consistent with mechanisms operating below the 300m source-data detection threshold — including sub-pixel degradation, upstream routing cascades, and climate-forcing shifts — but the current analytical design cannot partition their relative contributions. It reflects a spatial co-occurrence signal, not a causal attribution of decline to any specific driver.
+
+### 4. Absolute Population Exposure
+While socioeconomic profiling reveals relative characteristics, absolute population provides the scale of human impact.
+
+- **Widespread Human Impact:** Over 7.6 billion connected beneficiaries (roughly 97% of the evaluated global population) rely directly upon the spatial footprint of these hotspots or their connected servicesheds. 
+- **Concentration in Middle-Income Nations:** The majority of people exposed to ES decline hotspots reside in Upper and Lower Middle-Income countries.

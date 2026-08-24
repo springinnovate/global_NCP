@@ -64,8 +64,8 @@ Pollination, Nature_Access
 
 **Directionality.**
 
-* **Loss services** (bad when they go **down**): `Nature_Access`, `Pollination`, `N_Ret_Ratio`, `Sed_Ret_Ratio`, `C_Risk_Red_Ratio` → keep **lowest** tail.
-* **Gain services** (bad when they go **up**): `Sed_export`, `N_export`, `C_Risk` → keep **highest** tail.
+* **Loss services** (bad when they go **down**): `Nature_Access`, `Pollination`, `N_Ret_Ratio`, `Sed_Ret_Ratio`, `C_Risk_Red_Ratio` → keep **bottom 5% of grid cells by rank**.
+* **Gain services** (bad when they go **up**): `Sed_export`, `N_export`, `C_Risk` → keep **top 5% of grid cells by rank**.
 
 **Assumptions.**
 

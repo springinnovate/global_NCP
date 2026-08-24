@@ -3,8 +3,8 @@
 Jeronimo Rodriguez Escobar
 Affiliation: Global Science, WWF
 Supervisor: Becky Chaplin-Kramer
-Version: v1.3.3
-Last updated: 2026-05-12
+Version: v1.3.4
+Last updated: 2026-06-20
 
 # Executive Summary
 
@@ -22,17 +22,15 @@ By identifying areas of rapid change or high importance, this pipeline supports 
 
 ### Data Preparation (One-Time Setup)
 
-The analysis pipelines require a clean, canonical 10km grid file. The original method used an R script (`analysis/prepare_data.qmd`), but this has been a source of persistent geometry errors.
-
-A more robust, pure-Python alternative is now provided and is the recommended approach.
+The analysis pipelines require a clean, canonical 10km grid file. This is handled entirely by a pure-Python workflow which builds an enriched grid without geometry errors.
 
 #### Grid Preparation using Python (Recommended)
 
-This script creates a clean grid file guaranteed to be compatible with the downstream Python pipelines. Run this from your terminal, providing the path to your data directory.
+This script creates a clean grid file guaranteed to be compatible with the downstream Python pipelines.
 
 ```bash
-# Replace `/path/to/global_ncp/data` with the actual path to your data
-python analysis/prepare_grid_python.py --data-root /path/to/global_ncp/data
+# Ensure you are using the correct Python environment
+python Python_scripts/build_master_grid.py
 ```
 
 ### Running the Python Stage (Raster-based Zonal Statistics)
@@ -41,19 +39,17 @@ python analysis/prepare_grid_python.py --data-root /path/to/global_ncp/data
 # Pull Docker image
 docker pull therealspring/global_ncp-computational-environment:latest
 
-# First, generate the zone raster (one-time setup) from an R console:
-# Rscript analysis/create_zone_raster.R
-
-# Then, run the raster-based zonal stats pipeline inside the Docker container:
+# Run the raster-based zonal stats pipeline inside the Docker container:
 docker run -it --rm \
   -v $(pwd):/workspace \
   -v /path/to/global_ncp/data:/data \
   -w /workspace \
   therealspring/global_ncp-computational-environment:latest /bin/bash
 
-# Inside container, execute raster-based zonal summaries:
-python summary_pipeline_rasterzones.py --data-root /data analysis_configs/services_raster.yaml
-# python summary_pipeline_rasterzones.py --data-root /data analysis_configs/beneficiaries_raster.yaml
+# Inside container, execute zonal summaries (services, then beneficiaries, then coastal):
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/services_slim.yaml
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/beneficiaries_slim.yaml
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/c_protection_synth.yaml
 ```
 
 ### Running the R/Quarto Analysis Chain
@@ -62,12 +58,18 @@ Execute the following Quarto notebooks **in order** from the repository root:
 
 ```bash
 # Full sequential analysis
-quarto render analysis/prepare_data.qmd
 quarto render analysis/process_data.qmd
 quarto render analysis/hotspot_extraction.qmd
 quarto render analysis/hotspot_synthesis.qmd
 quarto render analysis/KS_tests_hotspots.qmd
-quarto render analysis/results_interpretation.qmd
+```
+
+### Rasterizing the Outputs
+
+After the analysis chain is complete, run the bash script to rasterize the hotspot output geometries to 10km GeoTiffs using GDAL:
+
+```bash
+bash scripts/gdal_rasterize_hotspots.sh
 ```
 
 Or render the full book (includes all chapters):
@@ -80,6 +82,56 @@ Output files will be saved to:
 - `processed/` – Intermediate GeoPackage and data files
 - `outputs/plots/` – Generated visualizations and maps
 
+
+---
+
+## Interactive Book Output
+
+Rendering the book (`quarto render docs/manuscript`) produces a self-contained HTML book with interactive tables in **Chapter 4 (WHERE — Hotspot Geography)**. No R session or data connection is required to use them — all queries run entirely in the browser.
+
+### Three table types
+
+| Tab | What it shows | Key filter columns |
+|---|---|---|
+| **Hotspot Area Coverage** | Hotspot cells, % area, and relative intensity for every service × geographic unit (country, WB region, biome, income group) | Grouping, Service, Geographic Unit |
+| **Compound Risk Summary** | Mean overlapping services and % multi-service cells per unit | Grouping, Geographic Unit |
+| **Country × Biome (Cross-dimensional)** | Hotspot stats for every *country–biome–service* combination (3,553 rows, ≥1 hotspot cell) | Country, Biome, WB Region, Income Group, Service |
+
+### How to use the tables
+
+- **Filter**: type in the box below any column header — partial match, case-insensitive
+- **Compare multiple values**: use `|` as OR within any text column — e.g. `Brazil|Indonesia` shows both countries; `Mangrov|Flooded` shows two biomes; `Pollin|C_Risk` shows two services
+- **Sort**: click any column header to toggle ascending / descending; numeric columns sort numerically
+- **Combine**: multiple column filters stack — e.g. `Brazil|Indonesia` in Country + `Mangroves` in Biome + sort Relative Intensity ↓ compares the two countries' Mangrove burden directly
+- **Page size**: selector at bottom-left — 10 / 25 / 50 / 100 rows
+- **Global search**: box at top-right searches across all columns simultaneously
+
+### Example queries
+
+```
+# Which biomes in Brazil have the highest Pollination hotspot burden?
+→ Country filter: "Brazil" | Service filter: "Pollination" | sort Relative Intensity ↓
+
+# Compare Brazil vs Indonesia Mangrove burden across all services:
+→ Country filter: "Brazil|Indonesia" | Biome filter: "Mangroves" | sort Relative Intensity ↓
+
+# How does coastal risk compare across all countries in Sub-Saharan Africa?
+→ WB Region filter: "Sub-Saharan" | Service filter: "C_Risk" | sort Relative Intensity ↓
+
+# Which services are failing most in low-income tropical countries?
+→ Income Group filter: "Low income" | Biome filter: "Tropical" | sort Relative Intensity ↓
+
+# Full profile of South Korea — all biomes and services ranked:
+→ Country filter: "South Korea" | sort Relative Intensity ↓
+```
+
+**Relative Intensity** is the key metric: values > 1 (shown in red) mean that unit hosts more hotspot area than its land share predicts; values < 1 (shown in blue) mean under-represented. A value of 4.78, for example, means nearly 5× the expected concentration.
+
+### Technical note
+
+The cross-dimensional table is built at book-render time from `hotspots_global_pct.gpkg` (225K cells, ~86 MB). The R chunk is cached — first render takes ~5 seconds for the GeoPackage load + pivot; subsequent renders are instant unless the source data changes. Requires the `reactable` R package (`install.packages("reactable")`).
+
+---
 
 - **AOO**: Area of Occupancy. A standard 10 km equal-area grid used for spatial analysis.
 - **ES**: Ecosystem Services. Benefits people obtain from nature (e.g., pollination, coastal protection).
@@ -98,83 +150,50 @@ For a detailed technical description of the pipeline, see the project's official
 ### Pipeline Architecture
 
 ```mermaid
-%%{init: {'flowchart': {'rankSpacing': 300, 'nodeSpacing': 30}}}%%
-flowchart LR
-    %% Subgraph Styling
-    style INPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
-    style PROCESSING fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
-    style OUTPUTS fill:#F8F9FA,stroke:#D3D3D3,stroke-width:2px
+%%{init: {'flowchart': {'rankSpacing': 55, 'nodeSpacing': 30}}}%%
+flowchart TB
+    RawES["InVEST ES Models\n300m · 1992 & 2020"]
+    RawGrid["IUCN 10km Master Grid\nSubregional Attributes"]
+    RawLC["ESA CCI Land Cover\n300m · 1992 & 2020"]
+    RawSoc["Socioeconomic Data\nPop, GDP, HDI"]
 
-    %% Input Layer
-    subgraph INPUTS [" "]
-        direction TB
-        RawES["<span style='font-size: 38px;'><b>Global InVEST ES Models</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 and 2020)</i></span>"]
-        RawGrid["<span style='font-size: 38px;'><b>IUCN AOO 10km Master Grid</b></span> <br/> <span style='font-size: 32px;'><i>Vector with Subregional Attributes</i></span>"]
-        RawLC["<span style='font-size: 38px;'><b>ESA CCI Land Cover</b></span> <br/> <span style='font-size: 32px;'>300m Rasters <i>(1992 and 2020)</i></span>"]
-        RawSoc["<span style='font-size: 38px;'><b>Socioeconomic Data</b></span> <br/> <span style='font-size: 32px;'>Rasters <i>(Pop, GDP, HDI)</i></span>"]
-    end
+    IntA["Path A\nPixel-level Summaries"]
+    MathA["Path A Metrics\nSPC & Absolute Diff"]
 
-    %% Processing Layer
-    subgraph PROCESSING [" "]
-        direction TB
-        IntA["<span style='font-size: 38px;'><b>Path A: Global Trajectories</b></span> <br/> <span style='font-size: 32px;'>Zonal Summaries <i>(1992 and 2020)</i></span>"]
-        MathA["<span style='font-size: 38px;'><b>Path A Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC and Absolute Difference</span>"]
+    IntB["Path B\n10km Grid Analysis"]
+    MathB["Path B Metrics\nSPC & Absolute Diff"]
 
-        IntB["<span style='font-size: 38px;'><b>Path B: Grid Analysis</b></span> <br/> <span style='font-size: 32px;'>10km Zonal Summaries <i>(1992 and 2020)</i></span>"]
-        MathB["<span style='font-size: 38px;'><b>Path B Metrics</b></span> <br/> <span style='font-size: 32px;'>SPC and Absolute Difference</span>"]
+    MathLC["Land Cover\nTransitions"]
+    MathSoc["KS Tests &\nSocioeco. Profiling"]
+    MathBenef["Serviceshed\nRouting"]
 
-        MathLC["<span style='font-size: 38px;'><b>Land Cover Transitions</b></span> <br/> <span style='font-size: 32px;'>Reclassified LC Contingency <br/> Matrices per 10km Gridcell</span>"]
-        MathSoc["<span style='font-size: 38px;'><b>Socioeconomic Stats and KS Tests</b></span> <br/> <span style='font-size: 32px;'>10km Grid Aggregation <br/> and Statistical Profiling</span>"]
-    end
+    P1(["WHAT\nGlobal Trajectories"])
+    P2(["WHERE\nHotspot Detection"])
+    P3(["WHY\nAttribution Gap"])
+    P4(["WHO\nExposure & Multiplier"])
 
-    %% Outputs Layer
-    subgraph OUTPUTS [" "]
-        direction TB
-        P1["<span style='font-size: 38px;'><b>WHAT: Global Trajectories</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Bar Charts, Summary Tables, <br/> and Cartographies (GPKGs)</i>"]
-        P2["<span style='font-size: 38px;'><b>WHERE: Hotspot Detection (Top/Bottom 5%)</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>Abs and SPC GPKGs, Synthesis Maps, <br/> and Distribution Plots</i>"]
-        P3["<span style='font-size: 38px;'><b>WHY: Attribution Gap</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>LCC Overlap CSVs, Heatmaps, <br/> Scatterplots, and Driver Maps</i>"]
-        P4["<span style='font-size: 38px;'><b>WHO: Equity and Exposure</b></span> <br/> <i style='font-size: 32px; font-weight: normal;'>KS Test Plots and <br/> Population Exposure CSVs</i>"]
-    end
+    RawES ==> IntA & IntB
+    RawGrid ==> IntB & MathLC & MathSoc
+    RawLC ==> MathLC
+    RawSoc ==> MathSoc & MathBenef
 
-    %% Logical Connections
-    RawGrid ==&gt; IntB
-    RawGrid ==&gt; MathLC
-    RawGrid ==&gt; MathSoc
+    IntA ==> MathA ==> P1
+    IntB ==> MathB ==> P2
 
-    RawES ==&gt; IntA
-    RawES ==&gt; IntB
+    P2 ==> MathLC & MathSoc & MathBenef
+    MathLC ==> P3
+    MathSoc ==> P4
+    MathBenef ==> P4
 
-    IntA ==&gt; MathA
-    IntB ==&gt; MathB
+    classDef c_what fill:#007930,stroke:#004D1E,stroke-width:2px,color:#FFF;
+    classDef c_where fill:#7B8327,stroke:#515619,stroke-width:2px,color:#FFF;
+    classDef c_why fill:#F07D00,stroke:#A85700,stroke-width:2px,color:#FFF;
+    classDef c_who fill:#F5D200,stroke:#B39900,stroke-width:2px,color:#333;
 
-    MathA ==&gt; P1
-    MathB ==&gt; P2
-
-    %% Downstream Analysis from Hotspots (P2)
-    P2 ==&gt; P3
-    RawLC ==&gt; MathLC
-    MathLC ==&gt; P3
-
-    P2 ==&gt; P4
-    RawSoc ==&gt; MathSoc
-    MathSoc ==&gt; P4
-
-    %% Layout Guides
-    RawSoc ~~~ MathSoc
-    IntA ~~~ P1
-
-    %% CANONICAL COLOR CLASSES (Matching Circular Diagram)
-    classDef c_what fill:#007930,stroke:#004D1E,stroke-width:3px,color:#FFF;
-    classDef c_where fill:#7B8327,stroke:#515619,stroke-width:3px,color:#FFF;
-    classDef c_why fill:#F07D00,stroke:#A85700,stroke-width:3px,color:#FFF;
-    classDef c_who fill:#F5D200,stroke:#B39900,stroke-width:3px,color:#333;
-
-    %% Pillar Assignments
     class RawES,IntA,MathA,P1 c_what;
     class RawGrid,IntB,MathB,P2 c_where;
     class RawLC,MathLC,P3 c_why;
-    class RawSoc,MathSoc,P4 c_who;
-```
+    class RawSoc,MathSoc,MathBenef,P4 c_who;
 ```
 
 ## Repository Structure
@@ -220,14 +239,20 @@ Stored under the external data root (`raw/`), include:
 
 ## Modeled Ecosystem Services
 
-1.  **Nitrogen Export** – InVEST NDR: kg/hectare/year (Standardized from pixel)
-2.  **Sediment Export/Retention** – InVEST SDR: ton/hectare/year (Standardized from pixel)
-3.  **USLE** – Soil erosion proxy. Derived from the *Revised Universal Soil Loss Equation* USLE
-4.  **Pollination** – InVEST Pollination Model: People fed on habitat
-5.  **Coastal Protection** – InVEST Coastal Vulnerability: Unitless vulnerability index
-6.  Sediment Retention Service: $$
-    \text{Potential Sediment Retention} = \frac{\text{USLE} - \text{Export}}{\text{USLE}}
-    $$
+Eight services modeled with InVEST at 300m resolution, 1992 and 2020. All rasters pre-normalised to per-hectare units before extraction; ratio/index services are dimensionless and exempt from area correction.
+
+| # | Service | Variable | Type |
+|---|---|---|---|
+| 1 | Nitrogen Export | `N_export` | Volumetric (kg N/ha) |
+| 2 | Nitrogen Retention Ratio | `N_Ret_Ratio` | Ratio (0–1) |
+| 3 | Sediment Export (USLE) | `Sed_export` | Volumetric (ton/ha) |
+| 4 | Sediment Retention Ratio | `Sed_Ret_Ratio` | Ratio (0–1) |
+| 5 | Pollination | `Pollination` | Index |
+| 6 | Nature Access | `Nature_Access` | Index (equidistant projection) |
+| 7 | Coastal Risk | `C_Risk` | Per linear metre of shore (Rt) |
+| 8 | Coastal Risk Reduction Ratio | `C_Risk_Red_Ratio` | Ratio (Rt_ratio, 0–1) |
+
+Canonical variable names are defined in `analysis/hotspot_extraction.qmd` (`HOTS_CFG`) and `R/utils_hotspot.R` (`svc_order`).
 
 ## Land Cover Layers
 
@@ -279,9 +304,9 @@ docker run -it --rm ^
 Then, run the workflow:
 
 ``` bash
-python summary_pipeline_landgrid.py --data-root /data analysis_configs/services_slim.yaml
-python summary_pipeline_landgrid.py --data-root /data analysis_configs/beneficiaries_slim.yaml
-python summary_pipeline_landgrid.py --data-root /data analysis_configs/c_protection_synth.yaml
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/services_slim.yaml
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/beneficiaries_slim.yaml
+python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/c_protection_synth.yaml
 ```
 
 Each raster-vector combo is processed in parallel, using `exactextract` for
@@ -326,7 +351,7 @@ ogr2ogr -wrapdateline -datelineoffset 180 \
 
 The pipeline is designed to be highly modular and extensible. To add new continuous raster data to the analysis in the future:
 1. **Add to Config:** Add the new raster path to the appropriate YAML config (or create a new one).
-2. **Run Python Extraction:** Run `python summary_pipeline_landgrid.py` with your config. This drops a new spatial GPKG into the workspace.
+2. **Run Python Extraction:** Run `python Python_scripts/summary_pipeline_landgrid.py` with your config. This drops a new spatial GPKG into the workspace.
 3. **R Consolidation:** Run `analysis/process_data.qmd`. It will automatically grab the latest extractions from the workspace, strip their geometries, and seamlessly `left_join` them to the canonical grid using the stable `fid` row identifier. 
 
 **Important Manual Steps in `process_data.qmd`:**
@@ -339,7 +364,7 @@ The R/Quarto analysis workflow is conducted through a series of notebooks in the
 
 ## Core R Analysis Chain (Execution Order)
 
-1. **`prepare_data.qmd`** – **Data Preparation & Baseline Setup**
+1. **`build_master_grid.py`** – **Data Preparation & Baseline Setup**
    - Loads raw zonal statistics from Python pipeline outputs
    - Prepares and validates the canonical 10km IUCN AOO grid with subregional attributes
    - Creates baseline data structures for downstream analysis
@@ -377,12 +402,6 @@ The R/Quarto analysis workflow is conducted through a series of notebooks in the
    - Generates KS test plots and statistical summaries
    - Links ecosystem service hotspots to drivers (land cover conversion, urbanization)
 
-7. **`results_interpretation.qmd`** – **Synthesis: Narrative & Interpretation**
-   - The final analysis notebook that synthesizes outputs from all prior steps
-   - Constructs the narrative answering: **WHERE are hotspots?**, **WHO is affected?**, **WHY (what are the drivers)?**
-   - Generates key findings, figures, and tables for manuscript or presentations
-   - **Recommended as the source document for presentations and co-author communication**
-
 ## Data Flow Summary
 
 ```
@@ -393,7 +412,7 @@ Python Pipeline (Docker)
     ↓
 R Analysis Chain (Sequential)
     ↓
-    prepare_data.qmd → process_data.qmd [creates 10k_change_calc.gpkg]
+    process_data.qmd [creates 10k_change_calc.gpkg]
     ↓
     hotspot_extraction.qmd [hotspot identification]
     ↓
@@ -401,9 +420,9 @@ R Analysis Chain (Sequential)
     ↓
     KS_tests_hotspots.qmd [socioeconomic profiling]
     ↓
-    results_interpretation.qmd [narrative synthesis]
-    ↓
 Final Outputs: Maps, summary tables, KS test plots, manuscript figures
+    ↓
+Validation: scripts/audit_claims.R [verifies key paper claims against outputs]
 ```
 
 ## For Complete Technical Details
@@ -414,22 +433,76 @@ See the project runbook for detailed methodology and validation notes:
 *   **`docs/methodology.md`** – Technical explanation of two-path analysis structure
 *   **`analysis/README.md`** – Archive policy and notebook scoping
 
+# Pipeline Scalability & Extensibility
+
+The current analysis applies this pipeline at global scale with two temporal snapshots (1992, 2020), a 100 km² grid, and globally-applied InVEST default parameters. These are **implementation choices for a global proof-of-concept**, not architectural constraints. The pipeline is designed to be flexible along all of these dimensions:
+
+## Spatial resolution
+The hotspot extraction, synthesis, and subregional analysis infrastructure is resolution-agnostic. Replacing the 100 km² global grid with a finer-resolution regional grid (e.g., 1 km² for a river basin or country study) requires only new Python zonal statistics inputs — all downstream R analysis and reporting steps work without modification. Finer resolution would directly address the site-level planning limitation of the current global analysis.
+
+## Temporal coverage
+The pipeline's dual-pathway structure already handles arbitrary numbers of time points. The `process_data.qmd` notebook identifies T0 and T1 automatically from available columns; adding a third or fourth year (e.g., 2000, 2010) requires populating those columns from new InVEST model runs. Multi-temporal analysis is a documented future task in `analysis/hotspot_extraction.qmd`.
+
+## Geographic scope
+The same pipeline can be run on a regional study area (Amazon basin, Southeast Asia, West Africa coastal zone, etc.) with locally-calibrated InVEST inputs. Regional applications benefit from site-specific parameterization that is not feasible at global scale, yielding more defensible biophysical outputs. The subregional filtering infrastructure (`filter_multidim()`, regional CSV subsets, and the parameterized report template) was designed to support exactly this kind of targeted analysis.
+
+## Additional services
+Any InVEST output — or output from another biophysical model — can be added as a new service column. Add the raster path to the Python YAML config, run the extraction, and update the `rename_list` in `process_data.qmd`. The hotspot identification, synthesis, and reporting steps handle arbitrary service sets automatically.
+
+## Quick reference: what to change for a regional high-resolution application
+
+| Component | Global (current) | Regional adaptation |
+|---|---|---|
+| Grid | IUCN AOO 100 km², global | Custom polygon grid at target resolution |
+| InVEST inputs | Global default parameters | Locally calibrated biophysical tables |
+| Temporal snapshots | 1992, 2020 | Any available model years |
+| Services | 8 global services | Any InVEST or compatible model outputs |
+| Socioeconomic data | Global gridded datasets | National/regional census or survey data |
+| Hotspot threshold | 5% global percentile | Adjustable via `pct_cutoff` in `HOTS_CFG` |
+
+See `docs/runbook.md` for the full execution guide and `docs/methodology.md` for the analytical framework.
+
+---
+
+# External Data: Critical Natural Assets (Chaplin-Kramer et al. 2022)
+
+Used in the Colombia country-report work (`scripts/mapping/make_colombia_critical_assets_map.R`
+and related). This repo only holds the **aggregated** raster
+(`data/external/critical_natural_assets/local_NCP_all_targets/local_NCP_land_all_targets_md5_7ccece.tif`).
+
+**Source (verified 2026-08-19)**: paper's own OSF data repository, `https://osf.io/r5xz7/`
+(cited in the paper's Data Availability statement, nature.com/articles/s41559-022-01934-5) — not
+a Dryad repository despite the hashed filenames suggesting one. That OSF project's `data/NCP
+layers/` folder holds the **individual per-service "realized" rasters** (pollination, coastal
+protection, nitrogen retention ×2 buffer distances, sediment deposition ×2 buffer distances,
+nature access ×4 urban/rural × 60/360min variants) plus a `potential service layers` subfolder
+(theoretical-maximum versions; two of those three files are 2-3GB each). None of the individual
+layers are downloaded into this repo yet — see `docs/HANDOFF_2026-08-19.md` for the direct
+per-file OSF download links if/when they're needed.
+
+Methodology (from the OSF project's own README): 14 NCP layers (12 local-scale + 2 global-scale:
+carbon storage, moisture recycling) at ~2km resolution, compiled by Rachel Neugarten and Becky
+Chaplin-Kramer, optimized with the R package `prioritizr` on an Eckert IV equal-area grid at
+multiple resolutions (1/5/10/100km). "Critical" cells sustain 90% of total current NCP magnitude;
+headline finding is that this covers only 30% of global land area for the 12 local NCPs (44% if
+the 2 global NCPs are included).
+
+---
+
 # Future Directions
 
--   Implement PostgreSQL + PostGIS backend
--   Normalize values (e.g., population-weighted) during extraction
--   Extend temporal coverage (e.g., 1990–2020 at 5-year intervals)
--   **TODO:** Compare results between the 10km grid-based approach and per-pixel analysis to quantify differences and determine the optimal method.
--   Add transitions and swap metrics to land cover summaries
--   Build R + Python dashboards or plug-ins for visualization
+-   **Multi-temporal analysis:** Extend to 3+ snapshots (e.g., 1992, 2000, 2010, 2020) to capture trajectories, recovery events, and rate of change — not just net difference.
+-   **Regional high-resolution applications:** Apply the pipeline to priority regions (Amazon, SE Asia, West Africa) at 1–10 km resolution with locally calibrated InVEST inputs.
+-   **Attribution strengthening:** Factorial InVEST experiments (fixed climate / varying land cover, and vice versa) to partition the attribution gap between land-use-driven and climate-driven change.
+-   **Population exposure by region and biome:** Extend `hotspot_pop_exposure.csv` to stratify by `region_wb`, `WWF_biome`, and country (currently income-group only; requires full synthesis re-run on adequate hardware).
+-   **Extend temporal coverage:** Incorporate intermediate years to characterize change trajectories rather than single bi-temporal snapshots.
+-   **Normalize values:** Explore population-weighted or area-normalized exposure metrics alongside absolute counts.
 
 ::: {.callout-tip icon="true"}
-## Future Tasks & Ideas
+## Open Technical Tasks
 
-Here are some ideas and future tasks for this analysis:
-
-1.  **Adapt analysis for multi-temporal data:** Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.
-2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to quantify and visualize the share of total change (from bar plots) that occurs within hotspots versus outside of them, possibly using stacked bar plots.
+1.  **Adapt analysis for multi-temporal data:** Adapt hotspot_extraction.qmd to handle 3+ time points.
+2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to show the share of total change occurring within vs. outside hotspots (stacked bar approach).
 :::
 
 ## License

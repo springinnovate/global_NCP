@@ -9,9 +9,13 @@
 
 ## Executive Summary
 
-We have consolidated the Global NCP repository structure, updated core documentation, and developed a comprehensive Quarto-based presentation (reveal.js) structured around three narrative pillars: **WHY** (motivation), **HOW** (methodology), and **WHAT** (findings).
+We have consolidated the Global NCP repository structure around a robust Python/GDAL architectural core, permanently retiring the legacy R-based spatial workflows. All core documentation has been updated, and we have finalized the presentation and manuscript deliverables which are now cleanly organized within the `docs/` folder. The outputs are structured around three narrative pillars: **WHY** (motivation), **HOW** (methodology), and **WHAT** (findings).
 
-The presentation is ready for:
+The finalized materials are available in:
+- **`docs/manuscript/`**: The complete Quarto-based paper draft and related assets.
+- **`docs/presentations/`**: The standalone reveal.js presentation deck.
+
+These are ready for:
 1. Co-author review and feedback
 2. Adaptation for specific audiences (scientific, policy, general public)
 3. Integration with manuscript development
@@ -22,10 +26,11 @@ The presentation is ready for:
 ## What Was Completed
 
 ### ✅ Phase 1: Repository Audit & Consolidation
-- **Verified active workflow:** 7 core Quarto notebooks in `/analysis/` follow the intended sequence
-- **Archived legacy code:** Legacy notebooks properly organized in `/archive/notebooks/`
-- **Documentation audit:** `/docs/` contains methodology, runbook, and data dictionaries
-- **Dependencies mapped:** Python (Docker) → R/Quarto pipeline is clear and well-documented
+- **Archival Purge:** The legacy `archive/` folder and deprecated R-spatial joins (`analysis/prepare_data.qmd`, `analysis/create_zone_raster.R`) were completely deleted to sanitize the workspace and prevent geometry bottlenecks.
+- **Architectural Lock-In:** The spatial core is permanently migrated to Python/QGIS/GDAL frameworks (e.g., `Python_scripts/enrich_grid.py`, `Python_scripts/summary_pipeline_landgrid.py`, and `scripts/gdal_rasterize_hotspots.sh`).
+- **Verified active workflow:** 5 core Quarto notebooks in `/analysis/` follow the intended sequence cleanly.
+- **Documentation audit:** `/docs/` contains methodology, runbook, and data dictionaries.
+- **Dependencies mapped:** Python (Docker) → R/Quarto → GDAL shell pipeline is clear and well-documented.
 
 ### ✅ Phase 2: Documentation Consolidation
 - **Updated README.md** with:

@@ -1,7 +1,5 @@
 # R/paths.R
 
-# read once at load time
-.GLOBAL_NCP_DATA <- Sys.getenv("GLOBAL_NCP_DATA", unset = "")
 .path_state <- new.env(parent = emptyenv())
 .path_state$project_root <- NULL
 
@@ -25,6 +23,13 @@
   root <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
   .path_state$project_root <- root
   root
+}
+
+# read once at load time, with a fallback similar to the python scripts
+.GLOBAL_NCP_DATA <- Sys.getenv("GLOBAL_NCP_DATA", unset = "")
+if (.GLOBAL_NCP_DATA == "") {
+    .GLOBAL_NCP_DATA <- file.path(.find_project_root(), "data")
+    message(paste("GLOBAL_NCP_DATA not set, defaulting to:", .GLOBAL_NCP_DATA))
 }
 
 # sanity check helper (optional)
