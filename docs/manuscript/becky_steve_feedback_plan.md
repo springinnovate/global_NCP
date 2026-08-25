@@ -29,6 +29,58 @@ export value is the raw delivered load) and the choice affects every downstream 
 and interpretation. Asked Becky (cc Steve) to confirm which framing is intended before any
 rewrite proceeds — see `docs/manuscript/becky_reply_2026-08-20.md` for the draft sent.
 
+**Found 2026-08-21, in a stale staging doc that was about to be deleted — the actual rationale for
+the export/risk choice already exists, dated 2026-07-28** (`docs/paper_5service_methodology_staging.md`,
+now retired, content migrated here):
+
+> We exclude Nitrogen and Sediment Retention Ratios and the Coastal Risk Reduction Ratio from
+> hotspot detection: export and retention of the same pollutant are not statistically independent,
+> and an increasing retention ratio can indicate upstream degradation rather than local ecological
+> improvement — a distinction that would require substantial additional explanation to interpret
+> correctly and is out of scope for the main hotspot analysis. Retention ratios remain part of the
+> broader change analysis, just not part of the hotspot *definition* itself.
+
+This was written *after* Steve's PDF comment (drafted 2026-06-24) proposing the retention/protection
+framing — someone already reasoned through why to override his suggestion, but that reasoning never
+made it back to him or Becky. The email sent 2026-08-20 just asked "which did you mean?" without
+this context.
+
+**Follow-up sent 2026-08-24** (draft file deleted after sending, per this project's standing
+practice — findings kept here, not in the draft). Two things were verified before sending, both
+worth keeping as reference:
+
+**Steve's exact wording, verbatim from the annotated `.docx`'s comments.xml** (the PDF's
+annotations don't extract cleanly as text; the `.docx` version at
+`OneDrive - World Wildlife Fund, Inc\Attachments\NCP decline hotspots SP BCK.docx` does):
+
+- Comment, 2026-07-14 20:07 (flagging the redundancy): *"...3 of these 8 are different ways to
+  express related concepts and are not independent services: coastal protection and coastal risk
+  reduction ratio; nitrogen export and nitrogen retention ratio; sediment export and sediment
+  retention ratio."*
+- Comment, 2026-07-15 02:19 (the actual 5-service proposal): *"I would say you have five services
+  modeled: nature access, pollination, coastal protection, nitrogen retention, and sediment
+  retention."* — note "ratio" is explicit in the first comment, dropped in the second. Read as
+  shorthand, not a change of metric, since neither nitrogen nor sediment has a separate non-ratio
+  "retention" variable in the pipeline to shift to.
+
+**"Coastal protection" doesn't exist as a computed variable — the paper's own Methods text was
+wrong.** Checked `analysis_configs/c_protection_synth.yaml`: only two coastal variables are ever
+computed, `C_Risk` and `C_Risk_Red_Ratio` (both derived from vector point data, rasterized — see
+`Python_scripts/rasterize_coastal.py`). There is no wave-attenuation "coastal protection" raster
+anywhere in the pipeline. The unmodified Methods text described one anyway (fixed 2026-08-24 in
+`paper_draft_5service.qmd`'s Coastal Risk Mitigation bullet). So Steve's "coastal protection" was
+almost certainly his shorthand for `C_Risk` — already what's in the 5-service Abstract — meaning
+coastal was likely never an actual disagreement, only nitrogen/sediment retention is a live
+question.
+
+**Also worth knowing if this ever needs re-deriving**: nitrogen has a real standalone absolute
+retention raster (`global_n_retention_ESAmar_*`, independently modeled, not derived) already
+flowing through `Python_scripts/calculate_bitemporal_change.py`'s rename map — usable with no
+upstream re-run if the absolute-amount reading turns out to be correct instead. Sediment has no
+equivalent — `calculate_ratios.py` computes `sed_retention_ratio` directly as
+`(USLE − sed_export) / USLE`, so the absolute quantity is mathematically implicit but was never
+saved as its own raster; deriving it would need one small script addition, not an InVEST re-run.
+
 ## Still unanswered in the paper itself
 
 The `[QUESTION FOR BECKY — required before submission]` on p.26 of the PDF (5.3/Discussion, the

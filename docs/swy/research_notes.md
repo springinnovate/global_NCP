@@ -274,6 +274,26 @@ New reference to add: **Guswa et al. 2018** (*J. Hydrologic Engineering*) — th
 behind InVEST-SWY's monthly CN-based quickflow method, cited directly in Hamel et al., more
 specific than the general user guide.
 
+## Routing vs. parameterization — two separable layers (clarified 2026-08-24)
+
+Worth stating explicitly, since it clarifies what's actually still open: this problem splits into
+two layers that get assembled together, not one undifferentiated "run SWY globally" task.
+
+1. **Routing** (basin-dependent): quickflow/baseflow accumulation only makes physical sense within
+   a real, DEM-coherent watershed — this is why HydroBASINS/basin-by-basin execution is the plan
+   (see open item below), not a single continuous global domain.
+2. **Parameterization** (basin-independent): CN is assigned per pixel from the land-cover-keyed
+   lookup table (`gcn250_esa_lc_cn_table.csv`, ESA LC class + soil group → CN_A/B/C/D), with a
+   narrower biome-specific correction layered on top for the ~3 flagged biomes (tropical moist
+   forest, mangroves, flooded grasslands/savannas — see open item below). This assignment has
+   nothing to do with which basin a pixel falls in.
+
+Assembly = the global CN/Kc raster (base table + biome corrections) gets clipped to each basin's
+extent, then each basin is routed independently using those already-correct pixel values —
+TaskGraph/ecoshard being the presumed (not yet confirmed) mechanism for running that per-unit at
+global scale. Sent to Rich (and Becky, same channel) 2026-08-24 for confirmation — see
+`docs/swy/rich_slack_reply_2026-08-21.md`; update this section once they weigh in.
+
 ## Open questions / next steps (remaining)
 
 - [x] Download and review NatCap's `kc_calculator.xlsx` tool — done, see above
