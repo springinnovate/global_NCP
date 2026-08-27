@@ -138,7 +138,15 @@ services-list answer changes it. Rendered clean, figure confirmed present in out
   the exact framing SP14/SP15 objected to. Needs a full rewrite naming the actual 5 services, once
   known.
 - Per-service methodological detail (SP10): only sediment/nitrogen retention ratios currently get
-  real explanation; the other services (whichever 5 they end up being) need the same treatment.
+  real explanation. **Partially addressed 2026-08-25** — the "For Becky — model run provenance"
+  callout (originally written in the book's `02-methods.qmd`, never ported to the paper, and never
+  discussed with Becky since she hasn't seen the book) was found and copied into the paper's
+  Biophysical Modeling section: explains *why* only the ratios get real formulas (this project
+  received finished InVEST rasters, never configured/ran those models directly) and asks Becky for
+  provenance, citation, and climate-input details. Still open: adding real per-service *model
+  mechanics* (Nature Access, Pollination, Coastal Risk) from the published InVEST documentation —
+  legitimate to write without Becky's input since it's public methodology, not run-specific
+  parameters, but not yet done.
 - Figure 2 (`biome_combined_diffs.png`) reorientation to 5×2 (service rows × risk/service columns),
   with biome+income+region breakdowns folded in as graph-only content.
 - The new 5×2 risk/service map grid (pollination production vs. sufficiency; nature access people
@@ -175,3 +183,17 @@ services-list answer changes it. Rendered clean, figure confirmed present in out
    (5×2), and 4.3+4.4 replacement together, since they all depend on which 5 services are final.
 5. The new 5×2 risk/service map grid waits on Becky's pollination-sufficiency layer regardless.
 6. Mangroves bug — can be investigated independently, anytime.
+
+## Parked, not written into the paper (2026-08-25)
+
+**Data Sources and Study Design — pollination NA-masking special case.** The original 8-service
+text carried an unresolved bracketed author note: *"[double check, for the specific case of
+pollination, I had to create a mask with all valid values for both dates, and reclass as zero, to
+avoid NA values in the difference calculation. This is a special case, and I should clarify it in
+the methods.]"* Decided not relevant enough to include in the streamlined exclusion-criteria
+sentence (also fixed the same day — the sentence had been citing the wrong denominator, 1,302,099,
+which `analysis/WORKLOG.md`'s 2026-07-29 entry documents as a stale/flawed figure for a different
+question; corrected to 1,372,621, the actual valid-land denominator used throughout the current
+5-service analysis). Parked here rather than deleted outright — if pollination's NA-handling ever
+becomes a live question again, this is the pointer back to where it was raised and why it was
+dropped.

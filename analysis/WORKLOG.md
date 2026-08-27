@@ -1,5 +1,49 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-08-27 — Sandra deck fixes (bio slide, Propuesta reframe, render regression); paper/dissertation threads opened
+
+**Sandra deck (`docs/presentations/sandra_valenzuela_colombia_case.qmd`)**:
+- Rewrote the "Sobre mi" bio slide's *land systems science* definition and the "me identifico como
+  land systems scientist" line — both were thin/redundant. Pulled real language from the user's PhD
+  dissertation (`LC_orinoquia/docs/Dissertation_Manuscript_F_JRE2.pdf`, read via `pdftotext` since
+  poppler's PATH hadn't propagated yet — see below) instead of writing a definition from scratch: the
+  "not only what changes, but how and for whom" framing (Ch.4 discussion) and the "quantitative rigor
+  of land system science + critical/political-ecology perspective" framing (Conclusions chapter).
+- Reframed the closing "Propuesta" slide: the old intro line ("Colombia hoy existe únicamente dentro
+  del agregado regional...") didn't actually state an ask. Replaced with three concrete offers —
+  deepen the Colombia-specific cut, sustain institutional reporting, and (the new, sharper point)
+  **transfer the know-how itself** — open-source pipeline, IDE-based, AI-agentic workflows, so WWF
+  Colombia's own team could run it, not just receive a one-off product. Added a link to the public
+  repo (`github.com/springinnovate/global_NCP`, confirmed public via the GitHub API).
+- Rearranged that same slide's layout to a proper two-column split (bullets left, map right) with the
+  stat callout as a full-width band underneath — the original vertical stack (intro + 3 bullets +
+  side-by-side stat/map) was too tall and cut the map off the bottom of the slide.
+- **Removed the "23% of Piedmont/Altillanura cells are hotspots" stat callout entirely.** This figure
+  had already been corrected twice on 2026-08-20 (see that entry below) via a real point-in-polygon
+  check against the dissertation's study-area polygon. On 2026-08-27 the user, looking at the map
+  again, judged that the hotspots still read as concentrated toward Caquetá/southern Meta rather than
+  Piedmont/Altillanura specifically — casting doubt on the corrected figure too. No time in-session to
+  re-run the verification before a meeting, so the stat was pulled from the slide rather than shipped
+  unresolved; a note in the `.qmd` flags that it must be re-verified against
+  `LC_orinoquia/vectors/msk_pm_crs.geojson` before it's reintroduced.
+- Caught and fixed a render regression I introduced: re-rendered the deck with `quarto render --to
+  html`, which overrides the YAML's `revealjs` format and silently falls back to pandoc's plain HTML
+  writer — the deck lost all reveal.js slide structure (only the first couple of headings rendered,
+  everything else collapsed). The `--to html` command is correct for `paper_draft_5service.qmd` (a
+  plain HTML doc) but wrong for any `revealjs` presentation in this repo — use `quarto render
+  <file>.qmd` with no `--to` override, or `--to revealjs` explicitly, for decks.
+
+**Environment**: installed poppler via `winget install --id oschwartz10612.Poppler --scope user` to
+enable PDF reading (needed for the dissertation above). The PATH update did not propagate to a fresh
+Claude Code session or a fresh PowerShell process — worked around by calling `pdftotext`/`pdftoppm`
+directly by full path (`%LOCALAPPDATA%\Microsoft\WinGet\Packages\oschwartz10612.Poppler_...\
+poppler-25.07.0\Library\bin\`). Likely needs an actual Windows sign-out/restart to fix system-wide.
+
+**Two other threads opened, not substantively started**: (1) a new dissertation-manuscript review
+thread (`LC_orinoquia/docs/Dissertation_Manuscript_F_JRE2.pdf`) — user flagged the last chapter as
+weak/low-priority; (2) the paper's Methods section review, explicitly paused mid-thread by the user
+before this session and not yet resumed. See `docs/HANDOFF_2026-08-27.md` for full detail on both.
+
 ### 2026-08-21 — Tremie follow-up sent (CLEC abstract confirmation + Módulo 5)
 
 Sent the overdue follow-up to Tremie: confirmed the CLEC abstract was submitted by the Aug 12
