@@ -4,6 +4,34 @@ This repository contains several historical Rmd/Qmd notebooks under `analysis/`,
 
 ---
 
+## ⚠️ Recurring risk category: `fid`/`grid_fid` handling
+
+This project has now hit **two separate, real bugs** from mismatched or mishandled grid cell IDs
+across different tools — different root causes, same failure family. Treat any code that joins two
+GPKG-derived tables by ID as suspect until proven otherwise; don't assume "it has an `fid` column"
+is enough.
+
+1. **2026-07-08, R/sf**: `10k_lcc_granular_metrics.gpkg`'s `grid_fid` was a row-index into an
+   entirely different, now-deleted source grid than every other pipeline stage — see the
+   Prerequisite section immediately below. Silently produced a wrong attribution-gap headline
+   number for months before being caught.
+2. **2026-08-29/31, Python/geopandas**: GeoPackage's own `fid` primary-key column is handled
+   *inconsistently between libraries and even between reads* — geopandas/pyogrio can silently turn
+   it into the DataFrame's row index (unnamed, not even labeled `"fid"`) instead of a normal
+   column, depending on the file and library version. Code that does `df["fid"]` or joins `on="fid"`
+   without checking first can fail loudly (best case) or silently join on the wrong thing (worst
+   case, and this is the dangerous one). See `scripts/merge_new_variable_into_change_calc.py` for
+   the hardened pattern this led to: **read GPKG attribute data via raw SQL (`sqlite3`), never
+   geopandas, whenever `fid` is the join key** — a `.gpkg` is a SQLite database, so `fid` is always
+   an unambiguous plain column that way, no library-version guessing involved. That script also
+   has to drop two of the file's own RTree-maintenance triggers before running any `UPDATE`, because
+   their WHEN-clauses call a SpatiaLite function (`ST_IsEmpty`) that plain Python `sqlite3` doesn't
+   have — safe to do only because the operation never touches `fid` or `geom` itself.
+
+**How to apply**: before writing any new join/merge on a GPKG file in this project, ask whether
+`fid` is actually a real column in what your tool gives you back (print `df.columns`, don't assume)
+— and prefer the SQL-based read pattern over geopandas by default for anything keyed on `fid`.
+
 ## Prerequisite: LC grid crosswalk (run once, before anything else)
 
 `10k_lcc_granular_metrics.gpkg`'s own `grid_fid` is a row-index into a *different* source grid
@@ -29,6 +57,52 @@ Always confirm the crosswalk file exists before trusting a from-scratch attribut
 > every processing stage read its base grid from one single master grid file from day one**, not to
 > reconcile mismatched grids after the fact with a spatial join. Reaching for another crosswalk script
 > should be a last resort for legacy data, not the default pattern going forward.
+
+## Step 0: Raw zonal extraction (Docker, Windows) — not previously documented here
+
+The R chain below (steps 1-5) all consume `grid_10km_land_synth_zonal_*.gpkg` files that don't
+exist until this step actually runs. This was reverse-engineered the hard way on 2026-08-28/29
+while adding a new coastal variable — worth documenting properly so the next person doesn't repeat
+the same dead ends. The README already documents the basic Docker invocation; this adds the
+Windows-specific gotchas it doesn't cover.
+
+**Prerequisite**: Docker Desktop must actually be running (`docker ps` should return a table, not
+a connection error) — starting the Docker Desktop app is not instant, give it a minute.
+
+```bash
+# Git Bash on Windows mangles container paths like /workspace into host paths
+# (e.g. "C:/Program Files/Git/workspace") unless this is set:
+export MSYS_NO_PATHCONV=1
+
+docker run --rm \
+  -v "C:/projects/global_NCP:/workspace" \
+  -v "C:/projects/global_NCP/data:/data" \
+  -w /workspace \
+  -e GLOBAL_NCP_DATA=/data \
+  -e ENV_NAME=geopy311 \
+  therealspring/global_ncp-computational-environment:latest \
+  python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/<config>.yaml
+```
+
+**`ENV_NAME=geopy311` is required and easy to miss.** The image is a `micromamba-docker` base with
+two environments (`base`, `geopy311`); its entrypoint activates whichever `$ENV_NAME` points to,
+defaulting to nothing usable. Without it, `python` isn't found at all (fails as `exec: python: not
+found` or `python: command not found` depending on how the container is invoked) — this looks like
+a broken image, but it's just the wrong environment being active. Confirm available environments
+with `docker run --rm <image> micromamba env list` if this ever changes.
+
+Run once per config that changed (`services_slim.yaml`, `beneficiaries_slim.yaml`,
+`c_protection_synth.yaml`, or any new one) — each takes ~15-20 minutes for the full 1.52M-cell grid
+(most of it is vector geometry validation, not the actual zonal stats). Output lands in
+`summary_pipeline_workspace_ha/grid_10km_land_synth_zonal_<timestamp>.gpkg` on the host (via the
+`/workspace` mount) — this is what `process_data.qmd` (step 1 below) reads.
+
+**Before adding a new raster to any of these configs, verify the referenced files actually exist**
+— `analysis_configs/c_protection_synth.yaml` had four stale raster paths (`Rt_1992.tif`,
+`Rt_2020.tif`, `Rt_ratio_1992.tif`, `Rt_ratio_2020.tif`) pointing at files that no longer exist in
+any local checkout (moved to `interim/archive/` on the server at some point, never copied back) —
+this failed loudly and immediately (`RasterioIOError: ... No such file or directory`) the first
+time this config was actually re-run in a long while, not caught by inspection alone.
 
 ## Full pipeline (re-run from raw data)
 

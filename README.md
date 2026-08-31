@@ -279,7 +279,10 @@ The `summary_pipeline_landgrid.py` script executes batch zonal summaries using
 `taskgraph` inside a Docker container. Inputs are defined in YAML files under
 `analysis_configs/` (e.g., `services_slim.yaml`, `beneficiaries_slim.yaml`,
 `c_protection_synth.yaml`) and point to the canonical IUCN AOO 10 km vector grid
-(`AOOGrid_10x10km_land_4326_clean.gpkg`) plus the raw raster inputs.
+(`landgrid_1_clean_enriched_4326.gpkg`) plus the raw raster inputs. **Do not use
+`AOOGrid_10x10km_land_4326_clean.gpkg`** — that grid is deprecated (no longer on disk) and was the
+root cause of a real bug (see `docs/runbook.md`'s Prerequisite section and the LCC striping-bug
+investigation); all current configs already reference the correct grid.
 
 To execute:
 
@@ -316,8 +319,8 @@ If you change grids or configs, clear the workspace cache (or set a new
 workspace dir) to avoid stale taskgraph outputs:
 
 ``` bash
-rm -f summary_pipeline_workspace/*.gpkg
-rm -f summary_pipeline_workspace/taskgraph_data.db
+rm -f summary_pipeline_workspace_ha/*.gpkg
+rm -f summary_pipeline_workspace_ha/taskgraph_data.db
 ```
 
 ``` bash
@@ -327,21 +330,21 @@ COASTAL_INCLUDE_CH=1 python Python_scripts/rasterize_coastal.py
 
 ``` bash
 # identify outputs (services = older, beneficiaries = newer)
-ls -lt summary_pipeline_workspace/*.gpkg
+ls -lt summary_pipeline_workspace_ha/*.gpkg
 
 OUT_DIR=/home/jeronimo/data/global_ncp/interim
 TS=$(date +%Y%m%d_%H%M%S)
 
-SERV_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/&lt;services_file&gt;.gpkg
+SERV_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace_ha/&lt;services_file&gt;.gpkg
 ogr2ogr -wrapdateline -datelineoffset 180 \
   "$OUT_DIR/10k_grid_synth_serv_${TS}.gpkg" "$SERV_SRC"
 
-BEN_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/&lt;beneficiaries_file&gt;.gpkg
+BEN_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace_ha/&lt;beneficiaries_file&gt;.gpkg
 ogr2ogr -wrapdateline -datelineoffset 180 \
   "$OUT_DIR/10k_grid_synth_benef_${TS}.gpkg" "$BEN_SRC"
 
 # coastal protection summary (single output in workspace)
-COAST_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/&lt;coastal_file&gt;.gpkg
+COAST_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace_ha/&lt;coastal_file&gt;.gpkg
 ogr2ogr -wrapdateline -datelineoffset 180 \
   "$OUT_DIR/10k_grid_synth_coastal_${TS}.gpkg" "$COAST_SRC"
 

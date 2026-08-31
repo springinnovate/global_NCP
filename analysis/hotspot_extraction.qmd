@@ -748,11 +748,23 @@ HOTS_CFG <- list(
   pct_cutoff      = 0.05,
   threshold_mode  = "percent",
   rule_mode       = "vectors",
-  loss = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
-  gain = c("Sed_export","N_export","C_Risk"),
+  # 5-service redesign (2026-08-28): retention/protection amounts replace export/risk for
+  # nitrogen, sediment, and coastal, per Steve's clarification and the Aug 24/26 email exchange.
+  # Retention/reduction ratios are excluded from hotspot detection entirely (per Methods'
+  # Hotspot Identification section) -- they remain part of the broader change analysis only,
+  # not this config. All five services are now framed consistently as "amount of benefit
+  # provided," so a hotspot uniformly means steepest decline -- there is no remaining "gain"
+  # direction (an increase is never the harmful direction for any of the five).
+  loss = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service"),
+  gain = c(),
+  # deg_combo/rec_combo previously split damage-framed vs. good-framed services; that split no
+  # longer applies since every service is now benefit-framed. Both combos point at the same
+  # full 5-service list so existing `count_deg_combo`/`count_rec_combo` output columns keep
+  # working for anything downstream that still reads them, without asserting a distinction
+  # that no longer exists.
   combos = list(
-    deg_combo = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
-    rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+    deg_combo = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service"),
+    rec_combo = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service")
   ),
 # centralize the grouping columns here
   groupings = c("income_grp","region_wb","WWF_biome","nev_name"),

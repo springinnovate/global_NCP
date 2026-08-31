@@ -1,5 +1,92 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-08-28/31 — Service-definition redesign (retention/protection), coastal pipeline dry run, two real bugs found and fixed
+
+Steve clarified his services-list comment (see `becky_steve_feedback_plan.md` and the real email
+chain, `docs/manuscript/draft_review emails.pdf`): nitrogen, sediment, and coastal should all move
+from export/risk framing to retention/protection *amounts* (not ratios) — the actual ecosystem
+service is what's retained/protected, export/risk is the residual. `HOTS_CFG` in
+`hotspot_extraction.qmd` updated accordingly (`N_retention`, `Sed_retention`, `C_Prot_service`
+replacing `N_export`, `Sed_export`, `C_Risk`; ratios confirmed already excluded from hotspot
+detection per the existing Methods text). This also collapses the old damage-vs-good `deg_combo`/
+`rec_combo` split, since every service is now benefit-framed — both combos now point at the same
+5-service list (kept as two names for output-column compatibility, documented as such).
+
+**Nitrogen**: no work needed — `n_retention_abs_chg`/`pct_chg` already exist in the current
+`10k_change_calc.gpkg` from a prior run. Pure config/definition change.
+
+**Sediment**: blocked. Retained amount = USLE − export needs the raw 1992/2020 rasters for both;
+only the pre-computed 2020−1992 *difference* rasters survive locally (confirmed absent from both
+this project's `data/` and the pre-migration `C:\Users\...\data\global_ncp\` copy). Traced through
+a data inventory (`docs/ncp_data_catalog.md`, new this session, from two OneDrive spreadsheets
+originally shared by Becky) to a `sci-ncscobenefits-spring` GCS bucket with exact filename/MD5
+matches to this project's own `services_slim.yaml` — but the actual URLs 404 (files deleted from
+the bucket since the inventory was built). Storage is Rich's; message sent to him 2026-08-28 asking
+where the files live now (`docs/manuscript/rich_raw_rasters_request_2026-08-28.draft.md`, since
+sent and deleted per the draft-cleanup convention) — **no reply as of 2026-08-31, expected given
+weekend timing, but still open.**
+
+**Coastal**: fully unblocked and completed. `Rt_service = Rt_nohab_all − Rt` turned out to already
+be computed in `Python_scripts/coastal_protection_join.py`'s join step — not a new derivation.
+Rasterized via `rasterize_coastal.py` (had to install `tqdm` into `.venv`, force `PYTHONIOENCODING=
+utf-8` around a Windows console crash on a checkmark character, and substitute a same-grid raster
+for the original `landcover_gl_1992.tif` template, which no longer exists anywhere local — the
+script only needs matching grid geometry, not real land cover values, so this is safe). Extracted
+via `summary_pipeline_landgrid.py` inside the project's documented Docker image
+(`therealspring/global_ncp-computational-environment`) — see the two real gotchas now written into
+`docs/runbook.md`'s new Step 0 (Git Bash's `MSYS_NO_PATHCONV` path-mangling, and the required
+`-e ENV_NAME=geopy311` the README never mentioned, without which `python` isn't found in the
+container at all).
+
+**Two real, previously-latent bugs found via this dry run, both fixed:**
+1. `analysis_configs/c_protection_synth.yaml` referenced four raster files (`Rt_1992.tif`,
+   `Rt_2020.tif`, `Rt_ratio_1992/2020.tif`) that no longer exist anywhere local — moved to
+   `interim/archive/` on the server at some point, never copied back. Failed loudly
+   (`RasterioIOError: ... No such file or directory`) the moment this config was actually re-run
+   for the first time in a long while. Fixed by scoping the run to just the new column (those
+   values already exist correctly in the current `10k_change_calc.gpkg` from a prior run, no need
+   to re-derive), with the reasoning documented inline in the yaml.
+2. `process_data.qmd`'s multi-file merge loop used `for (i in 2:length(files_to_load))` — breaks
+   when exactly one zonal file is present, because `2:1` evaluates to `c(2, 1)` in R, not an empty
+   sequence, causing an out-of-bounds `NA` read (`missing value where TRUE/FALSE needed`). Never
+   surfaced before because every prior real run had ≥2 zonal files (services + beneficiaries at
+   minimum); this session's scoped coastal-only extraction was the first time anyone hit exactly
+   one file. Fixed to `seq_len(length(files_to_load))[-1]`.
+
+**Given process_data.qmd's full merge now needs zonal files that don't survive between sessions,
+built a lighter alternative for merging one new/changed variable in**:
+`scripts/merge_new_variable_into_change_calc.py` — writes to a clearly-named copy
+(`10k_change_calc_DRYRUN_coastal.gpkg`), never touches the canonical file, computes abs/pct change
+with the exact SPC formula from the paper's Methods. Deliberately uses raw `sqlite3` rather than
+geopandas to read/join — see the "why" comment in that script and the new
+`docs/runbook.md` section below, since this surfaced a **second, independent fid-handling bug
+class** this project has now hit (first was the LCC `grid_fid` mismatch, 2026-07-08): geopandas/
+pyogrio can silently turn a GPKG's `fid` primary key into an unnamed row index instead of a normal
+column, depending on file/library version — caught here by an explicit `assert "fid" in
+columns`-style check before it could silently mis-join, not by inspection. Also hit and worked
+around: GPKG's own RTree-maintenance triggers call SpatiaLite's `ST_IsEmpty()` on *any* row update
+to a spatial table (not just geom/fid changes), which plain Python `sqlite3` doesn't have — safe to
+drop the two offending triggers on a disposable copy since this operation never touches geometry.
+
+**QA catch worth noting for its own sake**: the first sanity-check sample (10 rows, ordered by
+`fid`) showed *identical* 1992/2020 values for every row — looked exactly like a real bug (both
+years accidentally rasterized from the same source). Turned out to be an unlucky contiguous
+no-change coastal stretch; checking the full 53,186-row set showed 25% with real, small, plausible
+differences. Lesson (now baked into the merge script's own sanity-check output): never trust a
+small ordered-by-fid sample as representative — check identical-vs-different counts across the
+whole non-null set.
+
+**Also fixed while in the neighborhood**: README.md referenced the deprecated
+`AOOGrid_10x10km_land_4326_clean.gpkg` grid (the one behind the 2026-07-08 bug) instead of the
+correct `landgrid_1_clean_enriched_4326.gpkg`, and six references to
+`summary_pipeline_workspace/` instead of the actual `summary_pipeline_workspace_ha/` the configs
+use — both stale, both fixed.
+
+**Status**: coastal data validated and sitting in `10k_change_calc_DRYRUN_coastal.gpkg`, not yet
+promoted to canonical. Sediment blocked on Rich. Nothing in `paper_draft_5service.qmd`'s Results
+section touched yet, per explicit instruction not to change anything before Results until real
+numbers are in hand for all three services together.
+
 ### 2026-08-27 — Sandra deck fixes (bio slide, Propuesta reframe, render regression); paper/dissertation threads opened
 
 **Sandra deck (`docs/presentations/sandra_valenzuela_colombia_case.qmd`)**:

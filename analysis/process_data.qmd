@@ -14,6 +14,9 @@ format:
 #    number-sections: true
 #    geometry: margin=1in
 editor: source
+params:
+  output_gpkg: "10k_change_calc.gpkg" # e.g. "10k_change_calc_DRYRUN_coastal.gpkg" for a safe test run
+  output_layer: "10k_change_calc"
 execute:
   eval: false
 ---
@@ -122,7 +125,7 @@ message("Loading Base Run: ", basename(files_to_load[1]))
 sf_f <- sf::st_read(files_to_load[1], quiet = TRUE)
 if (!"fid" %in% names(sf_f)) sf_f$fid <- seq_len(nrow(sf_f))
 
-for (i in 2:length(files_to_load)) {
+for (i in seq_len(length(files_to_load))[-1]) {  # was 2:length(...) -- broke when only 1 file present (2:1 == c(2,1) in R, not empty), 2026-08-31
   message("Joining Run ", i, ": ", basename(files_to_load[i]))
   run_i <- sf::st_read(files_to_load[i], quiet = TRUE)
   if (!"fid" %in% names(run_i)) run_i$fid <- seq_len(nrow(run_i))
@@ -442,11 +445,11 @@ sf_to_write <- sf::st_wrap_dateline(sf_to_write, options = c("WRAPDATELINE=YES",
 tryCatch({
   st_write(
     sf_to_write,
-    file.path(processed_dir, "10k_change_calc.gpkg"),
-    layer = "10k_change_calc",
+    file.path(processed_dir, params$output_gpkg),
+    layer = params$output_layer,
     delete_dsn = TRUE
   )
-}, error = function(e) stop("\nCRITICAL: Failed to write 10k_change_calc.gpkg. Details: ", e$message))
+}, error = function(e) stop("\nCRITICAL: Failed to write ", params$output_gpkg, ". Details: ", e$message))
 ```
 
 Note: coastal protection is prepared upstream (join → ratios → rasterize → summary)
