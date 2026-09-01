@@ -31,12 +31,25 @@ wwf_dark_green <- "#004D1E"
 wwf_orange     <- "#F07D00"
 wwf_teal       <- "#009191"
 
+# 5-service redesign (2026-08-28): swapped from export/risk residuals to retention/protection
+# amounts, per Steve's clarification (settled 2026-08-31). All remaining services are uniformly
+# "good" direction -- an increase is always the favorable direction, matching the paper's Methods
+# text ("All five are framed consistently as an amount of benefit provided").
+# Fixed 2026-08-31 after finding this script (unlike make_native_change_figure.R, which is a
+# deliberately separate all-8-service reference figure) was the actual generator behind the paper's
+# "Global Pattern of Change" figure and had drifted to the old export/risk names.
+#
+# Coastal protection deliberately dropped from this panel, 2026-09-01 (user decision): the data is
+# correct (49,291 valid cells, real signal) but coastal protection only exists on a 1-cell-wide
+# coastline fringe, invisible at full-globe map scale next to the other services' continental
+# footprints -- confirmed by diagnostic, not a rendering bug. Noted in the panel count/caption
+# rather than shown blank. Regional zoom insets for high-hotspot-concentration coastlines are a
+# possible Annex addition, not yet built.
 svc_defs <- list(
-  list(service = "Pollination",   col = "pollination_pct_chg",   direction = "good",   label = "Pollination"),
-  list(service = "Sed_export",    col = "sed_export_pct_chg",    direction = "damage", label = "Sed export"),
-  list(service = "N_export",      col = "n_export_pct_chg",      direction = "damage", label = "N export"),
-  list(service = "Nature_Access", col = "nature_access_pct_chg", direction = "good",   label = "Nature Access"),
-  list(service = "C_Risk",        col = "c_risk_pct_chg",        direction = "damage", label = "C Risk")
+  list(service = "Pollination",     col = "pollination_pct_chg",       direction = "good", label = "Pollination"),
+  list(service = "Sed_retention",   col = "sed_retention_pct_chg",     direction = "good", label = "Sediment retention"),
+  list(service = "N_retention",     col = "n_retention_pct_chg",       direction = "good", label = "Nitrogen retention"),
+  list(service = "Nature_Access",   col = "nature_access_pct_chg",     direction = "good", label = "Nature Access")
 )
 
 get_color_scale <- function(direction, limits) {
@@ -119,7 +132,7 @@ names(panels) <- sapply(svc_defs, function(d) d$service)
 # ------------------------------------------------------------------------------
 
 compose_and_save <- function(panels, title, subtitle, out_path) {
-  combined <- wrap_plots(panels, ncol = 3) +
+  combined <- wrap_plots(panels, ncol = 2) +
     plot_annotation(
       title = title,
       subtitle = subtitle,

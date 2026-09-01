@@ -163,14 +163,33 @@ KS_CFG <- list(
   pct_cutoff     = 0.05,
   threshold_mode = "percent",
   rule_mode      = "vectors",
-  loss_services  = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
-  gain_services  = c("Sed_export","N_export","C_Risk"),
+  # 5-service redesign (2026-08-28): fixed 2026-08-31 after this file's independent config drift
+  # was found (was still using export/risk as "gain" services and ratios alone as "loss").
+  #
+  # loss_services controls two DIFFERENT things at once here, per extract_hotspots()'s actual
+  # mechanics (R/get_hotspots.R): (1) per-service direction for EVERY variable this file
+  # individually KS-tests (include_services, 8 total: 5 amounts + 3 ratios -- a service not listed
+  # in loss_services/gain_services can never be flagged as a hotspot for its OWN KS test, at all),
+  # and (2) membership in combos below. Both amounts and ratios are "good when low" here (a
+  # declining ratio = worse retention efficiency, same direction as a declining amount), so both
+  # belong in loss_services for correct per-service KS testing -- discovered 2026-08-31 when every
+  # ratio row came back with n_hot=0 after an earlier fix that (wrongly) restricted this to just
+  # the 5 amounts.
+  #
+  # combos (deg_combo/rec_combo) is what actually defines the *combined* ES-hotspot flag
+  # (count_deg_combo/count_rec_combo) -- this stays restricted to the 5 real hotspot-defining
+  # amounts, matching hotspot_extraction.qmd's HOTS_CFG exactly and the paper's own exclusion
+  # rationale (amounts define hotspots, ratios don't). Widening loss_services above does NOT widen
+  # this -- they're independent mechanisms.
+  loss_services  = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service",
+                      "N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
+  gain_services  = c(),
   combos = list(
-    deg_combo = c("Nature_Access","Pollination","N_export","Sed_export","C_Risk"),
-    rec_combo = c("Nature_Access","Pollination","N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio")
+    deg_combo = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service"),
+    rec_combo = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service")
   ),
   include_services = c(
-    "C_Risk","N_export","Sed_export",
+    "N_retention","Sed_retention","C_Prot_service",
     "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
     "Pollination","Nature_Access"
   ),
@@ -224,7 +243,7 @@ rds_path <- file.path(data_dir(), "processed", params$input_plt_long)
 need_reload <- TRUE
 if (file.exists(rds_path)) {
   plt_long <- readRDS(rds_path)
-  if (all(KS_CFG$vars_to_test %in% names(plt_long)) && "N_export" %in% unique(plt_long$service)) need_reload <- FALSE
+  if (all(KS_CFG$vars_to_test %in% names(plt_long)) && "N_retention" %in% unique(plt_long$service)) need_reload <- FALSE
 }
 
 if (need_reload) {
@@ -298,6 +317,7 @@ if (need_reload) {
     usle             = "USLE",
     n_ret_ratio      = "N_Ret_Ratio",
     sed_ret_ratio    = "Sed_Ret_Ratio",
+    sed_retention    = "Sed_retention",
     coastal_protection_rt            = "C_Risk",
     coastal_protection_rt_nohab_all  = "C_Risk_NoHab",
     coastal_protection_rt_ratio      = "C_Risk_Red_Ratio",
@@ -305,7 +325,9 @@ if (need_reload) {
     rt               = "C_Risk",
     c_risk           = "C_Risk",
     c_risk_red_ratio = "C_Risk_Red_Ratio",
-    rt_service       = "C_Prot_service",
+    # was "rt_service" -- didn't match the real column (c_prot_service); same bug independently
+    # fixed in hotspot_extraction.qmd 2026-08-31, this file has its own unsynced copy
+    c_prot_service   = "C_Prot_service",
     rt_nohab         = "Rt_nohab"
   )
   plt_long <- plt_long |>
@@ -324,7 +346,7 @@ if ("WWF_biome" %in% names(plt_long)) {
 }
 
 svc_order <- c(
-  "C_Risk","N_export","Sed_export",
+  "N_retention","Sed_retention","C_Prot_service",
   "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
   "Pollination","Nature_Access"
 )
@@ -443,7 +465,7 @@ dir.create(ks_plot_dir, recursive = TRUE, showWarnings = FALSE)
 # Heatmap
 heat_path <- file.path(ks_plot_dir, "ks_heatmap.png")
 svc_order <- c(
-  "C_Risk", "N_export", "Sed_export",
+  "N_retention", "Sed_retention", "C_Prot_service",
   "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
   "Pollination", "Nature_Access"
 )
@@ -514,7 +536,7 @@ ks_plot_dir <- KS_CFG$out_dir
 # Directionality plot (Cliff's Delta)
 dir_path <- file.path(ks_plot_dir, "directionality_cliffs_delta.png")
 svc_order <- c(
-  "C_Risk", "N_export", "Sed_export",
+  "N_retention", "Sed_retention", "C_Prot_service",
   "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
   "Pollination", "Nature_Access"
 )

@@ -175,6 +175,7 @@ if (!exists("canonical_lookup", inherits = TRUE)) {
     usle             = "USLE",
     n_ret_ratio      = "N_Ret_Ratio",
     sed_ret_ratio    = "Sed_Ret_Ratio",
+    sed_retention    = "Sed_retention",
     coastal_protection_rt            = "C_Risk",
     coastal_protection_rt_nohab_all  = "C_Risk_NoHab",
     coastal_protection_rt_ratio      = "C_Risk_Red_Ratio",
@@ -182,7 +183,11 @@ if (!exists("canonical_lookup", inherits = TRUE)) {
     rt               = "C_Risk",
     c_risk           = "C_Risk",
     c_risk_red_ratio = "C_Risk_Red_Ratio",
-    rt_service       = "C_Prot_service",
+    # was "rt_service" -- didn't match any real column; the merge scripts that actually produce
+    # this variable (merge_new_variable_into_change_calc.py, merge_sediment_and_coastal_via_
+    # crosswalk.py) write the "c_prot_service" prefix. This went undetected until 2026-08-31's
+    # first real run of hotspot_extraction.qmd against the coastal variable.
+    c_prot_service   = "C_Prot_service",
     rt_nohab         = "Rt_nohab"
   )
 }
@@ -919,10 +924,43 @@ if (file.exists(lc_gpkg)) {
   crosswalk_path <- file.path(data_dir(), "processed", "lc_grid_fid_to_master_fid_crosswalk.csv")
   if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df) && file.exists(crosswalk_path)) {
     crosswalk <- readr::read_csv(crosswalk_path, show_col_types = FALSE) %>% dplyr::filter(valid_match)
+
+    # The crosswalk is many-to-one for ~155K master_fid. Checked 2026-08-31 across all 155,131
+    # groups: 153,516 are genuine multi-way ties (every matched row within ~0m -- an antimeridian-
+    # type exact-duplicate legacy cell, confirmed elsewhere to carry identical values), but 1,609
+    # groups have ONE clearly-best (~0m) match plus a clearly-worse secondary match (4,600-5,900m
+    # away) that the crosswalk let through as valid_match=TRUE too -- averaging that bad secondary
+    # match in is exactly what produced 572 fid(s) with genuinely conflicting LC-driver values.
+    # Fix: within each master_fid group, keep only rows within 1m of that group's best match --
+    # this keeps every row of a true tie, and drops only the spurious far secondary matches.
+    crosswalk_best <- crosswalk %>%
+      dplyr::group_by(master_fid) %>%
+      dplyr::filter(match_dist_m <= min(match_dist_m) + 1.0) %>%
+      dplyr::ungroup()
+
     lc_df <- lc_df %>%
-      dplyr::inner_join(crosswalk %>% dplyr::select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
+      dplyr::inner_join(crosswalk_best %>% dplyr::select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
       dplyr::select(-grid_fid) %>%
       dplyr::rename(fid = master_fid)
+
+    # Remaining duplicates (from true multi-way ties) should now be identical -- verify before
+    # collapsing, never silently pick an arbitrary row among genuinely different values.
+    driver_cols <- setdiff(names(lc_df), "fid")
+    n_dupe_fid <- sum(duplicated(lc_df$fid))
+    if (n_dupe_fid > 0) {
+      dupe_check <- lc_df %>%
+        dplyr::group_by(fid) %>%
+        dplyr::summarise(n_distinct_rows = dplyr::n_distinct(dplyr::across(dplyr::all_of(driver_cols))), .groups = "drop")
+      n_conflicting <- sum(dupe_check$n_distinct_rows > 1)
+      if (n_conflicting > 0) {
+        stop(sprintf(
+          "%d fid(s) still have CONFLICTING LC-driver values after dropping distant secondary matches -- investigate before proceeding.",
+          n_conflicting
+        ))
+      }
+      cat(sprintf("LC driver join: collapsing %d duplicate-fid rows (confirmed identical values, true ties) after dropping distant secondary matches.\n", n_dupe_fid), file = stderr())
+      lc_df <- lc_df %>% dplyr::distinct(fid, .keep_all = TRUE)
+    }
   } else if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df)) {
     lc_df <- dplyr::rename(lc_df, fid = grid_fid)
   }

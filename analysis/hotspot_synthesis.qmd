@@ -228,15 +228,26 @@ HOTS_CFG <- list(
   pct_cutoff      = 0.05,
   threshold_mode  = "percent",
   rule_mode       = "vectors",
-  loss = c("Nature_Access", "Pollination"),
-  gain = c("Sed_export", "N_export", "C_Risk"),
+  # 5-service redesign (2026-08-28), same definition as analysis/hotspot_extraction.qmd's HOTS_CFG
+  # -- this file previously carried its own separate, unsynced copy still on the old export/risk
+  # names (N_export/Sed_export/C_Risk) and gain/loss split; fixed 2026-08-31 after the regenerated
+  # hotspot_area_stats.csv came back showing the stale service set. All five services are now
+  # benefit-framed, so everything is "loss" (steepest decline) and gain is empty, matching
+  # hotspot_extraction.qmd exactly.
+  loss = c("Nature_Access", "Pollination", "N_retention", "Sed_retention", "C_Prot_service"),
+  gain = c(),
   groupings = c("income_grp", "region_wb", "WWF_biome", "nev_name"),
+  # water/access combo membership preserved from the prior version (water = downstream-watershed
+  # services, access = proximity/travel-time services -- this split matters beyond just this qmd,
+  # since it's what produces the count_water/count_access columns Rich's beneficiary-buffer
+  # pipeline and the (currently paused, see docs/pipeline_reference.md B2) rasterization step both
+  # key off) -- only the member variable names changed, from export/risk to retention/protection.
   combos = list(
-    water  = c("N_export", "Sed_export"),
-    access = c("Nature_Access", "Pollination", "C_Risk")
+    water  = c("N_retention", "Sed_retention"),
+    access = c("Nature_Access", "Pollination", "C_Prot_service")
   ),
   svc_order = c(
-    "C_Risk", "N_export", "Sed_export",
+    "N_retention", "Sed_retention", "C_Prot_service",
     "Pollination", "Nature_Access"
   )
 )

@@ -6,10 +6,10 @@ This repository contains several historical Rmd/Qmd notebooks under `analysis/`,
 
 ## ⚠️ Recurring risk category: `fid`/`grid_fid` handling
 
-This project has now hit **two separate, real bugs** from mismatched or mishandled grid cell IDs
-across different tools — different root causes, same failure family. Treat any code that joins two
-GPKG-derived tables by ID as suspect until proven otherwise; don't assume "it has an `fid` column"
-is enough.
+This project has now hit **three separate, real incidents** from mismatched or mishandled grid cell
+IDs across different tools — different root causes, same failure family. Treat any code that joins
+two GPKG-derived tables by ID as suspect until proven otherwise; don't assume "it has an `fid`
+column" is enough.
 
 1. **2026-07-08, R/sf**: `10k_lcc_granular_metrics.gpkg`'s `grid_fid` was a row-index into an
    entirely different, now-deleted source grid than every other pipeline stage — see the
@@ -27,6 +27,20 @@ is enough.
    has to drop two of the file's own RTree-maintenance triggers before running any `UPDATE`, because
    their WHEN-clauses call a SpatiaLite function (`ST_IsEmpty`) that plain Python `sqlite3` doesn't
    have — safe to do only because the operation never touches `fid` or `geom` itself.
+3. **2026-08-31, sediment/nitrogen ratio-weighting fix**: `10k_grid_synth_all.gpkg` (a March 2026
+   zonal-extraction intermediate, regeneration disabled by default since — see WORKLOG) turned out
+   to still hold raw 1992/2020 USLE, sediment-export, N-export, and N-retention levels that the raw
+   *rasters* themselves no longer do. But it's built on the same legacy `AOOGrid_10x10km_land_4326_
+   clean.gpkg` grid as the Prerequisite section below (1,691,819 rows), not the current master grid
+   (1,522,073 rows) — the identical mismatch that caused incident #1. Reused the existing crosswalk
+   below rather than building a new one, but didn't just trust its `match_dist_m` column — independently
+   recomputed centroid distance from each file's own GPKG RTree bounding boxes first. It held up:
+   99.4% of rows are exact (0.0m) matches, and the flagged-invalid rows are genuine large mismatches
+   (6-654km), not borderline. See `scripts/merge_sediment_and_coastal_via_crosswalk.py`. This is a
+   reminder that "the raw raster is gone" doesn't always mean the data is gone — an old zonal
+   extraction may still be sitting in a debug/intermediate output — but also that reusing it always
+   means going back through the crosswalk, never assuming an old file's `fid` lines up with anything
+   current.
 
 **How to apply**: before writing any new join/merge on a GPKG file in this project, ask whether
 `fid` is actually a real column in what your tool gives you back (print `df.columns`, don't assume)

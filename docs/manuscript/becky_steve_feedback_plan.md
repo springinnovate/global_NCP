@@ -184,6 +184,47 @@ services-list answer changes it. Rendered clean, figure confirmed present in out
 5. The new 5×2 risk/service map grid waits on Becky's pollination-sufficiency layer regardless.
 6. Mangroves bug — can be investigated independently, anytime.
 
+## Progress (2026-08-28 to 2026-08-31) — the blocking question got answered
+
+**The service-framing question (SP14/SP15, blocking almost everything else per the "suggested
+order of operations" above) is resolved.** Steve's real email exchange confirmed retention/
+protection (nitrogen retention, sediment retention, coastal protection amount), not export/risk —
+matching his PDF comment, not the paper's prior working assumption. This is now a settled
+definitional decision (see the paper's own top-of-document Status note and Biophysical Modeling
+callout), not still open.
+
+Since then, resolved or advanced:
+- **Biophysical Modeling (§3.1.1)** — rewritten to name the actual 5 services under the
+  retention/protection framing, replacing the stale "eight simulated variables" text SP14/SP15
+  objected to (item was listed above as blocked; no longer blocked, done).
+- **Export/risk scope, a new decision beyond what Steve's PDF asked**: nitrogen export, sediment
+  export, and coastal risk are now explicitly scoped as computational inputs to the ratio formulas
+  only — never reported as their own variables/figures/tables anywhere in the paper. Confirmed with
+  Becky (see the 2026-08-31 email, question 3) rather than assumed.
+- **A new methodological finding, not in Steve's original comments**: the ratio variables
+  (nitrogen/sediment retention ratio, coastal risk reduction ratio) were being aggregated to
+  biome/region level as a plain per-pixel mean, which understates the true change by ~4x (should be
+  load-weighted). Whether to keep ratios in the paper at all, given this, is now open with Becky
+  (2026-08-31 email, question 2) — worth flagging to Steve too since it touches his original
+  "these are redundant with export/risk" comment (2026-07-14).
+- **Sediment and nitrogen data, computed** — including the ratio-weighting components — via a
+  local-data workaround (not the raw rasters, which remain a separate open request to Rich). Coastal
+  re-confirmed. Full Path B (10km-grid) hotspot/KS-test/attribution rerun in progress as of
+  2026-08-31 — see `docs/pipeline_reference.md` for the live step-by-step status.
+- **Abstract** rewritten for the 5-service framing (superseding the 8-service version noted as
+  "the only thing rewritten" at the top of this doc) — structure and language final, headline
+  numbers are placeholders pending the rerun above.
+- **Global Pattern of Change / Figure 2** — still not rebuilt (needs the Path A pixel-level rasters,
+  a separate blocked request to Rich), but now carries an explicit placeholder callout rather than
+  silently showing stale maps, addressing at least the "don't let this look finished when it isn't"
+  concern even though the SP17-19/Becky-requested map-format work itself hasn't happened yet.
+
+**Still genuinely open, unchanged from the 2026-08-25 status below**: Figure 2's 5×2 reorientation
+(now additionally blocked on the Path A raster request), the new risk/service map grid (blocked on
+Becky's pollination-sufficiency layer), 4.3/4.4 replacement (blocked on the rerun in progress),
+4.1's narrative rewrite, the mangroves sentence, and per-service model-mechanics detail for Nature
+Access/Pollination/Coastal (SP10).
+
 ## Parked, not written into the paper (2026-08-25)
 
 **Data Sources and Study Design — pollination NA-masking special case.** The original 8-service
