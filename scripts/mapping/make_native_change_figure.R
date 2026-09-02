@@ -112,7 +112,7 @@ grid <- st_read(here("data", "processed", "10k_change_calc.gpkg"), quiet = TRUE)
 grid <- grid[, intersect(names(grid), c(needed_cols, "geom", "geometry"))]
 
 # Same Antarctica/Seven-seas/Lakes/Rock&Ice exclusion used throughout this
-# analysis (scripts/extract_hotspots_5service.R) -- 1,372,447 cells remain.
+# analysis (scripts/extract_hotspots.R) -- 1,372,447 cells remain.
 grid <- grid %>%
   filter(!continent %in% c("Antarctica", "Seven seas (open ocean)"),
          !WWF_biome %in% c("Lakes", "Rock & Ice"))

@@ -1,9 +1,14 @@
-# 5-service hotspot redesign, per Becky's 2026-07-21 meeting + Slack instructions.
-# Keeps: Nature_Access, Pollination, N_export, Sed_export, C_Risk.
-# Drops: N_Ret_Ratio, Sed_Ret_Ratio, C_Risk_Red_Ratio.
-# Adds three overlap categories: water (N_export + Sed_export, any),
-# access (Nature_Access + Pollination + C_Risk, any), and combined_cross
-# (at least one water hotspot AND at least one access hotspot in the same cell).
+# 5-service hotspot redesign. Originally written for Becky's 2026-07-21 "water/access"
+# framing (N_export, Sed_export, C_Risk); updated 2026-09-01 to the retention/protection
+# framing (N_retention, Sed_retention, C_Prot_service, settled per Steve's clarification)
+# -- this script's own HOTS_CFG_5 had independently drifted to the old export/risk names,
+# same failure mode as 3 other files this session, see docs/pipeline_reference.md B7 and
+# R/service_config.R. Keeps: Nature_Access, Pollination, N_retention, Sed_retention,
+# C_Prot_service. Adds three overlap categories: water (N_retention + Sed_retention, any),
+# access (Nature_Access + Pollination + C_Prot_service, any), and combined_cross
+# (at least one water hotspot AND at least one access hotspot in the same cell) -- water/
+# access membership matches analysis/hotspot_synthesis.qmd's combos exactly, both sourced
+# from R/service_config.R.
 #
 # Reuses extract_hotspots() (R/get_hotspots.R) directly -- the same function
 # analysis/hotspot_extraction.qmd calls via run_one_hotset() -- rather than
@@ -22,6 +27,7 @@ library(dplyr)
 
 source("R/paths.R")
 source("R/get_hotspots.R")
+source("R/service_config.R")
 
 message("Loading cached plt_long (long-format service change data)...")
 plt_long <- readRDS(file.path(data_dir(), "processed", "plt_long.rds"))
@@ -53,11 +59,11 @@ HOTS_CFG_5 <- list(
   pct_cutoff     = 0.05,
   threshold_mode = "percent",
   rule_mode      = "vectors",
-  loss = c("Nature_Access", "Pollination"),
-  gain = c("Sed_export", "N_export", "C_Risk"),
+  loss = hotspot_direction_lists(looking_for = "decline")$loss_services,
+  gain = hotspot_direction_lists(looking_for = "decline")$gain_services,
   combos = list(
-    water  = c("N_export", "Sed_export"),
-    access = c("Nature_Access", "Pollination", "C_Risk")
+    water  = c("N_retention", "Sed_retention"),
+    access = c("Nature_Access", "Pollination", "C_Prot_service")
   ),
   out_dir = file.path(data_dir(), "processed", "hotspots_5service")
 )

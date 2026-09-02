@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Jerónimo Rodríguez Escobar">
+
+<title>Ecosystem Service Change &amp; Hotspot Extraction</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="hotspot_extraction_files/libs/clipboard/clipboard.min.js"></script>
+<script src="hotspot_extraction_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="hotspot_extraction_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="hotspot_extraction_files/libs/quarto-html/popper.min.js"></script>
+<script src="hotspot_extraction_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="hotspot_extraction_files/libs/quarto-html/anchor.min.js"></script>
+<link href="hotspot_extraction_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="hotspot_extraction_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="hotspot_extraction_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="hotspot_extraction_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="hotspot_extraction_files/libs/bootstrap/bootstrap-67270d1595a62d14f123c043d4fb2f18.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Contents</h2>
+   
+  <ul>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview"><span class="header-section-number">1</span> Overview</a></li>
+  <li><a href="#setup-and-libraries" id="toc-setup-and-libraries" class="nav-link" data-scroll-target="#setup-and-libraries"><span class="header-section-number">2</span> Setup and Libraries</a></li>
+  <li><a href="#metadata-banner" id="toc-metadata-banner" class="nav-link" data-scroll-target="#metadata-banner"><span class="header-section-number">3</span> Metadata Banner</a></li>
+  <li><a href="#produce-signed-change-bars" id="toc-produce-signed-change-bars" class="nav-link" data-scroll-target="#produce-signed-change-bars"><span class="header-section-number">4</span> Produce signed change bars</a></li>
+  <li><a href="#load-cached-long-table-plt_long-for-hotspotsks" id="toc-load-cached-long-table-plt_long-for-hotspotsks" class="nav-link" data-scroll-target="#load-cached-long-table-plt_long-for-hotspotsks"><span class="header-section-number">5</span> Load cached long table (plt_long) for hotspots/KS</a></li>
+  <li><a href="#hotspot-extraction-workflow-global-subregional" id="toc-hotspot-extraction-workflow-global-subregional" class="nav-link" data-scroll-target="#hotspot-extraction-workflow-global-subregional"><span class="header-section-number">6</span> Hotspot extraction workflow (global + subregional)</a>
+  <ul class="collapse">
+  <li><a href="#hotspot-rules-export-configuration" id="toc-hotspot-rules-export-configuration" class="nav-link" data-scroll-target="#hotspot-rules-export-configuration"><span class="header-section-number">6.1</span> Hotspot rules &amp; export configuration</a></li>
+  <li><a href="#validate-hotspot-configuration" id="toc-validate-hotspot-configuration" class="nav-link" data-scroll-target="#validate-hotspot-configuration"><span class="header-section-number">6.2</span> Validate hotspot configuration</a></li>
+  <li><a href="#export-hotspot-layers" id="toc-export-hotspot-layers" class="nav-link" data-scroll-target="#export-hotspot-layers"><span class="header-section-number">6.3</span> Export hotspot layers</a></li>
+  <li><a href="#regional-mean-change-dashed-global-mean" id="toc-regional-mean-change-dashed-global-mean" class="nav-link" data-scroll-target="#regional-mean-change-dashed-global-mean"><span class="header-section-number">6.4</span> Regional Mean Change (dashed = global mean)</a></li>
+  </ul></li>
+  <li><a href="#hotspot-boxplots" id="toc-hotspot-boxplots" class="nav-link" data-scroll-target="#hotspot-boxplots"><span class="header-section-number">7</span> Hotspot boxplots</a></li>
+  <li><a href="#attribution-to-drivers-of-change" id="toc-attribution-to-drivers-of-change" class="nav-link" data-scroll-target="#attribution-to-drivers-of-change"><span class="header-section-number">8</span> Attribution to Drivers of Change</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Ecosystem Service Change &amp; Hotspot Extraction</h1>
+<p class="subtitle lead">vv1.3.4</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Jerónimo Rodríguez Escobar </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">2026-09-01 14:15 Colombia Standard Time</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="overview" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="overview"><span class="header-section-number">1</span> Overview</h2>
+<p>Derives hotspot flags and produces bar/violin plots summarizing change by subregion. Assumes process_data.qmd has been run first to produce the canonical grid + change dataset (10k_change_calc.gpkg). Key steps: load the canonical grid, pivot change fields to long form, define hotspots using the configured thresholds, export hotspot layers, and save plots to outputs/plots/.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Future Tasks &amp; Ideas
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Here are some ideas and future tasks for this analysis:</p>
+<ol type="1">
+<li><strong>Adapt analysis for multi-temporal data:</strong> Adapt analysis to handle updated modeled ES layers and multiple points in time (beyond bi-temporal T0, T1). Strategize for incorporating multi-temporal data.</li>
+<li><strong>Quantify hotspot vs.&nbsp;non-hotspot change:</strong> Develop a method to quantify and visualize the share of total change (from bar plots) that occurs within hotspots versus outside of them, possibly using stacked bar plots.</li>
+<li><strong>Simplify Spatial Joins (V2 Technical Debt):</strong> Remove the on-the-fly spatial coordinate joins (X/Y) used to bypass upstream row-shifting. Once <code>summary_pipeline_landgrid.py</code> is updated to preserve true FIDs, revert to standard tabular <code>left_join(by = "fid")</code>.</li>
+</ol>
+</div>
+</div>
+</section>
+<section id="setup-and-libraries" class="level2" data-number="2">
+<h2 data-number="2" class="anchored" data-anchor-id="setup-and-libraries"><span class="header-section-number">2</span> Setup and Libraries</h2>
+<p>Load all core packages (tidyverse, spatial, plotting helpers) and initialize reproducibility settings. This chunk also sources <code>R/paths.R</code> and runs <code>devtools::load_all()</code> so downstream chunks can reuse helper functions.</p>
+</section>
+<section id="metadata-banner" class="level2" data-number="3">
+<h2 data-number="3" class="anchored" data-anchor-id="metadata-banner"><span class="header-section-number">3</span> Metadata Banner</h2>
+<p>Published: 2026-09-01 14:16 -05</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Run metadata</strong></p>
+<ul>
+<li>Analysis version: v1.3.4</li>
+<li>Rendered: 2026-09-01 14:16 -05</li>
+<li>Git: feature/paper-swy-integration @ 936be11</li>
+<li>Data root: C:/projects/global_NCP/data</li>
+</ul>
+</div>
+</div>
+</section>
+<section id="produce-signed-change-bars" class="level2" data-number="4">
+<h2 data-number="4" class="anchored" data-anchor-id="produce-signed-change-bars"><span class="header-section-number">4</span> Produce signed change bars</h2>
+<p>Bars are computed directly from <code>processed/10k_change_calc.gpkg</code>. We focus specifically on “active areas” by dropping true zeros, ensuring that our regional summaries reflect areas where the ecosystem service is actually provided or changing. Both absolute and relative changes are plotted with trimmed tails and a dashed global mean. We no longer compute “zeros kept” variants, as discrepancies in sign direction (MAUP/Simpson’s Paradox) are a known property of spatial aggregation rather than an artifact of zero-handling.</p>
+<p>What this chunk does: - Read the processed GPKG and normalize IDs (<code>fid</code>, <code>c_fid</code>), dropping any <code>c_fid.x/y</code> artifacts. - Build a service mapping (<code>svc_map</code>) so raw column bases (with/without <code>_mean</code>) map to the canonical services; construct <code>col_pct</code>/<code>col_abs</code> names. - <code>agg_by_group()</code>: intersect requested <code>groupings</code> with available columns; for each grouping × service, pick the pct/abs change column, drop zeros (<code>drop_zero = TRUE</code>), trim extremes at <code>cut_q</code>, then compute mean change by group. Returns tidy rows. - Run <code>agg_by_group()</code> to produce <code>signed_summary</code> and a later chunk computes global references <code>glob_refs</code>.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Grouping 'income_grp': 53171 NAs out of 1522073 rows (3.5%)
+  Sample values:  2. High income: nonOECD, 5. Low income, 3. Upper middle income, 1. High income: OECD, 4. Lower middle income 
+Grouping 'region_wb': 53171 NAs out of 1522073 rows (3.5%)
+  Sample values:  Antarctica, Latin America &amp; Caribbean, East Asia &amp; Pacific, Europe &amp; Central Asia, Sub-Saharan Africa 
+Grouping 'WWF_biome': 52570 NAs out of 1522073 rows (3.5%)
+  Sample values:  Tundra, Rock &amp; Ice, Temperate Broadleaf &amp; Mixed Forests, Temperate Grasslands, Savannas &amp; Shrublands, Montane Grasslands &amp; Shrublands </code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Dimensions of sf_f before filtering:  1522073 x 52 </code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Dimensions of sf_subset after filtering:  1341884 x 52 </code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Filtered out  180189  rows.</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 48 × 4
+   grouping  metric service              n
+   &lt;chr&gt;     &lt;chr&gt;  &lt;chr&gt;            &lt;int&gt;
+ 1 WWF_biome abs    C_Prot_service      14
+ 2 WWF_biome abs    C_Risk_Red_Ratio    14
+ 3 WWF_biome abs    N_Ret_Ratio         14
+ 4 WWF_biome abs    N_retention         14
+ 5 WWF_biome abs    Nature_Access       14
+ 6 WWF_biome abs    Pollination         14
+ 7 WWF_biome abs    Sed_Ret_Ratio       14
+ 8 WWF_biome abs    Sed_retention       14
+ 9 WWF_biome pct    C_Prot_service      14
+10 WWF_biome pct    C_Risk_Red_Ratio    14
+# ℹ 38 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="load-cached-long-table-plt_long-for-hotspotsks" class="level2" data-number="5">
+<h2 data-number="5" class="anchored" data-anchor-id="load-cached-long-table-plt_long-for-hotspotsks"><span class="header-section-number">5</span> Load cached long table (plt_long) for hotspots/KS</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Data sharing and external validation</strong></p>
+<p>The pivoted long table (<code>plt_long</code>) is exported as an RDS file to the processed data directory (e.g., <code>/home/jeronimo/data/global_ncp/processed/plt_long.rds</code>). This file contains all per-cell, per-service change metrics and is the canonical input for hotspot and KS analyses.</p>
+<ul>
+<li><p><strong>For R users:</strong> Load with:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">"R/config.R"</span>) <span class="co"># to load cfg object</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>plt_long <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="fu">file.path</span>(cfg<span class="sc">$</span>paths<span class="sc">$</span>processed_data_dir, <span class="st">"plt_long.rds"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p><strong>For Python users:</strong> Use <code>pyreadr</code> (<code>pip install pyreadr</code>), e.g.:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pyreadr</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Note: You may need to define the path manually if not running in an R-integrated environment</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>processed_data_dir <span class="op">=</span> <span class="st">"/home/jeronimo/data/global_ncp/processed"</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> pyreadr.read_r(<span class="ss">f'</span><span class="sc">{</span>processed_data_dir<span class="sc">}</span><span class="ss">/plt_long.rds'</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> result[<span class="va">None</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
+<li><p><strong>For other tools:</strong> RDS is a binary format; consider converting to CSV or Feather for broader compatibility if needed.</p></li>
+</ul>
+<p>This object is suitable for external review, reproducibility checks, and further interpretation in any suitable software.</p>
+</div>
+</div>
+<p>Hotspot export and KS still expect <code>plt_long</code>. To avoid the heavy pivot here, we load the cached table from the processed data directory. If it’s missing, this script can regenerate it.</p>
+</section>
+<section id="hotspot-extraction-workflow-global-subregional" class="level2" data-number="6">
+<h2 data-number="6" class="anchored" data-anchor-id="hotspot-extraction-workflow-global-subregional"><span class="header-section-number">6</span> Hotspot extraction workflow (global + subregional)</h2>
+<p>We identify per-service hotspots using a 5% percentile rule and <strong>direction vectors</strong>: - <code>loss_services</code> (e.g., Nature_Access, Pollination, N/Sed_Ret_Ratio, C_Risk_Red_Ratio) → we flag the <strong>lowest</strong> values; - <code>gain_services</code> (Sed_export, N_export, C_Risk) → we flag the <strong>highest</strong> values. <strong>Definition of a Hotspot:</strong> A hotspot is defined as being among the <strong>5% of grid cells with the most detrimental change</strong> globally for a given service.</p>
+<ul>
+<li><strong>For Beneficial Services</strong> (e.g., Nature Access, Pollination, Retention Ratios): Hotspots are the 5% of cells with the <strong>steepest declines</strong> (the bottom 5% of grid cells by rank).</li>
+<li><strong>For Detrimental Flows/Risks</strong> (e.g., N/Sed Export, Coastal Risk): Hotspots are the 5% of cells with the <strong>steepest increases</strong> (the top 5% of grid cells by rank).</li>
+</ul>
+<p>We run this <strong>once globally</strong> and then <strong>once per subregion</strong> (World Bank region, income group, WWF biome). For each run and for each metric (absolute and percent change) we write a compact <strong>GPKG</strong> containing only the hotspot cells, plus a CSV index:</p>
+<ul>
+<li>Output root: <code>processed/hotspots/</code>
+<ul>
+<li><code>abs/global/hotspots_global_abs.gpkg</code></li>
+<li><code>pct/global/hotspots_global_pct.gpkg</code></li>
+<li><code>abs/&lt;group_col&gt;/hotspots_&lt;group_col&gt;_&lt;group_val&gt;_abs.gpkg</code></li>
+<li><code>pct/&lt;group_col&gt;/hotspots_&lt;group_col&gt;_&lt;group_val&gt;_pct.gpkg</code></li>
+</ul></li>
+<li>Index: <code>processed/hotspots/_hotspots_index.csv</code> (columns: scope, group_col, group_val, metric, n_hot, gpkg).</li>
+</ul>
+<p>These files are meant for QGIS/QA and downstream stats (e.g., KS) without recomputing hotspots.</p>
+<section id="hotspot-rules-export-configuration" class="level3" data-number="6.1">
+<h3 data-number="6.1" class="anchored" data-anchor-id="hotspot-rules-export-configuration"><span class="header-section-number">6.1</span> Hotspot rules &amp; export configuration</h3>
+<p>The analysis uses a single, central configuration so the hotspot rules are consistent everywhere:</p>
+<p>Thresholding: we flag hotspots using the top/bottom tails of the distribution per service. Here we use a percentile cutoff (e.g., 5%) rather than a fixed count.</p>
+<p>Direction of concern: services in loss are “worse when they go down” (we keep the lowest tail); services in gain are “worse when they go up” (we keep the highest tail).</p>
+<p>Combos (optional): grouped service sets that we count per cell for quick composite summaries.</p>
+<p>Export switches: choose whether to write GPKGs and/or the CSV index.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>::: callout-note
+**Hotspot configuration**
+
+- Cutoff: 5% (percent)
+- Rule mode: vectors
+- Loss services: N_retention, Sed_retention, C_Prot_service, Pollination, Nature_Access
+- Gain services: 
+- Combos: **deg_combo**: N_retention, Sed_retention, C_Prot_service, Pollination, Nature_Access&lt;br&gt;**rec_combo**: N_retention, Sed_retention, C_Prot_service, Pollination, Nature_Access
+…
+- Groupings: income_grp, region_wb, WWF_biome, nev_name
+…- Write layers: TRUE | Write index: TRUE
+- Output dir: `C:/projects/global_NCP/data/processed/hotspots`
+:::</code></pre>
+</div>
+</div>
+</section>
+<section id="validate-hotspot-configuration" class="level3" data-number="6.2">
+<h3 data-number="6.2" class="anchored" data-anchor-id="validate-hotspot-configuration"><span class="header-section-number">6.2</span> Validate hotspot configuration</h3>
+</section>
+<section id="export-hotspot-layers" class="level3" data-number="6.3">
+<h3 data-number="6.3" class="anchored" data-anchor-id="export-hotspot-layers"><span class="header-section-number">6.3</span> Export hotspot layers</h3>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Hotspot export module</strong><br>
+- Computes hotspot cells once (global + by subregion) for ABS and PCT change.<br>
+- Writes compact GPKGs for mapping/QA and maintains <code>_hotspots_index.csv</code>.<br>
+- Prereqs: <code>plt_long</code> in memory, <code>HOTS_CFG</code> defined (loss/gain/combos/etc.).</p>
+</div>
+</div>
+</section>
+<section id="regional-mean-change-dashed-global-mean" class="level3" data-number="6.4">
+<h3 data-number="6.4" class="anchored" data-anchor-id="regional-mean-change-dashed-global-mean"><span class="header-section-number">6.4</span> Regional Mean Change (dashed = global mean)</h3>
+<p><img src="../outputs/plots/signed_bars/bars_signed_income_grp_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/signed_bars/bars_signed_income_grp_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/signed_bars/bars_signed_region_wb_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/signed_bars/bars_signed_region_wb_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/signed_bars/bars_signed_wwf_biome_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/signed_bars/bars_signed_wwf_biome_pct.png" class="img-fluid"></p>
+</section>
+</section>
+<section id="hotspot-boxplots" class="level2" data-number="7">
+<h2 data-number="7" class="anchored" data-anchor-id="hotspot-boxplots"><span class="header-section-number">7</span> Hotspot boxplots</h2>
+<p>Summarize hotspot distributions by group using saved PNGs; skip computation if group columns are absent. Helper <code>run_hotspot_boxplots_by()</code> now lives in <code>R/hotspot_violins.R</code>, so we just call it from this report.</p>
+<p>Outputs: PNGs are written to <code>outputs/plots/{abs|pct}/&lt;group_col&gt;/boxplots_*.png</code> and mirrored into <code>outputs/plots/latest/boxplots/</code> for embedding.</p>
+<p><img src="../outputs/plots/abs/income_grp/boxplots_income_grp_abs_volumetric.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/abs/region_wb/boxplots_region_wb_abs_volumetric.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/abs/wwf_biome/boxplots_wwf_biome_abs_volumetric.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/income_grp/boxplots_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/income_grp/boxplots_coastal_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/income_grp/boxplots_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/income_grp/boxplots_ratios_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/income_grp/boxplots_volumetric_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/income_grp/boxplots_volumetric_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/nev_name/boxplots_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/nev_name/boxplots_coastal_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/nev_name/boxplots_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/nev_name/boxplots_ratios_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/nev_name/boxplots_volumetric_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/nev_name/boxplots_volumetric_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/region_wb/boxplots_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/region_wb/boxplots_coastal_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/region_wb/boxplots_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/region_wb/boxplots_ratios_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/region_wb/boxplots_volumetric_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/region_wb/boxplots_volumetric_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/WWF_biome/boxplots_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/WWF_biome/boxplots_coastal_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/WWF_biome/boxplots_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/WWF_biome/boxplots_ratios_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/WWF_biome/boxplots_volumetric_abs.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/boxplots_unified/WWF_biome/boxplots_volumetric_pct.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/coastal/income_grp/boxplots_income_grp_pct_coastal.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/coastal/region_wb/boxplots_region_wb_pct_coastal.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/coastal/WWF_biome/boxplots_WWF_biome_pct_coastal.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/main_report/abs/income_grp/boxplots_income_grp_abs_volumetric.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/main_report/pct/income_grp/boxplots_income_grp_pct_volumetric.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/main_report/ratios/income_grp/boxplots_income_grp_ratios.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/pct/income_grp/boxplots_income_grp_pct_volumetric.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/pct/region_wb/boxplots_region_wb_pct_volumetric.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/pct/wwf_biome/boxplots_wwf_biome_pct_volumetric.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/ratios/income_grp/boxplots_income_grp_ratios.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/ratios/region_wb/boxplots_region_wb_ratios.png" class="img-fluid"></p>
+<p><img src="../outputs/plots/ratios/wwf_biome/boxplots_wwf_biome_ratios.png" class="img-fluid"></p>
+</section>
+<section id="attribution-to-drivers-of-change" class="level2" data-number="8">
+<h2 data-number="8" class="anchored" data-anchor-id="attribution-to-drivers-of-change"><span class="header-section-number">8</span> Attribution to Drivers of Change</h2>
+<p>Here we integrate Land Cover change, specifically focusing on Land Conversion (Loss of Natural Land). We define Conversion Hotspots as the top 5% of grid cells with the highest gross loss of natural land (Loss_2). We then calculate the overlap: What percentage of ES hotspots are also Conversion Hotspots?</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+
+Table: LCC Attribution Gap (% Overlap) - pct_chg
+
+|service        | n_es_hotspots| n_overlap| pct_overlap|driver         |metric  |
+|:--------------|-------------:|---------:|-----------:|:--------------|:-------|
+|Nature_Access  |         66200|     29007|        43.8|Crop_Exp       |pct_chg |
+|Nature_Access  |         66200|     18245|        27.6|Forest_Loss    |pct_chg |
+|Pollination    |         67095|     15870|        23.7|Forest_Loss    |pct_chg |
+|Pollination    |         67095|     14683|        21.9|Crop_Exp       |pct_chg |
+|Nature_Access  |         66200|     12766|        19.3|Grassland_Loss |pct_chg |
+|Sed_retention  |         51815|      9305|        18.0|Grassland_Gain |pct_chg |
+|Sed_retention  |         51815|      8391|        16.2|Grassland_Loss |pct_chg |
+|C_Prot_service |          2603|       369|        14.2|Urban_Exp      |pct_chg |
+|N_retention    |         67095|      7854|        11.7|Urban_Exp      |pct_chg |
+|N_retention    |         67095|      7165|        10.7|Grassland_Loss |pct_chg |
+|Pollination    |         67095|      6741|        10.0|Grassland_Gain |pct_chg |
+|Pollination    |         67095|      6032|         9.0|Grassland_Loss |pct_chg |
+|Nature_Access  |         66200|      3928|         5.9|Urban_Exp      |pct_chg |
+|C_Prot_service |          2603|       151|         5.8|Forest_Loss    |pct_chg |
+|C_Prot_service |          2603|       109|         4.2|Crop_Exp       |pct_chg |
+|N_retention    |         67095|      2566|         3.8|Crop_Exp       |pct_chg |
+|N_retention    |         67095|      2352|         3.5|Forest_Loss    |pct_chg |
+|Nature_Access  |         66200|      1836|         2.8|Grassland_Gain |pct_chg |
+|N_retention    |         67095|      1787|         2.7|Grassland_Gain |pct_chg |
+|Sed_retention  |         51815|      1359|         2.6|Urban_Exp      |pct_chg |
+
+
+Table: LCC Attribution Gap (% Overlap) - abs_chg
+
+|service        | n_es_hotspots| n_overlap| pct_overlap|driver         |metric  |
+|:--------------|-------------:|---------:|-----------:|:--------------|:-------|
+|Nature_Access  |         66200|     13922|        21.0|Crop_Exp       |abs_chg |
+|Nature_Access  |         66200|     11097|        16.8|Forest_Loss    |abs_chg |
+|Pollination    |         67095|     11186|        16.7|Crop_Exp       |abs_chg |
+|Pollination    |         67095|     10594|        15.8|Forest_Loss    |abs_chg |
+|C_Prot_service |          2603|       339|        13.0|Urban_Exp      |abs_chg |
+|Nature_Access  |         66200|      7710|        11.6|Grassland_Loss |abs_chg |
+|N_retention    |         67095|      7474|        11.1|Urban_Exp      |abs_chg |
+|Nature_Access  |         66200|      6792|        10.3|Urban_Exp      |abs_chg |
+|Sed_retention  |         51815|      4638|         9.0|Grassland_Loss |abs_chg |
+|Sed_retention  |         51815|      3544|         6.8|Grassland_Gain |abs_chg |
+|C_Prot_service |          2603|       172|         6.6|Forest_Loss    |abs_chg |
+|Pollination    |         67095|      4084|         6.1|Grassland_Loss |abs_chg |
+|Pollination    |         67095|      3142|         4.7|Grassland_Gain |abs_chg |
+|C_Prot_service |          2603|       119|         4.6|Crop_Exp       |abs_chg |
+|N_retention    |         67095|      2642|         3.9|Grassland_Loss |abs_chg |
+|Sed_retention  |         51815|      1447|         2.8|Urban_Exp      |abs_chg |
+|Nature_Access  |         66200|      1701|         2.6|Grassland_Gain |abs_chg |
+|N_retention    |         67095|      1265|         1.9|Grassland_Gain |abs_chg |
+|N_retention    |         67095|       903|         1.3|Forest_Loss    |abs_chg |
+|C_Prot_service |          2603|        35|         1.3|Grassland_Loss |abs_chg |</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-hotspot-overlap-plot-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-hotspot-overlap-plot-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+
+Table: Correlation between ES Percentage Change and Net Natural Land Change
+
+|service          | pearson_r| spearman_rho|       n|
+|:----------------|---------:|------------:|-------:|
+|Sed_Ret_Ratio    |     0.378|        0.724|  854097|
+|NA               |    -0.634|       -0.670|  907265|
+|Sed_export       |    -0.631|       -0.623| 1046516|
+|N_export         |    -0.579|       -0.505| 1046516|
+|Nature_Access    |     0.380|        0.424| 1039883|
+|Pollination      |     0.275|        0.256| 1046516|
+|N_Ret_Ratio      |     0.136|        0.217|  846050|
+|C_Risk           |    -0.109|       -0.027|   60701|
+|C_Risk_Red_Ratio |     0.081|        0.027|   60701|</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-correlation-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+
+Table: Correlation between ES Absolute Change and Net Natural Land Change
+
+|service          | pearson_r| spearman_rho|       n|
+|:----------------|---------:|------------:|-------:|
+|Sed_Ret_Ratio    |     0.173|        0.726|  854097|
+|NA               |    -0.290|       -0.641|  907265|
+|Sed_export       |    -0.186|       -0.586| 1046516|
+|N_export         |    -0.240|       -0.493| 1046516|
+|Nature_Access    |     0.071|        0.417| 1039883|
+|Pollination      |     0.022|        0.229| 1046516|
+|N_Ret_Ratio      |     0.188|        0.220|  846050|
+|C_Risk           |    -0.104|       -0.027|   60701|
+|C_Risk_Red_Ratio |     0.107|        0.027|   60701|</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-correlation-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-scatterplots-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-scatterplots-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-scatterplots-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-scatterplots-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-scatterplots-5.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-scatterplots-6.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-scatterplots-7.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-scatterplots-8.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-scatterplots-9.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="hotspot_extraction_files/figure-html/lc-es-scatterplots-10.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stderr">
+<pre><code>Found socio vars: hdi_raster_predictions_2020_mean, rast_adm1_gini_disp_2020_mean, GHS_POP_E2020_GLOBE_sum, GlobPOP_Count_30arc_2020_sum, rast_gdpTot_1990_2020_30arcsec_2020_sum</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+
+Table: Correlation: LC Drivers vs Socioeconomic Status
+
+|Driver         |SocioVar                                | SpearmanRho|
+|:--------------|:---------------------------------------|-----------:|
+|Urban_Exp      |rast_gdpTot_1990_2020_30arcsec_2020_sum |       0.668|
+|Urban_Exp      |GHS_POP_E2020_GLOBE_sum                 |       0.621|
+|Urban_Exp      |GlobPOP_Count_30arc_2020_sum            |       0.611|
+|Urban_Exp      |hdi_raster_predictions_2020_mean        |       0.239|
+|Grassland_Gain |GlobPOP_Count_30arc_2020_sum            |      -0.161|
+|Grassland_Gain |GHS_POP_E2020_GLOBE_sum                 |      -0.143|
+|Grassland_Gain |rast_gdpTot_1990_2020_30arcsec_2020_sum |      -0.137|
+|Forest_Loss    |hdi_raster_predictions_2020_mean        |       0.127|
+|Grassland_Gain |rast_adm1_gini_disp_2020_mean           |      -0.103|
+|Forest_Loss    |rast_adm1_gini_disp_2020_mean           |      -0.102|
+|Grassland_Loss |GlobPOP_Count_30arc_2020_sum            |       0.101|
+|Grassland_Loss |GHS_POP_E2020_GLOBE_sum                 |       0.099|
+|Forest_Loss    |rast_gdpTot_1990_2020_30arcsec_2020_sum |       0.087|
+|Grassland_Loss |rast_gdpTot_1990_2020_30arcsec_2020_sum |       0.082|
+|Grassland_Loss |rast_adm1_gini_disp_2020_mean           |       0.071|
+|Grassland_Loss |hdi_raster_predictions_2020_mean        |      -0.070|
+|Forest_Loss    |GHS_POP_E2020_GLOBE_sum                 |       0.069|
+|Urban_Exp      |rast_adm1_gini_disp_2020_mean           |      -0.068|
+|Crop_Exp       |rast_gdpTot_1990_2020_30arcsec_2020_sum |       0.056|
+|Crop_Exp       |GHS_POP_E2020_GLOBE_sum                 |       0.055|
+|Crop_Exp       |rast_adm1_gini_disp_2020_mean           |       0.034|
+|Forest_Loss    |GlobPOP_Count_30arc_2020_sum            |       0.031|
+|Crop_Exp       |GlobPOP_Count_30arc_2020_sum            |       0.029|
+|Grassland_Gain |hdi_raster_predictions_2020_mean        |       0.022|
+|Crop_Exp       |hdi_raster_predictions_2020_mean        |       0.006|</code></pre>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

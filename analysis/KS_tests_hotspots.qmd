@@ -163,8 +163,9 @@ KS_CFG <- list(
   pct_cutoff     = 0.05,
   threshold_mode = "percent",
   rule_mode      = "vectors",
-  # 5-service redesign (2026-08-28): fixed 2026-08-31 after this file's independent config drift
-  # was found (was still using export/risk as "gain" services and ratios alone as "loss").
+  # Sourced from R/service_config.R (2026-09-01) instead of hardcoded -- this file previously
+  # carried its own independent, unsynced copy (fixed 2026-08-31, see docs/pipeline_reference.md
+  # B7 for the full incident and why this centralization exists).
   #
   # loss_services controls two DIFFERENT things at once here, per extract_hotspots()'s actual
   # mechanics (R/get_hotspots.R): (1) per-service direction for EVERY variable this file
@@ -172,27 +173,28 @@ KS_CFG <- list(
   # in loss_services/gain_services can never be flagged as a hotspot for its OWN KS test, at all),
   # and (2) membership in combos below. Both amounts and ratios are "good when low" here (a
   # declining ratio = worse retention efficiency, same direction as a declining amount), so both
-  # belong in loss_services for correct per-service KS testing -- discovered 2026-08-31 when every
-  # ratio row came back with n_hot=0 after an earlier fix that (wrongly) restricted this to just
-  # the 5 amounts.
+  # belong in loss_services for correct per-service KS testing (discovered 2026-08-31 when every
+  # ratio row came back with n_hot=0 after an earlier fix wrongly restricted this to just the 5
+  # amounts) -- hence combining service_names() and ratio_names() below, not just the former.
   #
   # combos (deg_combo/rec_combo) is what actually defines the *combined* ES-hotspot flag
   # (count_deg_combo/count_rec_combo) -- this stays restricted to the 5 real hotspot-defining
   # amounts, matching hotspot_extraction.qmd's HOTS_CFG exactly and the paper's own exclusion
   # rationale (amounts define hotspots, ratios don't). Widening loss_services above does NOT widen
   # this -- they're independent mechanisms.
-  loss_services  = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service",
-                      "N_Ret_Ratio","Sed_Ret_Ratio","C_Risk_Red_Ratio"),
-  gain_services  = c(),
+  # Ratios dropped from this analysis entirely, 2026-09-02: ratios were never part of the
+  # hotspot definition (amounts only, per Methods' Hotspot Identification section), so
+  # independently KS-testing them alongside the 5 real hotspot-defining services was
+  # inconsistent with that decision -- same fix already applied to the "Hotspot Magnitude by
+  # Biome" boxplots. include_services now 5, not 8 -- 25 service-by-covariate combinations,
+  # not 40.
+  loss_services  = hotspot_direction_lists(looking_for = "decline")$loss_services,
+  gain_services  = hotspot_direction_lists(looking_for = "decline")$gain_services,
   combos = list(
-    deg_combo = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service"),
-    rec_combo = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service")
+    deg_combo = service_names(),
+    rec_combo = service_names()
   ),
-  include_services = c(
-    "N_retention","Sed_retention","C_Prot_service",
-    "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-    "Pollination","Nature_Access"
-  ),
+  include_services = service_names(),
   # KS settings
   vars_to_test = c(
     "rast_gdpTot_1990_2020_30arcsec_2020_sum",
@@ -307,29 +309,9 @@ if (need_reload) {
     dplyr::filter(!(is.infinite(abs_chg) | is.infinite(pct_chg))) |>
     dplyr::filter(!is.na(abs_chg) | !is.na(pct_chg))
 
-  # Canonical lookup matching hotspot_extraction.qmd (v1.0.1)
-  canonical_lookup <- c(
-    sed_export       = "Sed_export",
-    n_export         = "N_export",
-    n_retention      = "N_retention",
-    nature_access    = "Nature_Access",
-    pollination      = "Pollination",
-    usle             = "USLE",
-    n_ret_ratio      = "N_Ret_Ratio",
-    sed_ret_ratio    = "Sed_Ret_Ratio",
-    sed_retention    = "Sed_retention",
-    coastal_protection_rt            = "C_Risk",
-    coastal_protection_rt_nohab_all  = "C_Risk_NoHab",
-    coastal_protection_rt_ratio      = "C_Risk_Red_Ratio",
-    rt_ratio         = "C_Risk_Red_Ratio",
-    rt               = "C_Risk",
-    c_risk           = "C_Risk",
-    c_risk_red_ratio = "C_Risk_Red_Ratio",
-    # was "rt_service" -- didn't match the real column (c_prot_service); same bug independently
-    # fixed in hotspot_extraction.qmd 2026-08-31, this file has its own unsynced copy
-    c_prot_service   = "C_Prot_service",
-    rt_nohab         = "Rt_nohab"
-  )
+  # Sourced from R/service_config.R (2026-09-01) -- was an independent, unsynced copy that had
+  # drifted (fixed 2026-08-31, see docs/pipeline_reference.md B7 for the full incident).
+  canonical_lookup <- service_canonical_lookup()
   plt_long <- plt_long |>
     dplyr::mutate(service = tolower(service)) |>
     dplyr::mutate(service = dplyr::recode(service, !!!canonical_lookup))
@@ -345,11 +327,7 @@ if ("WWF_biome" %in% names(plt_long)) {
   plt_long <- dplyr::filter(plt_long, !WWF_biome %in% c("Lakes", "Rock & Ice"))
 }
 
-svc_order <- c(
-  "N_retention","Sed_retention","C_Prot_service",
-  "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-  "Pollination","Nature_Access"
-)
+svc_order <- c(service_names(), ratio_names())
 extras <- setdiff(unique(plt_long$service), svc_order)
 plt_long <- plt_long |>
   dplyr::mutate(service = factor(service, levels = c(svc_order, sort(extras))))
@@ -464,11 +442,10 @@ dir.create(ks_plot_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Heatmap
 heat_path <- file.path(ks_plot_dir, "ks_heatmap.png")
-svc_order <- c(
-  "N_retention", "Sed_retention", "C_Prot_service",
-  "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
-  "Pollination", "Nature_Access"
-)
+# Hardcoded 8-service list (with ratios) replaced 2026-09-02 -- another independent copy found
+# alongside the include_services fix above; with drop=FALSE this would otherwise force 3 empty
+# columns for the now-untested ratio services. Sourced from R/service_config.R.
+svc_order <- service_names()
 
 # Adjust color ramp: 'sqrt' transform helps visualize differences in lower D values
 # when a few high values might otherwise compress the scale.
@@ -535,11 +512,8 @@ The bar plots below display **Cliff's Delta**, a non-parametric effect size meas
 ks_plot_dir <- KS_CFG$out_dir
 # Directionality plot (Cliff's Delta)
 dir_path <- file.path(ks_plot_dir, "directionality_cliffs_delta.png")
-svc_order <- c(
-  "N_retention", "Sed_retention", "C_Prot_service",
-  "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
-  "Pollination", "Nature_Access"
-)
+# Hardcoded 8-service list (with ratios) replaced 2026-09-02 -- see the heatmap chunk above.
+svc_order <- service_names()
 
 # Clean up variable names for plotting
 ks_res_plot <- ks_res %>%

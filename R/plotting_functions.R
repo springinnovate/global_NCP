@@ -4,6 +4,38 @@
 library(dplyr)
 library(ggplot2)
 library(tidytext)
+library(patchwork)
+
+#' Plain-text "N: Name" key panel, for charts whose y/x-axis is abbreviated to a number
+#'
+#' Centralized 2026-09-02: was an ad hoc local copy in hotspot_synthesis.qmd's intensity-chart
+#' chunk before this, and about to become a second independent copy in the boxplot generator --
+#' pulled here first instead, per this project's own hard-won lesson this week about local copies
+#' of the same logic silently drifting (see docs/runbook.md's service-config-drift section).
+#' Replaces an older per-group color-swatch legend (an invisible geom_point() alpha=0 hack) that
+#' no longer serves a purpose once bars stopped being colored by group. Format changed from
+#' "[N] Name" to "N: Name" and default size bumped 11->15pt same day -- flagged as still too small
+#' relative to the rest of the figure (axis/strip text already at 13-16pt).
+#'
+#' @param labels Character vector of "N: Name" strings, in the desired 1..N reading order.
+#' @param ncol Number of columns to wrap the key into.
+#' @param text_size Point size of the key text (not mm -- converted internally).
+#' @return A ggplot object (a text-only grid, no axes), meant to be stacked below the main plot
+#'   with patchwork (`main_plot / make_key_panel(labels) + plot_layout(heights = c(10, key_height))`).
+make_key_panel <- function(labels, ncol = 3, text_size = 15) {
+  n <- length(labels)
+  nrow <- ceiling(n / ncol)
+  df <- data.frame(
+    label = labels,
+    col   = (seq_len(n) - 1) %% ncol,
+    row   = nrow - ((seq_len(n) - 1) %/% ncol)
+  )
+  ggplot(df, aes(x = col, y = row, label = label)) +
+    geom_text(hjust = 0, size = text_size / .pt) +
+    scale_x_continuous(limits = c(-0.05, ncol), expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0.4, nrow + 0.6), expand = c(0, 0)) +
+    theme_void()
+}
 
 # Biome name mappings for cleaner labels
 get_biome_labels <- function() {

@@ -7,17 +7,17 @@ date: last-modified
 date-format: "YYYY-MM-DD HH:mm zzz"
 analysis_version: "v1.3.4"
 format:
-#  html:
-#    toc: true
-#   number-sections: true
-#   code-fold: false
-#  toc-title: "Contents"
-#   theme: cosmo
-  pdf:
+  html:
     toc: true
     number-sections: true
-    geometry: margin=1in
-    df-print: kable
+    code-fold: false
+    toc-title: "Contents"
+    theme: cosmo
+#  pdf:
+#    toc: true
+#    number-sections: true
+#    geometry: margin=1in
+#    df-print: kable
 editor: source
 
 params:
@@ -159,37 +159,18 @@ cat(paste0(
 #| include: false
 #| echo: false
 if (!exists("svc_order", inherits = TRUE)) {
-  svc_order <- c(
-    "C_Risk","N_export","Sed_export",
-    "C_Risk_Red_Ratio","N_Ret_Ratio","Sed_Ret_Ratio",
-    "Pollination","Nature_Access"
-  )
+  # Sourced from R/service_config.R (2026-09-01) -- was hardcoded to the old export/risk
+  # names and never even included the current retention/protection amounts (a 4th
+  # independent stale copy found while doing the config-centralization pass, see
+  # docs/pipeline_reference.md B7). 5 amounts + 3 ratios, legacy export/risk excluded
+  # per the paper's decision that those are never reported directly.
+  svc_order <- c(service_names(), ratio_names())
 }
 if (!exists("canonical_lookup", inherits = TRUE)) {
-  canonical_lookup <- c(
-    sed_export       = "Sed_export",
-    n_export         = "N_export",
-    n_retention      = "N_retention",
-    nature_access    = "Nature_Access",
-    pollination      = "Pollination",
-    usle             = "USLE",
-    n_ret_ratio      = "N_Ret_Ratio",
-    sed_ret_ratio    = "Sed_Ret_Ratio",
-    sed_retention    = "Sed_retention",
-    coastal_protection_rt            = "C_Risk",
-    coastal_protection_rt_nohab_all  = "C_Risk_NoHab",
-    coastal_protection_rt_ratio      = "C_Risk_Red_Ratio",
-    rt_ratio         = "C_Risk_Red_Ratio",
-    rt               = "C_Risk",
-    c_risk           = "C_Risk",
-    c_risk_red_ratio = "C_Risk_Red_Ratio",
-    # was "rt_service" -- didn't match any real column; the merge scripts that actually produce
-    # this variable (merge_new_variable_into_change_calc.py, merge_sediment_and_coastal_via_
-    # crosswalk.py) write the "c_prot_service" prefix. This went undetected until 2026-08-31's
-    # first real run of hotspot_extraction.qmd against the coastal variable.
-    c_prot_service   = "C_Prot_service",
-    rt_nohab         = "Rt_nohab"
-  )
+  # Sourced from R/service_config.R (loaded via devtools::load_all() above) --
+  # single source of truth, see that file's header for why this used to be a local
+  # copy here and drifted silently (2026-08-31 incident, docs/pipeline_reference.md B7).
+  canonical_lookup <- service_canonical_lookup()
 }
 ```
 
@@ -757,19 +738,24 @@ HOTS_CFG <- list(
   # nitrogen, sediment, and coastal, per Steve's clarification and the Aug 24/26 email exchange.
   # Retention/reduction ratios are excluded from hotspot detection entirely (per Methods'
   # Hotspot Identification section) -- they remain part of the broader change analysis only,
-  # not this config. All five services are now framed consistently as "amount of benefit
-  # provided," so a hotspot uniformly means steepest decline -- there is no remaining "gain"
-  # direction (an increase is never the harmful direction for any of the five).
-  loss = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service"),
-  gain = c(),
+  # not this config.
+  #
+  # Sourced from R/service_config.R (2026-09-01) instead of hardcoded here -- single source of
+  # truth, see that file's header for the 2026-08-31 drift incident this replaces. All 5 services
+  # currently share "high" good_direction (an increase is favorable), so looking_for="decline"
+  # (the default -- flags steepest decline as hotspots) puts all 5 in loss_services and leaves
+  # gain_services empty; pass looking_for="improvement" instead to flip this pipeline to search
+  # for the *best* improvements rather than declines, without touching this config by hand.
+  loss = hotspot_direction_lists(looking_for = "decline")$loss_services,
+  gain = hotspot_direction_lists(looking_for = "decline")$gain_services,
   # deg_combo/rec_combo previously split damage-framed vs. good-framed services; that split no
   # longer applies since every service is now benefit-framed. Both combos point at the same
   # full 5-service list so existing `count_deg_combo`/`count_rec_combo` output columns keep
   # working for anything downstream that still reads them, without asserting a distinction
   # that no longer exists.
   combos = list(
-    deg_combo = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service"),
-    rec_combo = c("Nature_Access","Pollination","N_retention","Sed_retention","C_Prot_service")
+    deg_combo = service_names(),
+    rec_combo = service_names()
   ),
 # centralize the grouping columns here
   groupings = c("income_grp","region_wb","WWF_biome","nev_name"),
@@ -1247,10 +1233,19 @@ if ("income_grp" %in% names(plt_long)) {
   cat("[DIAGNOSTIC] Globally excluding '2. High income: nonOECD' from all boxplots.\n", file=stderr())
 }
 
-# Define service lists for directing plotting logic
-volumetric_services <- c("Nature_Access", "Pollination", "Sed_export", "N_export")
-ratio_services <- c("N_Ret_Ratio", "Sed_Ret_Ratio")
-coastal_services <- c("C_Risk", "C_Risk_Red_Ratio")
+# Consolidated 2026-09-01 (user decision): the previous volumetric/ratio/coastal 3-way
+# split (a) had drifted to the old export/risk names independently of every other
+# instance fixed this session (see docs/pipeline_reference.md B7), and (b) was no longer
+# a meaningful distinction now that all 5 hotspot-defining services are benefit-framed
+# amounts -- the split existed to keep wildly different units off a shared y-axis, but
+# each facet panel below already uses its own free_y scale, so one unified chart loses
+# no information, just produces fewer PNGs. Sourced from R/service_config.R.
+#
+# Ratios dropped from this figure entirely, 2026-09-02: this is "Hotspot Magnitude by Biome" --
+# ratios were never part of the hotspot definition (amounts only, per Methods' Hotspot
+# Identification section), so showing them here alongside the real hotspot-defining services
+# was inconsistent with that decision, not just a display choice.
+all_boxplot_services <- service_names()
 
 missing_groupings <- setdiff(groupings, names(plt_long))
 if (length(missing_groupings)) {
@@ -1270,134 +1265,20 @@ if (length(missing_groupings)) {
 groupings <- intersect(groupings, names(plt_long))
 cat("[DIAGNOSTIC] make-hotspot-boxplots groupings to process: ", if (length(groupings)) paste(groupings, collapse = ", ") else "none", "\n", file=stderr())
 
-biome_labels <- c(
-  'Tropical & Subtropical Moist Broadleaf Forests' = 'Trop/Subtrop Moist Broadleaf',
-  'Tropical & Subtropical Dry Broadleaf Forests' = 'Trop/Subtrop Dry Broadleaf',
-  'Tropical & Subtropical Coniferous Forests' = 'Trop/Subtrop Coniferous',
-  'Temperate Broadleaf & Mixed Forests' = 'Temp Broadleaf/Mixed',
-  'Temperate Coniferous Forests' = 'Temp Coniferous',
-  'Boreal Forests/Taiga' = 'Boreal/Taiga',
-  'Tropical & Subtropical Grasslands, Savannas & Shrublands' = 'Trop/Subtrop Grass/Sav/Shrub',
-  'Temperate Grasslands, Savannas & Shrublands' = 'Temp Grass/Sav/Shrub',
-  'Flooded Grasslands & Savannas' = 'Flooded Grass/Savannas',
-  'Montane Grasslands & Shrublands' = 'Montane Grass/Shrub',
-  'Tundra' = 'Tundra',
-  'Mediterranean Forests, Woodlands & Scrub' = 'Mediterranean',
-  'Deserts & Xeric Shrublands' = 'Deserts & Xeric Shrub',
-  'Mangroves' = 'Mangroves'
+# Plotting logic centralized 2026-09-02 into scripts/mapping/make_hotspot_boxplots.R -- this
+# document's own render is slow (the long per-country export loop below), so any pure styling
+# change to these figures used to require a full re-render just to see it. That script can now
+# also be run standalone and fast via scripts/mapping/run_hotspot_boxplots.R (reads this same
+# plt_long via its cached plt_long.rds). Single source of truth, not a second copy to drift --
+# see docs/runbook.md's service-config-drift section for why that risk is real on this project.
+source(here::here("scripts", "mapping", "make_hotspot_boxplots.R"))
+generate_hotspot_boxplots(
+  plt_long,
+  groupings     = groupings,
+  pct_cutoff    = HOTS_CFG$pct_cutoff,
+  loss_services = HOTS_CFG$loss,
+  all_services  = all_boxplot_services
 )
-
-get_short_name <- function(g, grp_name) {
-  g <- as.character(g)
-  if (any(grp_name %in% c("WWF_biome", "biome"))) {
-    res <- biome_labels[g]
-    unname(ifelse(is.na(res), g, res))
-  } else {
-    g
-  }
-}
-
-boxplot_order <- levels(plt_long$service)
-if (is.null(boxplot_order)) {
-  boxplot_order <- unique(plt_long$service)
-}
-boxplot_order <- as.character(boxplot_order)
-
-if (length(groupings) == 0) {
-  warning("No grouping columns found in plt_long; skipping hotspot boxplots.")
-} else {
-  for (gc in groupings) {
-    # Check for valid data before attempting to plot
-    n_valid <- sum(!is.na(plt_long[[gc]]))
-    cat("[DIAGNOSTIC] Grouping: ", gc, " | Valid rows in plt_long: ", n_valid, "\n", file=stderr())
-    if (n_valid == 0) {
-      cat("[DIAGNOSTIC] Skipping boxplots for ", gc, ": all values are NA.\n", file=stderr())
-      next
-    }
-
-    # --- 1. Data Preparation (for all service types) ---
-    hotspots_all <- plt_long %>%
-      dplyr::filter(!is.na(.data[[gc]])) %>%
-      dplyr::group_by(service) %>%
-      dplyr::mutate(
-        is_loss = service %in% HOTS_CFG$loss,
-        cutoff = if_else(is_loss, quantile(pct_chg, HOTS_CFG$pct_cutoff, na.rm = TRUE), quantile(pct_chg, 1 - HOTS_CFG$pct_cutoff, na.rm = TRUE)),
-        is_hotspot = if_else(is_loss, pct_chg <= cutoff, pct_chg >= cutoff)
-      ) %>%
-      dplyr::ungroup() %>%
-      dplyr::filter(is_hotspot == TRUE)
-
-    unique_groups <- sort(unique(as.character(hotspots_all[[gc]])))
-    group_id_map <- setNames(seq_along(unique_groups), unique_groups)
-    unique_groups_desc <- sort(unique_groups, decreasing = TRUE)
-    legend_levels <- paste0("[", group_id_map[unique_groups_desc], "] ", get_short_name(unique_groups_desc, gc))
-    legend_cols <- 3
-
-    # --- 2. Unified Plotting Function ---
-    plot_and_save_boxplots <- function(df, services_to_plot, metric, plot_title, out_filename, n_cols, width, height) {
-        # Re-create legend levels based on ascending order for consistency
-        legend_levels_asc <- paste0("[", group_id_map[unique_groups], "] ", get_short_name(unique_groups, gc))
-
-        plot_stats <- df %>%
-            dplyr::filter(service %in% services_to_plot, !is.na(.data[[metric]])) %>%
-            dplyr::group_by(dplyr::across(dplyr::all_of(c("service", gc)))) %>%
-            dplyr::summarise(
-                middle = stats::median(.data[[metric]], na.rm = TRUE),
-                lower  = stats::quantile(.data[[metric]], 0.25, na.rm = TRUE),
-                upper  = stats::quantile(.data[[metric]], 0.75, na.rm = TRUE),
-                iqr    = stats::IQR(.data[[metric]], na.rm = TRUE),
-                ymin   = max(min(.data[[metric]], na.rm = TRUE), lower - 1.5 * iqr),
-                ymax   = min(max(.data[[metric]], na.rm = TRUE), upper + 1.5 * iqr),
-                .groups = "drop"
-            ) %>%
-            dplyr::group_by(service) %>%
-            dplyr::mutate(scaled_fill = scales::rescale(abs(middle))) %>%
-            dplyr::ungroup() %>%
-            dplyr::mutate(
-                group = factor(.data[[gc]], levels = unique_groups),
-                grp_num_id = as.character(group_id_map[as.character(.data[[gc]])]),
-                grp_legend_label = factor(paste0("[", grp_num_id, "] ", get_short_name(as.character(.data[[gc]]), gc)), levels = legend_levels_asc)
-            )
-        if (nrow(plot_stats) == 0) {
-            cat("[DIAGNOSTIC] No data to plot for ", plot_title, "\n", file=stderr())
-            return(NULL)
-        }
-
-        metric_label <- if (metric == "pct_chg") "Percent Change (%)" else "Absolute Change"
-
-        p <- ggplot(plot_stats, aes(x = group, ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax)) +
-            geom_boxplot(stat = "identity", aes(fill = scaled_fill)) +
-            geom_point(aes(color = grp_legend_label), y = -Inf, shape = 15, size = 0, alpha = 0) +
-            facet_wrap(~service, scales = "free", ncol = n_cols) +
-            labs(title = plot_title, subtitle = paste("Metric:", metric_label), x = NULL, y = metric_label, color = "Group") +
-            scale_fill_distiller(palette = "Reds", direction = 1, guide = "none") +
-            scale_x_discrete(labels = function(x) group_id_map[x]) +
-            theme_minimal(base_size = 14) +
-            theme(
-                strip.text = element_text(face = "bold"),
-                axis.text.y = element_text(size = 12),
-                axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
-                axis.title = element_text(size = 14),
-                legend.position = "bottom",
-                legend.title = element_blank(),
-                legend.text = element_text(size = 12)
-            ) +
-            guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), order = 1)) # Ensure legend is ordered by factor levels
-
-        out_dir <- here::here("outputs", "plots", "boxplots_unified", gc)
-        dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-        fname <- file.path(out_dir, out_filename)
-        ggsave(fname, p, width = width, height = height, bg = "white", dpi = 300)
-        cat("[DIAGNOSTIC] Saved unified boxplot to: ", fname, "\n", file=stderr())
-    }
-
-    # --- 3. Execute Plotting for Each Service Type ---
-    plot_and_save_boxplots(hotspots_all, volumetric_services, "abs_chg", paste("Hotspot Distribution (Volumetric):", gc), "boxplots_volumetric_abs.png", n_cols = 2, width = 12, height = 10)
-    plot_and_save_boxplots(hotspots_all, volumetric_services, "pct_chg", paste("Hotspot Distribution (Volumetric):", gc), "boxplots_volumetric_pct.png", n_cols = 2, width = 12, height = 10)
-    plot_and_save_boxplots(hotspots_all, ratio_services, "pct_chg", paste("Hotspot Distribution (Ratios):", gc), "boxplots_ratios_pct.png", n_cols = 2, width = 12, height = 6)
-    plot_and_save_boxplots(hotspots_all, coastal_services, "pct_chg", paste("Hotspot Distribution (Coastal):", gc), "boxplots_coastal_pct.png", n_cols = 2, width = 12, height = 6)
-  }
-}
 
 ```
 

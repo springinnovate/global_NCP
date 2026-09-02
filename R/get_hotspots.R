@@ -415,7 +415,7 @@ filter_multidim <- function(
 #' has no built-in way to ask "is this cell a hotspot in combo A AND also in
 #' combo B" across two different combos. This helper adds that one derived
 #' step so it doesn't have to be re-derived by hand per case — see the
-#' `combined_cross` column in `scripts/extract_hotspots_5service.R`, which
+#' `combined_cross` column in `scripts/extract_hotspots.R`, which
 #' wrote this exact pattern out manually before this function existed.
 #'
 #' @param data A data frame containing one `count_<name>` column per combo

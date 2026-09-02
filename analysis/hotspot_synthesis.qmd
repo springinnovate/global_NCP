@@ -228,28 +228,24 @@ HOTS_CFG <- list(
   pct_cutoff      = 0.05,
   threshold_mode  = "percent",
   rule_mode       = "vectors",
-  # 5-service redesign (2026-08-28), same definition as analysis/hotspot_extraction.qmd's HOTS_CFG
-  # -- this file previously carried its own separate, unsynced copy still on the old export/risk
-  # names (N_export/Sed_export/C_Risk) and gain/loss split; fixed 2026-08-31 after the regenerated
-  # hotspot_area_stats.csv came back showing the stale service set. All five services are now
-  # benefit-framed, so everything is "loss" (steepest decline) and gain is empty, matching
-  # hotspot_extraction.qmd exactly.
-  loss = c("Nature_Access", "Pollination", "N_retention", "Sed_retention", "C_Prot_service"),
-  gain = c(),
+  # Sourced from R/service_config.R (2026-09-01) instead of hardcoded -- this file previously
+  # carried its own separate, unsynced copy still on the old export/risk names, fixed 2026-08-31
+  # after the regenerated hotspot_area_stats.csv came back showing the stale service set; now
+  # pulls from the single shared definition to prevent that class of drift recurring (see
+  # docs/pipeline_reference.md B7).
+  loss = hotspot_direction_lists(looking_for = "decline")$loss_services,
+  gain = hotspot_direction_lists(looking_for = "decline")$gain_services,
   groupings = c("income_grp", "region_wb", "WWF_biome", "nev_name"),
-  # water/access combo membership preserved from the prior version (water = downstream-watershed
-  # services, access = proximity/travel-time services -- this split matters beyond just this qmd,
-  # since it's what produces the count_water/count_access columns Rich's beneficiary-buffer
-  # pipeline and the (currently paused, see docs/pipeline_reference.md B2) rasterization step both
-  # key off) -- only the member variable names changed, from export/risk to retention/protection.
+  # water/access combo membership (water = downstream-watershed services, access = proximity/
+  # travel-time services) is business logic specific to Rich's beneficiary-buffer categorization,
+  # not a generic service-config property -- kept explicit here rather than centralized. Names
+  # must match R/service_config.R's canonical spelling exactly (no programmatic link, unlike
+  # loss/gain/svc_order above -- a rename here would need a matching manual edit).
   combos = list(
     water  = c("N_retention", "Sed_retention"),
     access = c("Nature_Access", "Pollination", "C_Prot_service")
   ),
-  svc_order = c(
-    "N_retention", "Sed_retention", "C_Prot_service",
-    "Pollination", "Nature_Access"
-  )
+  svc_order = service_names()
 )
 
 # Master Exclusion Lists (Applies to all downstream Intensity & Hotness calculations)
@@ -412,14 +408,21 @@ get_short_name <- function(g, grp_name) {
     res <- biome_labels[g]
     unname(ifelse(is.na(res), g, res))
   } else {
-    g
+    # income_grp's own raw values carry a leading ordinal ("1. High income: OECD", "3. Upper
+    # middle income", ...) -- left as-is, this doubled up with the key's own "N: " numbering
+    # (e.g. "1: 1. High income: OECD"), found 2026-09-02.
+    sub("^\\d+\\.\\s*", "", g)
   }
 }
 
 library(tidytext)
+library(patchwork)
 
 out_intensity_dir <- file.path(out_plots(), paste0("intensity", params$output_suffix))
 dir.create(out_intensity_dir, recursive = TRUE, showWarnings = FALSE)
+
+# make_key_panel() is defined once in R/plotting_functions.R (auto-loaded via devtools::load_all()
+# above) -- a plain-text "[N] Name" key, replacing the old per-group color-swatch legend hack.
 
 for (g_var in valid_groupings) {
   plot_data <- hotspot_area_stats %>%
@@ -439,77 +442,68 @@ for (g_var in valid_groupings) {
   unique_groups <- sort(unique(as.character(plot_data$group)))
   group_id_map <- setNames(seq_along(unique_groups), unique_groups)
   unique_groups_desc <- sort(unique_groups, decreasing = TRUE)
-  legend_levels <- paste0("[", group_id_map[unique_groups_desc], "] ", get_short_name(unique_groups_desc, g_var))
 
   plot_data <- plot_data %>%
-    dplyr::mutate(
-      group = factor(group, levels = unique_groups_desc),
-      grp_num_id = as.character(group_id_map[as.character(group)]),
-      grp_legend_label = factor(paste0("[", grp_num_id, "] ", get_short_name(as.character(group), g_var)), levels = legend_levels)
-    )
+    dplyr::mutate(group = factor(group, levels = unique_groups_desc))
 
-  legend_cols <- 3 # As requested
+  key_labels <- paste0(group_id_map[unique_groups], ": ", get_short_name(unique_groups, g_var))
+  # ncol scales up for large group counts (e.g. nev_name's ~190 countries) so the key panel
+  # stays within ggsave's 50-inch sanity limit -- a fixed ncol=3 came close to hitting it.
+  key_ncol   <- max(3, ceiling(length(key_labels) / 15))
+  key_panel  <- make_key_panel(key_labels, ncol = key_ncol)
+  # Row height tightened 2026-09-02 (0.5 -> 0.35): too much vertical whitespace between key
+  # rows at the larger 15pt text size.
+  key_height <- ceiling(length(key_labels) / key_ncol) * 0.35 + 0.3
+
+  # Titles removed 2026-09-02: these figures are always embedded with an external Quarto figure
+  # caption in the paper, so an in-image title/subtitle just duplicated it and ate vertical space.
+  # Text sizes bumped throughout (axis/axis-title/facet-strip) -- same "too small at full page
+  # width" flag as the key panel above.
+  base_theme <- theme_minimal() +
+    theme(
+      axis.ticks.y = element_blank(),
+      axis.text  = element_text(size = 13),
+      axis.title = element_text(size = 13),
+      strip.text = element_text(size = 13, face = "bold")
+    )
 
   # 1. Coverage Plot
   p_cov <- ggplot(plot_data, aes(x = pct_area, y = group)) +
     geom_col(fill = "#E83737") +
-    # HACK: Add an invisible geom_point to generate a color aesthetic, which we can then use to build a manual legend for the y-axis labels.
-    geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
-    coord_cartesian(clip = "off") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
-    labs(title = paste("Hotspot Coverage by", g_var), x = "% of Area that is a Hotspot", y = NULL) +
+    labs(x = "% of Area that is a Hotspot", y = NULL) +
     scale_y_discrete(labels = function(x) group_id_map[x]) +
-    theme_minimal() +
-    theme(
-          axis.ticks.y = element_blank(), 
-          legend.position = "bottom", 
-          legend.title = element_blank(), 
-          legend.text = element_text(size = 10),
-          axis.text = element_text(size = 10)) +
-    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
+    base_theme
 
-  ggsave(file.path(out_intensity_dir, paste0("hotspot_coverage_", tolower(g_var), ".png")), p_cov, width=14, height=10, bg="white")
+  ggsave(file.path(out_intensity_dir, paste0("hotspot_coverage_", tolower(g_var), ".png")),
+         p_cov / key_panel + plot_layout(heights = c(10, key_height)),
+         width = 14, height = 10 + key_height, bg = "white")
 
   # 2. Share Plot
   p_share <- ggplot(plot_data, aes(x = pct_share, y = group)) +
     geom_col(fill = "#E83737") +
-    # HACK: Add an invisible geom_point to generate a color aesthetic for the legend.
-    geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
-    coord_cartesian(clip = "off") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
-    labs(title = paste("Global Hotspot Share by", g_var), x = "% of Global Hotspots", y = NULL) +
+    labs(x = "% of Global Hotspots", y = NULL) +
     scale_y_discrete(labels = function(x) group_id_map[x]) +
-    theme_minimal() +
-    theme(
-          axis.ticks.y = element_blank(), 
-          legend.position = "bottom", 
-          legend.title = element_blank(), 
-          legend.text = element_text(size = 10),
-          axis.text = element_text(size = 10)) +
-    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
+    base_theme
 
-  ggsave(file.path(out_intensity_dir, paste0("hotspot_share_", tolower(g_var), ".png")), p_share, width=14, height=10, bg="white")
+  ggsave(file.path(out_intensity_dir, paste0("hotspot_share_", tolower(g_var), ".png")),
+         p_share / key_panel + plot_layout(heights = c(10, key_height)),
+         width = 14, height = 10 + key_height, bg = "white")
 
   # 3. Relative Intensity Plot
   p_enrich <- ggplot(plot_data, aes(x = relative_intensity, y = group)) +
-    geom_col(aes(alpha = relative_intensity > 1), fill = "#E83737") + geom_vline(xintercept = 1, linetype = "dashed", color = "black") +
-    # HACK: Add an invisible geom_point to generate a color aesthetic for the legend.
-    geom_point(aes(color = grp_legend_label), x = -Inf, shape = 15, size = 0, alpha = 0) +
-    coord_cartesian(clip = "off") +
+    geom_col(aes(alpha = relative_intensity > 1), fill = "#E83737") +
+    geom_vline(xintercept = 1, linetype = "dashed", color = "black") +
     facet_wrap(~ service, scales = "free_x", ncol = 3) +
     scale_alpha_manual(values = c("TRUE" = 1, "FALSE" = 0.4), guide = "none") +
-    labs(title = paste("Relative Hotspot Intensity by", g_var), x = "Intensity Score (Regional Hotspot % ÷ Global Average [~5%])", y = NULL) +
+    labs(x = "Intensity Score (Regional Hotspot % ÷ Global Average [~5%])", y = NULL) +
     scale_y_discrete(labels = function(x) group_id_map[x]) +
-    theme_minimal() +
-    theme(
-          axis.ticks.y = element_blank(), 
-          legend.position = "bottom", 
-          legend.title = element_blank(), 
-          legend.text = element_text(size = 10),
-          axis.text = element_text(size = 10)) +
-    guides(color = guide_legend(ncol = legend_cols, override.aes = list(size = 4, alpha = 1), reverse = TRUE))
+    base_theme
 
-  ggsave(file.path(out_intensity_dir, paste0("hotspot_relative_intensity_", tolower(g_var), ".png")), p_enrich, width=14, height=10, bg="white")
+  ggsave(file.path(out_intensity_dir, paste0("hotspot_relative_intensity_", tolower(g_var), ".png")),
+         p_enrich / key_panel + plot_layout(heights = c(10, key_height)),
+         width = 14, height = 10 + key_height, bg = "white")
 }
 ```
 

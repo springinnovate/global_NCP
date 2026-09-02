@@ -1,5 +1,110 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-09-01 — Sediment/coastal unblocked via crosswalk, full 5-service Path B rerun, 6-copy config-drift incident found and fixed architecturally
+
+Picks up directly from 2026-08-31 below, where sediment was blocked on raw rasters from Rich.
+
+**Sediment unblocked without Rich, via a legacy-grid crosswalk.** Found that
+`10k_grid_synth_all.gpkg` — a March 2026 zonal-extraction intermediate whose regeneration was later
+disabled by default, never deleted — still holds raw 1992/2020 USLE, sediment-export, N-export, and
+N-retention levels the raw *rasters* no longer do. It's built on the same legacy
+`AOOGrid_10x10km_land_4326_clean.gpkg` grid as the 2026-07-08 LCC striping bug, not the current
+master grid, so reusing it required going back through `lc_grid_fid_to_master_fid_crosswalk.csv`.
+Didn't just trust the crosswalk's own `match_dist_m` — independently recomputed centroid distance
+from each file's own GPKG RTree bounding boxes first (99.4% of rows exact 0.0m matches, flagged-
+invalid rows genuinely 6-654km off, not borderline). `scripts/merge_sediment_and_coastal_via_
+crosswalk.py` written for this, promoted to canonical `10k_change_calc.gpkg` with a dated backup
+kept (`10k_change_calc_BACKUP_2026-08-31.gpkg`).
+
+**Refined once more after B1 caught a real flaw**: of the ~155K many-to-one crosswalk groups, 1,609
+have a clearly-best (~0m) match plus a clearly-worse secondary (4,600-5,900m away) that the
+crosswalk let through as `valid_match=TRUE` too — averaging that bad secondary match produced 572
+genuinely conflicting fids when the same crosswalk was reused for the LC-driver join in
+`hotspot_extraction.qmd`. Fixed by keeping only each group's best match(es) (within 1m of the
+group minimum) before aggregating — re-ran the sediment/coastal merge with this correction, small
+effect (~1,609 of 1.5M cells) but the right thing to do given this data feeds the paper.
+
+**Full Path B (10km-grid) rerun, real numbers, cross-validated three ways.** `hotspot_extraction.
+qmd` → 219,138 hotspot cells. `KS_tests_hotspots.qmd` → 38/40 covariate tests significant (both
+non-significant results are coastal vs. agricultural plot size, coherent with the paper's own
+decoupling narrative). `compute_attribution_true_union.R` → 63.77% attribution gap (was 65.8% under
+the old definition), risk ratio 8.23. A separate script, `scripts/extract_hotspots.R` (see rename
+below), independently reproduced the same 219,138 for the pct metric — exact match, strong
+consistency check. Geographic clustering (mean `relative_intensity` across the 5 services, matching
+the established 2026-07-30 methodology exactly): East Asia & Pacific 1.37×, Latin America &
+Caribbean 1.22× — same two regions as before, order flipped. Income disparity: lower-middle-income
+1.29× vs. high-income OECD 0.69× → ~1.9× (was 1.6×).
+
+**Config-drift incident — 6 independent copies found, not the 3 first assumed.** Fixing `hotspot_
+extraction.qmd`'s `HOTS_CFG`/`canonical_lookup` (stale `rt_service` key, no `sed_retention` entry)
+surfaced the same pattern independently in `hotspot_synthesis.qmd` and `KS_tests_hotspots.qmd` —
+each rendered with exit code 0 while silently computing on the old export/risk service names, caught
+only by spot-checking output *content*. A user-driven check against the actual shared Google Drive
+folder (screenshot) then revealed a 5th copy, `scripts/extract_hotspots_5service.R` (the generator
+of the `count_water`/`count_access`/`combined_cross` overlap columns Rich's beneficiary-buffer
+configs literally threshold on) — also independently drifted. A deliberate repo-wide grep sweep
+(`grep -rln '"N_export"\|"Sed_export"\|"C_Risk"' analysis/ scripts/ R/`) then found a 6th, more
+consequential instance: `R/utils_hotspot.R` defines `svc_order` at `devtools::load_all()` time
+(before any qmd chunk runs), and was **silently shadowing** `hotspot_extraction.qmd`'s own
+`if (!exists("svc_order"))` guard — meaning an earlier fix to that guard never actually took effect.
+`R/hotspot_violins.R` had three more hardcoded copies of the same pattern.
+
+**Architectural fix, not another patch**: `R/service_config.R` is now the single source of truth —
+`SERVICE_AMOUNTS`, `SERVICE_RATIOS`, `SERVICE_LEGACY_RAW`, and `service_canonical_lookup()`/
+`hotspot_direction_lists()`/`service_names()`/`ratio_names()` accessors, auto-loaded via
+`devtools::load_all()` like every other `R/*.R` file. Every one of the 6 drifted files now sources
+this instead of redefining the list locally. `hotspot_direction_lists(looking_for=)` also builds in
+the direction-flexibility the user asked for going forward (search for declines vs. best
+improvements) rather than hardcoding "decline" as the only possible analysis. `extract_hotspots_
+5service.R` renamed to `extract_hotspots.R` — the suffix was a leftover from when this was a special
+variant of an 8-service scheme; it's the canonical script now, no `extract_hotspots.R` predecessor
+ever existed to conflict with. **Known not-yet-audited**: `scripts/audit_hotspot_geography.R` and 7
+Colombia/Sandra-deck mapping scripts — not on the current critical path, deliberately deferred and
+logged (`docs/pipeline_reference.md` B7) rather than silently assumed fine.
+
+**Rich's hotspot rasters rebuilt and verified.** `scripts/gdal_rasterize_hotspots_5service.R`
+rewritten — the old version pointed at a stale July 28 file with old export/risk columns and the
+old water/access beneficiary categories, unrelated to today's data. New version reads both
+`hotspot_extraction.qmd`'s output (hotspot_count + 5 per-service flags) and `extract_hotspots.R`'s
+output (count_water/count_access/combined_cross), producing 18 files total (9 columns × abs/pct),
+matching the actual file set in Rich's shared Drive folder (confirmed via user-provided screenshot,
+not guessed). Sanity-checked via `terra`: `hotspot_count` range 1-5, per-service columns clean 0/1,
+221,372 valid pixels (~1% over the 219,138 vector count, normal reprojection edge effect).
+
+**Boxplot outputs consolidated**, per user request: the old volumetric/ratio/coastal 3-way split
+(itself one of the drifted-name locations) dropped in favor of one unified chart per metric — each
+facet already used `scales="free_y"` so no information is lost, just fewer files (4 → 2 per
+grouping). Surfaced and fixed a related bug: the boxplot's own per-service hotspot direction check
+only looked at `HOTS_CFG$loss` (the 5 amounts), silently misclassifying the 3 ratio services as
+gain-direction for this chart specifically.
+
+**Paper updated throughout `paper_draft_5service.qmd`**: Abstract rewritten for 5 services, 4 of 5
+headline numbers now real (219,138 cells, 63.8% gap, regional/income figures above) — only the
+Rich-blocked multiplier-effect figure remains `[TBD]`. Export/risk explicitly scoped as ratio-
+formula inputs only, never reported directly (Figure 2's old paired export/ratio layout flagged as
+needing to change when rebuilt). Coastal dropped from the global 4-panel change map — data-correct
+but a 1-cell-wide coastline fringe is invisible at full-globe scale, confirmed by diagnostic — with
+an honest caption rather than a blank-looking panel. Several stale status callouts caught (some by
+the user reading closely) and corrected — the top-of-document status note, the Biophysical Modeling
+callout, and the Hotspot Identification callout had all drifted to "still pending"/"in progress"
+language after the underlying work was actually done.
+
+**New process discipline note**: briefly ran two renders of `hotspot_extraction.qmd` concurrently
+(started a second one to pick up the `R/service_config.R`/boxplot fixes without confirming the
+first had finished) — no data corruption resulted since `HOTS_CFG` itself was unchanged between the
+two attempts, but it was luck, not design. Confirm a prior render has actually completed before
+starting another one of the same file.
+
+**Checkpoint commit made before the architectural refactor** (`936be11`) specifically so the
+service-config centralization could be attempted freely with a clean rollback point.
+
+**Still pending**: Rich's beneficiary rerun (rasters ready, not yet sent — combined email drafted
+covering both this and the still-open Path A raw-raster request), Becky's 6 questions (1 required
+before submission — InVEST climate inputs), Figure 2/Annex trajectory maps (blocked on Path A raw
+300m rasters, separate `zonal_stats_toolkit` repo), Results/Discussion prose still needs a pass to
+replace old numbers with the real ones now available, and the deferred old-output cleanup /
+unaudited-scripts list in `docs/pipeline_reference.md` section F.
+
 ### 2026-08-28/31 — Service-definition redesign (retention/protection), coastal pipeline dry run, two real bugs found and fixed
 
 Steve clarified his services-list comment (see `becky_steve_feedback_plan.md` and the real email

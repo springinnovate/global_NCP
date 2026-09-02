@@ -12,6 +12,14 @@
 #
 # Builds panels once, then composes TWO title variants (ES/EN) from the
 # same cached panels -- the expensive step (rasterize) only runs once.
+#
+# Output moved 2026-09-02 from outputs/plots/colombia_report/ to outputs/plots/maps/ -- that
+# directory is genuinely Colombia-scoped (7+ make_colombia_*.R scripts write there), and this
+# figure now does double duty as the paper's main "Global Pattern of Change" figure, not just a
+# Sandra-deck companion panel. outputs/plots/maps/ already holds the other global-scale map
+# outputs (global_hotspot_count_heatmap_*, global_attribution_gap_map_*) -- same naming
+# convention, better fit. Still referenced by the Sandra deck alongside colombia_report's own
+# colombia_change_5panel.png, just from the new path.
 # ==============================================================================
 
 library(sf)
@@ -22,8 +30,9 @@ library(patchwork)
 library(here)
 
 source(here("R", "paths.R"))
+source(here("R", "service_config.R"))
 
-out_dir <- here("outputs", "plots", "colombia_report")
+out_dir <- here("outputs", "plots", "maps")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 wwf_green      <- "#007930"
@@ -45,20 +54,49 @@ wwf_teal       <- "#009191"
 # footprints -- confirmed by diagnostic, not a rendering bug. Noted in the panel count/caption
 # rather than shown blank. Regional zoom insets for high-hotspot-concentration coastlines are a
 # possible Annex addition, not yet built.
-svc_defs <- list(
-  list(service = "Pollination",     col = "pollination_pct_chg",       direction = "good", label = "Pollination"),
-  list(service = "Sed_retention",   col = "sed_retention_pct_chg",     direction = "good", label = "Sediment retention"),
-  list(service = "N_retention",     col = "n_retention_pct_chg",       direction = "good", label = "Nitrogen retention"),
-  list(service = "Nature_Access",   col = "nature_access_pct_chg",     direction = "good", label = "Nature Access")
+# Built from R/service_config.R's SERVICE_AMOUNTS (single source of truth for name/column/
+# direction) rather than hardcoded -- only the display label and the coastal exclusion (see
+# note above) are specific to this figure.
+panel_labels <- c(
+  Pollination    = "Pollination",
+  Sed_retention  = "Sediment retention",
+  N_retention    = "Nitrogen retention",
+  Nature_Access  = "Nature Access"
 )
 
-get_color_scale <- function(direction, limits) {
+# 2026-09-02: added an absolute-change variant alongside the existing percentage-change one, to
+# compare which reads better for this specific figure -- this map is per-cell, not aggregated to
+# region/biome/income, so the Simpson's-paradox/MAUP sign-flip risk that justifies preferring SPC
+# for REGIONAL summaries elsewhere in the paper doesn't apply here (see docs/methodology.md).
+# Native units per service for the absolute legend (not tracked in R/service_config.R since no
+# other consumer needs them):
+abs_units <- c(
+  N_retention   = "kg N/ha/yr",
+  Sed_retention = "t/ha/yr",
+  Pollination   = "people-fed equiv./ha",
+  Nature_Access = "access index"
+)
+
+build_svc_defs <- function(metric) {
+  col_suffix <- if (metric == "pct") "_pct_chg" else "_abs_chg"
+  lapply(Filter(function(s) s$name != "C_Prot_service", SERVICE_AMOUNTS), function(s) {
+    list(
+      service     = s$name,
+      col         = paste0(s$col_prefix, col_suffix),
+      direction   = if (s$good_direction == "high") "good" else "damage",
+      label       = panel_labels[[s$name]],
+      legend_name = if (metric == "pct") "% change" else abs_units[[s$name]]
+    )
+  })
+}
+
+get_color_scale <- function(direction, limits, legend_name) {
   if (direction == "good") {
     scale_fill_gradient2(low = wwf_orange, mid = "white", high = wwf_teal,
-                          midpoint = 0, limits = limits, name = "% change", na.value = NA)
+                          midpoint = 0, limits = limits, name = legend_name, na.value = NA)
   } else {
     scale_fill_gradient2(low = wwf_teal, mid = "white", high = wwf_orange,
-                          midpoint = 0, limits = limits, name = "% change", na.value = NA)
+                          midpoint = 0, limits = limits, name = legend_name, na.value = NA)
   }
 }
 
@@ -66,8 +104,13 @@ get_color_scale <- function(direction, limits) {
 # 1. Load, filter, and reproject the global grid ONCE
 # ------------------------------------------------------------------------------
 
+svc_defs_pct <- build_svc_defs("pct")
+svc_defs_abs <- build_svc_defs("abs")
+
 message("Loading 10k_change_calc.gpkg (global)...")
-needed_cols <- c("grid_fid", "continent", "WWF_biome", sapply(svc_defs, function(d) d$col))
+needed_cols <- c("grid_fid", "continent", "WWF_biome",
+                  sapply(svc_defs_pct, function(d) d$col),
+                  sapply(svc_defs_abs, function(d) d$col))
 grid <- st_read(here("data", "processed", "10k_change_calc.gpkg"), quiet = TRUE)
 grid <- grid[, intersect(names(grid), c(needed_cols, "geom", "geometry"))]
 
@@ -109,7 +152,7 @@ make_panel <- function(d) {
     geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) +
     geom_tile(data = df_r, aes(x = x, y = y, fill = value, alpha = alpha)) +
     scale_alpha_identity(guide = "none") +
-    get_color_scale(d$direction, limits) +
+    get_color_scale(d$direction, limits, d$legend_name) +
     coord_sf(crs = "EPSG:8857") +
     labs(title = d$label) +
     theme_void() +
@@ -123,40 +166,32 @@ make_panel <- function(d) {
     )
 }
 
-message("Building global panels (5 headline services)...")
-panels <- lapply(svc_defs, make_panel)
-names(panels) <- sapply(svc_defs, function(d) d$service)
+message("Building global panels (pct change)...")
+panels_pct <- lapply(svc_defs_pct, make_panel)
+names(panels_pct) <- sapply(svc_defs_pct, function(d) d$service)
+
+message("Building global panels (abs change)...")
+panels_abs <- lapply(svc_defs_abs, make_panel)
+names(panels_abs) <- sapply(svc_defs_abs, function(d) d$service)
 
 # ------------------------------------------------------------------------------
 # 3. Compose ES + EN title variants from the same cached panels
 # ------------------------------------------------------------------------------
 
-compose_and_save <- function(panels, title, subtitle, out_path) {
-  combined <- wrap_plots(panels, ncol = 2) +
-    plot_annotation(
-      title = title,
-      subtitle = subtitle,
-      theme = theme(
-        plot.title = element_text(size = 16, face = "bold", hjust = 0.5, color = wwf_dark_green),
-        plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray30")
-      )
-    )
+# Title/subtitle removed 2026-09-02: these figures are always embedded with an external Quarto
+# figure caption in the paper (and this pair is now two standalone figures there, not one
+# 2-panel block), so an in-image title just duplicated it and ate vertical space -- same fix
+# already applied to the hotspot count map, intensity charts, and boxplots.
+compose_and_save <- function(panels, out_path) {
+  combined <- wrap_plots(panels, ncol = 2)
   ggsave(out_path, combined, width = 16, height = 11, dpi = 200, bg = "white", limitsize = FALSE)
   message("Saved: ", out_path)
 }
 
-compose_and_save(
-  panels,
-  "Global — Cambio en servicios ecosistémicos, 1992–2020",
-  "Cambio porcentual por celda de 10km (5 servicios evaluados)",
-  file.path(out_dir, "global_change_5panel_es.png")
-)
+compose_and_save(panels_pct, file.path(out_dir, "global_change_5panel_es.png"))
+compose_and_save(panels_pct, file.path(out_dir, "global_change_5panel_en.png"))
+compose_and_save(panels_abs, file.path(out_dir, "global_change_5panel_abs_es.png"))
 
-compose_and_save(
-  panels,
-  "Global — Ecosystem Service Change, 1992–2020",
-  "Percentage change per 10km cell (5 services evaluated)",
-  file.path(out_dir, "global_change_5panel_en.png")
-)
+compose_and_save(panels_abs, file.path(out_dir, "global_change_5panel_abs_en.png"))
 
 message("\nDone.")
