@@ -1,5 +1,73 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-09-02 — Paper numbers/figures audit, sediment/USLE finding, docx callout bug, sent to Becky/Steve/Rich
+
+Continuation of 2026-09-01 below (same rerun, next working session). Picks up with the 5-service
+Path B rerun already complete and real numbers already existing in `10k_change_calc.gpkg`/derived
+tables — this session's work was auditing whether `paper_draft_5service.qmd` actually reflected
+them, and it mostly didn't yet.
+
+**Sediment retention amount found demand-sensitive — the main new finding.** `Sed_retention =
+USLE − SedExport`, and USLE carries a land-cover-dependent cover-management (C) factor, so
+converting forest to cropland/pasture raises USLE directly. Decomposed Brazil's national total:
+of the +58,033 increase in sediment retention amount, 95% (+55,105) traces to rising USLE, only 5%
+to an actual export decline — concentrated in the Amazon biome specifically, not the Cerrado.
+Documented in Methods/Results/Limitations; reframes the open Becky question about keeping ratio
+variables (structurally immune to this) rather than dropping them as secondary. See memory
+`project_sediment_retention_demand_artifact.md`.
+
+**Repeated pattern, found independently four separate times**: a number gets updated in one
+section (usually Results) but survives stale elsewhere (Discussion, Methods, a hardcoded table, the
+paper's own status callout). Fixed each time by actually recomputing/grepping rather than trusting
+a prior fix: the attribution-gap numbers (225,113/65.8%/7.4 → 219,138/63.8%/8.2, and the per-driver
+risk-ratio range itself was stale, 4.2–97.5 → 3.6–40.1, with the strongest driver changing from
+Urban Expansion to Cropland Expansion), the Discussion's "Differentiated Vulnerability Tiers"
+paragraph (named `N_export`/`Sed_export`, never tested under any version of the current framing),
+a World Bank Region table hardcoded to 5 stale regions with the wrong ranking (real data has 7,
+East Asia & Pacific leading), and an income-group multiplier figure (1.6× → real ~1.8×).
+
+**Ratios dropped from two secondary analyses, not the hotspot definition itself** (already
+settled) — the hotspot-magnitude boxplot figure and KS Diagnostics had each independently drifted
+into testing the 3 ratios alongside the 5 real hotspot-defining amounts. Boxplots cut to 5 panels,
+KS Diagnostics rescoped to 25 combinations (was 40) and actually re-run: 24/25 significant, one
+non-significant (coastal protection × field size, same decoupling story as before). Centralized
+the boxplot generator out of `hotspot_extraction.qmd`'s slow inline chunk into
+`scripts/mapping/make_hotspot_boxplots.R` + a fast standalone `run_hotspot_boxplots.R` (~90s vs. a
+full document render) — also found and fixed two more independent hardcoded 8-service `svc_order`
+copies in `KS_tests_hotspots.qmd` and one silently-broken paper table (`tbl-cliffs-delta`'s
+`service_order` never matched the post-redesign scheme, so rows were quietly dropping with no
+error). `R/plotting_functions.R` gained a shared `make_key_panel()` helper (plain-text legend,
+replacing an old per-group color-swatch hack) used by both the intensity charts and the boxplots.
+
+**Figure-quality pass** across every multi-panel figure: fonts bumped, redundant in-image
+titles/captions removed (duplicated the external Quarto caption), the combined 3-in-1
+hotspot-distribution figure and the abs/pct global-change map split into standalone figures,
+income-group chart legend fixed (was double-numbering, e.g. "1: 1. High income: OECD").
+
+**Docx export for Steve surfaced a real Quarto bug** (1.9.37, this environment): every
+`.callout-*` div's content vanishes entirely in docx output, confirmed with a minimal isolated
+test file. Fixed by converting all 16 real callout blocks to plain blockquotes, which survive in
+every format — don't reintroduce `.callout-*` divs in this file. Also fixed in the same pass: the
+paper's `DT::datatable()` tables (HTML-only widget, degrades to a raw text dump in docx — switched
+to plain `kable()`), and a missing title/author block in docx (added a
+`{.content-visible when-format="docx"}`-guarded manual title, docx-only, `.unnumbered` so it
+doesn't get numbered into the section sequence or duplicate in html). Full writeup:
+`docs/pipeline_reference.md` section G.
+
+**Sent to Becky, Steve, and Rich.** User rewrote the Becky/Steve email into one shorter, plainer
+combined message after finding the drafted version too structured/decorated — see memory
+`feedback_correspondence_style.md`, a real course-correction on how these should read going
+forward. Rich's message had a factual error caught after send-drafting: it claimed hotspot
+coverage/beneficiary masks were uploaded, when actually the updated *service hotspot rasters* were
+uploaded so Rich can produce the coverage masks and population rasters himself — fixed before
+sending. Also flagged: `Python_scripts/msk_zeros_diff.py` (pollination-vs-agriculture-mask logic)
+confirmed via repo-wide grep to be uncalled by any current pipeline file — unclear yet whether
+pollination masking happened upstream before rasters arrived here, or is genuinely missing; not
+resolved, logged in `docs/HANDOFF_2026-09-01.md` item 6 for next session.
+
+**Committed and pushed**: `0580637` (main paper/figure/docx work) and `99c2801` (Discussion trim +
+handoff) on `feature/paper-swy-integration`.
+
 ### 2026-09-01 — Sediment/coastal unblocked via crosswalk, full 5-service Path B rerun, 6-copy config-drift incident found and fixed architecturally
 
 Picks up directly from 2026-08-31 below, where sediment was blocked on raw rasters from Rich.
