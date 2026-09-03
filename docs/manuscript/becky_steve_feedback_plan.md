@@ -1,5 +1,62 @@
 # Becky/Steve feedback — status and action plan
 
+## REVERSAL, 2026-09-02 — Becky overrides the retention/protection framing, revert to export/risk
+
+**Read this section first — it supersedes the "settled" framing decision below and everything
+built on it.** Slack exchange, same day: Becky's exact words — *"No I disagree for the reasons we
+talked through earlier! The change in export is the thing people actually experience. Also the
+retention can have changes happen on other pixels — they increase or decrease the retention
+without anything changing on the pixel — so it's very confusing. I will explain to Steve, he just
+doesn't understand that level of detail of the modeling."* She's overriding Steve's SP14/SP15
+suggestion (which this whole doc, and the entire 2026-08-28 to 09-02 work, was built on).
+
+**What this means concretely**: revert nitrogen/sediment/coastal from retention/protection
+*amounts* back to export/risk *residuals* as the hotspot-defining variables, per the original
+pre-redesign scheme. Ratios return to secondary/context role, same as before.
+
+**Not wasted work — reusable pieces**:
+- `R/service_config.R` is the single source of truth almost everything now reads from
+  (`hotspot_extraction.qmd`, `hotspot_synthesis.qmd`, `KS_tests_hotspots.qmd`, the boxplot
+  generator, several mapping scripts) — flipping `SERVICE_AMOUNTS`/`SERVICE_RATIOS` there should
+  cascade through most of the pipeline without touching each consumer individually. This is
+  exactly the payoff the 2026-09-01 config-centralization work was for, even though nobody
+  expected to need it for a *reversal* specifically.
+- The sediment/USLE demand-inflation finding (`project_sediment_retention_demand_artifact.md`)
+  is the same *class* of problem as Becky's stated objection (retention shifting for reasons
+  unrelated to the local pixel) — reframe as supporting evidence for going back to export/risk,
+  don't just delete it.
+- Backups exist for most underlying data (`10k_change_calc_BACKUP_2026-08-31.gpkg` and others,
+  see `docs/pipeline_reference.md`) — the export/risk columns were never removed, just stopped
+  being the *active* hotspot-defining ones. Confirm this before assuming a re-derivation is needed.
+
+**Correction, same day, user's own clarification**: the *individual* per-service export/risk
+hotspot rasters were never overwritten — the 5-service redesign work *created new* files
+alongside them, it didn't destroy the originals, so those should already exist untouched. What
+actually needs regenerating is only the **aggregates** — `hotspot_count` (combines whichever
+service set is currently active) and the water/access/combined_cross beneficiary-overlap rasters
+— since those were computed against the 5-service set. **No rush on this**: Rich doesn't need
+them right now (he'd already produced his own downstream output from an earlier round); this is
+about internal correctness and keeping the shared Drive folder accurate, not a blocker. Per the
+Slack thread, Rich already uploaded the requested raw 1992/2020 rasters to Drive regardless —
+user's own assessment: "I don't need the rasters that much [anymore]... maybe to draw some maps
+again with better resolution" — so that raw-raster need is downgraded, not eliminated (still
+useful for the Path A pixel-level maps, independent of this reversal).
+
+**Still genuinely open, needs a live conversation with Becky, not something to resolve unilaterally
+in a session**: sediment retention vs. retention ratio tradeoffs (user: "given the way the
+variables are actually calculated, the change between two dates..." — message cut off, finish
+this thought with her directly), and **directionality ambiguity in the change signal** — not yet
+precisely scoped in writing; likely related to Becky's own point that a pixel's retention/export
+change can reflect redistribution (upstream/downstream shift) rather than a real local net
+gain/loss, raising the question of what "hotspot direction" even means for a redistributed-not-
+lost service. Don't guess at a resolution — this is explicitly the thing to discuss with her.
+
+**Open process question, also for that conversation**: whether to send Becky/Steve the current
+(retention-framed) paper draft for one more review pass before reverting, or revert first and
+send a clean export/risk version. User has not decided; leaning toward asking them directly
+rather than picking unilaterally.
+
+
 **Context**: Becky's summary email (received 2026-08-20, referencing a 2026-07-09 meeting with
 Steve) plus the full annotated PDF (`NCP decline hotspots SP BCK.pdf`, draft dated 2026-06-24,
 Becky's [BC] and Steve's [SP] inline comments) were reviewed together against the current
