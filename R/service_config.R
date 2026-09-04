@@ -23,17 +23,29 @@
 # should build its local CFG list by referencing the objects/functions below, not by
 # re-typing service names.
 
-# ---- The 5 real hotspot-defining services (retention/protection amounts) ----------
-# good_direction: "high" means an increase is favorable. All 5 are currently "high"
-# (the paper's Methods: "framed consistently as an amount of benefit provided") --
-# but this is a per-service PROPERTY, not a hardcoded assumption baked into every
-# consumer, so a future service with the opposite framing (or a deliberately
-# improvement-seeking analysis, see hotspot_direction_lists() below) doesn't require
-# re-deriving the loss/gain split by hand again.
+# REVERSAL (2026-09-02/03): Becky overrode Steve's retention/protection suggestion via
+# Slack -- "the change in export is the thing people actually experience... the
+# retention can have changes happen on other pixels ... without anything changing on
+# the pixel -- so it's very confusing." Reverted SERVICE_AMOUNTS back to export/risk
+# residuals (the pre-2026-08-28 scheme); N_retention/Sed_retention/C_Prot_service
+# demoted to SERVICE_LEGACY_RAW (still computed, no longer hotspot-defining or
+# reported directly). SERVICE_RATIOS unchanged throughout -- ratios were secondary/
+# non-hotspot-defining both before and after Steve's suggestion, only the *amounts*
+# flipped. See docs/manuscript/becky_steve_feedback_plan.md's "REVERSAL, 2026-09-02"
+# section and memory project_sediment_retention_demand_artifact.md (the sediment/USLE
+# demand-inflation finding, which is the same class of problem as Becky's objection --
+# kept as supporting evidence, not deleted).
+
+# ---- The 5 real hotspot-defining services (export/risk residuals) -----------------
+# good_direction: "high" means an increase is favorable, "low" means a DEcrease is
+# favorable (used by hotspot_direction_lists() below to flag the correct tail as a
+# hotspot). Nitrogen/sediment export and coastal risk are "low" -- these are
+# detrimental flows, so an INCREASE is the hotspot direction. Pollination and Nature
+# Access are "high" -- beneficial services, so a DEcrease is the hotspot direction.
 SERVICE_AMOUNTS <- list(
-  list(name = "N_retention",    col_prefix = "n_retention",    good_direction = "high"),
-  list(name = "Sed_retention",  col_prefix = "sed_retention",  good_direction = "high"),
-  list(name = "C_Prot_service", col_prefix = "c_prot_service", good_direction = "high"),
+  list(name = "N_export",       col_prefix = "n_export",       good_direction = "low"),
+  list(name = "Sed_export",     col_prefix = "sed_export",     good_direction = "low"),
+  list(name = "C_Risk",         col_prefix = "c_risk",         good_direction = "low"),
   list(name = "Pollination",    col_prefix = "pollination",    good_direction = "high"),
   list(name = "Nature_Access",  col_prefix = "nature_access",  good_direction = "high")
 )
@@ -48,16 +60,17 @@ SERVICE_RATIOS <- list(
   list(name = "C_Risk_Red_Ratio", col_prefix = "c_risk_red_ratio", good_direction = "high")
 )
 
-# ---- Legacy export/risk raw variables ----------------------------------------------
-# Used ONLY as computational inputs to the ratio forms above (paper Methods: "not
-# reported as variables in their own right anywhere in this paper"). Never hotspot-
-# defining, never plotted directly. Kept here only so canonical_lookup() below can
-# still resolve raw columns that reference them (e.g. for the ratio formulas, or for
-# make_native_change_figure.R's deliberately-separate all-8-service reference figure).
+# ---- Legacy retention/protection amount variables -----------------------------------
+# The 2026-08-28 redesign's hotspot-defining "amounts," demoted back to legacy/raw
+# status by the reversal above -- these are the numerator components of the ratio
+# forms above (e.g. Sed_retention = USLE - Sed_export, the numerator of Sed_Ret_Ratio),
+# but are never hotspot-defining or reported as variables in their own right anywhere
+# in the paper post-reversal. Kept here only so canonical_lookup() below can still
+# resolve raw columns that reference them.
 SERVICE_LEGACY_RAW <- list(
-  list(name = "N_export",   col_prefix = "n_export"),
-  list(name = "Sed_export", col_prefix = "sed_export"),
-  list(name = "C_Risk",     col_prefix = "c_risk")
+  list(name = "N_retention",    col_prefix = "n_retention"),
+  list(name = "Sed_retention",  col_prefix = "sed_retention"),
+  list(name = "C_Prot_service", col_prefix = "c_prot_service")
 )
 
 # ---- Accessors ----------------------------------------------------------------------

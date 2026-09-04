@@ -1,5 +1,72 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-09-03/04 — Full reversal executed (export/risk restored), pipeline/SWY docs brought current, second paper round queued for Becky/Steve
+
+Becky's 2026-09-02 Slack override (see `becky_steve_feedback_plan.md`'s "REVERSAL" section) got
+actually executed this session, not just documented. Flipped `R/service_config.R`'s
+`SERVICE_AMOUNTS` back to the export/risk trio (N_export, Sed_export, C_Risk), reran the full Path
+B chain end to end (hotspot extraction, spatial synthesis, KS diagnostics, attribution-gap script),
+and regenerated every figure that depends on the service list. Real numbers: **189,932** hotspot
+cells (vs. 219,138 under retention), **63.3%** attribution gap (vs. 63.77%), region_wb ranking
+flipped back to Latin America & Caribbean leading (1.58×) over East Asia & Pacific (1.21×) — both
+rankings were genuinely correct for their respective service definitions, not a repeat of an
+earlier ranking bug. B6b's known `unlink()`-wipes-the-maps-folder hazard fired again; recovered via
+`git checkout` plus a B6 rerun, nothing lost. Rewrote every paper section tied to the service
+definition (Methods, Hotspot Identification, Results, Discussion, Limitations, Conclusions,
+Annex), reframing the sediment/USLE demand-sensitivity finding as supporting evidence for Becky's
+call rather than an open tension, and confirmed the Population Exposure/multiplier numbers are
+**not** blocked on Rich after all — his existing beneficiary output was run against the export/risk
+definition already, which the reversal restores exactly, so no rerun is needed there. Corrected a
+real file corruption mid-session (a merged/truncated ~800-character span in the Annex, most likely
+from the qmd being open and saved from the IDE while edits were in progress) — repaired and
+verified via full render.
+
+**Also updated the reversal-era tracking docs, which had drifted**: `docs/pipeline_reference.md`
+still described the retention-era run as current in Sections A–E, including one row (D4) that had
+gone actively backwards (said to drop export/risk from Figure 2, which is now the wrong direction
+entirely) — every row updated with the real reverted numbers, old text kept as labeled incident
+history rather than deleted. Same pass on `docs/manuscript/becky_ratio_weighting_and_scope_2026-08-31.draft.md`
+(deleted, replaced by `becky_open_questions_2026-09-03.draft.md` — dropped the now-moot "confirm
+export/risk are fully out of the paper" question, kept the 4 still-genuinely-open ones plus the
+ratio-aggregation weighting bug as a separate, lower-priority item). Two other stale drafts found
+and deleted as obsolete during a broader draft-folder sweep: `rich_slack_message_2026-09-01.draft.md`
+(the raw-raster ask was already fulfilled per the plan doc — exact filenames archived into
+`pipeline_reference.md`'s D1 row before deleting) and `steve_feedback_status_update_2026-08-31.draft.md`
+(described the retention framing as final, now simply wrong). Two other drafts confirmed still
+valid and unsent: `becky_open_questions_2026-09-03.draft.md` and
+`justin_ee_correspondence_provenance_2026-08-31.draft.md` (the ee_correspondence citation ask —
+still fully accurate, provenance questions don't depend on service framing).
+
+**SWY, real progress after a ~10-day gap**: cloned and read `github.com/springinnovate/swy_global`
+directly — confirmed at the code level (not just from Rich's description) that it batches
+watersheds into per-basin jobs, routes each independently via TaskGraph, and stitches results into
+one continuous global mosaic, and that the `model_args` dict accepts direct CN/Kc raster overrides
+that bypass the lookup table entirely. Sent a trimmed version of the routing-vs-parameterization
+confirmation to Rich in the existing 2026-08-24 thread; he replied "Yes!" the same day — but only
+to the mechanical framing, since the Hamel et al. 2020 validation-scale question got dropped
+before sending and remains genuinely open, not just unconfirmed. Traced Hamel's Myanmar CN/Kc
+provenance back to Mandle et al. 2017 — Perrine Hamel is a co-author on both papers, so the
+calibration lineage is her own earlier work, not a random borrow; added to `literature_review.ris`
+with a caveat that her paper's "dry-season baseflows" metric isn't yet confirmed comparable to
+SWY's own quickflow output. Worked through a sequencing question with the user (test at Hamel's
+own basin scale first vs. run globally then validate against Hamel after) and landed on test-first:
+the global-assembly mechanism is already confirmed, so a global run would mostly re-pay for
+something already known while testing the actual unknown (parameterization accuracy) no more
+rigorously than a scoped basin test would. Sent this as a concrete proposal to Becky (mentioning
+Rich), replacing an earlier, weaker "test an arbitrary Llanos basin" framing — not yet answered.
+`docs/swy/research_notes.md`'s "Open questions" checklist rewritten to reflect all of this as
+current status rather than the July/August state it had been frozen at.
+
+**Also today**: consolidated LC_orinoquia's docs separately (five dated HANDOFF files + a
+CHECKPOINT doc merged into one, that repo's own WORKLOG updated, `methodology.md` corrected for
+the confirmed-permanent OneDrive training-data loss) — see that repo's own worklog, not
+duplicated here. Sent a follow-up to Carlos Mauricio Herrera and César Freddy Suárez (WWF Colombia)
+on the Orinoquía action-plan thread Sandra raised — separate from this repo's pipeline work, logged
+here only because it was part of the same session.
+
+**Queued, not yet sent**: a second reviewed round of `paper_draft_5service.qmd` (with the reversal)
+to Becky and Steve, targeted for this weekend so they have it Tuesday (Monday is Labor Day).
+
 ### 2026-09-02 — Paper numbers/figures audit, sediment/USLE finding, docx callout bug, sent to Becky/Steve/Rich
 
 Continuation of 2026-09-01 below (same rerun, next working session). Picks up with the 5-service

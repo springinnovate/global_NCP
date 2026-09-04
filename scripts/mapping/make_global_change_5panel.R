@@ -40,16 +40,17 @@ wwf_dark_green <- "#004D1E"
 wwf_orange     <- "#F07D00"
 wwf_teal       <- "#009191"
 
-# 5-service redesign (2026-08-28): swapped from export/risk residuals to retention/protection
-# amounts, per Steve's clarification (settled 2026-08-31). All remaining services are uniformly
-# "good" direction -- an increase is always the favorable direction, matching the paper's Methods
-# text ("All five are framed consistently as an amount of benefit provided").
+# REVERSAL (2026-09-02/03): Becky overrode Steve's retention/protection suggestion -- back to
+# export/risk residuals as the hotspot-defining amounts (see R/service_config.R's own REVERSAL
+# note and docs/manuscript/becky_steve_feedback_plan.md). Nitrogen/sediment export are "low"
+# direction (an increase is the adverse direction); pollination/nature access stay "high".
 # Fixed 2026-08-31 after finding this script (unlike make_native_change_figure.R, which is a
 # deliberately separate all-8-service reference figure) was the actual generator behind the paper's
-# "Global Pattern of Change" figure and had drifted to the old export/risk names.
+# "Global Pattern of Change" figure and had drifted to the old export/risk names -- now reverting
+# back to those same names after the redesign that replaced them was itself reverted.
 #
-# Coastal protection deliberately dropped from this panel, 2026-09-01 (user decision): the data is
-# correct (49,291 valid cells, real signal) but coastal protection only exists on a 1-cell-wide
+# Coastal service deliberately dropped from this panel, 2026-09-01 (user decision, carried through
+# the reversal): the data is correct but coastal risk/protection only exists on a 1-cell-wide
 # coastline fringe, invisible at full-globe map scale next to the other services' continental
 # footprints -- confirmed by diagnostic, not a rendering bug. Noted in the panel count/caption
 # rather than shown blank. Regional zoom insets for high-hotspot-concentration coastlines are a
@@ -58,10 +59,10 @@ wwf_teal       <- "#009191"
 # direction) rather than hardcoded -- only the display label and the coastal exclusion (see
 # note above) are specific to this figure.
 panel_labels <- c(
-  Pollination    = "Pollination",
-  Sed_retention  = "Sediment retention",
-  N_retention    = "Nitrogen retention",
-  Nature_Access  = "Nature Access"
+  Pollination   = "Pollination",
+  Sed_export    = "Sediment export",
+  N_export      = "Nitrogen export",
+  Nature_Access = "Nature Access"
 )
 
 # 2026-09-02: added an absolute-change variant alongside the existing percentage-change one, to
@@ -71,15 +72,15 @@ panel_labels <- c(
 # Native units per service for the absolute legend (not tracked in R/service_config.R since no
 # other consumer needs them):
 abs_units <- c(
-  N_retention   = "kg N/ha/yr",
-  Sed_retention = "t/ha/yr",
+  N_export      = "kg N/ha/yr",
+  Sed_export    = "t/ha/yr",
   Pollination   = "people-fed equiv./ha",
   Nature_Access = "access index"
 )
 
 build_svc_defs <- function(metric) {
   col_suffix <- if (metric == "pct") "_pct_chg" else "_abs_chg"
-  lapply(Filter(function(s) s$name != "C_Prot_service", SERVICE_AMOUNTS), function(s) {
+  lapply(Filter(function(s) s$name != "C_Risk", SERVICE_AMOUNTS), function(s) {
     list(
       service     = s$name,
       col         = paste0(s$col_prefix, col_suffix),
