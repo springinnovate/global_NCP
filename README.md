@@ -239,20 +239,39 @@ Stored under the external data root (`raw/`), include:
 
 ## Modeled Ecosystem Services
 
-Eight services modeled with InVEST at 300m resolution, 1992 and 2020. All rasters pre-normalised to per-hectare units before extraction; ratio/index services are dimensionless and exempt from area correction.
+Eight variables modeled with InVEST at 300m resolution, 1992 and 2020, split into two tiers as of
+the 2026-08 retention/protection redesign. All rasters pre-normalised to per-hectare units before
+extraction; ratio/index services are dimensionless and exempt from area correction.
+
+**The 5 hotspot-defining services** (retention/protection *amounts* — the paper's actual variable
+set; a hotspot is the most intense 5% decline in provision for any one of these):
 
 | # | Service | Variable | Type |
 |---|---|---|---|
-| 1 | Nitrogen Export | `N_export` | Volumetric (kg N/ha) |
-| 2 | Nitrogen Retention Ratio | `N_Ret_Ratio` | Ratio (0–1) |
-| 3 | Sediment Export (USLE) | `Sed_export` | Volumetric (ton/ha) |
-| 4 | Sediment Retention Ratio | `Sed_Ret_Ratio` | Ratio (0–1) |
-| 5 | Pollination | `Pollination` | Index |
-| 6 | Nature Access | `Nature_Access` | Index (equidistant projection) |
-| 7 | Coastal Risk | `C_Risk` | Per linear metre of shore (Rt) |
-| 8 | Coastal Risk Reduction Ratio | `C_Risk_Red_Ratio` | Ratio (Rt_ratio, 0–1) |
+| 1 | Nitrogen Retention | `N_retention` | Volumetric (kg N/ha retained) |
+| 2 | Sediment Retention | `Sed_retention` | Volumetric (ton/ha retained; USLE − sediment export) |
+| 3 | Coastal Protection | `C_Prot_service` | Risk reduction attributable to habitat (Rt_nohab_all − Rt) |
+| 4 | Pollination | `Pollination` | Index |
+| 5 | Nature Access | `Nature_Access` | Index (equidistant projection) |
 
-Canonical variable names are defined in `analysis/hotspot_extraction.qmd` (`HOTS_CFG`) and `R/utils_hotspot.R` (`svc_order`).
+**3 proportional ratio forms**, plus their export/risk raw inputs — not hotspot-defining, not
+reported directly in the paper (used only as computational inputs to the ratios), but still
+present in the data and individually tested/plotted in several places (e.g. KS-test distributions):
+
+| # | Variable | Type |
+|---|---|---|
+| `N_Ret_Ratio` | Nitrogen retention ratio | Ratio (0–1) |
+| `Sed_Ret_Ratio` | Sediment retention ratio | Ratio (0–1) |
+| `C_Risk_Red_Ratio` | Coastal risk reduction ratio | Ratio (Rt_ratio, 0–1) |
+| `N_export`, `Sed_export`, `C_Risk` | Export/risk residuals | Raw inputs to the ratios above only |
+
+**Canonical variable names, columns, and direction are defined in exactly one place**:
+`R/service_config.R` (`SERVICE_AMOUNTS`, `SERVICE_RATIOS`, `SERVICE_LEGACY_RAW`, and the
+`service_canonical_lookup()`/`hotspot_direction_lists()` accessors). Every analysis notebook and
+mapping script sources this instead of redefining the list locally — three independent copies
+drifted out of sync in 2026-08-31 before this consolidation; see `docs/pipeline_reference.md`
+(row B7) for that incident. **Do not add a new hardcoded service list anywhere else in this
+repo** — extend `R/service_config.R` and let consumers pick it up.
 
 ## Land Cover Layers
 
@@ -279,7 +298,10 @@ The `summary_pipeline_landgrid.py` script executes batch zonal summaries using
 `taskgraph` inside a Docker container. Inputs are defined in YAML files under
 `analysis_configs/` (e.g., `services_slim.yaml`, `beneficiaries_slim.yaml`,
 `c_protection_synth.yaml`) and point to the canonical IUCN AOO 10 km vector grid
-(`AOOGrid_10x10km_land_4326_clean.gpkg`) plus the raw raster inputs.
+(`landgrid_1_clean_enriched_4326.gpkg`) plus the raw raster inputs. **Do not use
+`AOOGrid_10x10km_land_4326_clean.gpkg`** — that grid is deprecated (no longer on disk) and was the
+root cause of a real bug (see `docs/runbook.md`'s Prerequisite section and the LCC striping-bug
+investigation); all current configs already reference the correct grid.
 
 To execute:
 
@@ -316,8 +338,8 @@ If you change grids or configs, clear the workspace cache (or set a new
 workspace dir) to avoid stale taskgraph outputs:
 
 ``` bash
-rm -f summary_pipeline_workspace/*.gpkg
-rm -f summary_pipeline_workspace/taskgraph_data.db
+rm -f summary_pipeline_workspace_ha/*.gpkg
+rm -f summary_pipeline_workspace_ha/taskgraph_data.db
 ```
 
 ``` bash
@@ -327,21 +349,21 @@ COASTAL_INCLUDE_CH=1 python Python_scripts/rasterize_coastal.py
 
 ``` bash
 # identify outputs (services = older, beneficiaries = newer)
-ls -lt summary_pipeline_workspace/*.gpkg
+ls -lt summary_pipeline_workspace_ha/*.gpkg
 
 OUT_DIR=/home/jeronimo/data/global_ncp/interim
 TS=$(date +%Y%m%d_%H%M%S)
 
-SERV_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/&lt;services_file&gt;.gpkg
+SERV_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace_ha/&lt;services_file&gt;.gpkg
 ogr2ogr -wrapdateline -datelineoffset 180 \
   "$OUT_DIR/10k_grid_synth_serv_${TS}.gpkg" "$SERV_SRC"
 
-BEN_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/&lt;beneficiaries_file&gt;.gpkg
+BEN_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace_ha/&lt;beneficiaries_file&gt;.gpkg
 ogr2ogr -wrapdateline -datelineoffset 180 \
   "$OUT_DIR/10k_grid_synth_benef_${TS}.gpkg" "$BEN_SRC"
 
 # coastal protection summary (single output in workspace)
-COAST_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace/&lt;coastal_file&gt;.gpkg
+COAST_SRC=/home/jeronimo/projects/global_NCP/summary_pipeline_workspace_ha/&lt;coastal_file&gt;.gpkg
 ogr2ogr -wrapdateline -datelineoffset 180 \
   "$OUT_DIR/10k_grid_synth_coastal_${TS}.gpkg" "$COAST_SRC"
 
@@ -429,8 +451,12 @@ Validation: scripts/audit_claims.R [verifies key paper claims against outputs]
 
 See the project runbook for detailed methodology and validation notes:
 
-*   **`docs/runbook.md`** – Full execution guide and validation procedures
-*   **`docs/methodology.md`** – Technical explanation of two-path analysis structure
+*   **`docs/runbook.md`** – Full execution guide, gotchas, and validation procedures
+*   **`docs/methodology.md`** – Technical explanation of the analytical framework (two-path structure, hotspot definition, KS/attribution methodology)
+*   **`docs/pipeline_reference.md`** – Step-by-step status tracker for the current rewrite in progress (not a permanent reference — check its own status header for what it's tracking)
+*   **`docs/data_dictionary.md`** – Column-level schema for the pipeline's output CSV tables (`hotspot_area_stats.csv`, etc.)
+*   **`docs/hotspots_rasters_data_dictionary.md`** – File-level reference for the hotspot rasters shared with the beneficiaries pipeline
+*   **`docs/ncp_data_catalog.md`** – Inventory of external NatCap/TNC modeling-output sources (OneDrive spreadsheets, GCS buckets)
 *   **`analysis/README.md`** – Archive policy and notebook scoping
 
 # Pipeline Scalability & Extensibility
@@ -447,7 +473,7 @@ The pipeline's dual-pathway structure already handles arbitrary numbers of time 
 The same pipeline can be run on a regional study area (Amazon basin, Southeast Asia, West Africa coastal zone, etc.) with locally-calibrated InVEST inputs. Regional applications benefit from site-specific parameterization that is not feasible at global scale, yielding more defensible biophysical outputs. The subregional filtering infrastructure (`filter_multidim()`, regional CSV subsets, and the parameterized report template) was designed to support exactly this kind of targeted analysis.
 
 ## Additional services
-Any InVEST output — or output from another biophysical model — can be added as a new service column. Add the raster path to the Python YAML config, run the extraction, and update the `rename_list` in `process_data.qmd`. The hotspot identification, synthesis, and reporting steps handle arbitrary service sets automatically.
+Any InVEST output — or output from another biophysical model — can be added as a new service column. Add the raster path to the Python YAML config, run the extraction, and update the `rename_list` in `process_data.qmd`. **Also add the new service to `R/service_config.R`** (name, column prefix, good direction) — this is the one place every analysis notebook and mapping script reads the service list from; a service added only to `rename_list` will extract correctly but never be recognized as hotspot-eligible anywhere downstream. The hotspot identification, synthesis, and reporting steps then handle the expanded service set automatically.
 
 ## Quick reference: what to change for a regional high-resolution application
 

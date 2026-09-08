@@ -5,7 +5,7 @@ subtitle: "Data sources, change metrics, and analytical pipeline"
 
 This chapter describes the methods used to address the four questions introduced in Chapter 1: how ecosystem service provision has changed globally (WHAT), where that change is most concentrated (WHERE), which populations and socioeconomic contexts face the greatest exposure (WHO), and whether land cover change monitoring alone is sufficient to track where ES provision is declining most (WHY).
 
-The analysis integrates three data streams: InVEST biophysical models of eight ecosystem services at 300m resolution; ESA CCI (1992) and Copernicus C3S (2020) land cover classification maps at 300m; and four gridded socioeconomic covariates — population density, GDP, human development index, and income inequality. These are combined within a dual-pathway structure that separates global regional trajectory analysis from local hotspot detection.
+The analysis integrates three data streams: InVEST biophysical models of five hotspot-defining ecosystem services at 300m resolution (plus three secondary ratio variables modeled from the same runs); ESA CCI (1992) and Copernicus C3S (2020) land cover classification maps at 300m; and four gridded socioeconomic covariates — population density, GDP, human development index, and income inequality. These are combined within a dual-pathway structure that separates global regional trajectory analysis from local hotspot detection.
 
 ## Data Sources
 
@@ -15,12 +15,16 @@ This analysis integrates four major datasets:
 
 - **Source**: Natural Capital Project — InVEST (Integrated Valuation of Ecosystem Services and Tradeoffs) model suite (Sharp et al., 2020)
 - **Coverage**: Global, 300m resolution, 1992 & 2020 snapshots
-- **Services modeled**:
+- **Hotspot-defining services (5)**:
+    - Nitrogen Export (nutrient loading reaching waterways)
+    - Sediment Export (erosion delivery to stream networks)
+    - Coastal Risk (wave energy reaching shore, net of habitat attenuation)
     - Pollination (habitat suitability and foraging range support for wild pollinators)
-    - Nitrogen Export & Retention Ratio (nutrient loading and landscape filtration efficiency)
-    - Sediment Export & Retention Ratio (erosion delivery and on-slope retention capacity)
     - Nature Access (proximity to intact natural habitat)
-    - Coastal Protection / Coastal Risk Reduction Ratio (wave energy attenuation by coastal habitats)
+- **Secondary ratio variables (3, modeled from the same InVEST runs, not hotspot-defining)**:
+    - Nitrogen Retention Ratio (landscape filtration efficiency)
+    - Sediment Retention Ratio (on-slope retention capacity)
+    - Coastal Risk Reduction Ratio (proportional risk reduction from habitat presence)
 
 **How it works**: InVEST uses land cover, climate, and biophysical parameters to simulate ecosystem service supply via process-based models. Each service is modeled independently; outputs are continuous rasters at 300m resolution. A full technical description is in the Technical Appendix (Sharp et al., 2020).
 
@@ -64,7 +68,7 @@ Two temporally contiguous products from the ESA classification lineage:
 | Built-up area | GHSL-BUILT | [same GHSL release — citation to verify] |
 | GDP (total) | World Bank gridded economic layers | [citation — to add] |
 | Human Development Index | Gridded HDI predictions (10km, ML-downscaled) | Sherman et al. (2026) |
-| Agricultural plot intensity | Global field size dataset | Mehrabi et al. (2022) |
+| Agricultural plot intensity | Global field size dataset | Mehrabi et al. (2021) |
 | Gini coefficient | Gridded admin-1 Gini (disposable income, 2020) | [citation — to verify: source of `rast_adm1_gini_disp_2020`] |
 
 **Purpose**: Profile the socioeconomic context of hotspot areas; test whether hotspot populations differ systematically from the background landscape (KS tests + Cliff's Delta).
@@ -188,22 +192,22 @@ SPC is bounded between −200% and +200%, making these boundary cases interpreta
 **Rationale**:
 - Top 5% of grid cells by rank for detrimental change = Locations with most rapid DECLINE or risk increase (greatest concern)
 
-**Result**: ~75,000 hotspot cells per service (5% of 1.5M global cells)
+**Result**: 189,932 total hotspot cells across the 5 hotspot-defining services combined (current as of the 2026-09-03 export/risk reversal; a cell qualifying as a hotspot for more than one service is counted once here).
 
 ## Socioeconomic Profiling: Kolmogorov-Smirnov Tests
 
 **Question**: Are socioeconomic conditions in hotspot cells statistically and practically different from a matched background landscape?
 
-**Comparison design**: Hotspot cells are compared against a *median background* — the 47.5th to 52.5th percentiles of service change — rather than all non-hotspot cells. This isolates the profile of acute decline against typical stable conditions, avoiding confounding with cells at the opposite extreme (large service gains). All p-values are FDR-corrected (Benjamini & Hochberg, 1995) across the full 40-comparison matrix (8 services × 5 covariates).
+**Comparison design**: Hotspot cells are compared against a *median background* — the 47.5th to 52.5th percentiles of service change — rather than all non-hotspot cells. This isolates the profile of acute decline against typical stable conditions, avoiding confounding with cells at the opposite extreme (large service gains). All p-values are FDR-corrected (Benjamini & Hochberg, 1995) across the full 25-comparison matrix (5 hotspot-defining services × 5 covariates: population, GDP, HDI, GINI, agricultural field size).
 
 ::: {.callout-note}
-**Why FDR correction — and why 39/40 matters**
+**Why FDR correction — and why 24/25 matters**
 
-When you run 40 statistical tests simultaneously, some will appear significant purely by chance. With a standard 5% threshold, you'd expect roughly 2 false positives just from random variation across 40 comparisons — even if nothing real is happening.
+When you run 25 statistical tests simultaneously, some will appear significant purely by chance. With a standard 5% threshold, you'd expect roughly 1 false positive just from random variation across 25 comparisons — even if nothing real is happening.
 
-Benjamini-Hochberg FDR correction adjusts the significance bar across all 40 tests together. Rather than tightening the threshold on each individual test (as Bonferroni does), it limits the *proportion* of significant results likely to be false alarms — a less conservative but statistically principled approach for exploratory analysis at this scale.
+Benjamini-Hochberg FDR correction adjusts the significance bar across all 25 tests together. Rather than tightening the threshold on each individual test (as Bonferroni does), it limits the *proportion* of significant results likely to be false alarms — a less conservative but statistically principled approach for exploratory analysis at this scale.
 
-That **39 of 40 combinations remain significant after correction** is itself an important finding: the socioeconomic signal is so consistent across services and covariates that multiple-testing adjustment barely changes the picture. The one non-significant combination (Coastal Risk Reduction Ratio × agricultural plot intensity) also makes ecological sense — coastal protection hotspots are structurally decoupled from small-plot agricultural landscapes.
+That **24 of 25 combinations remain significant after correction** is itself an important finding: the socioeconomic signal is so consistent across services and covariates that multiple-testing adjustment barely changes the picture. The one non-significant combination (Coastal Risk × agricultural field size, p_adj=0.44) also makes ecological sense — coastal risk hotspots are structurally decoupled from small-plot agricultural landscapes.
 :::
 
 
@@ -220,8 +224,8 @@ Range is −1 to +1, where 0 = complete distributional overlap and ±1 = complet
 
 **Interpretation**:
 
-- High |δ| + significant p_adj = distributions are both statistically and practically distinct (e.g., coastal risk hotspots: δ_HDI ≈ +0.30, large effect — co-occur with more developed contexts)
-- Near-zero δ despite significant p = difference is real but negligibly small in practical terms (e.g., agricultural plot intensity across all services: δ ≈ 0)
+- High |δ| + significant p_adj = distributions are both statistically and practically distinct (e.g., coastal risk hotspots: δ_HDI ≈ +0.29, large effect — co-occur with more developed contexts)
+- Near-zero δ despite significant p = difference is real but negligibly small in practical terms (e.g., agricultural field size for Pollination hotspots specifically: δ ≈ 0.01)
 
 ## Population Exposure and the Serviceshed Multiplier
 
@@ -341,7 +345,7 @@ Full pipeline documentation and configuration notes are in the Technical Appendi
 
 ## Summary
 
-This chapter describes a four-component methodological framework designed to diagnose global ecosystem service change with spatial and socioeconomic precision. Eight biophysical services were simulated at 300m resolution using InVEST for 1992 and 2020, then aggregated to a consistent 10km equal-area grid spanning 1.3 million terrestrial cells globally.
+This chapter describes a four-component methodological framework designed to diagnose global ecosystem service change with spatial and socioeconomic precision. Five hotspot-defining biophysical services (plus three secondary ratio variables) were simulated at 300m resolution using InVEST for 1992 and 2020, then aggregated to a consistent 10km equal-area grid spanning 1.3 million terrestrial cells globally.
 
 Two parallel analytical pathways address different spatial questions. Path A computes pixel-level regional trajectories to answer *what changed globally* — preserving true volumetric trends by aggregating differences before summarizing. Path B aggregates raster values to the grid first, then computes change — isolating the most intense local shifts without them being averaged away. Hotspots are defined as the top 5% of cells by Symmetric Percentage Change per service — a rank-based, scale-invariant threshold that enables fair comparison across services measured in fundamentally different units.
 

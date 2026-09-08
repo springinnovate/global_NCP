@@ -4,6 +4,104 @@ This repository contains several historical Rmd/Qmd notebooks under `analysis/`,
 
 ---
 
+## ⚠️ Recurring risk category: `fid`/`grid_fid` handling
+
+This project has now hit **three separate, real incidents** from mismatched or mishandled grid cell
+IDs across different tools — different root causes, same failure family. Treat any code that joins
+two GPKG-derived tables by ID as suspect until proven otherwise; don't assume "it has an `fid`
+column" is enough.
+
+1. **2026-07-08, R/sf**: `10k_lcc_granular_metrics.gpkg`'s `grid_fid` was a row-index into an
+   entirely different, now-deleted source grid than every other pipeline stage — see the
+   Prerequisite section immediately below. Silently produced a wrong attribution-gap headline
+   number for months before being caught.
+2. **2026-08-29/31, Python/geopandas**: GeoPackage's own `fid` primary-key column is handled
+   *inconsistently between libraries and even between reads* — geopandas/pyogrio can silently turn
+   it into the DataFrame's row index (unnamed, not even labeled `"fid"`) instead of a normal
+   column, depending on the file and library version. Code that does `df["fid"]` or joins `on="fid"`
+   without checking first can fail loudly (best case) or silently join on the wrong thing (worst
+   case, and this is the dangerous one). See `scripts/merge_new_variable_into_change_calc.py` for
+   the hardened pattern this led to: **read GPKG attribute data via raw SQL (`sqlite3`), never
+   geopandas, whenever `fid` is the join key** — a `.gpkg` is a SQLite database, so `fid` is always
+   an unambiguous plain column that way, no library-version guessing involved. That script also
+   has to drop two of the file's own RTree-maintenance triggers before running any `UPDATE`, because
+   their WHEN-clauses call a SpatiaLite function (`ST_IsEmpty`) that plain Python `sqlite3` doesn't
+   have — safe to do only because the operation never touches `fid` or `geom` itself.
+3. **2026-08-31, sediment/nitrogen ratio-weighting fix**: `10k_grid_synth_all.gpkg` (a March 2026
+   zonal-extraction intermediate, regeneration disabled by default since — see WORKLOG) turned out
+   to still hold raw 1992/2020 USLE, sediment-export, N-export, and N-retention levels that the raw
+   *rasters* themselves no longer do. But it's built on the same legacy `AOOGrid_10x10km_land_4326_
+   clean.gpkg` grid as the Prerequisite section below (1,691,819 rows), not the current master grid
+   (1,522,073 rows) — the identical mismatch that caused incident #1. Reused the existing crosswalk
+   below rather than building a new one, but didn't just trust its `match_dist_m` column — independently
+   recomputed centroid distance from each file's own GPKG RTree bounding boxes first. It held up:
+   99.4% of rows are exact (0.0m) matches, and the flagged-invalid rows are genuine large mismatches
+   (6-654km), not borderline. See `scripts/merge_sediment_and_coastal_via_crosswalk.py`. This is a
+   reminder that "the raw raster is gone" doesn't always mean the data is gone — an old zonal
+   extraction may still be sitting in a debug/intermediate output — but also that reusing it always
+   means going back through the crosswalk, never assuming an old file's `fid` lines up with anything
+   current.
+
+## Pattern: pulling slow-qmd figure code out into a fast standalone script (2026-09-02)
+
+`hotspot_extraction.qmd`'s own render is slow (the long per-country export loop), so a pure
+styling tweak to one figure used to force a full re-render just to see the result. Fixed for the
+hotspot-magnitude boxplots by extracting the plotting logic to `scripts/mapping/
+make_hotspot_boxplots.R` (defines `generate_hotspot_boxplots()`, no auto-execution) with a thin
+`scripts/mapping/run_hotspot_boxplots.R` standalone entry point that reads the qmd's own cached
+`data/processed/plt_long.rds` instead of recomputing anything — full 4-grouping regeneration in
+~90s instead of a full document render. `hotspot_extraction.qmd` now `source()`s the same script
+and calls the same function with its own in-memory `plt_long`/`HOTS_CFG`, so there's exactly one
+copy of the logic, not two to drift (same lesson as the service-config incident below). The
+shared `make_key_panel()` text-legend helper (see next section) lives in `R/plotting_functions.R`
+for the same reason — it's now used by both this script and `hotspot_synthesis.qmd`.
+
+**How to apply**: if another figure inside a slow qmd needs frequent styling iteration, consider
+the same split — a plain function in `scripts/`, a thin standalone runner, and the qmd sourcing
++ calling it rather than keeping a second inline copy.
+
+## ⚠️ Service-definition config: now centralized in `R/service_config.R` (2026-09-01)
+
+A separate, related failure mode from the fid/grid_fid one above: **the service list itself** (canonical names, raw column prefixes, hotspot direction, ratio-vs-amount classification) was independently copy-pasted into `analysis/hotspot_extraction.qmd`, `analysis/hotspot_synthesis.qmd`, `analysis/KS_tests_hotspots.qmd`, and two `scripts/mapping/*.R` files. During the 2026-08-31/09-01 5-service rerun, three of those five copies were found to have silently drifted to the old export/risk service names — each rendered with exit code 0 while computing on stale definitions, caught only because output *content* (not just render success) was spot-checked against expected service names.
+
+**Fixed by centralizing**: `R/service_config.R` is now the single source of truth — `SERVICE_AMOUNTS`, `SERVICE_RATIOS`, `SERVICE_LEGACY_RAW`, and the `service_canonical_lookup()` / `hotspot_direction_lists()` / `service_names()` / `ratio_names()` accessors. It loads automatically via `devtools::load_all()` in every qmd; `scripts/mapping/*.R` scripts need an explicit `source(here("R", "service_config.R"))` since they only source `R/paths.R` by convention.
+
+**How to apply**: never hardcode a service name, column prefix, or loss/gain direction anywhere else in this repo. If you're adding, renaming, or redefining a service, edit `R/service_config.R` only — every consumer picks up the change automatically, or fails loudly at load time if something referencing the old name breaks. See `docs/pipeline_reference.md` (row B7) for the full incident writeup, and `README.md`'s "Additional services" section for the new-service checklist.
+
+**How to apply**: before writing any new join/merge on a GPKG file in this project, ask whether
+`fid` is actually a real column in what your tool gives you back (print `df.columns`, don't assume)
+— and prefer the SQL-based read pattern over geopandas by default for anything keyed on `fid`.
+
+## ⚠️ Interpretation risk: sediment retention *amount* is demand-sensitive (found 2026-09-01)
+
+`sed_retention = USLE − sed_export`. USLE is not land-cover-independent — it carries a
+cover-management (C) factor that rises when forest converts to cropland/pasture — so an increase
+in the sediment retention *amount* can mean "more erosion is being generated by land conversion,
+and some of it is still being caught," not "retention capacity improved." Confirmed on real data,
+not theoretical: decomposing Brazil's national total change, 95% (+55,105 of +58,033) traces to
+rising USLE, only 5% to an actual decline in delivered export, concentrated almost entirely in the
+Amazon biome (Tropical & Subtropical Moist Broadleaf Forest), not the Cerrado. Query pattern used
+(sqlite3 directly against `data/processed/10k_change_calc.gpkg`, no geopandas needed):
+
+```python
+SELECT SUM(usle_2020-usle_1992) AS total_usle_chg,
+       SUM(sed_export_raw_2020-sed_export_raw_1992) AS total_export_chg,
+       SUM(sed_retention_abs_chg) AS total_retention_chg
+FROM "10k_change_calc" WHERE nev_name='<country>' AND sed_retention_abs_chg IS NOT NULL
+```
+
+**How to apply**: never read a `Sed_retention` amount increase (map, bar chart, or hotspot
+"gain") as environmental improvement without checking this decomposition for the region in
+question — especially anywhere the increase coincides with a known LCC conversion driver
+(Crop_Exp, Grassland_Gain). The *ratio* (`(USLE−SedExport)/USLE`) is structurally immune since
+dividing by USLE cancels the demand term — prefer it as a cross-check. `N_retention` is not
+subject to this (InVEST models it directly under a fixed fertilizer-load scenario applied to both
+1992 and 2020 land cover, so its change is retention-capacity-only). Coastal protection's exposure
+to an analogous artifact has not been checked. See `docs/manuscript/paper_draft_5service.qmd`'s
+Methods callout (Biophysical Modeling section) and Limitations for the paper-facing writeup, and
+`docs/manuscript/becky_ratio_weighting_and_scope_2026-08-31.draft.md` (question 2) for the
+ratio-scope implication sent to Becky/Steve.
+
 ## Prerequisite: LC grid crosswalk (run once, before anything else)
 
 `10k_lcc_granular_metrics.gpkg`'s own `grid_fid` is a row-index into a *different* source grid
@@ -29,6 +127,52 @@ Always confirm the crosswalk file exists before trusting a from-scratch attribut
 > every processing stage read its base grid from one single master grid file from day one**, not to
 > reconcile mismatched grids after the fact with a spatial join. Reaching for another crosswalk script
 > should be a last resort for legacy data, not the default pattern going forward.
+
+## Step 0: Raw zonal extraction (Docker, Windows) — not previously documented here
+
+The R chain below (steps 1-5) all consume `grid_10km_land_synth_zonal_*.gpkg` files that don't
+exist until this step actually runs. This was reverse-engineered the hard way on 2026-08-28/29
+while adding a new coastal variable — worth documenting properly so the next person doesn't repeat
+the same dead ends. The README already documents the basic Docker invocation; this adds the
+Windows-specific gotchas it doesn't cover.
+
+**Prerequisite**: Docker Desktop must actually be running (`docker ps` should return a table, not
+a connection error) — starting the Docker Desktop app is not instant, give it a minute.
+
+```bash
+# Git Bash on Windows mangles container paths like /workspace into host paths
+# (e.g. "C:/Program Files/Git/workspace") unless this is set:
+export MSYS_NO_PATHCONV=1
+
+docker run --rm \
+  -v "C:/projects/global_NCP:/workspace" \
+  -v "C:/projects/global_NCP/data:/data" \
+  -w /workspace \
+  -e GLOBAL_NCP_DATA=/data \
+  -e ENV_NAME=geopy311 \
+  therealspring/global_ncp-computational-environment:latest \
+  python Python_scripts/summary_pipeline_landgrid.py --data-root /data analysis_configs/<config>.yaml
+```
+
+**`ENV_NAME=geopy311` is required and easy to miss.** The image is a `micromamba-docker` base with
+two environments (`base`, `geopy311`); its entrypoint activates whichever `$ENV_NAME` points to,
+defaulting to nothing usable. Without it, `python` isn't found at all (fails as `exec: python: not
+found` or `python: command not found` depending on how the container is invoked) — this looks like
+a broken image, but it's just the wrong environment being active. Confirm available environments
+with `docker run --rm <image> micromamba env list` if this ever changes.
+
+Run once per config that changed (`services_slim.yaml`, `beneficiaries_slim.yaml`,
+`c_protection_synth.yaml`, or any new one) — each takes ~15-20 minutes for the full 1.52M-cell grid
+(most of it is vector geometry validation, not the actual zonal stats). Output lands in
+`summary_pipeline_workspace_ha/grid_10km_land_synth_zonal_<timestamp>.gpkg` on the host (via the
+`/workspace` mount) — this is what `process_data.qmd` (step 1 below) reads.
+
+**Before adding a new raster to any of these configs, verify the referenced files actually exist**
+— `analysis_configs/c_protection_synth.yaml` had four stale raster paths (`Rt_1992.tif`,
+`Rt_2020.tif`, `Rt_ratio_1992.tif`, `Rt_ratio_2020.tif`) pointing at files that no longer exist in
+any local checkout (moved to `interim/archive/` on the server at some point, never copied back) —
+this failed loudly and immediately (`RasterioIOError: ... No such file or directory`) the first
+time this config was actually re-run in a long while, not caught by inspection alone.
 
 ## Full pipeline (re-run from raw data)
 

@@ -1,6 +1,10 @@
 ---
 title: "Hotspot Redesign Plan — 5-Service Set, New Overlap Categories, Beneficiary Reanalysis"
-status: "DRAFT — for Becky's review, she is on holiday this week"
+status: "ARCHIVED 2026-09-07 — nearly every phase below is done. Before archiving, the Phase 4
+  beneficiary-mask Gini/HDI/GDP finding (not captured anywhere else) was ported to
+  docs/methodology.md's Population Exposure section, and the still-open 'five housekeeping
+  items' (R-package hygiene, grid-file naming, data/outputs split, country-report toolbox) were
+  carried into memory (project_docs_cleanup_deferred). Kept here for full provenance/detail only."
 date: "2026-07-28"
 branch: "feature/hotspot-5service-redesign"
 ---

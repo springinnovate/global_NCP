@@ -1,7 +1,9 @@
 ---
 title: "5-Service Hotspot Rasters — What They Are, For Rich's Beneficiaries Pipeline"
 date: "2026-07-28"
-status: "Global scope only, delivered for beneficiaries rerun handoff"
+status: "ARCHIVED 2026-09-07 — superseded by docs/hotspots_rasters_data_dictionary.md (more
+  complete, same numbers) and docs/pipeline_reference.md (current status/numbers). Kept for
+  provenance only, not a current reference."
 ---
 
 ## What this covers

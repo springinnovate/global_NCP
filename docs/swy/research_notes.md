@@ -48,13 +48,13 @@ https://storage.googleapis.com/releases.naturalcapitalproject.org/invest-usergui
   stream-connected water bodies/wetlands; wet-condition (ARC-III) values for flood modeling.
 - **Practical implication**: CN genuinely needs literature-sourced, region-specific values. This is the
   harder of the two parameters and the one that actually justifies Becky's "subregional tables" framing.
-- **Not yet investigated, worth checking next**: SWAT (Soil and Water Assessment Tool) is a different,
-  widely-used global hydrology model built on the same SCS-CN method, and has been applied at
-  continental/global scale far more often than InVEST SWY has. SWAT's literature on CN parameterization
-  across regions/land covers is a plausible source of directly transferable precedent — has not been
-  searched yet.
-- Also not yet checked: whether any published InVEST SWY case study has already assembled a
-  multi-region or country-spanning CN table that could serve as a partial building block.
+- **SWAT checked, 2026-07-16 (see below) — no shortcut there.** SWAT's own global land cover
+  databases (Abbaspour & Ashraf Vaghefi 2019) only crosswalk land cover classes to SWAT's own
+  crop/landuse definitions, not curve number values. Useful negative result, not a building block —
+  don't re-check this.
+- Also checked: whether any published InVEST SWY case study had already assembled a multi-region
+  CN table — yes, Hamel et al. 2020 (see below), by borrowing from existing calibrated regional
+  studies rather than building one from scratch. This became the actual operating strategy.
 - Source citations: NRCS TR-55 (https://www.nrc.gov/docs/ML1421/ML14219A437.pdf); CN tables also at
   https://www.hec.usace.army.mil/confluence/hmsdocs/hmstrm/cn-tables
 
@@ -93,15 +93,20 @@ Two very different sub-problems here — cropland and everything else.
 
 SWY needs a raster of hydrologic soil group (A/B/C/D, encoded 1-4) — this input doesn't exist anywhere in
 the current pipeline (all 8 existing services are soil-group-agnostic). Candidate: **HYSOGs250m** (Ross et
-al. 2018), a global 250m hydrologic soil group product — flagged last session, **not yet verified** (not
-confirmed to still be publicly available, not confirmed compatible with this pipeline's grid/CRS handling).
+al. 2018), a global 250m hydrologic soil group product. **Confirmed still live and available**
+(2026-07-16, see below) via ORNL DAAC (DOI 10.3334/ORNLDAAC/1566) and NASA Earthdata — this input is
+unblocked, just not yet downloaded (see the "Open questions" checklist near the end of this file).
 
-## Proposed approach (draft — not yet validated, do not build against this yet)
+## Proposed approach (2026-07-10 draft — superseded, kept for history only)
 
-1. **CN**: build subregional tables, stratified by some combination of biome (WWF_biome, already in this
-   pipeline's grid attributes) and/or Köppen climate zone. Check SWAT literature before finalizing the
-   stratification scheme — it may already have a defensible precedent for how many strata is
-   "manageable but meaningful," which is exactly the tradeoff Becky flagged.
+**Superseded 2026-07-16 by the GCN250 milestone below** — item 1's "build subregional tables from
+scratch, stratified by biome/Köppen" plan was replaced by "use GCN250 as the global baseline
+everywhere, patch only the ~3 biomes GCN250's own authors flag as least validated." Items 2–4
+(Kc) held up and are still the actual plan. Don't build against item 1 as written — see the
+"Open questions / next steps" section near the end of this file for the actual current checklist.
+
+1. ~~**CN**: build subregional tables, stratified by some combination of biome (WWF_biome, already in this
+   pipeline's grid attributes) and/or Köppen climate zone.~~
 2. **Kc, cropland fraction**: FAO-56 tables, crop-calendar-adjusted by hemisphere/climate zone at minimum.
 3. **Kc, non-crop vegetation fraction**: NDVI-derived via the Kamble et al. regression (or a better
    updated one, if found) — likely avoids needing a regional lookup table at all for most of the land
@@ -290,23 +295,208 @@ two layers that get assembled together, not one undifferentiated "run SWY global
 
 Assembly = the global CN/Kc raster (base table + biome corrections) gets clipped to each basin's
 extent, then each basin is routed independently using those already-correct pixel values —
-TaskGraph/ecoshard being the presumed (not yet confirmed) mechanism for running that per-unit at
-global scale. Sent to Rich (and Becky, same channel) 2026-08-24 for confirmation — see
-`docs/swy/rich_slack_reply_2026-08-21.md`; update this section once they weigh in.
+TaskGraph/ecoshard being the mechanism for running that per-unit at global scale. Sent to Rich
+(and Becky, same channel) 2026-08-24 for confirmation.
+
+**Confirmed by Rich (2026-09-03, Slack, verbatim "Yes!")**: the *mechanical* framing is correct
+— `run_swy_global.py` really does batch the watershed vector into per-basin jobs, route each
+independently through TaskGraph, stitch into one continuous global mosaic, and the CN/Kc raster
+paths really do bypass the lookup table when supplied directly. Combined with the independent
+code-level confirmation from reading `swy_global` directly the same day (see below), this half
+of the architecture question is closed.
+
+**Genuinely still open, confirmed NOT asked in the message that got sent**: the message as
+actually sent only asked the mechanical question above — it dropped the Hamel et al. 2020
+validation-scale nuance (whether stitching many small basin runs together satisfies what Hamel's
+basin-size caution would consider a defensible "global" result, as opposed to just being
+mechanically possible) that was in an earlier draft. Rich's "Yes!" cannot be read as covering a
+question he was never asked. This remains a real open question, not just unconfirmed — worth a
+separate, explicit ask before treating "global run" as scientifically validated rather than
+merely mechanically executable.
+
+## `swy_global` repo studied (2026-09-03) — confirms the routing/parameterization split at the code level
+
+Cloned `github.com/springinnovate/swy_global` (Rich's prior global SWY framework, pointed to
+2026-08-21) and read `README.md` + `run_swy_global.py` directly — not a summary from Rich's
+description, the actual code. Findings:
+
+- **The TaskGraph/ecoshard mechanism from the section above is now confirmed, not presumed.**
+  `run_swy_global.py` imports `ecoshard.taskgraph` and `ecoshard.geoprocessing`, and calls
+  `inspring.seasonal_water_yield.execute()` (a NatCap "inspring" package — an extended/research
+  SWY implementation, not stock InVEST) once per watershed job.
+- **Basin batching is real and already solved, not something to design from scratch.**
+  `_batch_into_watershed_subsets()` loops over the global watershed vector (`.shp` files under
+  `WATERSHEDS_VECTOR_PATH`, a HydroSHEDS-derived product per `swy_global.ini`), groups small
+  watersheds into degree-separated tiles capped at 1000 features per job (large watersheds get
+  their own job), reprojects each job to its local UTM zone, and schedules them largest-first for
+  parallel execution via `multiprocessing` + `TaskGraph`. Results get stitched back into one
+  continuous mosaic via a queue-based worker (`N_TO_BUFFER_STITCH`), with per-job workspaces
+  cleaned up once stitching confirms completion. **This resolves the "one global run vs. regional
+  mosaic" framing as a false binary** — the tool does both simultaneously: real per-basin
+  computation (respecting Hamel et al. 2020's basin-scale validation caution) assembled into a
+  seamless global output. Worth stating this precisely in any reply to Rich, not just "seems to
+  work."
+- **Continuous CN/Kc rasters bypass the lookup table entirely — confirmed at the `model_args`
+  level.** `run_swy_global.py` builds one `model_args` dict per job containing *both*
+  `lulc_raster_path` + `biophysical_table_path` (the standard InVEST route) *and* optional
+  `cn_a_path`/`cn_b_path`/`cn_c_path`/`cn_d_path`/`kc_1_path`...`kc_12_path` overrides, commented
+  "these keys are optional rasters that would replace lulc biophysical parameters." This is
+  exactly the integration point for this project's plan: precompute CN_A-D and Kc_1-12 rasters by
+  blending the GCN250 lookup table with the biome-specific literature corrections (tropical moist
+  forest, mangroves, flooded grasslands/savannas), then feed them here directly — no lookup-table
+  step needed at all.
+- **`calculate_average_monthly_events.py` (the rain-events calculator) uses Google Earth Engine +
+  CHIRPS DAILY, not ERA5.** There's a commented-out ERA5 dataset line (`# ('ERA5', ...)`,
+  disabled) sitting next to the active CHIRPS entry — meaning **the CHIRPS 60°N/60°S coverage gap
+  is NOT resolved by this script as shipped**; ERA5 blending was evidently tried or planned but is
+  currently inactive scaffolding, not a working fallback. This answers the open question from the
+  2026-08-21 Rich outreach ("does his calculator already blend ERA5 for high latitudes") — no, it
+  doesn't, currently. Re-enabling it would need real work, not just an undocumented existing
+  feature to switch on.
+- **`base_data/biophysical_template_PH.csv`** — a sample biophysical table (Philippines), confirms
+  the repo also supports the traditional LULC+table route as a fallback/reference format, useful
+  for understanding the expected table schema even though this project plans to use the direct-
+  raster route instead.
+
+**Not yet done**: haven't traced through `inspring.seasonal_water_yield.execute()` itself (that
+package isn't in this cloned repo — it's a separate dependency, `pip`-installed presumably from
+NatCap's own package index or a private index; would need locating separately if the actual
+model internals matter, as opposed to just the orchestration layer covered here).
 
 ## Open questions / next steps (remaining)
 
+**Update 2026-09-07 — test-basin question resolved (user decision), two open threads reconciled.**
+This file had been carrying two different test-basin proposals in parallel without ever explicitly
+choosing between them: the Llanos idea below (2026-09-03/04) and the separate Hamel-basin-
+replication proposal sent to Becky 2026-09-04 (see the SWY section of `docs/HANDOFF_2026-09-07.md`
+— replicate on Hamel's own Peru/Myanmar basin(s), compare against her actual published output).
+**Resolved: Hamel's basin(s) first.** Reasoning: Llanos would be a real test-basin run, but there is
+no existing SWY output for the Llanos to validate the result against — a coherent trial with nothing
+to check it against. Hamel's basins have exactly that (her own published quickflow output), so they
+validate the parametrization, not just prove the mechanism runs. Llanos stays a real, wanted next
+step — it's still the concrete test case for the flooded-grasslands/savannas CN patch, and
+personally motivated for the user — just sequenced after the Hamel-basin validation, not before it.
+
+**Update 2026-09-08 — validation-test year question resolved, simply.** The test year(s) should
+just be whatever period Hamel et al. 2020's own original SWY run used for the chosen basin (Peru or
+Myanmar) — not 2020, not 1992, not a project convention. Match the validation target exactly, since
+the point of this test is a direct comparison against her actual output. Asked Rich directly
+(`docs/swy/rich_swy_status_and_asks_2026-09-08.draft.md`) for the exact year(s), alongside the
+granular basin output itself. The 2020-vs-2000 decision below still applies separately, but only
+once/if this moves beyond the validation test into this project's own multi-temporal SWY run.
+
+**Same update — 1992 NDVI unavailability accepted as a real limitation, not a blocker.** MOD13A3
+only covers 2000-present (see "Remaining inputs" below); MODIS didn't exist in 1992. Decided: don't
+chase a cross-sensor 1992 substitute (e.g. GIMMS AVHRR) for now. Use **2020** as the anchor year
+whenever NDVI is actually needed for this project's own comparative pipeline (matching the other
+four services' 2020 snapshot) — separately decide later whether pulling **~2000** (the earliest
+MOD13A3 year) as a second time point is worth it, once/if this moves beyond a validation test into
+an actual multi-temporal SWY run. Note this doesn't apply to the Hamel-basin validation test itself,
+which should use whatever period Hamel et al. 2020's own study covered, not 2020 or 1992 — check her
+methods for the actual years before pulling anything for that test specifically.
+
+**Previously (2026-09-03/04, kept for context)**: proposed to Becky, not yet confirmed — start with a real test run on
+one representative Colombian Llanos basin rather than jumping to anything global. That scope
+changes several items below from "must resolve first" to "doesn't apply at this scale, revisit
+before going global": the precipitation-source blend question doesn't need resolving (Llanos is
+well inside CHIRPS' coverage, no need for the CHELSA fallback yet), and the Hamel et al.
+validation-scale question (still an open ask to Rich, see the section above) doesn't block a
+single sub-10,000 km² basin either. What the Llanos scope can't dodge, and shouldn't: it *is* the
+flooded-grasslands/savannas biome, so it's the concrete test case for that patch decision, not
+something to defer further.
+
 - [x] Download and review NatCap's `kc_calculator.xlsx` tool — done, see above
-- [ ] Build the actual biome-stratified CN correction for the ~3 flagged biomes (see
-      `docs/swy/model_specification.md`'s refined CN decision)
-- [ ] Acquire and integrate HYSOGs250m into the pipeline's grid/CRS handling
-- [ ] Acquire MOD13A3 NDVI and apply the Kamble et al. regression
-- [ ] Acquire HydroBASINS as the watersheds/AOI input
-- [ ] Resolve the precipitation source (CHIRPS+CHELSA blend vs. single source) with Becky —
-      tied to the existing WORKLOG.md climate-data provenance question
-- [ ] Derive the rain-events table from daily CHIRPS once the precipitation source is settled
+- [x] Confirm the routing-vs-parameterization architecture — done 2026-09-03, both at the
+      `swy_global` code level and by Rich directly (see section above)
+- [ ] **Mangrove / flooded-grasslands CN patch — leaning toward "structural limitation," not yet
+      formally decided or communicated to Becky.** No usable literature found after three separate
+      search angles; both are flood-pulse/tide-dominated systems where CN's local rainfall-runoff
+      premise may just not apply (same treatment as GCN250's own "Water/wetlands" PFT row, CN≈100).
+      The proposed Llanos test run is the concrete case to resolve this against, not an abstract call.
+      **Asked Becky directly instead (2026-09-07, sent)**: whether NatCap's existing Indonesia SWY
+      run touches mangroves or flooded/seasonal wetlands — would resolve this gap directly if so,
+      without more searching. Not yet answered.
+- [ ] Tropical moist broadleaf forest CN patch — this one has real candidate literature (Calero
+      Mosquera et al. 2021, Fábrega et al. 2012, pending verification) and is a genuine "build the
+      correction" task, unlike the item above.
+- [ ] Acquire HYSOGs250m, MOD13A3 NDVI, and HydroBASINS — **scope to the proposed Llanos test
+      basin first**, not a global pull, per the update above.
+- [ ] Resolve the precipitation source (CHIRPS+CHELSA blend vs. single source) with Becky — only
+      actually blocking once/if this moves beyond the Llanos test to anything outside CHIRPS'
+      60°N/60°S coverage.
+- [ ] Derive the rain-events table from daily CHIRPS via `calculate_average_monthly_events.py`
+      (confirmed working, Earth Engine + CHIRPS daily) once the Llanos basin boundary is pulled.
 - [ ] FAO-56 Kc tables for cropland fraction, re-run with region-correct planting dates
       (not the spreadsheet's Northern-Hemisphere defaults)
+- [x] **Locate `inspring.seasonal_water_yield` — done 2026-09-08.** Public GitHub repo,
+      `github.com/springinnovate/inspring` (the `Dockerfile`/`setup.py`'s `therealspring/inspring`
+      URL is just Rich's old GitHub account name — same org, redirects, not a fork). No PyPI
+      package, no NatCap credentials needed. **No maintained install manifest** — the repo's own
+      `requirements.txt` was deleted in 2022 and never replaced; the `Dockerfile` is stale (pins
+      InVEST 3.9.0, a specific old `ecoshard` fork commit, even a vestigial `torch` dependency).
+      Real install path: `git clone` + `pip install .` (ships compiled Cython extensions —
+      `seasonal_water_yield_core.pyx` is where the actual routing math lives — needs a C++
+      compiler, `cython`, `numpy`, `setuptools_scm` at build time). One thing worth asking Rich
+      directly: the Dockerfile pins a specific fork commit of `ecoshard`
+      (`therealspring/ecoshard@b9b4580...`), not the stock PyPI `ecoshard` (currently 0.7.0) —
+      unconfirmed whether PyPI's `routing` submodule API (`fill_pits`, `flow_dir_mfd`,
+      `flow_accumulation_mfd`, `extract_streams_mfd`, `detect_lowest_drain_and_sink`) matches, or
+      whether his fork is still required.
+
+## `inspring.seasonal_water_yield.execute()` — full required-inputs list (2026-09-08, code-read)
+
+Several of these were not previously compiled anywhere in this file:
+
+- Always: `workspace_dir`, `dem_raster_path`, `aoi_path`, **`threshold_flow_accumulation`** (stream
+  extraction threshold — was in `swy_global.ini`, never listed here), **`alpha_m`, `beta_i`,
+  `gamma`** (the three SWY routing-partition parameters), `lulc_raster_path` (conditionally —
+  only needed if any biophysical factor isn't directly raster-overridden).
+- Unless `user_defined_local_recharge=True`: `et0_dir` (monthly reference-ET rasters, globbed +
+  **alphabetically sorted** — filenames must sort Jan→Dec or months get silently misassigned;
+  PET is computed inside the model as `PET_m = Kc_m × ET0_m`), `precip_dir` (same sorting
+  convention), `soil_group_path` (HSG raster, 1–4).
+- Rain events: exactly one of `rain_events_table_path` (CSV), `climate_zone_table_path` +
+  `climate_zone_raster_path`, or `user_defined_rain_events_dir` — `swy_global` uses the last.
+- Biophysical: `biophysical_table_path` (CSV — code requires a `root_depth` column too, not just
+  `lucode`/`CN_A-D`/`Kc_1-12` as the docstring implies) OR direct raster overrides per factor
+  (`root_depth_path`, `cn_a/b/c/d_path`, `kc_1...12_path`).
+- Also real, previously unlisted: `max_pixel_fill_count` (caps pit-fill flood extent),
+  `single_outlet` (forces one lowest-drain/sink pixel as sole outlet — `run_swy_global.py` sets
+  this automatically for single-watershed jobs).
+
+**Real finding: `root_depth` is required to satisfy the pipeline but is dead code in this fork** —
+traced through `seasonal_water_yield.py` and the `.pyx` core: it's computed but never consumed in
+the actual water-balance equations (not passed into `calculate_local_recharge`, not referenced in
+quickflow/baseflow routing). Stock InVEST SWY uses root depth for AET; this variant doesn't appear
+to have it wired in yet. Practical implication: still need *some* root-depth input to avoid an
+error, but it's low-priority to source carefully — its values currently don't affect output.
+
+**CN/Kc resolution/alignment question, resolved precisely — this was a real open question, now
+answered**: **no, CN/Kc/root_depth override rasters do NOT need to be pre-aligned to the job's
+grid.** `inspring`'s own `_reclassify_or_clip()` automatically warps any supplied override onto
+the DEM's aligned grid via bilinear resampling — unconditional, regardless of the `prealigned`
+flag. (Worth knowing: bilinear on curve number, a bounded 0–100 quantity, will blur values across
+LULC-class/soil-group boundaries — not nearest-neighbor, which might be expected for a categorical-
+origin variable.) Separately, `run_swy_global.py`'s per-basin worker always sets
+`prealigned=True` and does its own complete pre-warp of every input to the watershed job's local
+CRS before calling `execute()` — so in the actual `swy_global` pipeline, `inspring`'s internal
+CN/Kc warp is a redundant-but-harmless second pass; it's the load-bearing mechanism only if
+`inspring.seasonal_water_yield.execute()` is ever called directly, without the `swy_global`
+wrapper.
+
+**Guswa et al. 2018 confirmed at the code level, not just by citation-inference**:
+`_calculate_monthly_quick_flow()` implements the exact closed-form stochastic-rainfall quickflow
+expression (`Si = 1000/CN − 10`, mean rain depth per event, `scipy.special.expn(1, ...)` for the
+exponential-integral E₁ term) — Guswa's analytical solution under exponentially-distributed daily
+rainfall, matching InVEST User Guide Eq. [1].
+
+Clone paths (session-scoped scratch, will not persist — cheap to re-clone from
+`github.com/springinnovate/{swy_global,inspring}` if gone):
+`.../scratchpad/swy_research/swy_global` and `.../scratchpad/swy_research/inspring`. Files worth
+returning to directly: `inspring/src/inspring/seasonal_water_yield/seasonal_water_yield.py`
+(`execute()`/`_execute()`, `_reclassify_or_clip`), `seasonal_water_yield_core.pyx` (the Cython
+`calculate_local_recharge`/`route_baseflow_sum` MFD-routing kernels), `swy_global/run_swy_global.py`
+(~line 640-805 for the per-basin pre-warp worker, ~873-912 for `model_args` construction).
 
 ## Sources consulted so far
 

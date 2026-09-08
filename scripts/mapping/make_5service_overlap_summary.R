@@ -22,7 +22,7 @@ d <- st_read(gpkg_path, quiet = TRUE) |> st_drop_geometry()
 n_hotspots <- nrow(d)
 
 # Total valid land grid cells (denominator for "share of land area"), same
-# Antarctica/Lakes/Rock & Ice exclusion as extract_hotspots_5service.R.
+# Antarctica/Lakes/Rock & Ice exclusion as extract_hotspots.R.
 master_path <- file.path(data_dir(), "processed", "10k_change_calc.gpkg")
 geom_check <- st_read(master_path, quiet = TRUE) |> st_drop_geometry()
 if ("continent" %in% names(geom_check)) geom_check <- filter(geom_check, !continent %in% c("Antarctica", "Seven seas (Open Ocean)"))

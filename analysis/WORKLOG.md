@@ -1,5 +1,376 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-09-03/04 — Full reversal executed (export/risk restored), pipeline/SWY docs brought current, second paper round queued for Becky/Steve
+
+Becky's 2026-09-02 Slack override (see `becky_steve_feedback_plan.md`'s "REVERSAL" section) got
+actually executed this session, not just documented. Flipped `R/service_config.R`'s
+`SERVICE_AMOUNTS` back to the export/risk trio (N_export, Sed_export, C_Risk), reran the full Path
+B chain end to end (hotspot extraction, spatial synthesis, KS diagnostics, attribution-gap script),
+and regenerated every figure that depends on the service list. Real numbers: **189,932** hotspot
+cells (vs. 219,138 under retention), **63.3%** attribution gap (vs. 63.77%), region_wb ranking
+flipped back to Latin America & Caribbean leading (1.58×) over East Asia & Pacific (1.21×) — both
+rankings were genuinely correct for their respective service definitions, not a repeat of an
+earlier ranking bug. B6b's known `unlink()`-wipes-the-maps-folder hazard fired again; recovered via
+`git checkout` plus a B6 rerun, nothing lost. Rewrote every paper section tied to the service
+definition (Methods, Hotspot Identification, Results, Discussion, Limitations, Conclusions,
+Annex), reframing the sediment/USLE demand-sensitivity finding as supporting evidence for Becky's
+call rather than an open tension, and confirmed the Population Exposure/multiplier numbers are
+**not** blocked on Rich after all — his existing beneficiary output was run against the export/risk
+definition already, which the reversal restores exactly, so no rerun is needed there. Corrected a
+real file corruption mid-session (a merged/truncated ~800-character span in the Annex, most likely
+from the qmd being open and saved from the IDE while edits were in progress) — repaired and
+verified via full render.
+
+**Also updated the reversal-era tracking docs, which had drifted**: `docs/pipeline_reference.md`
+still described the retention-era run as current in Sections A–E, including one row (D4) that had
+gone actively backwards (said to drop export/risk from Figure 2, which is now the wrong direction
+entirely) — every row updated with the real reverted numbers, old text kept as labeled incident
+history rather than deleted. Same pass on `docs/manuscript/becky_ratio_weighting_and_scope_2026-08-31.draft.md`
+(deleted, replaced by `becky_open_questions_2026-09-03.draft.md` — dropped the now-moot "confirm
+export/risk are fully out of the paper" question, kept the 4 still-genuinely-open ones plus the
+ratio-aggregation weighting bug as a separate, lower-priority item). Two other stale drafts found
+and deleted as obsolete during a broader draft-folder sweep: `rich_slack_message_2026-09-01.draft.md`
+(the raw-raster ask was already fulfilled per the plan doc — exact filenames archived into
+`pipeline_reference.md`'s D1 row before deleting) and `steve_feedback_status_update_2026-08-31.draft.md`
+(described the retention framing as final, now simply wrong). Two other drafts confirmed still
+valid and unsent: `becky_open_questions_2026-09-03.draft.md` and
+`justin_ee_correspondence_provenance_2026-08-31.draft.md` (the ee_correspondence citation ask —
+still fully accurate, provenance questions don't depend on service framing).
+
+**SWY, real progress after a ~10-day gap**: cloned and read `github.com/springinnovate/swy_global`
+directly — confirmed at the code level (not just from Rich's description) that it batches
+watersheds into per-basin jobs, routes each independently via TaskGraph, and stitches results into
+one continuous global mosaic, and that the `model_args` dict accepts direct CN/Kc raster overrides
+that bypass the lookup table entirely. Sent a trimmed version of the routing-vs-parameterization
+confirmation to Rich in the existing 2026-08-24 thread; he replied "Yes!" the same day — but only
+to the mechanical framing, since the Hamel et al. 2020 validation-scale question got dropped
+before sending and remains genuinely open, not just unconfirmed. Traced Hamel's Myanmar CN/Kc
+provenance back to Mandle et al. 2017 — Perrine Hamel is a co-author on both papers, so the
+calibration lineage is her own earlier work, not a random borrow; added to `literature_review.ris`
+with a caveat that her paper's "dry-season baseflows" metric isn't yet confirmed comparable to
+SWY's own quickflow output. Worked through a sequencing question with the user (test at Hamel's
+own basin scale first vs. run globally then validate against Hamel after) and landed on test-first:
+the global-assembly mechanism is already confirmed, so a global run would mostly re-pay for
+something already known while testing the actual unknown (parameterization accuracy) no more
+rigorously than a scoped basin test would. Sent this as a concrete proposal to Becky (mentioning
+Rich), replacing an earlier, weaker "test an arbitrary Llanos basin" framing — not yet answered.
+`docs/swy/research_notes.md`'s "Open questions" checklist rewritten to reflect all of this as
+current status rather than the July/August state it had been frozen at.
+
+**Also today**: consolidated LC_orinoquia's docs separately (five dated HANDOFF files + a
+CHECKPOINT doc merged into one, that repo's own WORKLOG updated, `methodology.md` corrected for
+the confirmed-permanent OneDrive training-data loss) — see that repo's own worklog, not
+duplicated here. Sent a follow-up to Carlos Mauricio Herrera and César Freddy Suárez (WWF Colombia)
+on the Orinoquía action-plan thread Sandra raised — separate from this repo's pipeline work, logged
+here only because it was part of the same session.
+
+**Queued, not yet sent**: a second reviewed round of `paper_draft_5service.qmd` (with the reversal)
+to Becky and Steve, targeted for this weekend so they have it Tuesday (Monday is Labor Day).
+
+### 2026-09-02 — Paper numbers/figures audit, sediment/USLE finding, docx callout bug, sent to Becky/Steve/Rich
+
+Continuation of 2026-09-01 below (same rerun, next working session). Picks up with the 5-service
+Path B rerun already complete and real numbers already existing in `10k_change_calc.gpkg`/derived
+tables — this session's work was auditing whether `paper_draft_5service.qmd` actually reflected
+them, and it mostly didn't yet.
+
+**Sediment retention amount found demand-sensitive — the main new finding.** `Sed_retention =
+USLE − SedExport`, and USLE carries a land-cover-dependent cover-management (C) factor, so
+converting forest to cropland/pasture raises USLE directly. Decomposed Brazil's national total:
+of the +58,033 increase in sediment retention amount, 95% (+55,105) traces to rising USLE, only 5%
+to an actual export decline — concentrated in the Amazon biome specifically, not the Cerrado.
+Documented in Methods/Results/Limitations; reframes the open Becky question about keeping ratio
+variables (structurally immune to this) rather than dropping them as secondary. See memory
+`project_sediment_retention_demand_artifact.md`.
+
+**Repeated pattern, found independently four separate times**: a number gets updated in one
+section (usually Results) but survives stale elsewhere (Discussion, Methods, a hardcoded table, the
+paper's own status callout). Fixed each time by actually recomputing/grepping rather than trusting
+a prior fix: the attribution-gap numbers (225,113/65.8%/7.4 → 219,138/63.8%/8.2, and the per-driver
+risk-ratio range itself was stale, 4.2–97.5 → 3.6–40.1, with the strongest driver changing from
+Urban Expansion to Cropland Expansion), the Discussion's "Differentiated Vulnerability Tiers"
+paragraph (named `N_export`/`Sed_export`, never tested under any version of the current framing),
+a World Bank Region table hardcoded to 5 stale regions with the wrong ranking (real data has 7,
+East Asia & Pacific leading), and an income-group multiplier figure (1.6× → real ~1.8×).
+
+**Ratios dropped from two secondary analyses, not the hotspot definition itself** (already
+settled) — the hotspot-magnitude boxplot figure and KS Diagnostics had each independently drifted
+into testing the 3 ratios alongside the 5 real hotspot-defining amounts. Boxplots cut to 5 panels,
+KS Diagnostics rescoped to 25 combinations (was 40) and actually re-run: 24/25 significant, one
+non-significant (coastal protection × field size, same decoupling story as before). Centralized
+the boxplot generator out of `hotspot_extraction.qmd`'s slow inline chunk into
+`scripts/mapping/make_hotspot_boxplots.R` + a fast standalone `run_hotspot_boxplots.R` (~90s vs. a
+full document render) — also found and fixed two more independent hardcoded 8-service `svc_order`
+copies in `KS_tests_hotspots.qmd` and one silently-broken paper table (`tbl-cliffs-delta`'s
+`service_order` never matched the post-redesign scheme, so rows were quietly dropping with no
+error). `R/plotting_functions.R` gained a shared `make_key_panel()` helper (plain-text legend,
+replacing an old per-group color-swatch hack) used by both the intensity charts and the boxplots.
+
+**Figure-quality pass** across every multi-panel figure: fonts bumped, redundant in-image
+titles/captions removed (duplicated the external Quarto caption), the combined 3-in-1
+hotspot-distribution figure and the abs/pct global-change map split into standalone figures,
+income-group chart legend fixed (was double-numbering, e.g. "1: 1. High income: OECD").
+
+**Docx export for Steve surfaced a real Quarto bug** (1.9.37, this environment): every
+`.callout-*` div's content vanishes entirely in docx output, confirmed with a minimal isolated
+test file. Fixed by converting all 16 real callout blocks to plain blockquotes, which survive in
+every format — don't reintroduce `.callout-*` divs in this file. Also fixed in the same pass: the
+paper's `DT::datatable()` tables (HTML-only widget, degrades to a raw text dump in docx — switched
+to plain `kable()`), and a missing title/author block in docx (added a
+`{.content-visible when-format="docx"}`-guarded manual title, docx-only, `.unnumbered` so it
+doesn't get numbered into the section sequence or duplicate in html). Full writeup:
+`docs/pipeline_reference.md` section G.
+
+**Sent to Becky, Steve, and Rich.** User rewrote the Becky/Steve email into one shorter, plainer
+combined message after finding the drafted version too structured/decorated — see memory
+`feedback_correspondence_style.md`, a real course-correction on how these should read going
+forward. Rich's message had a factual error caught after send-drafting: it claimed hotspot
+coverage/beneficiary masks were uploaded, when actually the updated *service hotspot rasters* were
+uploaded so Rich can produce the coverage masks and population rasters himself — fixed before
+sending. Also flagged: `Python_scripts/msk_zeros_diff.py` (pollination-vs-agriculture-mask logic)
+confirmed via repo-wide grep to be uncalled by any current pipeline file — unclear yet whether
+pollination masking happened upstream before rasters arrived here, or is genuinely missing; not
+resolved, logged in `docs/HANDOFF_2026-09-01.md` item 6 for next session.
+
+**Committed and pushed**: `0580637` (main paper/figure/docx work) and `99c2801` (Discussion trim +
+handoff) on `feature/paper-swy-integration`.
+
+### 2026-09-01 — Sediment/coastal unblocked via crosswalk, full 5-service Path B rerun, 6-copy config-drift incident found and fixed architecturally
+
+Picks up directly from 2026-08-31 below, where sediment was blocked on raw rasters from Rich.
+
+**Sediment unblocked without Rich, via a legacy-grid crosswalk.** Found that
+`10k_grid_synth_all.gpkg` — a March 2026 zonal-extraction intermediate whose regeneration was later
+disabled by default, never deleted — still holds raw 1992/2020 USLE, sediment-export, N-export, and
+N-retention levels the raw *rasters* no longer do. It's built on the same legacy
+`AOOGrid_10x10km_land_4326_clean.gpkg` grid as the 2026-07-08 LCC striping bug, not the current
+master grid, so reusing it required going back through `lc_grid_fid_to_master_fid_crosswalk.csv`.
+Didn't just trust the crosswalk's own `match_dist_m` — independently recomputed centroid distance
+from each file's own GPKG RTree bounding boxes first (99.4% of rows exact 0.0m matches, flagged-
+invalid rows genuinely 6-654km off, not borderline). `scripts/merge_sediment_and_coastal_via_
+crosswalk.py` written for this, promoted to canonical `10k_change_calc.gpkg` with a dated backup
+kept (`10k_change_calc_BACKUP_2026-08-31.gpkg`).
+
+**Refined once more after B1 caught a real flaw**: of the ~155K many-to-one crosswalk groups, 1,609
+have a clearly-best (~0m) match plus a clearly-worse secondary (4,600-5,900m away) that the
+crosswalk let through as `valid_match=TRUE` too — averaging that bad secondary match produced 572
+genuinely conflicting fids when the same crosswalk was reused for the LC-driver join in
+`hotspot_extraction.qmd`. Fixed by keeping only each group's best match(es) (within 1m of the
+group minimum) before aggregating — re-ran the sediment/coastal merge with this correction, small
+effect (~1,609 of 1.5M cells) but the right thing to do given this data feeds the paper.
+
+**Full Path B (10km-grid) rerun, real numbers, cross-validated three ways.** `hotspot_extraction.
+qmd` → 219,138 hotspot cells. `KS_tests_hotspots.qmd` → 38/40 covariate tests significant (both
+non-significant results are coastal vs. agricultural plot size, coherent with the paper's own
+decoupling narrative). `compute_attribution_true_union.R` → 63.77% attribution gap (was 65.8% under
+the old definition), risk ratio 8.23. A separate script, `scripts/extract_hotspots.R` (see rename
+below), independently reproduced the same 219,138 for the pct metric — exact match, strong
+consistency check. Geographic clustering (mean `relative_intensity` across the 5 services, matching
+the established 2026-07-30 methodology exactly): East Asia & Pacific 1.37×, Latin America &
+Caribbean 1.22× — same two regions as before, order flipped. Income disparity: lower-middle-income
+1.29× vs. high-income OECD 0.69× → ~1.9× (was 1.6×).
+
+**Config-drift incident — 6 independent copies found, not the 3 first assumed.** Fixing `hotspot_
+extraction.qmd`'s `HOTS_CFG`/`canonical_lookup` (stale `rt_service` key, no `sed_retention` entry)
+surfaced the same pattern independently in `hotspot_synthesis.qmd` and `KS_tests_hotspots.qmd` —
+each rendered with exit code 0 while silently computing on the old export/risk service names, caught
+only by spot-checking output *content*. A user-driven check against the actual shared Google Drive
+folder (screenshot) then revealed a 5th copy, `scripts/extract_hotspots_5service.R` (the generator
+of the `count_water`/`count_access`/`combined_cross` overlap columns Rich's beneficiary-buffer
+configs literally threshold on) — also independently drifted. A deliberate repo-wide grep sweep
+(`grep -rln '"N_export"\|"Sed_export"\|"C_Risk"' analysis/ scripts/ R/`) then found a 6th, more
+consequential instance: `R/utils_hotspot.R` defines `svc_order` at `devtools::load_all()` time
+(before any qmd chunk runs), and was **silently shadowing** `hotspot_extraction.qmd`'s own
+`if (!exists("svc_order"))` guard — meaning an earlier fix to that guard never actually took effect.
+`R/hotspot_violins.R` had three more hardcoded copies of the same pattern.
+
+**Architectural fix, not another patch**: `R/service_config.R` is now the single source of truth —
+`SERVICE_AMOUNTS`, `SERVICE_RATIOS`, `SERVICE_LEGACY_RAW`, and `service_canonical_lookup()`/
+`hotspot_direction_lists()`/`service_names()`/`ratio_names()` accessors, auto-loaded via
+`devtools::load_all()` like every other `R/*.R` file. Every one of the 6 drifted files now sources
+this instead of redefining the list locally. `hotspot_direction_lists(looking_for=)` also builds in
+the direction-flexibility the user asked for going forward (search for declines vs. best
+improvements) rather than hardcoding "decline" as the only possible analysis. `extract_hotspots_
+5service.R` renamed to `extract_hotspots.R` — the suffix was a leftover from when this was a special
+variant of an 8-service scheme; it's the canonical script now, no `extract_hotspots.R` predecessor
+ever existed to conflict with. **Known not-yet-audited**: `scripts/audit_hotspot_geography.R` and 7
+Colombia/Sandra-deck mapping scripts — not on the current critical path, deliberately deferred and
+logged (`docs/pipeline_reference.md` B7) rather than silently assumed fine.
+
+**Rich's hotspot rasters rebuilt and verified.** `scripts/gdal_rasterize_hotspots_5service.R`
+rewritten — the old version pointed at a stale July 28 file with old export/risk columns and the
+old water/access beneficiary categories, unrelated to today's data. New version reads both
+`hotspot_extraction.qmd`'s output (hotspot_count + 5 per-service flags) and `extract_hotspots.R`'s
+output (count_water/count_access/combined_cross), producing 18 files total (9 columns × abs/pct),
+matching the actual file set in Rich's shared Drive folder (confirmed via user-provided screenshot,
+not guessed). Sanity-checked via `terra`: `hotspot_count` range 1-5, per-service columns clean 0/1,
+221,372 valid pixels (~1% over the 219,138 vector count, normal reprojection edge effect).
+
+**Boxplot outputs consolidated**, per user request: the old volumetric/ratio/coastal 3-way split
+(itself one of the drifted-name locations) dropped in favor of one unified chart per metric — each
+facet already used `scales="free_y"` so no information is lost, just fewer files (4 → 2 per
+grouping). Surfaced and fixed a related bug: the boxplot's own per-service hotspot direction check
+only looked at `HOTS_CFG$loss` (the 5 amounts), silently misclassifying the 3 ratio services as
+gain-direction for this chart specifically.
+
+**Paper updated throughout `paper_draft_5service.qmd`**: Abstract rewritten for 5 services, 4 of 5
+headline numbers now real (219,138 cells, 63.8% gap, regional/income figures above) — only the
+Rich-blocked multiplier-effect figure remains `[TBD]`. Export/risk explicitly scoped as ratio-
+formula inputs only, never reported directly (Figure 2's old paired export/ratio layout flagged as
+needing to change when rebuilt). Coastal dropped from the global 4-panel change map — data-correct
+but a 1-cell-wide coastline fringe is invisible at full-globe scale, confirmed by diagnostic — with
+an honest caption rather than a blank-looking panel. Several stale status callouts caught (some by
+the user reading closely) and corrected — the top-of-document status note, the Biophysical Modeling
+callout, and the Hotspot Identification callout had all drifted to "still pending"/"in progress"
+language after the underlying work was actually done.
+
+**New process discipline note**: briefly ran two renders of `hotspot_extraction.qmd` concurrently
+(started a second one to pick up the `R/service_config.R`/boxplot fixes without confirming the
+first had finished) — no data corruption resulted since `HOTS_CFG` itself was unchanged between the
+two attempts, but it was luck, not design. Confirm a prior render has actually completed before
+starting another one of the same file.
+
+**Checkpoint commit made before the architectural refactor** (`936be11`) specifically so the
+service-config centralization could be attempted freely with a clean rollback point.
+
+**Still pending**: Rich's beneficiary rerun (rasters ready, not yet sent — combined email drafted
+covering both this and the still-open Path A raw-raster request), Becky's 6 questions (1 required
+before submission — InVEST climate inputs), Figure 2/Annex trajectory maps (blocked on Path A raw
+300m rasters, separate `zonal_stats_toolkit` repo), Results/Discussion prose still needs a pass to
+replace old numbers with the real ones now available, and the deferred old-output cleanup /
+unaudited-scripts list in `docs/pipeline_reference.md` section F.
+
+### 2026-08-28/31 — Service-definition redesign (retention/protection), coastal pipeline dry run, two real bugs found and fixed
+
+Steve clarified his services-list comment (see `becky_steve_feedback_plan.md` and the real email
+chain, `docs/manuscript/draft_review emails.pdf`): nitrogen, sediment, and coastal should all move
+from export/risk framing to retention/protection *amounts* (not ratios) — the actual ecosystem
+service is what's retained/protected, export/risk is the residual. `HOTS_CFG` in
+`hotspot_extraction.qmd` updated accordingly (`N_retention`, `Sed_retention`, `C_Prot_service`
+replacing `N_export`, `Sed_export`, `C_Risk`; ratios confirmed already excluded from hotspot
+detection per the existing Methods text). This also collapses the old damage-vs-good `deg_combo`/
+`rec_combo` split, since every service is now benefit-framed — both combos now point at the same
+5-service list (kept as two names for output-column compatibility, documented as such).
+
+**Nitrogen**: no work needed — `n_retention_abs_chg`/`pct_chg` already exist in the current
+`10k_change_calc.gpkg` from a prior run. Pure config/definition change.
+
+**Sediment**: blocked. Retained amount = USLE − export needs the raw 1992/2020 rasters for both;
+only the pre-computed 2020−1992 *difference* rasters survive locally (confirmed absent from both
+this project's `data/` and the pre-migration `C:\Users\...\data\global_ncp\` copy). Traced through
+a data inventory (`docs/ncp_data_catalog.md`, new this session, from two OneDrive spreadsheets
+originally shared by Becky) to a `sci-ncscobenefits-spring` GCS bucket with exact filename/MD5
+matches to this project's own `services_slim.yaml` — but the actual URLs 404 (files deleted from
+the bucket since the inventory was built). Storage is Rich's; message sent to him 2026-08-28 asking
+where the files live now (`docs/manuscript/rich_raw_rasters_request_2026-08-28.draft.md`, since
+sent and deleted per the draft-cleanup convention) — **no reply as of 2026-08-31, expected given
+weekend timing, but still open.**
+
+**Coastal**: fully unblocked and completed. `Rt_service = Rt_nohab_all − Rt` turned out to already
+be computed in `Python_scripts/coastal_protection_join.py`'s join step — not a new derivation.
+Rasterized via `rasterize_coastal.py` (had to install `tqdm` into `.venv`, force `PYTHONIOENCODING=
+utf-8` around a Windows console crash on a checkmark character, and substitute a same-grid raster
+for the original `landcover_gl_1992.tif` template, which no longer exists anywhere local — the
+script only needs matching grid geometry, not real land cover values, so this is safe). Extracted
+via `summary_pipeline_landgrid.py` inside the project's documented Docker image
+(`therealspring/global_ncp-computational-environment`) — see the two real gotchas now written into
+`docs/runbook.md`'s new Step 0 (Git Bash's `MSYS_NO_PATHCONV` path-mangling, and the required
+`-e ENV_NAME=geopy311` the README never mentioned, without which `python` isn't found in the
+container at all).
+
+**Two real, previously-latent bugs found via this dry run, both fixed:**
+1. `analysis_configs/c_protection_synth.yaml` referenced four raster files (`Rt_1992.tif`,
+   `Rt_2020.tif`, `Rt_ratio_1992/2020.tif`) that no longer exist anywhere local — moved to
+   `interim/archive/` on the server at some point, never copied back. Failed loudly
+   (`RasterioIOError: ... No such file or directory`) the moment this config was actually re-run
+   for the first time in a long while. Fixed by scoping the run to just the new column (those
+   values already exist correctly in the current `10k_change_calc.gpkg` from a prior run, no need
+   to re-derive), with the reasoning documented inline in the yaml.
+2. `process_data.qmd`'s multi-file merge loop used `for (i in 2:length(files_to_load))` — breaks
+   when exactly one zonal file is present, because `2:1` evaluates to `c(2, 1)` in R, not an empty
+   sequence, causing an out-of-bounds `NA` read (`missing value where TRUE/FALSE needed`). Never
+   surfaced before because every prior real run had ≥2 zonal files (services + beneficiaries at
+   minimum); this session's scoped coastal-only extraction was the first time anyone hit exactly
+   one file. Fixed to `seq_len(length(files_to_load))[-1]`.
+
+**Given process_data.qmd's full merge now needs zonal files that don't survive between sessions,
+built a lighter alternative for merging one new/changed variable in**:
+`scripts/merge_new_variable_into_change_calc.py` — writes to a clearly-named copy
+(`10k_change_calc_DRYRUN_coastal.gpkg`), never touches the canonical file, computes abs/pct change
+with the exact SPC formula from the paper's Methods. Deliberately uses raw `sqlite3` rather than
+geopandas to read/join — see the "why" comment in that script and the new
+`docs/runbook.md` section below, since this surfaced a **second, independent fid-handling bug
+class** this project has now hit (first was the LCC `grid_fid` mismatch, 2026-07-08): geopandas/
+pyogrio can silently turn a GPKG's `fid` primary key into an unnamed row index instead of a normal
+column, depending on file/library version — caught here by an explicit `assert "fid" in
+columns`-style check before it could silently mis-join, not by inspection. Also hit and worked
+around: GPKG's own RTree-maintenance triggers call SpatiaLite's `ST_IsEmpty()` on *any* row update
+to a spatial table (not just geom/fid changes), which plain Python `sqlite3` doesn't have — safe to
+drop the two offending triggers on a disposable copy since this operation never touches geometry.
+
+**QA catch worth noting for its own sake**: the first sanity-check sample (10 rows, ordered by
+`fid`) showed *identical* 1992/2020 values for every row — looked exactly like a real bug (both
+years accidentally rasterized from the same source). Turned out to be an unlucky contiguous
+no-change coastal stretch; checking the full 53,186-row set showed 25% with real, small, plausible
+differences. Lesson (now baked into the merge script's own sanity-check output): never trust a
+small ordered-by-fid sample as representative — check identical-vs-different counts across the
+whole non-null set.
+
+**Also fixed while in the neighborhood**: README.md referenced the deprecated
+`AOOGrid_10x10km_land_4326_clean.gpkg` grid (the one behind the 2026-07-08 bug) instead of the
+correct `landgrid_1_clean_enriched_4326.gpkg`, and six references to
+`summary_pipeline_workspace/` instead of the actual `summary_pipeline_workspace_ha/` the configs
+use — both stale, both fixed.
+
+**Status**: coastal data validated and sitting in `10k_change_calc_DRYRUN_coastal.gpkg`, not yet
+promoted to canonical. Sediment blocked on Rich. Nothing in `paper_draft_5service.qmd`'s Results
+section touched yet, per explicit instruction not to change anything before Results until real
+numbers are in hand for all three services together.
+
+### 2026-08-27 — Sandra deck fixes (bio slide, Propuesta reframe, render regression); paper/dissertation threads opened
+
+**Sandra deck (`docs/presentations/sandra_valenzuela_colombia_case.qmd`)**:
+- Rewrote the "Sobre mi" bio slide's *land systems science* definition and the "me identifico como
+  land systems scientist" line — both were thin/redundant. Pulled real language from the user's PhD
+  dissertation (`LC_orinoquia/docs/Dissertation_Manuscript_F_JRE2.pdf`, read via `pdftotext` since
+  poppler's PATH hadn't propagated yet — see below) instead of writing a definition from scratch: the
+  "not only what changes, but how and for whom" framing (Ch.4 discussion) and the "quantitative rigor
+  of land system science + critical/political-ecology perspective" framing (Conclusions chapter).
+- Reframed the closing "Propuesta" slide: the old intro line ("Colombia hoy existe únicamente dentro
+  del agregado regional...") didn't actually state an ask. Replaced with three concrete offers —
+  deepen the Colombia-specific cut, sustain institutional reporting, and (the new, sharper point)
+  **transfer the know-how itself** — open-source pipeline, IDE-based, AI-agentic workflows, so WWF
+  Colombia's own team could run it, not just receive a one-off product. Added a link to the public
+  repo (`github.com/springinnovate/global_NCP`, confirmed public via the GitHub API).
+- Rearranged that same slide's layout to a proper two-column split (bullets left, map right) with the
+  stat callout as a full-width band underneath — the original vertical stack (intro + 3 bullets +
+  side-by-side stat/map) was too tall and cut the map off the bottom of the slide.
+- **Removed the "23% of Piedmont/Altillanura cells are hotspots" stat callout entirely.** This figure
+  had already been corrected twice on 2026-08-20 (see that entry below) via a real point-in-polygon
+  check against the dissertation's study-area polygon. On 2026-08-27 the user, looking at the map
+  again, judged that the hotspots still read as concentrated toward Caquetá/southern Meta rather than
+  Piedmont/Altillanura specifically — casting doubt on the corrected figure too. No time in-session to
+  re-run the verification before a meeting, so the stat was pulled from the slide rather than shipped
+  unresolved; a note in the `.qmd` flags that it must be re-verified against
+  `LC_orinoquia/vectors/msk_pm_crs.geojson` before it's reintroduced.
+- Caught and fixed a render regression I introduced: re-rendered the deck with `quarto render --to
+  html`, which overrides the YAML's `revealjs` format and silently falls back to pandoc's plain HTML
+  writer — the deck lost all reveal.js slide structure (only the first couple of headings rendered,
+  everything else collapsed). The `--to html` command is correct for `paper_draft_5service.qmd` (a
+  plain HTML doc) but wrong for any `revealjs` presentation in this repo — use `quarto render
+  <file>.qmd` with no `--to` override, or `--to revealjs` explicitly, for decks.
+
+**Environment**: installed poppler via `winget install --id oschwartz10612.Poppler --scope user` to
+enable PDF reading (needed for the dissertation above). The PATH update did not propagate to a fresh
+Claude Code session or a fresh PowerShell process — worked around by calling `pdftotext`/`pdftoppm`
+directly by full path (`%LOCALAPPDATA%\Microsoft\WinGet\Packages\oschwartz10612.Poppler_...\
+poppler-25.07.0\Library\bin\`). Likely needs an actual Windows sign-out/restart to fix system-wide.
+
+**Two other threads opened, not substantively started**: (1) a new dissertation-manuscript review
+thread (`LC_orinoquia/docs/Dissertation_Manuscript_F_JRE2.pdf`) — user flagged the last chapter as
+weak/low-priority; (2) the paper's Methods section review, explicitly paused mid-thread by the user
+before this session and not yet resumed. See `docs/HANDOFF_2026-08-27.md` for full detail on both.
+
 ### 2026-08-21 — Tremie follow-up sent (CLEC abstract confirmation + Módulo 5)
 
 Sent the overdue follow-up to Tremie: confirmed the CLEC abstract was submitted by the Aug 12

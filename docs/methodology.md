@@ -52,6 +52,8 @@ While the canonical master grid initially contains 1,522,073 terrestrial cells, 
 *   **Modeling Constraints:** Certain biophysical models may fail to resolve valid outputs in edge-case topographies.
 By dropping these cells, we guarantee that the final analysis compares a mathematically sound, 1-to-1 footprint of cells that contain complete, valid, non-NA data for all required services across both time periods.
 
+*Note on denominators:* this ~1,302,099 figure is a stricter, further-filtered subset of the paper's own "1,372,621 valid land cells" figure (which excludes only permanent ice, open ocean, and inland water). The two are not in conflict — 1,372,621 is the terrestrial-land denominator; ~1,302,099 is that same set narrowed further to cells with complete data across every required variable in both 1992 and 2020, which is what the hotspot-extraction pipeline itself actually operates on.
+
 *Note: The legacy R script `analysis/prepare_data.qmd` and standalone cleaning utilities like `clean_grid.py` were fully deprecated in v1.3.4 in favor of this Python workflow.*
 
 ### Grid Geometry & Reprojection Effects
@@ -227,8 +229,13 @@ Hotspot cells are compared against the *median 5%* of each service's change dist
 **Why Cliff's Delta, not just p-values?**
 With ~1.5 million grid cells, even a negligibly small difference between hotspot and background distributions will produce a statistically significant p-value. This doesn't mean the difference is practically meaningful. Cliff's Delta (δ) measures the *probability* that a randomly drawn hotspot cell has a higher covariate value than a randomly drawn background cell, independently of sample size. δ = 0 means complete overlap; δ = ±1 means complete separation.
 
-**Why FDR correction — and what 39/40 means:**
-Running 40 tests at once (8 services × 5 covariates) means roughly 2 would appear significant by chance alone at a standard 5% threshold. Benjamini-Hochberg False Discovery Rate correction adjusts the significance bar across all 40 tests together, limiting the proportion of significant results that are likely to be false alarms. That **39 of 40 combinations remain significant after correction** means the socioeconomic signal is robust — the correction barely changed anything. The one non-significant result (Coastal Risk Reduction Ratio × agricultural plot intensity, $p_{adj}$ = 0.48, δ ≈ 0.001) also makes ecological sense: coastal protection hotspots are structurally decoupled from small-plot agricultural landscapes.
+**Why FDR correction — and what 24/25 means:**
+Running 25 tests at once (5 services × 5 covariates) means roughly 1 would appear significant by chance alone at a standard 5% threshold. Benjamini-Hochberg False Discovery Rate correction adjusts the significance bar across all 25 tests together, limiting the proportion of significant results that are likely to be false alarms. That **24 of 25 combinations remain significant after correction** means the socioeconomic signal is robust — the correction barely changed anything. The one non-significant result (Coastal Risk × agricultural plot intensity, $p_{adj}$ = 0.44, δ ≈ 0.001) also makes ecological sense: coastal risk hotspots are structurally decoupled from small-plot agricultural landscapes.
+
+> **Updated 2026-09-07**: this was 8 services / 40 tests / 39 significant / "Coastal Risk Reduction
+> Ratio" in earlier versions of this section — stale since the 5-service redesign dropped the 3 ratio
+> services from the hotspot-defining set (they're secondary context only now). Current numbers per
+> `docs/pipeline_reference.md` row B4.
 
 ### Population Exposure and the Serviceshed Multiplier Effect
 To assess the human impact of ecosystem service hotspots, the pipeline quantifies both direct and indirect population exposure, establishing a "Serviceshed Multiplier Effect."
@@ -263,6 +270,48 @@ The `hotspot_count` distribution in the current GeoPackage: 1 service = 139,514 
 **Analytical Purpose:** 
 This framework allows us to test whether intense, compounding environmental crises remain geographically contained. By plotting the exposed populations across escalating compound risk tiers, we measure the multiplier gap between *Local Residents* and total *Connected Beneficiaries*. This mathematically tracks how highly localized environmental degradation cascades into systemic regional vulnerabilities.
 
+> **Note (added 2026-09-07): the table above is 8-service-era (pre-July-2026 redesign) and pre-dates
+> both the 5-service redesign and the 2026-09-03 export/risk reversal.** Current hotspot count is
+> **189,932** cells (not 225,113), and the paper's current headline connected-beneficiaries figure is
+> **7.6 billion (96.7% of evaluated population)**. Don't cite the tier-by-tier table above as current
+> without re-deriving it from `10k_change_calc.gpkg`/the current beneficiary CSVs first — it's kept
+> here to show the *methodology* (how the multiplier is computed), not as a current numbers source.
+
+### Beneficiary-Mask Socioeconomic Test (Gini/HDI/GDP on buffered exposure zones)
+
+Distinct from the hotspot-cell-level KS/Cliff's-Delta test above (Section 5, "Socioeconomic
+Profiling"), a second test applies the same KS/Cliff's-Delta machinery to the *buffered beneficiary
+masks* themselves (downstream + travel-time reach, not just the originating hotspot cells) —
+answering "are the people who benefit from these ecosystem services systematically different from
+the rest of the landscape?" rather than "are the hotspot cells themselves different?"
+
+**Method:** zonal-extract each category's union coverage mask (`combined_cross`, `tier_3plus`,
+`tier_4plus`) onto the 10km grid as a coverage fraction, threshold at ≥0.5 for a binary "inside
+beneficiary mask" flag, then run `R/ks_hotspots.R::run_ks_hot_vs_non()` against HDI, Gini, and GDP.
+Validated against an independent `terra::expanse()`-based area calculation (agreement within 0.5
+percentage points) before trusting the KS result.
+
+**Result (2026-08-07, all 12 service × variable combinations significant, no exceptions):**
+beneficiary-mask areas are strongly wealthier and more populated than the surrounding landscape
+(Cliff's δ ≈ 0.48–0.53 for GDP and population), skew toward *more* unequal regions rather than less
+(δ ≈ 0.22–0.33 Gini, effect grows with tier exclusivity), and are close to HDI-neutral (δ ≈ 0.04–0.10,
+the weakest signal of the three) — consistent with buffers concentrating around where people already
+are, rather than around any particular development tier.
+
+**Status (2026-09-07): confirmed direction — this goes into the paper's socioeconomic profiling
+discussion**, as a distinct, complementary angle to the hotspot-cell-level result already there
+(this is exposure at the level of who *benefits*, not just which cells decline). **Deliberately not
+edited into `paper_draft_5service.qmd` yet** — Becky/Steve's feedback on the round sent 2026-09-07
+is still pending, and adding this now would collide with their review of the version already in
+their hands. Pick this up once their reply lands. This result predates the 5-service redesign's
+later retention/export detour and the 2026-09-03 reversal, but was built on the same underlying
+5-service definition the reversal restored (189,927 cells then vs. 189,932 now — a 5-cell
+difference), so it's very likely still valid without a rerun — not independently re-verified
+against the reverted data as of this note; do that check before actually writing it into the paper.
+Full detail (including the two-stage water/access buffer logic and a mermaid diagram of how Stage 1
+hotspot categories feed Stage 2 buffers) was in `docs/hotspot_redesign_plan.md` (Phase 4), archived
+to `docs/archive/` 2026-09-07 — see there if this section needs expanding.
+
 ### Land Cover Change Attribution
 To explain *why* hotspots occur, we integrate Land Cover Change (LCC) metrics derived from ESA CCI (1992) and C3S (2020) maps.
 
@@ -274,20 +323,22 @@ Instead of simple "Net Change" (which masks simultaneous loss and gain), we use 
 
 These metrics are aggregated to the 100 sq km master grid and overlaid with ES hotspots to quantify the **"Attribution Gap"**.
 
-> **Numbers below current as of 2026-07-08** (via `scripts/compute_attribution_true_union.R`, see
-> `docs/runbook.md` step 5 and the LCC grid crosswalk prerequisite it depends on). This section
-> previously cited a stale 24%/76% split computed before a grid-identity bug was fixed — see
-> `analysis/WORKLOG.md`'s 2026-07-07/2026-07-08 entries for the full incident. Verify against the current
-> book (`docs/manuscript/chapters/05-drivers-WHY.qmd`) or paper before citing if this file is more than a
-> few weeks old.
+> **Numbers below current as of 2026-09-03** (post-reversal rerun of `scripts/compute_attribution_true_union.R`,
+> see `docs/pipeline_reference.md` row B5). This section has been through two prior corrections: a stale
+> 24%/76% split (grid-identity bug, see `analysis/WORKLOG.md`'s 2026-07-07/2026-07-08 entries), then a
+> 34.5%/65.5% split computed under the 5-service export/risk definition before the brief 2026-08-28 to
+> 09-02 retention/protection detour and its 2026-09-03 reversal back to export/risk. Verify against the
+> current paper (`docs/manuscript/paper_draft_5service.qmd`) before citing if this file is more than a
+> few weeks old — this number moves whenever the hotspot-defining service set changes, even when the
+> underlying land-cover driver data doesn't.
 
 **Symmetric threshold design (critical for correct interpretation)**
 
 The co-occurrence analysis uses a **symmetric 5%/5% threshold**: ES hotspot cells are defined as the top 5% of SPC change per service; LCC driver hotspot cells are defined as the top 5% of gross conversion magnitude per driver, across **five drivers** (Forest Loss, Cropland Expansion, Urban Expansion, Grassland Loss, Grassland Gain — see Granular Models below). Both thresholds operate within the same 10km equal-area grid.
 
-**34.5% of ES hotspot cells co-occur** with at least one of the five LCC driver hotspots (the union across drivers) — a **strong, highly significant positive association** (odds ratio 12.17 for the union; risk ratios 3.9–36.6 per individual driver), far above what spatial independence would predict.
+**36.71% of ES hotspot cells co-occur** with at least one of the five LCC driver hotspots (the union across drivers) — a **strong, highly significant positive association** (odds ratio 10.94 [95% CI 10.81–11.08] for the union; risk ratio 7.29 for the union, 4.3–94.6 per individual driver — Cropland Expansion strongest, Grassland Gain weakest), far above what spatial independence would predict.
 
-The **Attribution Gap of 65.5%** means that most ES hotspot cells do **not** co-occur with any extreme (top 5%) LCC driver cell. This must not be read as "65.5% of cells had no land cover change" — it means those cells did not co-occur with the *most intense* conversion cells. Moderate or low-level land cover change may still be present in those cells but below the top-5% threshold. Framed as a *stronger* version of the chapter's thesis, not a weaker one: where land-cover conversion is detected at this intensity, it is a reliable indicator of ES-hotspot co-occurrence — but categorical monitoring alone misses the majority of cases.
+The **Attribution Gap of 63.29%** means that most ES hotspot cells do **not** co-occur with any extreme (top 5%) LCC driver cell. This must not be read as "63.29% of cells had no land cover change" — it means those cells did not co-occur with the *most intense* conversion cells. Moderate or low-level land cover change may still be present in those cells but below the top-5% threshold. Framed as a *stronger* version of the chapter's thesis, not a weaker one: where land-cover conversion is detected at this intensity, it is a reliable indicator of ES-hotspot co-occurrence — but categorical monitoring alone misses the majority of cases.
 
 This is a **spatial co-occurrence analysis, not causal attribution**. An important structural constraint is that ESA CCI land cover data serves simultaneously as a primary input to InVEST biophysical models and as the basis for the LCC overlay. This endogeneity means the gap cannot be treated as an independent empirical partition between degradation-driven and conversion-driven change.
 

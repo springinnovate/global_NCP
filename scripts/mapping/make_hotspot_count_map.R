@@ -58,14 +58,15 @@ generate_count_maps <- function(gpkg_path, metric, base_sf) {
   sf_data <- st_read(gpkg_path, quiet = TRUE)
   sf_data <- st_transform(sf_data, crs = "EPSG:8857")
 
-  metric_label <- ifelse(metric == "pct", "Percentage Change", "Absolute Change")
-
   # Map 1: Capped at 4+
   sf_data_cap4 <- sf_data %>%
     mutate(hotspots_capped = pmin(as.numeric(hotspot_count), 4),
            hotspot_label = factor(hotspots_capped, levels = 1:4, labels = c("1", "2", "3", "4+")))
 
-  p1 <- ggplot() + geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) + geom_sf(data = sf_data_cap4, aes(fill = hotspot_label), color = NA) + scale_fill_manual(name = "Overlapping\nHotspots", values = c("1" = "#FFD54F", "2" = "#FB8C00", "3" = "#E53935", "4+" = "#800026"), na.value = "gray90", drop = FALSE) + labs(title = paste("Global Ecosystem Service Hotspot Frequency", paste0("(", metric_label, ")")), subtitle = "Number of overlapping hotspots of decline/damage per 10km grid cell") + theme_void() + theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 14, hjust = 0.5, margin = margin(b = 15)), legend.position = "bottom", legend.key.width = unit(2.5, "cm"))
+  # Title/subtitle removed 2026-09-02: this figure is always embedded with an external Quarto
+  # figure caption in the paper, duplicating it wasted space. Legend text/title sized up (was
+  # default ~11pt) since this gets embedded at full page width.
+  p1 <- ggplot() + geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) + geom_sf(data = sf_data_cap4, aes(fill = hotspot_label), color = NA) + scale_fill_manual(name = "Overlapping\nHotspots", values = c("1" = "#FFD54F", "2" = "#FB8C00", "3" = "#E53935", "4+" = "#800026"), na.value = "gray90", drop = FALSE) + theme_void() + theme(legend.position = "bottom", legend.key.width = unit(2.5, "cm"), legend.title = element_text(size = 16), legend.text = element_text(size = 14))
 
   out_p1 <- file.path(out_dir, paste0("global_hotspot_count_heatmap_cap4_", metric, ".png"))
   ggsave(out_p1, p1, width = 16, height = 9, bg = "white", dpi = 300)
@@ -73,7 +74,7 @@ generate_count_maps <- function(gpkg_path, metric, base_sf) {
 
   # Map 2: 3+ Only
   sf_data_3plus <- sf_data %>% filter(as.numeric(hotspot_count) >= 3) %>% mutate(hotspot_label = factor(pmin(as.numeric(hotspot_count), 4), levels = 1:4, labels = c("1", "2", "3", "4+")))
-  p2 <- ggplot() + geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) + geom_sf(data = sf_data_3plus, aes(fill = hotspot_label), color = NA) + scale_fill_manual(name = "Overlapping\nHotspots", values = c("1" = "#FFD54F", "2" = "#FB8C00", "3" = "#E53935", "4+" = "#800026"), na.value = "gray90", drop = FALSE) + labs(title = paste("High-Frequency Hotspot Concentrations", paste0("(", metric_label, ")")), subtitle = "Locations with at least 3 overlapping hotspots of decline/damage") + theme_void() + theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 14, hjust = 0.5, margin = margin(b = 15)), legend.position = "bottom", legend.key.width = unit(2.5, "cm"))
+  p2 <- ggplot() + geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) + geom_sf(data = sf_data_3plus, aes(fill = hotspot_label), color = NA) + scale_fill_manual(name = "Overlapping\nHotspots", values = c("1" = "#FFD54F", "2" = "#FB8C00", "3" = "#E53935", "4+" = "#800026"), na.value = "gray90", drop = FALSE) + theme_void() + theme(legend.position = "bottom", legend.key.width = unit(2.5, "cm"), legend.title = element_text(size = 16), legend.text = element_text(size = 14))
 
   out_p2 <- file.path(out_dir, paste0("global_hotspot_count_heatmap_3plus_", metric, ".png"))
   ggsave(out_p2, p2, width = 16, height = 9, bg = "white", dpi = 300)
@@ -81,7 +82,7 @@ generate_count_maps <- function(gpkg_path, metric, base_sf) {
 
   # Map 3: Capped at 3+
   sf_data_cap3 <- sf_data %>% mutate(hotspots_capped_3 = pmin(as.numeric(hotspot_count), 3), hotspot_label_3 = factor(hotspots_capped_3, levels = 1:3, labels = c("1", "2", "3+")))
-  p3 <- ggplot() + geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) + geom_sf(data = sf_data_cap3, aes(fill = hotspot_label_3), color = NA) + scale_fill_manual(name = "Overlapping\nHotspots", values = c("1" = "#FFD54F", "2" = "#FB8C00", "3+" = "#E53935"), na.value = "gray90", drop = FALSE) + labs(title = paste("Global Ecosystem Service Hotspot Frequency", paste0("(", metric_label, ")")), subtitle = "Number of overlapping hotspots of decline/damage per 10km grid cell (Capped at 3+)") + theme_void() + theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5), plot.subtitle = element_text(size = 14, hjust = 0.5, margin = margin(b = 15)), legend.position = "bottom", legend.key.width = unit(2.5, "cm"))
+  p3 <- ggplot() + geom_sf(data = base_sf, fill = "gray95", color = "gray80", linewidth = 0.1) + geom_sf(data = sf_data_cap3, aes(fill = hotspot_label_3), color = NA) + scale_fill_manual(name = "Overlapping\nHotspots", values = c("1" = "#FFD54F", "2" = "#FB8C00", "3+" = "#E53935"), na.value = "gray90", drop = FALSE) + theme_void() + theme(legend.position = "bottom", legend.key.width = unit(2.5, "cm"), legend.title = element_text(size = 16), legend.text = element_text(size = 14))
 
   out_p3 <- file.path(out_dir, paste0("global_hotspot_count_heatmap_cap3_", metric, ".png"))
   ggsave(out_p3, p3, width = 16, height = 9, bg = "white", dpi = 300)

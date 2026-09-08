@@ -29,11 +29,10 @@ run_hotspot_boxplots_by <- function(
 
   stopifnot(group_col %in% names(df_long))
 
-  # Define canonical order for all services (edit as needed)
-  canonical_order <- c(
-    "N_export", "Sed_export", "Pollination", "Nature_Access",
-    "C_Risk", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio"
-  )
+  # Derived from R/service_config.R (2026-09-01) -- was hardcoded to the old export/risk
+  # names, one of several independent drifted copies found this session (see
+  # docs/pipeline_reference.md B7).
+  canonical_order <- c(service_names(), ratio_names())
   # Use canonical order for svc_order if not provided
   if (is.null(svc_order)) {
     svc_order <- canonical_order
@@ -105,11 +104,15 @@ run_hotspot_boxplots_by <- function(
   }
 
   # Define which services get both abs and pct plots (volumetric), and which are ratios/indices
+  # Coastal protection is plotted alongside the ratios/indices, not the true volumetric
+  # (mass-based) pair, matching the paper's own "risk and ratio indices...native
+  # dimensionless units" distinction -- preserved from the pre-2026-09-01 hardcoded
+  # version, which grouped C_Risk (the old name) the same way.
   if (is.null(volumetric_services)) {
-    volumetric_services <- c("Nature_Access", "Pollination", "Sed_export", "N_export")
+    volumetric_services <- setdiff(service_names(), "C_Prot_service")
   }
   if (is.null(ratio_services)) {
-    ratio_services <- c("C_Risk", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio")
+    ratio_services <- c("C_Prot_service", ratio_names())
   }
 
   # Setup plotting aesthetics for standard vs top N logic
@@ -165,7 +168,7 @@ run_hotspot_boxplots_by <- function(
 
   # --- PLOT: Ratio/Index Services (only one plot needed) ---
   # Only plot ratio_services that are present in the data, with specified facet order/layout
-  ratio_present <- c("C_Risk", "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio")
+  ratio_present <- c("C_Prot_service", ratio_names())
   ratio_present <- ratio_present[ratio_present %in% unique(vals$service)]
   vals_ratio <- dplyr::filter(vals, service %in% ratio_present) %>%
     dplyr::mutate(service = factor(service, levels = ratio_present))

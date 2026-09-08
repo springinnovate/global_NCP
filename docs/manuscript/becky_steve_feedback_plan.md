@@ -1,5 +1,62 @@
 # Becky/Steve feedback — status and action plan
 
+## REVERSAL, 2026-09-02 — Becky overrides the retention/protection framing, revert to export/risk
+
+**Read this section first — it supersedes the "settled" framing decision below and everything
+built on it.** Slack exchange, same day: Becky's exact words — *"No I disagree for the reasons we
+talked through earlier! The change in export is the thing people actually experience. Also the
+retention can have changes happen on other pixels — they increase or decrease the retention
+without anything changing on the pixel — so it's very confusing. I will explain to Steve, he just
+doesn't understand that level of detail of the modeling."* She's overriding Steve's SP14/SP15
+suggestion (which this whole doc, and the entire 2026-08-28 to 09-02 work, was built on).
+
+**What this means concretely**: revert nitrogen/sediment/coastal from retention/protection
+*amounts* back to export/risk *residuals* as the hotspot-defining variables, per the original
+pre-redesign scheme. Ratios return to secondary/context role, same as before.
+
+**Not wasted work — reusable pieces**:
+- `R/service_config.R` is the single source of truth almost everything now reads from
+  (`hotspot_extraction.qmd`, `hotspot_synthesis.qmd`, `KS_tests_hotspots.qmd`, the boxplot
+  generator, several mapping scripts) — flipping `SERVICE_AMOUNTS`/`SERVICE_RATIOS` there should
+  cascade through most of the pipeline without touching each consumer individually. This is
+  exactly the payoff the 2026-09-01 config-centralization work was for, even though nobody
+  expected to need it for a *reversal* specifically.
+- The sediment/USLE demand-inflation finding (`project_sediment_retention_demand_artifact.md`)
+  is the same *class* of problem as Becky's stated objection (retention shifting for reasons
+  unrelated to the local pixel) — reframe as supporting evidence for going back to export/risk,
+  don't just delete it.
+- Backups exist for most underlying data (`10k_change_calc_BACKUP_2026-08-31.gpkg` and others,
+  see `docs/pipeline_reference.md`) — the export/risk columns were never removed, just stopped
+  being the *active* hotspot-defining ones. Confirm this before assuming a re-derivation is needed.
+
+**Correction, same day, user's own clarification**: the *individual* per-service export/risk
+hotspot rasters were never overwritten — the 5-service redesign work *created new* files
+alongside them, it didn't destroy the originals, so those should already exist untouched. What
+actually needs regenerating is only the **aggregates** — `hotspot_count` (combines whichever
+service set is currently active) and the water/access/combined_cross beneficiary-overlap rasters
+— since those were computed against the 5-service set. **No rush on this**: Rich doesn't need
+them right now (he'd already produced his own downstream output from an earlier round); this is
+about internal correctness and keeping the shared Drive folder accurate, not a blocker. Per the
+Slack thread, Rich already uploaded the requested raw 1992/2020 rasters to Drive regardless —
+user's own assessment: "I don't need the rasters that much [anymore]... maybe to draw some maps
+again with better resolution" — so that raw-raster need is downgraded, not eliminated (still
+useful for the Path A pixel-level maps, independent of this reversal).
+
+**Still genuinely open, needs a live conversation with Becky, not something to resolve unilaterally
+in a session**: sediment retention vs. retention ratio tradeoffs (user: "given the way the
+variables are actually calculated, the change between two dates..." — message cut off, finish
+this thought with her directly), and **directionality ambiguity in the change signal** — not yet
+precisely scoped in writing; likely related to Becky's own point that a pixel's retention/export
+change can reflect redistribution (upstream/downstream shift) rather than a real local net
+gain/loss, raising the question of what "hotspot direction" even means for a redistributed-not-
+lost service. Don't guess at a resolution — this is explicitly the thing to discuss with her.
+
+**Open process question, also for that conversation**: whether to send Becky/Steve the current
+(retention-framed) paper draft for one more review pass before reverting, or revert first and
+send a clean export/risk version. User has not decided; leaning toward asking them directly
+rather than picking unilaterally.
+
+
 **Context**: Becky's summary email (received 2026-08-20, referencing a 2026-07-09 meeting with
 Steve) plus the full annotated PDF (`NCP decline hotspots SP BCK.pdf`, draft dated 2026-06-24,
 Becky's [BC] and Steve's [SP] inline comments) were reviewed together against the current
@@ -103,7 +160,7 @@ current Abstract. "BC"/"SP" numbers refer to the PDF's comment markers.
 | Methods | Add real per-service biophysical modeling detail — currently only sediment/nitrogen retention ratios get real explanation, the rest are thin; clarify what "spatial data extraction pipeline" means; simplify the exclusion-criteria sentence (currently hard to parse); define "localized urban footprints" | SP10, SP12, SP13, SP16 |
 | 4.1 (Global/Regional Trajectories) | Substantially expand narrative before hotspots are introduced; add un-faceted, original/10km-resolution change maps (not broken down by zone) — flagged independently by both Becky's email and SP19, a strong signal; lead with global trends before regional, and emphasize absolute change over percentage change | Becky email, SP17, SP19 |
 | Figure 2 (biome_combined_diffs) | Reorient to 5×2: one row per service, risk/damage on the left, service on the right. Zone breakdowns (biome, income group, world region — all three, not just biome) apply only to the graphs, not the maps. Currently "opaque" per Steve. | Becky email, SP18 |
-| New 5×2 risk/service map grid | Pollination: change in production (left) vs. change in pollination sufficiency (right) — **blocked, needs Becky's sufficiency layer, not yet sent**. Nature access: change in # people within 1hr (left, already have this) vs. change in natural land cover loss/gain (right, need to build) | Becky email |
+| New 5×2 risk/service map grid | Pollination: change in production (left) vs. change in pollination sufficiency (right) — **blocked, question sent to Becky/Justin 2026-08-21 (which layer/source is the right sufficiency data), reply not yet confirmed here**. Nature access: change in # people within 1hr (left, already have this) vs. change in natural land cover loss/gain (right, need to build) | Becky email |
 | 4.3 + 4.4 | Replace with the water/access/combined beneficiary analysis already computed and sitting in the Abstract — pending Becky's confirmation this is what she means | Becky email |
 | 4.5 (Spatial Attribution Gap) | Move wholesale to the Supplement; the causal-vs-co-occurrence caveat language is already mostly present, just needs relocating along with its table/figures; resolve/remove the existing `[FLAG FOR BECKY]` callout since her email now supersedes it | Becky email |
 | All figures | Add panel labels (a/b/c-style), not just legends — current numbering is confusing per Steve | Becky email |
@@ -138,7 +195,15 @@ services-list answer changes it. Rendered clean, figure confirmed present in out
   the exact framing SP14/SP15 objected to. Needs a full rewrite naming the actual 5 services, once
   known.
 - Per-service methodological detail (SP10): only sediment/nitrogen retention ratios currently get
-  real explanation; the other services (whichever 5 they end up being) need the same treatment.
+  real explanation. **Partially addressed 2026-08-25** — the "For Becky — model run provenance"
+  callout (originally written in the book's `02-methods.qmd`, never ported to the paper, and never
+  discussed with Becky since she hasn't seen the book) was found and copied into the paper's
+  Biophysical Modeling section: explains *why* only the ratios get real formulas (this project
+  received finished InVEST rasters, never configured/ran those models directly) and asks Becky for
+  provenance, citation, and climate-input details. Still open: adding real per-service *model
+  mechanics* (Nature Access, Pollination, Coastal Risk) from the published InVEST documentation —
+  legitimate to write without Becky's input since it's public methodology, not run-specific
+  parameters, but not yet done.
 - Figure 2 (`biome_combined_diffs.png`) reorientation to 5×2 (service rows × risk/service columns),
   with biome+income+region breakdowns folded in as graph-only content.
 - The new 5×2 risk/service map grid (pollination production vs. sufficiency; nature access people
@@ -175,3 +240,58 @@ services-list answer changes it. Rendered clean, figure confirmed present in out
    (5×2), and 4.3+4.4 replacement together, since they all depend on which 5 services are final.
 5. The new 5×2 risk/service map grid waits on Becky's pollination-sufficiency layer regardless.
 6. Mangroves bug — can be investigated independently, anytime.
+
+## Progress (2026-08-28 to 2026-08-31) — the blocking question got answered
+
+**The service-framing question (SP14/SP15, blocking almost everything else per the "suggested
+order of operations" above) is resolved.** Steve's real email exchange confirmed retention/
+protection (nitrogen retention, sediment retention, coastal protection amount), not export/risk —
+matching his PDF comment, not the paper's prior working assumption. This is now a settled
+definitional decision (see the paper's own top-of-document Status note and Biophysical Modeling
+callout), not still open.
+
+Since then, resolved or advanced:
+- **Biophysical Modeling (§3.1.1)** — rewritten to name the actual 5 services under the
+  retention/protection framing, replacing the stale "eight simulated variables" text SP14/SP15
+  objected to (item was listed above as blocked; no longer blocked, done).
+- **Export/risk scope, a new decision beyond what Steve's PDF asked**: nitrogen export, sediment
+  export, and coastal risk are now explicitly scoped as computational inputs to the ratio formulas
+  only — never reported as their own variables/figures/tables anywhere in the paper. Confirmed with
+  Becky (see the 2026-08-31 email, question 3) rather than assumed.
+- **A new methodological finding, not in Steve's original comments**: the ratio variables
+  (nitrogen/sediment retention ratio, coastal risk reduction ratio) were being aggregated to
+  biome/region level as a plain per-pixel mean, which understates the true change by ~4x (should be
+  load-weighted). Whether to keep ratios in the paper at all, given this, is now open with Becky
+  (2026-08-31 email, question 2) — worth flagging to Steve too since it touches his original
+  "these are redundant with export/risk" comment (2026-07-14).
+- **Sediment and nitrogen data, computed** — including the ratio-weighting components — via a
+  local-data workaround (not the raw rasters, which remain a separate open request to Rich). Coastal
+  re-confirmed. Full Path B (10km-grid) hotspot/KS-test/attribution rerun in progress as of
+  2026-08-31 — see `docs/pipeline_reference.md` for the live step-by-step status.
+- **Abstract** rewritten for the 5-service framing (superseding the 8-service version noted as
+  "the only thing rewritten" at the top of this doc) — structure and language final, headline
+  numbers are placeholders pending the rerun above.
+- **Global Pattern of Change / Figure 2** — still not rebuilt (needs the Path A pixel-level rasters,
+  a separate blocked request to Rich), but now carries an explicit placeholder callout rather than
+  silently showing stale maps, addressing at least the "don't let this look finished when it isn't"
+  concern even though the SP17-19/Becky-requested map-format work itself hasn't happened yet.
+
+**Still genuinely open, unchanged from the 2026-08-25 status below**: Figure 2's 5×2 reorientation
+(now additionally blocked on the Path A raster request), the new risk/service map grid (blocked on
+Becky's pollination-sufficiency layer), 4.3/4.4 replacement (blocked on the rerun in progress),
+4.1's narrative rewrite, the mangroves sentence, and per-service model-mechanics detail for Nature
+Access/Pollination/Coastal (SP10).
+
+## Parked, not written into the paper (2026-08-25)
+
+**Data Sources and Study Design — pollination NA-masking special case.** The original 8-service
+text carried an unresolved bracketed author note: *"[double check, for the specific case of
+pollination, I had to create a mask with all valid values for both dates, and reclass as zero, to
+avoid NA values in the difference calculation. This is a special case, and I should clarify it in
+the methods.]"* Decided not relevant enough to include in the streamlined exclusion-criteria
+sentence (also fixed the same day — the sentence had been citing the wrong denominator, 1,302,099,
+which `analysis/WORKLOG.md`'s 2026-07-29 entry documents as a stale/flawed figure for a different
+question; corrected to 1,372,621, the actual valid-land denominator used throughout the current
+5-service analysis). Parked here rather than deleted outright — if pollination's NA-handling ever
+becomes a live question again, this is the pointer back to where it was raised and why it was
+dropped.
