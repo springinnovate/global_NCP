@@ -515,9 +515,17 @@ dir_path <- file.path(ks_plot_dir, "directionality_cliffs_delta.png")
 # Hardcoded 8-service list (with ratios) replaced 2026-09-02 -- see the heatmap chunk above.
 svc_order <- service_names()
 
-# Clean up variable names for plotting
+# Clean up variable names for plotting -- friendly labels matching the paper's own
+# tbl-cliffs-delta mapping (paper_draft_5service.qmd), not raw column names
+var_label_map <- c(
+  GHS_POP_E2020_GLOBE_sum                  = "Population",
+  rast_gdpTot_1990_2020_30arcsec_2020_sum  = "GDP (total)",
+  hdi_raster_predictions_2020_mean         = "HDI",
+  rast_adm1_gini_disp_2020_mean            = "GINI",
+  fields_mehrabi_2017_mean                 = "Field size"
+)
 ks_res_plot <- ks_res %>%
-  mutate(var_label = gsub("_", " ", var)) %>%
+  mutate(var_label = dplyr::coalesce(var_label_map[var], gsub("_", " ", var))) %>%
   mutate(var_label = stringr::str_wrap(var_label, 40))
 
 # Define signed 4th root transform to further improve visibility of low values in divergent scale
@@ -540,10 +548,11 @@ p_direction <- ggplot(ks_res_plot, aes(x = service, y = cliffs_delta, fill = cli
     x = "Ecosystem Service",
     y = "Cliff's Delta (Effect Size)"
   ) +
-  theme_minimal(base_size = 12) +
+  theme_minimal(base_size = 14) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
-    strip.text = element_text(size = 8)
+    axis.text.y = element_text(size = 13),
+    strip.text = element_text(size = 13, face = "bold")
   )
 
 ggsave(

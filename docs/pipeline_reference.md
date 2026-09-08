@@ -86,6 +86,23 @@ skipped for this rerun (see note)
 decision changes — don't batch it for later, that's exactly how a step gets lost. If a new
 dependency turns up mid-run (like C1 did today), add a row rather than mentioning it only in chat.
 
+## G. Book (docs/manuscript/) figure regeneration — flagged 2026-09-08, not started
+
+The book's text/numbers were brought fully current 2026-09-08 (all 9 chapters + index.qmd rewritten
+against the reverted 5-service dataset, full book render verified clean, one real render-breaking
+bug fixed in 04-hotspot-WHERE.qmd). The **images** are a separate, still-open task — each row below
+is a real script re-run, not a text edit. Confirmed via file mtime (pre-2026-09-03 = suspect):
+
+| # | Image(s) | Used in | Status |
+|---|---|---|---|
+| G1 | `pop_exposure_income.png`, `pop_exposure_hdi.png`, `multiplier_effect.png`, `exposure_multiplier_dumbbell_{region_wb,income_grp,WWF_biome}.png` | 06-hotspot-WHO.qmd | ⛔ Aug 24, pre-reversal, `hotspot_count`-derived |
+| G2 | `directionality_cliffs_delta.png`, `ks_heatmap.png`, `ecdf_*.png` (4 files) | 06-hotspot-WHO.qmd | ✅ already regenerated 2026-09-08, current |
+| G3 | `boxplots_{volumetric,coastal,ratios}_pct.png` (9 files, 3 groupings × 3-way split) | — | ⚪ orphaned, no longer referenced anywhere in the book (04-hotspot-WHERE.qmd redirected to the single consolidated `boxplots_pct.png` per grouping) — candidate for actual deletion once confirmed nothing else points at them |
+| G4 | `outputs/maps/map_{region_wb,income_grp,biome}_{abs,pct}.png` | 03-global-patterns-WHAT.qmd | ⚪ Aug 24, Path A — likely fine per D3/E3 (never migrated to retention framing) but not spot-checked this session |
+| G5 | Country-tab figures now missing 3 ratio tabs (Coastal Risk Reduction, Nitrogen/Sediment Retention) | 07-regional-profiles.qmd | ✅ not a gap — those 3 tabs were removed, not left blank, since the underlying columns don't exist in the current pipeline output |
+
+**Not urgent** — same "no rush" status as the rest of this file's stale-raster rows, since nothing downstream (Becky/Steve, SWY) depends on these specific book images right now. Pick up when there's a natural reason to touch this repo's R/plotting scripts again.
+
 ## F. Deferred cleanup (flagged 2026-09-01, not started)
 
 **Old output clutter**: after this rerun settles, `outputs/plots/` and `data/processed/hotspots*`

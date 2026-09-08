@@ -451,8 +451,12 @@ Validation: scripts/audit_claims.R [verifies key paper claims against outputs]
 
 See the project runbook for detailed methodology and validation notes:
 
-*   **`docs/runbook.md`** – Full execution guide and validation procedures
-*   **`docs/methodology.md`** – Technical explanation of two-path analysis structure
+*   **`docs/runbook.md`** – Full execution guide, gotchas, and validation procedures
+*   **`docs/methodology.md`** – Technical explanation of the analytical framework (two-path structure, hotspot definition, KS/attribution methodology)
+*   **`docs/pipeline_reference.md`** – Step-by-step status tracker for the current rewrite in progress (not a permanent reference — check its own status header for what it's tracking)
+*   **`docs/data_dictionary.md`** – Column-level schema for the pipeline's output CSV tables (`hotspot_area_stats.csv`, etc.)
+*   **`docs/hotspots_rasters_data_dictionary.md`** – File-level reference for the hotspot rasters shared with the beneficiaries pipeline
+*   **`docs/ncp_data_catalog.md`** – Inventory of external NatCap/TNC modeling-output sources (OneDrive spreadsheets, GCS buckets)
 *   **`analysis/README.md`** – Archive policy and notebook scoping
 
 # Pipeline Scalability & Extensibility

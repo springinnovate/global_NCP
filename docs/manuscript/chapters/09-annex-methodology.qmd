@@ -38,6 +38,8 @@ While the canonical master grid initially contains 1,522,073 terrestrial cells, 
 *   **Modeling Constraints:** Certain biophysical models may fail to resolve valid outputs in edge-case topographies.
 By dropping these cells, we guarantee that the final analysis compares a mathematically sound, 1-to-1 footprint of cells that contain complete, valid, non-NA data for all required services across both time periods.
 
+*Note on denominators:* this ~1,302,099 figure is a stricter, further-filtered subset of the paper's own "1,372,621 valid land cells" figure (which excludes only permanent ice, open ocean, and inland water). The two are not in conflict — 1,372,621 is the terrestrial-land denominator; ~1,302,099 is that same set narrowed further to cells with complete data across every required variable in both 1992 and 2020, which is what the hotspot-extraction pipeline itself actually operates on.
+
 *Note: The legacy R script `analysis/prepare_data.qmd` and standalone cleaning utilities like `clean_grid.py` were fully deprecated in v1.3.4 in favor of this Python workflow.*
 
 ### Grid Geometry & Reprojection Effects
