@@ -1,5 +1,57 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-09-10/11 (overnight) — First real SWY Borneo run: consolidated pipeline, a genuine result, a real diagnosed issue
+
+Whole Borneo SWY pipeline consolidated into real, re-runnable scripts —
+`Python_scripts/swy_borneo_run/` (numbered 01-11: AOI build through the model call and output
+map rendering), no longer only ad-hoc interactive commands. Along the way: found this project's
+local `data/raw/LandCovers/landcover_gl_1992.tif` is an empty/corrupted stub (zero valid pixels
+anywhere on Earth) — the real 2020 Copernicus C3S land cover was recovered from the user's WWF
+OneDrive instead. Also found and worked around two real packaging bugs in `inspring` itself
+(missing `requirements.txt`, a `setup.py` bug omitting the `seasonal_water_yield` subpackage) —
+real candidates for a small upstream PR later, not yet attempted. Confirmed the *current* upstream
+`ecoshard` (not the old pinned fork commit) has everything `inspring` needs.
+
+**First run attempt**: laptop sleep killed Docker Desktop mid-run. Checking the actual output
+files (not just the process exit code) showed quickflow and actual-ET were both fully computed
+and physically plausible (QF mean 406.8mm/yr, AET mean 1288.0mm/yr) — but the local-recharge
+routing step (`L_sum`) had only processed roughly the northern half of the AOI before the crash,
+confirmed by comparing valid-pixel latitude ranges against the (fully-complete) stream and
+quickflow rasters. The aggregated baseflow figure computed from that incomplete `L_sum` was
+therefore not trustworthy, despite superficially looking like a normal finished result. Real
+lesson: a non-null final output doesn't prove a routed/iterative computation actually finished —
+check the actual spatial coverage, not just "did it produce a number."
+
+Fixed the actual cause (battery sleep timeout was still on a 1-hour timer despite AC sleep already
+being disabled) and added a `SetThreadExecutionState`-based active keep-awake process for the
+rerun's duration, on top of the power-setting fix. **Rerun in progress as of this entry** from a
+clean workspace (old incomplete one preserved at
+`data/swy_borneo_workspace_INCOMPLETE_run1_2026-09-10/` for reference, not deleted).
+
+Also added: an interactive Leaflet map (viridis, toggleable QF/AET/L_sum layers, real satellite/
+street basemap, pan/zoom) embedded directly in `docs/reports/swy_status_report.qmd` — genuinely
+useful diagnostically, not just presentational: seeing `L_sum`'s spatial pattern is what made the
+incomplete-coverage issue legible in the first place.
+
+### 2026-09-07 through 2026-09-10 — Paper sent to Becky/Steve, Borneo SWY pivot, full input acquisition
+
+Paper draft sent to Becky/Steve 2026-09-07; Becky returned 14 numbered review comments on
+`docs/manuscript/paper_draft_5service.pdf` (gitignored). At the 2026-09-09 13:30 call, Becky
+decided the SWY test basin is **Borneo**, not Peru/Myanmar — she isn't treating the mangrove/
+flooded-savannas CN gap or rigorous published-benchmark validation as blockers for this round.
+Meeting with Becky and Rich together confirmed for 2026-09-11.
+
+**2026-09-10, full SWY session**: every raw input the Borneo test needs (AOI, DEM, routing,
+LULC, soil group, precipitation, ET0, NDVI, CN base) is now downloaded and content-verified — not
+just requested, actually opened and sanity-checked. Real architecture finding: `inspring` accepts
+CN/Kc as direct raster overrides rather than only a lucode-indexed biophysical table, which
+substantially shrinks an earlier-flagged "no lucode master table exists" gap. SWY documentation
+restructured: `docs/swy/workflow.md` (new, live status tracker) and `docs/swy/swy_methods.qmd`
+(new, permanent conceptual/methods reference with real formulas and a working bibliography,
+replacing the meeting-dated `model_specification.md`, archived not deleted). Full technical
+detail — task IDs, verification numbers, download gotchas — in `docs/swy/research_notes.md`'s
+2026-09-09/10 entries, not repeated here.
+
 ### 2026-09-03/04 — Full reversal executed (export/risk restored), pipeline/SWY docs brought current, second paper round queued for Becky/Steve
 
 Becky's 2026-09-02 Slack override (see `becky_steve_feedback_plan.md`'s "REVERSAL" section) got
@@ -1480,6 +1532,7 @@ The 700× and 1,700× multipliers previously stated were derived from the wrong 
 *   **Repository Restructuring & Cleanup:** Conducted a major repository cleanup to align with FAIR principles and good industry practices. Transitioned the project from a standard R package structure to a broader reproducible research project structure, acknowledging its evolution into a large-scale analytical pipeline.
 *   **Data Consolidation:** Unified data directories, ensuring that `C:\projects\global_NCP\data` contains the most recent canonical data, while deprecating redundant `home/` directories.
 *   **Git Cleanup:** Removed a large number of temporary and untracked files from the `home/` directory (e.g., temporary Rscript runs and libloc files) from the git repository to ensure a clean and reproducible state.
+*   **Documentation Clarification:** Standardized the definition of 'hotspot' across the repository (including `README.md`, manuscript `index.qmd`, `paper_draft.qmd`, methodology, and book chapters) to explicitly state it is the top 5% of grid cells by rank, not a value-based percentile.
 
 ### 2026-06-12
 *   **Population Exposure Milestone:** Calculated the total 2020 GHSL population captured across the 1.3 million evaluated 10km grid cells (7,855,519,292 people).
@@ -1994,4 +2047,3 @@ This section highlights the major technical and methodological hurdles overcome 
 
 ### 2026-01-05
 *   **AI Context Migration:** Created `ai_context.md`, migrated to AI assistant (Copilot / Gemini).
-`n### 2026-06-16`n- **Documentation Clarification:** Standardized the definition of 'hotspot' across the repository (including `README.md`, manuscript `index.qmd`, `paper_draft.qmd`, methodology, and book chapters) to explicitly state it is the top 5% of grid cells by rank, not a value-based percentile.

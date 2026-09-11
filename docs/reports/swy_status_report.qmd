@@ -1,0 +1,214 @@
+---
+title: "Seasonal Water Yield: preparing global run"
+subtitle: "Status of tools, data, and Borneo test plan"
+date: last-modified
+date-format: "D MMMM YYYY"
+format:
+  html:
+    css: swy_report_styles.css
+    embed-resources: true
+    theme: none
+    page-layout: full
+    toc: false
+    minimal: true
+---
+
+<div class="eyebrow">Global NCP — SWY Status Memo</div>
+<div class="meta">
+  <span>Prepared by Jerónimo Rodríguez Escobar</span>
+  <span>Global Science, WWF</span>
+  <span>{{< meta date >}}</span>
+</div>
+
+## Where we stand
+
+::: {.findings}
+::: {.finding}
+**This is a new model run, not a table update.** The other InVEST outputs were handed pre-computed; SWY has not been run globally yet, because a single global calibration isn't feasible. Producing an output means assembling every real input and running the model from scratch.
+:::
+::: {.finding}
+**The orchestration is real and confirmed, not assumed.** Rich's `swy_global` + `inspring` were
+read directly at the code level, not from descriptions: basin batching, per-basin routing, global-mosaic stitching, and direct CN/Kc raster overrides all work as expected. One real bug found in `inspring` itself along the way (a dead `root_depth` parameter).
+:::
+::: {.finding}
+**The plan is test-then-scale, decided with Becky 2026-09-09: Borneo — and the first real
+in-house attempt ran.** Quickflow (mean 406.8mm/year) and actual ET (mean 1288.0mm/year) both
+land in physically plausible ranges for tropical rainforest. One genuine, diagnosable issue
+found, not hidden: ~4.6% of local-recharge pixels show a flow-accumulation anomaly, likely an
+unresolved DEM sink — detail below. Meeting with Becky and Rich together today, 2026-09-11.
+:::
+:::
+
+## Question
+
+> Is this project's own CN/Kc parametrization, built from
+> public, peer-reviewed global products robust enough to trust at the global scale.
+>
+> Running end-to-end on a real study area as check (Borneo).
+>
+> (A stricter version of this question — does it reproduce a known, published result closely
+> enough to trust scaling further — was the original framing, tested against one of Hamel et al.
+> 2020's own basins. Kept as a reference in the validation section below; it isn't blocking this
+> round.)
+
+## What the model needs, and where each piece stands
+
+| Input | Status |
+|---|---|
+| AOI / watershed vector | **Built** — `borneo_aoi.gpkg`, a single dissolved polygon from HydroBASINS Australia/Oceania level-6 units intersecting Borneo, built 2026-09-10 (computed area 753,803 km² vs. real ~743,330 km², 1.4% off) |
+| DEM | **Sourced and verified** — SRTMGL3, 90m, via AppEEARS. Elevation range -91–4041m (Mt. Kinabalu, Borneo's real high point, is 4095m — a close, correct match) |
+| Routing parameters | **Found** — Rich's `swy_global.ini` defaults (`THRESHOLD_FLOW_ACCUMULATION=1000`, `ALPHA_M=0.083333`, `BETA_I=1`, `GAMMA=1`, `MAX_PIXEL_FILL_COUNT=1000000`) |
+| LULC | **Sourced and verified** — real 2020 Copernicus C3S land cover, extracted from the user's WWF OneDrive copy after this project's local file turned out to be an empty/corrupted stub (a real data-integrity finding, not a download gap). 48.1% valid fraction matches every other Borneo raster; plausible class mix (58.3% broadleaf evergreen forest) |
+| Monthly precipitation | **Sourced and verified** — CHIRPS 2020, ~5.5km, clipped to Borneo. July mean 138.9mm, plausible for the region |
+| Monthly ET0 | **Sourced and verified** — TerraClimate `pet` (Penman-Monteith, CO2-corrected), ~4km. Monthly means 97–118mm, plausible for tropical reference ET. **New source as of 2026-09-10** — CHIRPS is precipitation-only |
+| Soil hydrologic group | **HYSOGs250m** — downloaded 2026-09-09 (global file, `data/raw/soil_hydrologic_group/`) |
+| Rain events | **Placeholder used for the first run** (uniform 18 events/month) — not derived from real daily CHIRPS. The documented derivation method needs Google Earth Engine access not set up in this environment; a real gap, flagged not hidden |
+| Curve number (CN) | **GCN250** as global base, confirmed sourced; biome-specific patches not yet applied for this first attempt — see below |
+| Crop coefficient (Kc) | **NDVI sourced and verified** (MOD13A3, full 2000–2026 record; ~0.82 mean for a July granule, plausible for rainforest) and used directly — see below for how |
+| `root_depth` | Required by the interface but confirmed dead in this model fork — satisfied with a placeholder raster, not worth sourcing carefully |
+
+: {.terms tbl-colwidths="[25,75]"}
+
+## Curve number: the harder parameter, and where the gap actually is
+
+InVEST's own documentation is explicit that there's no global shortcut for CN — it depends on soil
+group, cover type, and moisture condition, and region-specific values are preferred over blanket
+defaults. **GCN250** solves the bulk of this: a purpose-built, peer-reviewed global CN product
+combining land cover and soil hydrologic group. Its own authors are candid that it differentiates by
+land-cover granularity, not by region-specific values *within* one land-cover class — and that the
+underlying method is least validated in forested/humid environments, which is exactly this
+project's LAC focus.
+
+| Biome | Status |
+|---|---|
+| Tropical moist broadleaf forest | Real candidate literature found (Calero Mosquera et al. 2021, Fábrega et al. 2012) — both directly confirm the standard method overestimates runoff under tropical conditions. Patch is buildable. |
+| Mangroves | No usable literature found after three separate search passes. The underlying reason: these are **tide-flooded** systems — CN's rainfall-runoff premise doesn't describe what's driving water movement here. Leaning toward documenting this as a structural limitation rather than continuing to search. |
+| Flooded grasslands / savannas | Same missing-CN-number problem, but a **different mechanism**: these are **river-overflow-flooded** (seasonal inundation), not tidal. Same underlying failure mode as mangroves — a flood-pulse-dominated system CN's premise wasn't built for — just a different flood driver. The Colombian Llanos is the real, motivated test case for this specifically — sequenced after the basin validation above, not instead of it. |
+
+: {.results}
+
+::: {.validation-note}
+**Why this matters more than it might look**: in Hamel et al. (2020)'s own sensitivity analysis,
+quickflow changed by **factors of 10–13×** between antecedent-moisture CN settings in one basin. CN
+is close to the dominant source of variance in this model's output, not a minor calibration knob.
+:::
+
+::: {.validation-note}
+**A real architectural finding, from 2026-09-10**: `inspring`'s SWY implementation accepts CN as
+a **direct raster override** (`cn_a/b/c/d_path`), not only via a lucode-indexed biophysical
+table. Since GCN250 is already a per-pixel product, that's the architecturally better long-term
+path — not a novel idea on our part; continuous, gridded parameterization is the norm for
+physically-based hydrology models generally, and InVEST's table-based convention is a design
+choice suited to its usual land-use-scenario use case. **For this first run attempt, the simpler
+CSV table path was used instead** (built from GCN250's own crosswalk, no biome patches applied
+yet) — lower-risk for a first pass; the raster-override path is worth a follow-up round.
+:::
+
+## Crop coefficient: mostly solved by NDVI, not a table
+
+- **Cropland**: the plan is standard FAO-56 values with region-correct crop-calendar timing (real
+  remaining work — the available reference spreadsheet's defaults are Northern-Hemisphere only,
+  and oil palm, likely Borneo's dominant cropland, isn't a native FAO-56 entry).
+- **Everything else** (forest, grassland, shrubland — most of global land area): **no table
+  needed.** A validated NDVI regression (Kamble et al. 2013, corroborated by multiple follow-up
+  studies through 2025) computes Kc directly per pixel per month from satellite NDVI.
+- **Non-vegetated** (water, wetlands, bare soil, built): fixed values from InVEST's own guidance.
+- **For this first run attempt**: the NDVI regression was applied uniformly across *all* vegetated
+  classes, including cropland, rather than switching cropland to FAO-56 — a real, flagged
+  simplification (no region-correct crop calendar built yet), more defensible than applying the
+  wrong Northern-Hemisphere one. Computed per land-cover class (zonal-averaged NDVI, not
+  per-pixel) and fed via the CSV biophysical table, not the raster-override path described above.
+
+## The test plan
+
+**Decided with Becky, 2026-09-09: test in Borneo.** Every raw input the model needs is downloaded
+and content-verified — AOI, DEM, routing parameters, LULC, soil group, precipitation, ET0, NDVI,
+and the CN base (`data/swy_shared_package/`, ~1.1GB, ready to upload). The CN/Kc biophysical
+table and a placeholder rain-events table are built. **A first real in-house run attempt was made
+2026-09-11 via Docker, and it worked**: the full standard SWY output set exists, including the
+final aggregated-results shapefile with a real computed baseflow value. Quickflow and actual ET
+both land in physically plausible ranges. Whole pipeline consolidated into real, reproducible
+scripts: `Python_scripts/swy_borneo_run/` (see that directory's own README for the exact pipeline
+and known compromises in this run). Rich has everything needed — data and scripts both — to pick
+this up or extend it with his own tooling; see "Findings for Rich" below for concrete,
+reproducible issues found in `inspring`'s own packaging along the way.
+
+::: {.validation-note}
+**The run outcome, plainly**: quickflow mean 406.8mm/year (range 2.3–4837.2mm), actual ET mean
+1288.0mm/year — both physically reasonable for tropical rainforest, where most rainfall
+infiltrates rather than running off quickly. **One real, genuine issue, flagged rather than
+hidden**: ~4.6% of local-recharge (`L_sum`) pixels show runaway flow-accumulation values (up to
+10.9 billion, where the bulk of the distribution sits in the thousands) — the classic signature
+of an unresolved DEM sink or pit-fill issue, not random corruption (the rest of the raster is
+fine). Worth investigating before trusting `L_sum`-derived outputs, including the aggregated
+baseflow figure, quantitatively. A Docker crash (the laptop sleeping mid-run killed Docker
+Desktop's backend) initially looked like a run failure — the actual output files on disk tell a
+different, better story, confirmed by directly reading and sanity-checking them, not by trusting
+the process exit code alone.
+:::
+
+Two things worth being explicit about, since they're a real shift from where this research
+started, not a detail:
+
+- **The mangrove/flooded-savannas CN gap is not a blocker for her.** Resolving that patch before
+  testing was this project's own caution, not a condition she set.
+- **Rigorous validation against a published result isn't the priority she cares about here either**
+  — testing that the pipeline actually runs on a real basin matters more right now than proving
+  numerical agreement with an external benchmark.
+
+::: {.validation-note}
+**Kept for reference, not as a current requirement**: the original plan was to test against one of
+Hamel et al. (2020)'s own basins (Peru or Myanmar) specifically because they have published,
+granular output to check a result against — Peru's CN came from an existing calibrated SWAT model
+(Uribe et al. 2013), Myanmar's from Mandle et al. (2017) (Hamel co-authored both — one small
+research lineage, not independent sources). That reasoning is still scientifically sound and worth
+returning to if a rigor-focused validation is wanted later; it just isn't what this round is for.
+:::
+
+## First run output — interactive preview
+
+{{< include _output_map.html >}}
+
+## Findings for Rich, from actually trying to build `inspring` in Docker
+
+Concrete and reproducible, not "it didn't work":
+
+1. **`inspring`'s own `Dockerfile` fails immediately** on `pip3 install -r requirements.txt` —
+   that file was deleted from the repo in 2022 and never replaced. Confirmed by actually running
+   the build, not just reading the file.
+2. **`setup.py`'s `packages` list omits `inspring.seasonal_water_yield`** — a normal `pip install
+   .` compiles the Cython extension but the Python module itself isn't importable afterward.
+   Worked around (not fixed upstream) via `python setup.py build_ext --inplace` + `PYTHONPATH`
+   pointed at the source tree directly.
+3. **Good news**: the *current* upstream `ecoshard` (not the old pinned
+   `therealspring/ecoshard@b9b4580` fork commit) works fine — its bundled `ecoshard.geoprocessing`
+   (with `routing`) and `ecoshard.taskgraph` have the API `inspring` expects. Resolves an earlier
+   open question about whether the old fork was still required — it isn't.
+4. This project's own existing Docker image
+   (`therealspring/global_ncp-computational-environment`) already had everything `inspring`
+   actually needs — building on top of that, rather than debugging `inspring`'s own broken
+   Dockerfile, is what actually worked.
+
+Items 1 and 2 are small, well-scoped, non-scientific fixes — real candidates for a short PR back
+to `springinnovate/inspring`, not yet attempted.
+
+## Open items
+
+| # | Item | Blocked on |
+|---|---|---|
+| 1 | Upload the built data package (`data/swy_shared_package/`, ~1.1GB — every raw input plus the derived biophysical/rain-events tables) to shared Google Drive | Nobody — just needs doing |
+| 2 | Investigate the L_sum flow-accumulation anomaly (~4.6% of pixels) — likely an unresolved DEM sink | Real diagnostic work, not blocking the headline "it runs" finding |
+| 3 | Real daily-CHIRPS-derived rain events table (current one is a placeholder) | Google Earth Engine access, not yet configured |
+| 4 | Region-correct FAO-56 cropland Kc (current run uses the NDVI regression uniformly instead) | Crop-calendar research, including an oil-palm-specific gap |
+| 5 | Build CN/Kc as raster overrides instead of the CSV table (architecturally preferable, see above) | Follow-up round, not blocking this test |
+| 6 | Mangrove / flooded-grassland CN patch — needs a documented position | Internal decision |
+| 7 | Small `inspring` packaging fixes (missing `requirements.txt`, a `setup.py` bug) — real candidates for a PR back | Not yet forked/attempted |
+
+: {.terms tbl-colwidths="[10,60,30]"}
+
+<div class="report-footer">
+Full chronological research log, with the reasoning behind each decision:
+<code>docs/swy/research_notes.md</code>. Key literature: Hamel et al. (2020), Mandle et al. (2017),
+Guswa et al. (2018), Kamble et al. (2013), Calero Mosquera et al. (2021), Fábrega et al. (2012),
+Allen et al. (1998, FAO-56).
+</div>

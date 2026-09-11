@@ -1,0 +1,216 @@
+---
+title: "Seasonal Water Yield: conceptual and methodological foundations"
+subtitle: "Durable technical reference — not tied to any single meeting. For point-in-time status, see `workflow.md`; for the chronological reasoning log, see `research_notes.md`."
+date: last-modified
+date-format: "D MMMM YYYY"
+bibliography: references.bib
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+    number-sections: true
+---
+
+## Why this model, why this is a first attempt
+
+The other services in this project's pipeline arrived as pre-computed InVEST outputs — earlier
+work, by Becky and collaborators, that this project only ever post-processed. Seasonal Water
+Yield (SWY) is different: **nobody has run InVEST SWY at anything approaching global scale
+before**, on this project or, as far as a systematic literature review found, anywhere else. That
+is not a rhetorical claim; it follows from a real precedent review.
+
+## Precedent review
+
+Every InVEST SWY application found in the literature is watershed- or country-scale: a West
+Bengal (India) study, a two-basin Peru/Myanmar study [@hamel2020], and UK-catchment validation
+work. No published global-scale application exists. The closest analogue to a "global" precedent
+isn't InVEST-specific at all — it's GCN250 [@jaafar2019], a global gridded curve-number product
+that solves the same underlying problem (curve number varies by land cover and geography, no
+single number works everywhere) as a general hydrology product, independent of InVEST's own
+workflow.
+
+Reading @hamel2020 in full (not just the abstract) changes the framing in two ways worth being
+explicit about:
+
+1. **Neither of their case studies derived CN or Kc from literature tables cold.** Peru reused CN
+   values from an existing calibrated SWAT model of that exact basin, built years earlier for a
+   payments-for-ecosystem-services program. Myanmar reused CN/Kc from an existing national
+   ecosystem-service assessment [@mandle2017]. The operational lesson: search for an existing
+   calibrated hydrologic study or ecosystem-service assessment covering a representative watershed
+   in each biome that needs a correction, rather than deriving values from cover-type tables from
+   scratch.
+2. **Model reliability appears to degrade at large basin scale, and their largest basin was only
+   114,000 km².** Their own guidance recommends caution with absolute values "in new geographies,"
+   with relative baseflow results in basins under 10,000 km² best supported by their validation
+   data. A genuinely global run is planetary scale — several orders of magnitude beyond anything
+   validated in this literature, InVEST-specific or otherwise. **Whether "one global run" is even
+   the right framing is a live open question**, not a settled premise — a basin-by-basin or
+   regional-mosaic approach (closer to what Hamel et al. actually did: two separate basin-scale
+   applications, not one global one) may be the more defensible framing than a single
+   planetary-scale run.
+
+The quickflow method itself traces to @guswa2018, validated against 544 US watersheds — a reminder
+that the model's core empirical grounding is American in origin, not tropical or global, independent
+of any input-data question.
+
+## Model inputs — current status
+
+| Input | Status (2026-09-10) |
+|---|---|
+| AOI / watershed vector | Built — `borneo_aoi.gpkg`, dissolved from HydroBASINS Australia/Oceania [@lehner2013] level-6 units, 1.4% area error against Borneo's known extent |
+| DEM | Sourced and verified — SRTMGL3 [@farr2007], 90m. Elevation range -91–4041m against a known high point of 4095m (Mt. Kinabalu) |
+| Routing parameters | Rich's `swy_global.ini` defaults (`THRESHOLD_FLOW_ACCUMULATION=1000`, `ALPHA_M=0.083333`, `BETA_I=1`, `GAMMA=1`) |
+| LULC | ESA CCI 1992 / Copernicus C3S 2020, 300m, already used elsewhere in this pipeline |
+| Soil hydrologic group | HYSOGs250m [@ross2018] |
+| Monthly precipitation | Sourced and verified — CHIRPS [@funk2015], 2020, ~5.5km |
+| Monthly ET0 | Sourced and verified — TerraClimate `pet` [@abatzoglou2018], 2020, ~4km, ASCE Penman-Monteith corrected for CO2 |
+| Rain events table | Derivable from CHIRPS daily via a working script; precip is in hand, derivation not yet run |
+| Curve number (CN) base | GCN250 [@jaafar2019] |
+| NDVI (feeds Kc) | Sourced and verified — MOD13A3 [@didan2021], full 2000–2026 record |
+| `root_depth` | Required by the `inspring` interface but confirmed dead code in this fork — a placeholder raster satisfies it |
+
+: {tbl-colwidths="[25,75]"}
+
+## How CN and Kc actually get fed to the model
+
+InVEST's documented convention is a lucode-indexed biophysical table — one CSV row per land-cover
+class, columns for `CN_A`/`CN_B`/`CN_C`/`CN_D` and `Kc_1`...`Kc_12`. `inspring`
+(`github.com/springinnovate/inspring`, Rich's implementation) additionally accepts **direct raster
+overrides** per factor (`cn_a/b/c/d_path`, `kc_1...12_path`, `root_depth_path`) — confirmed by
+reading the code directly, not inferred from documentation. When every factor is raster-overridden,
+`lulc_raster_path` itself becomes unnecessary.
+
+This project uses the raster-override path for both CN and Kc, because both underlying products are
+inherently continuous already — GCN250 is a per-pixel raster, and the NDVI-Kc regression below
+computes a value per pixel per month. Routing either through a shared, class-based lucode scheme
+first would discard resolution, not add anything. To be clear about what is and is not novel here:
+continuous, gridded parameterization is the default in most physically-based distributed hydrology
+models (VIC, PCR-GLOBWB, and similar land-surface models are raster-native from the start) — it is
+InVEST's table-based convention that is the special case, a design choice suited to its usual
+land-use-scenario comparison use case. The raster-override path is best understood as `inspring`'s
+own engineering solution for making a genuinely large-extent run of a table-oriented model
+tractable, not a novel modeling idea introduced by this project. Whether this specific path is
+something other InVEST users rely on, or a bespoke solution built for this project's own global-run
+ambitions, is an open question worth asking Rich directly rather than assuming either way.
+
+## Curve number: methodology and the biome-patch decision
+
+InVEST's own documentation is explicit that there is no defensible global shortcut for CN — it
+depends on soil group, cover type, and moisture condition, and region-specific values are preferred
+over blanket defaults [@usda_neh630_2007]. **GCN250** [@jaafar2019] solves the bulk of this: a
+purpose-built, peer-reviewed global CN product combining land cover and soil hydrologic group
+[@ross2018], with three antecedent-runoff-condition variants. Its own authors are candid that it
+differentiates by land-cover granularity, not by region-specific values *within* one land-cover
+class, and that the underlying method is least validated in forested/humid tropical environments.
+
+**Recommended approach: GCN250 as baseline, targeted biome-level correction on top.** This maps onto
+a short list of this pipeline's WWF biome classes, not all sixteen: Tropical & Subtropical Moist
+Broadleaf Forests, Mangroves, and Flooded Grasslands & Savannas are the priority candidates for a
+literature-sourced correction layered on the GCN250 baseline. This is not a hypothetical
+refinement — @hamel2020's own sensitivity analysis found quickflow changing by **factors of
+10–13×** between antecedent-moisture-condition CN settings in a single basin. CN is close to the
+dominant source of variance in this model's output.
+
+Per @hamel2020's own precedent (search for an existing calibrated study rather than deriving from
+cover-type tables cold):
+
+| Biome | Status |
+|---|---|
+| Tropical moist broadleaf forest | Real candidates found [@calero2021; @fabrega2012], both confirming the standard method overestimates runoff under tropical conditions. Patch is buildable. |
+| Flooded grasslands & savannas | Direct hit: @oliveira2016, measured CN from Brazilian Cerrado (undisturbed savanna CN ≈ 81.2 on soil group B) — the closest ecological analogue to the Colombian Llanos/Orinoquía. @nogales2021 is valuable regional precedent but is **not** a CN source (different model, no vegetation-based parameterization) — don't conflate the two. |
+| Mangroves | No usable literature found after three search passes. These are tide-flooded systems — CN's rainfall-runoff premise doesn't describe what drives water movement here. Leaning toward documenting this as a structural limitation of the CN method itself, not a literature gap to keep searching for. |
+
+: {tbl-colwidths="[25,75]"}
+
+## Crop coefficient: methodology
+
+The governing relationship, per FAO-56 [@allen1998]:
+
+$$ET_c = K_c \times ET_0$$
+
+where $ET_0$ is reference evapotranspiration from climate data alone, and $K_c$ is a unitless
+multiplier reflecting what's actually growing on a pixel. `inspring` computes this internally per
+month as $PET_m = K_{c,m} \times ET0_m$.
+
+FAO-56's own tables don't solve this globally: they're built for managed crops with defined growth
+stages, calibrated against Northern-Hemisphere crop calendars — most global land area is not
+cropland, and has no "planting date" for that framework to apply to. The three-way split used here:
+
+- **Cropland**: FAO-56 tables [@allen1998], adapted with region-correct crop-calendar timing (the
+  reference tool's built-in defaults are Northern-Hemisphere only, and does not have a native entry
+  for oil palm — an open question for whichever cropland is actually dominant in a given AOI).
+- **Non-crop vegetation** (forest, grassland, shrubland — most of global land area): the validated
+  NDVI regression from @kamble2013, calibrated against AmeriFlux eddy-covariance flux-tower
+  measurements across multiple vegetation types ($r^2 = 0.90$–$0.91$):
+
+  $$K_c = 1.457 \times NDVI - 0.1725$$
+
+  Corroborated by multiple follow-up studies through 2025, including one Sentinel-2 study
+  reporting an even tighter fit [@grapevine_kc_2025]. This is an empirical, statistical
+  relationship, not a mechanistic one — it assumes the same linear slope holds across vegetation
+  physiologies and regions the original flux towers didn't sample. That is a real simplifying
+  assumption, not a proven universal law, though the same category of assumption GCN250 makes for
+  CN, and one repeatedly replicated rather than a one-off finding.
+- **Non-vegetated** (water, wetlands, bare soil, built): fixed values from InVEST's own guidance
+  [@invest_userguide_2026].
+
+The three are merged per-pixel via a land-cover mask (crop / non-crop-vegetation / non-vegetated) —
+a much smaller artifact than a full lucode-indexed biophysical table, since CN and Kc are otherwise
+raster-overridden as described above.
+
+## Rain events
+
+Not directly available from any source — derived by counting days with more than 0.1mm of rainfall
+per month from a daily precipitation product. CHIRPS [@funk2015] has the necessary daily
+granularity; a working script (`calculate_average_monthly_events.py`) already exists. Rain-day
+frequency genuinely varies by climate zone, which is InVEST's own stated reason for offering a
+"climate zone" advanced option as an alternative to a single global rain-events table.
+
+## Test design: Borneo
+
+**Decided with Becky, 2026-09-09.** The actual goal is a global run; running end-to-end on a real
+basin is a necessary check, not the goal itself. The real question this test answers is whether
+this project's own CN/Kc parametrization — built from public, peer-reviewed global products rather
+than a hand-built regional table — is robust enough to trust at that scale. Borneo, not Indonesia as
+a whole, is the test case: the large, single landmass that allows a real-scale test without the
+added complication of Indonesia's thousands of small islands.
+
+Two things represent a real shift from where this research started, worth stating plainly:
+
+- **The mangrove/flooded-savannas CN gap is not a blocker for this round.** Resolving that patch
+  before testing was this project's own caution, not a condition Becky set.
+- **Rigorous validation against a published result is not the priority for this round either** —
+  confirming the pipeline runs end-to-end on a real basin matters more right now than proving
+  numerical agreement with an external benchmark.
+
+The original, stricter framing — reproducing a known published result closely enough to trust
+further scaling — was to test against one of @hamel2020's own basins (Peru or Myanmar), since they
+have published, granular output to check a result against. Peru's CN came from an existing
+calibrated SWAT model [@abbaspour2019 gives the class of tool, not this specific calibration];
+Myanmar's from an existing ecosystem-service assessment [@mandle2017]. That reasoning remains
+scientifically sound and worth returning to for a rigor-focused validation later — it just isn't
+what this round is for.
+
+## Open research questions
+
+- **Is "one global run" the right framing at all**, or should this proceed as a set of
+  basin-by-basin/regional-mosaic runs combined afterward — closer to what @hamel2020 actually did?
+  Not resolved; named explicitly rather than assumed away.
+- **The mangrove CN gap** — is documenting it as a structural limitation of the curve-number method
+  (not merely an unfilled literature gap) the right final position?
+- **Is the `inspring` raster-override path a known pattern elsewhere**, or specific engineering
+  built for this project's own use case? Worth asking Rich directly.
+- **Oil palm and FAO-56** — cropland Kc assumes a native FAO-56 entry exists; it does not for oil
+  palm specifically, the crop most likely to actually dominate Borneo's cropland fraction.
+
+## Figures
+
+Not yet populated — the strongest figures here will be actual Borneo run output (quickflow/baseflow
+maps) once a run exists, rather than input-data maps alone. Revisit after the first successful run.
+
+## References
+
+::: {#refs}
+:::

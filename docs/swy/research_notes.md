@@ -365,6 +365,30 @@ model internals matter, as opposed to just the orchestration layer covered here)
 
 ## Open questions / next steps (remaining)
 
+**Update 2026-09-09 — Becky meeting, real decision, supersedes the Hamel-basin-first plan below.**
+Test basin is now **Borneo**, not Peru/Myanmar. Two things worth being precise about, since they
+change the shape of the plan below rather than just the location:
+
+1. **Becky is not treating the mangrove/flooded-savannas CN gap as a blocker.** The whole
+   "resolve the biome patch before testing" framing in this file (and in the Indonesia-question
+   thread) was this project's own caution, not a condition she imposed — she's comfortable testing
+   without it resolved first.
+2. **Rigorous validation-against-published-output is not the priority she cares about here either**
+   ("even the validation does not bother that much"). This is a real shift from the reasoning below
+   (Hamel's basins chosen specifically *because* they have published output to check against) — the
+   Peru/Myanmar validation-test framing, and the Nash-Sutcliffe-efficiency comparison plan, was this
+   project's own rigor standard, not hers. Keep the reasoning below for what it's worth
+   scientifically, but don't present the Borneo run as still needing to clear that bar unless asked.
+
+**Practical plan from the meeting**: get the data already in hand (CN tables, GCN250, HYSOGs250m,
+HydroBASINS — see below) onto a shared Google Drive. Attempt the actual Borneo run in-house first;
+Rich runs it if that doesn't work. **Meeting Friday with both Becky and Rich — be ready.**
+
+**What this doesn't change**: the required-inputs list, the CN/Kc strategy (GCN250 + biome patches,
+FAO-56 + Kamble NDVI regression), and the `swy_global`/`inspring` architecture findings below are
+all still accurate and still needed for Borneo — only the target basin and the validation framing
+changed, not the underlying mechanics.
+
 **Update 2026-09-07 — test-basin question resolved (user decision), two open threads reconciled.**
 This file had been carrying two different test-basin proposals in parallel without ever explicitly
 choosing between them: the Llanos idea below (2026-09-03/04) and the separate Hamel-basin-
@@ -419,8 +443,18 @@ something to defer further.
 - [ ] Tropical moist broadleaf forest CN patch — this one has real candidate literature (Calero
       Mosquera et al. 2021, Fábrega et al. 2012, pending verification) and is a genuine "build the
       correction" task, unlike the item above.
-- [ ] Acquire HYSOGs250m, MOD13A3 NDVI, and HydroBASINS — **scope to the proposed Llanos test
-      basin first**, not a global pull, per the update above.
+- [x] **HYSOGs250m acquired — 2026-09-09.** Downloaded the full global, already-reclassified
+      Cloud-Optimized GeoTIFF (`HYSOGs250m_Soil_Groups_reclassified.tif`, ~388MB) from NatCap's own
+      Data Hub (`data.naturalcapitalalliance.stanford.edu`) rather than the raw ORNL DAAC source
+      (DOI 10.3334/ORNLDAAC/1566) — same underlying data (Ross et al. 2018), but pre-formatted for
+      InVEST use and no Earthdata login required. Pulled the **global** file, not basin-clipped —
+      a one-time global download is simpler than re-fetching per basin; clip locally per-basin as
+      needed once a basin is chosen. Saved to `data/raw/soil_hydrologic_group/`.
+- [x] **HydroBASINS acquired — 2026-09-09.** Downloaded South America and Asia (all 12
+      Pfafstetter levels each) directly from `hydrosheds.org` — the two continents covering every
+      candidate basin actually discussed (Peru, Llanos in South America; Myanmar, Indonesia in
+      Asia), not a full global pull. Saved to `data/raw/hydrobasins/hybas_sa/` and `hybas_as/`.
+- [ ] Acquire MOD13A3 NDVI — **scope to the chosen test basin first**, not a global pull.
 - [ ] Resolve the precipitation source (CHIRPS+CHELSA blend vs. single source) with Becky — only
       actually blocking once/if this moves beyond the Llanos test to anything outside CHIRPS'
       60°N/60°S coverage.
@@ -508,3 +542,196 @@ returning to directly: `inspring/src/inspring/seasonal_water_yield/seasonal_wate
   FAO Irrigation and Drainage Paper 56.
 - NRCS-USDA (2007). National Engineering Handbook.
 - NRCS TR-55 (1999). Urban Hydrology for Small Watersheds.
+
+## 2026-09-09 — Borneo pivot, decided with Becky
+
+Real pivot at the 13:30 call: test basin is **Borneo**, not Peru/Myanmar (the original
+Hamel-basin validation plan) or the Colombian Llanos. Becky isn't treating the mangrove/
+flooded-savannas CN gap or rigorous validation-against-a-published-result as blockers for this
+round — both were this project's own rigor standard, not a condition she set. Meeting with Becky
+and Rich together set for Friday 2026-09-12. The stricter Hamel-basin validation framing is kept
+as a reference, explicitly not abandoned, for a later round — see `swy_methods.qmd`'s "Test
+design" section.
+
+## 2026-09-10 — full raw-input acquisition, a real architecture correction, and documentation restructuring
+
+**Every raw input SWY needs is now downloaded and content-verified** (not just "request says
+done" — actually opened and sanity-checked with `rasterio`/`geopandas`), closing out what had been
+the last real acquisition gaps:
+
+- **DEM**: SRTMGL3 (`SRTMGL3_NC.003`, 90m, via AppEEARS) — the earlier call to not source a DEM
+  independently was about not duplicating Rich's *global* one; it doesn't hold for an in-house
+  Borneo-only attempt, which needs its own AOI-scoped file. Verified: range -91–4041m against Mt.
+  Kinabalu's real 4095m high point — a close, correct match. 149MB.
+- **Precipitation, 2020**: CHIRPS v2.0, `data.chc.ucsb.edu`, no auth, global monthly GeoTIFFs
+  (~14.5MB/month) clipped locally with the project's own geopandas/rasterio (CHIRPS isn't
+  NASA-distributed, not reachable via AppEEARS). Verified: July mean 138.9mm, plausible for
+  equatorial Borneo.
+- **Reference ET0, 2020**: **TerraClimate `pet`** — a genuinely new source, not previously
+  vetted anywhere in this project before today, needed because CHIRPS is precipitation-only.
+  "Reference Evapotranspiration," ASCE Penman-Monteith corrected for CO2, ~4km
+  (`thredds.northwestknowledge.net`, no auth, one global netCDF per year). Verified: monthly means
+  97–118mm, plausible for tropical reference ET. Citation added: @abatzoglou2018 (Crossref-verified
+  DOI `10.1038/sdata.2017.191`).
+- **NDVI**: MOD13A3.061, both a 2020-only task and the full 2000–2026 record submitted and
+  verified (636 GeoTIFFs for the full record). The full record is kept locally
+  (`data/mod13a3_borneo_full_record/`) but deliberately **not** shipped in the shared Drive
+  package — package scope is one test year, to stay manageable; 2020 was chosen to match the
+  Copernicus C3S LULC anchor year and as a reasonable guess (unconfirmed) for the year the other
+  8 pre-computed services actually used.
+
+**A real correction to the CN/Kc plan**, found by re-reading this file's own 2026-09-08 code-read
+entry above more carefully: `inspring.seasonal_water_yield.execute()` accepts CN and Kc as
+**direct raster overrides** (`cn_a/b/c/d_path`, `kc_1...12_path`, `root_depth_path`), not only via
+a lucode-indexed biophysical CSV — and `lulc_raster_path` itself becomes unnecessary once every
+factor is raster-overridden. Since GCN250 and the Kamble NDVI regression are both inherently
+per-pixel, the plan is now to build CN/Kc as rasters and feed them through that path directly,
+rather than force either through a shared lucode scheme. This shrinks the earlier "no lucode
+master table exists" gap substantially — only a small 3-way land-cover mask
+(crop/non-crop-veg/non-vegetated) is actually needed for the Kc split, not a pipeline-wide table.
+Worth being honest about what is and isn't novel here (a question the user raised directly):
+continuous, gridded parameterization is the default for most physically-based distributed
+hydrology models generally; it's InVEST's table-based convention that's the special case, suited
+to its usual land-use-scenario comparison use case. Whether this raster-override path is a
+pattern used elsewhere or bespoke engineering Rich built for his own global-run ambitions is an
+open question, not yet asked of him directly.
+
+**Real gotchas hit today, worth keeping**:
+- AppEEARS's bundle-file download endpoint (`/api/bundle/{task_id}/{file_id}`) returns an HTTP
+  redirect to a pre-signed S3 URL — `curl` needs `-L` or it silently saves the tiny HTML redirect
+  page instead of the real file (a uniform ~3.3KB file size across "downloaded" files is the
+  giveaway).
+- Calling `curl` from *inside* a Python `subprocess` picked up a different, Windows-native
+  `curl.exe` that couldn't read `.netrc` (return code 26) — had to call Git-Bash's `curl` directly
+  from bash, not wrapped through Python subprocess.
+- `Rscript`/`sf`/GDAL segfaults reading `borneo_aoi.gpkg` in this environment (same underlying
+  crash noted in `project_phase4_status.md` memory's Session 18 entry) — used the project's
+  Python `.venv` (`geopandas`) instead, which worked cleanly.
+- One transient run where every downloaded filename picked up a stray trailing underscore
+  (`....tif_`) — did not reproduce on retry with the identical script; root cause not identified,
+  not currently a live issue.
+
+**Documentation restructured today**, after the user flagged real fragmentation risk (three
+different places were tracking "current status" in overlapping ways):
+- `docs/swy/workflow.md` (new) — a mermaid pipeline diagram with live status coloring, now the
+  one place "current status" should be tracked. Other docs point to it rather than duplicating it.
+- `docs/swy/model_specification.md` archived to
+  `docs/archive/model_specification_2026-07-16.md` (not deleted) and replaced by
+  **`docs/swy/swy_methods.qmd`** — a permanent conceptual/methods reference, deliberately not tied
+  to any single meeting's framing (unlike the old file, which was explicitly written "for Becky,
+  Tuesday" and unlike `docs/reports/swy_status_report.qmd`, which stays a disposable, meeting-tied
+  status memo, regenerated fresh rather than kept permanently current). Includes real typeset
+  formulas (the Kamble Kc regression, $ET_c = K_c \times ET_0$), the raster-override architecture
+  note above, and an open-questions section.
+- **`docs/swy/references.bib`** (new) — 22 entries, generated from `literature_review.ris` via
+  `pandoc -f ris -t biblatex` (confirmed: Quarto/pandoc can read `.ris` bibliographies directly,
+  no conversion is strictly required — but RIS's auto-generated citation keys are unwieldy
+  multi-author strings, e.g. `Hamel_Valencia_Schmitt_Shrestha_Piman_Sharp_Francesconi_Guswa_2020`,
+  and two USDA entries collided on `United_*` — hand-cleaned to short keys like `hamel2020` after
+  conversion). Two new sources added and Crossref-verified: `abatzoglou2018` (TerraClimate) and
+  `farr2007` (the SRTM mission paper — was previously used in this project without ever being
+  formally cited). Keep `.ris` and `.bib` in sync going forward: `.ris` is the reference-manager
+  master, `.bib` is what Quarto actually cites from.
+
+**The shared Drive package** (`data/swy_shared_package/`) grew from 892MB to ~2.1GB (adding
+DEM/NDVI/precip/ET0) then back down to **~1.1GB** after deliberately trimming NDVI to 2020-only.
+README.md fully rewritten with the complete data dictionary. Still needs the actual Drive upload —
+user's own action.
+
+**Not yet done**: the CN/Kc rasters themselves (masking + regression + merge logic — all inputs
+are in hand, this is implementation work now, not acquisition), the rain-events derivation
+(script exists, CHIRPS is in hand), and the actual `inspring` model call.
+
+## 2026-09-10/11 — first real run attempt: local LULC turned out corrupted, Docker path found, run in progress
+
+**Real data-integrity finding**: `data/raw/LandCovers/landcover_gl_1992.tif`, an input this
+project's other pipeline apparently depends on, turned out to be an **empty/corrupted stub** —
+zero valid pixels found anywhere on Earth (checked Borneo, the Amazon, Colombia, the Congo — all
+NaN), despite having correct-looking metadata (CRS, bounds, dtype). The user had removed the
+real data for storage reasons at some point. Real gotcha worth generalizing: verify raster
+*content*, not just file existence/metadata, before trusting an "this input already exists"
+assumption. The real 2020 Copernicus C3S land cover (the year actually needed here, not 1992)
+was located on the user's WWF OneDrive as a 2.3GB netCDF and extracted directly via a windowed
+read (no need to copy the full global file) — see `Python_scripts/swy_borneo_run/06_extract_lulc_2020.py`.
+Real validation: 48.1% valid fraction (matches every other Borneo raster exactly), and a
+physically sensible class breakdown (58.3% broadleaf evergreen forest, real mangrove/swamp-forest
+and oil-palm-consistent cropland fractions) — the C3S data and the clip are both correct.
+
+**GCN250 gap found**: only the derived CN lookup CSVs were ever downloaded, never the actual
+GCN250 per-pixel raster — irrelevant for this run (the CSV path was used, see below) but a real
+gap if the raster-override path is attempted later.
+
+**Docker/`inspring` investigation — tried Rich's own path first, per explicit user instruction,
+before falling back.** Concrete, reproducible findings (not vague "it didn't work"):
+1. `inspring`'s own `Dockerfile` fails immediately and reproducibly on `pip3 install -r
+   requirements.txt` — that file was deleted from the repo in 2022 and never replaced. Confirmed
+   by actually running the build.
+2. `inspring`'s `setup.py` omits `inspring.seasonal_water_yield` from its `packages` list — a
+   normal `pip install .` compiles the Cython extension but leaves the Python module itself
+   unimportable. **Worked around**, not fixed upstream: `python setup.py build_ext --inplace` +
+   `PYTHONPATH` pointed directly at the source tree.
+3. **Good news**: the *current* upstream `ecoshard` (not the old pinned
+   `therealspring/ecoshard@b9b4580` fork commit) has a working `ecoshard.geoprocessing` (with
+   `routing`) and `ecoshard.taskgraph` — resolves the open question flagged 2026-09-08 about
+   whether the old fork was still required. It isn't.
+4. This project's *own* existing Docker image (`therealspring/global_ncp-computational-
+   environment`, built from the repo's own `Dockerfile`/`environment.yml`) already had everything
+   `inspring` actually needs (gcc/g++/cython/GDAL, a fresh unpinned `ecoshard`) — building
+   `inspring` on top of that image (rather than debugging `inspring`'s own broken one) is what
+   actually worked. `natcap.invest` itself was also tried directly via pip as a possible fallback
+   and failed for an unrelated, more fundamental reason: **GDAL has no PyPI wheels on any
+   platform** (confirmed on both native Windows and a plain Linux container) — this is a
+   well-known GDAL-maintainer decision, not an environment bug. `conda-forge` (via
+   `condaforge/miniforge3`) installs `natcap.invest` + `gdal` cleanly with no compilation, and
+   would have been the fallback path if the `inspring`-on-existing-image approach hadn't worked.
+5. Items 1 and 2 are small, well-scoped, non-scientific packaging fixes — real candidates for a
+   PR back to `springinnovate/inspring`, not attempted yet (would need an actual GitHub fork,
+   deferred until after the immediate Borneo test).
+
+**Whole pipeline consolidated into real scripts**, not just interactive commands — see
+`Python_scripts/swy_borneo_run/README.md` for the full pipeline table and known compromises in
+this specific run (placeholder rain-events table, NDVI-regression Kc applied uniformly including
+cropland, placeholder `root_depth`, CSV biophysical-table path rather than raster-overrides).
+
+**Run submitted, outcome not yet known as of this entry** — check `docker ps`/the run's actual
+output before assuming either success or failure.
+
+## 2026-09-11 — the run actually finished (crash was infrastructure, not the model): real, mostly plausible results, one genuine diagnosable issue
+
+**What actually happened**: the laptop went to sleep mid-run, which killed Docker Desktop's
+backend (`error waiting for container: unexpected EOF`), which the harness reported as the run
+"failing" (exit code 4). That's a real, legitimate confusion to have from the task notification
+alone — but checking the actual workspace directory tells a very different story: **every
+standard SWY output file exists and is non-empty**, including the 12 monthly `qf_*` rasters, AET,
+CN, `L`/`L_avail`/`L_sum`/`L_sum_avail`, `Vri`, and — critically — the final
+`aggregated_results_swy_borneo_2020_test.shp` with a real, non-null computed baseflow value
+(`qb = 1705.005`, `vri_sum = 0.998`). Aggregation is one of the model's last computational steps,
+so this strongly indicates the actual scientific computation completed; what died afterward was
+some post-computation Python/taskgraph cleanup step, hit right as Docker's Linux backend
+disappeared out from under it (the traceback that actually landed in the log is 100% thread-join/
+deprecation-warning noise from an unclean interpreter shutdown, not a computation error).
+
+**Real content check, not just "files exist"**:
+- **QF (annual quickflow)**: clean stats (excluding nodata and 14 stray fill-value pixels out of
+  182M, a negligible 0.00% artifact) — mean 406.8mm/year, range 2.3–4837.2mm. Plausible for
+  tropical rainforest, where most precipitation infiltrates rather than running off quickly.
+- **AET (actual evapotranspiration)**: mean 1288.0mm/year, range up to 1566mm. Squarely in the
+  expected range for warm, humid, year-round tropical conditions.
+- **L_sum (local recharge, accumulated downstream)**: a real, genuine anomaly — while the median
+  (4646.87) and most of the distribution look reasonable, ~4.6% of valid pixels (1.76M of 38.3M)
+  have runaway values into the millions/billions (p99.9 = 812M, max = 10.86B). This is the
+  classic signature of a flow-accumulation blow-up — almost certainly an unresolved DEM
+  sink/pit-fill issue or a flow-routing anomaly interacting with the placeholder rain-events
+  table, not random file corruption (the bulk of the distribution is fine; this is localized).
+  **Worth investigating before trusting L_sum-derived outputs (including the aggregated `qb`)
+  quantitatively** — but doesn't change the headline finding that the pipeline runs end-to-end
+  and QF/AET look right.
+
+**Bottom line for tomorrow's meeting**: the actual answer to "does it run, and is our
+parametrization plausible" is a real yes on both counts, with one specific, honestly-flagged
+follow-up item (the L_sum anomaly) rather than a clean, unqualified success — which is a more
+credible thing to bring to Becky and Rich than either "it's perfect" or "it crashed."
+
+**Also worth logging**: `data/swy_borneo_workspace/` (gitignored) has the full output set if
+anyone wants to inspect it directly — not copied into the shared Drive package (output, not
+input; the package is scoped to inputs per its own README).
