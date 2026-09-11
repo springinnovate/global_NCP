@@ -70,25 +70,35 @@ session in `c:\projects\global_NCP` to resume.
   (curl redirects, `.netrc`, R/GDAL segfaults) — lives in `docs/swy/research_notes.md`'s
   2026-09-09/10 entries, not here.** Current status: `docs/swy/workflow.md`. Permanent
   conceptual/methods reference: `docs/swy/swy_methods.qmd`.
-  - **Still open**: upload the package to Drive (user's action), build the CN/Kc rasters, derive
-    rain events (script exists, CHIRPS in hand), attempt the actual `inspring` run.
+  - **Data package uploaded to Drive and Becky notified, 2026-09-11 (user's own action, confirmed
+    done).** No longer an open item — see the corrected `Pending` list below.
   - **2026-09-10/11, the whole pipeline consolidated into real, re-runnable scripts**:
     `Python_scripts/swy_borneo_run/` (numbered 01-09, plus `Dockerfile`, `appeears_common.py`,
     and its own `README.md`) — AOI build through the actual model call, no longer only ad-hoc
     interactive commands. See that README's "Findings for Rich" section for concrete,
     reproducible bugs found in `inspring`'s packaging (not vague "it didn't work").
-  - **The run finished — real, mostly plausible results, 2026-09-11.** The laptop sleeping killed
-    Docker mid-run (harness reported this as a task "failure," exit code 4) — but the actual
-    workspace shows the full SWY output set including the final aggregated-results shapefile with
-    a real computed baseflow value, meaning the scientific computation completed; what died
-    afterward was a post-computation cleanup step, not the model. **QF (quickflow) mean
-    406.8mm/year, AET mean 1288.0mm/year — both physically plausible for tropical rainforest.**
-    One real, genuine issue found and worth flagging to Rich, not hidden: ~4.6% of `L_sum` pixels
-    have runaway flow-accumulation values (likely an unresolved DEM pit/sink), while the rest of
-    the distribution looks fine. Full detail: `docs/swy/research_notes.md`'s 2026-09-11 entry.
-    Fix applied for next time: `powercfg /change standby-timeout-dc 0` (battery sleep was still
-    on a 60-min timer; AC sleep was already off) — still worth checking the lid-close action in
-    Windows Settings manually, command-line querying didn't cleanly surface that one.
+  - **Two run attempts, 2026-09-11 — the second completed cleanly, and it changed the diagnosis.**
+    First attempt: laptop sleep killed Docker mid-run (battery sleep was still on a 60-min timer
+    despite AC sleep already being off); the `L_sum` routing step was cut off almost exactly at
+    the equator, and the aggregated `qb=1705.005` from that run was suspect. Fixed properly before
+    rerunning: `standby-timeout-dc 0` plus an active `SetThreadExecutionState` keep-awake process
+    for the run's duration (belt-and-suspenders, given this is an AzureAD-managed laptop where
+    `powercfg` couldn't even confirm the lid-close-action setting). Old incomplete workspace moved
+    aside, not deleted (`data/swy_borneo_workspace_INCOMPLETE_run1_2026-09-10/`), so `taskgraph`
+    couldn't silently reuse the broken cached `L_sum`.
+    **Second run: exit code 0, full spatial coverage confirmed.** QF/AET identical to the first
+    run (406.8mm/yr, 1288.0mm/yr — expected, don't depend on routing). **The real finding: the
+    L_sum flow-accumulation anomaly (~5% of pixels, values into the billions) persisted at the
+    same order of magnitude with full coverage — it is a genuine, reproducible issue, not a crash
+    artifact.** Visually (via the new interactive map — see below) it clusters most visibly at one
+    specific coastal river-mouth location, consistent with (not confirmed as) SRTM noise in flat
+    tidal terrain. Separately: the aggregated `qb` value came out **numerically identical** between
+    the broken and complete runs (1705.005), suggesting the AOI-wide aggregate itself is more
+    robust than the pixel-level anomaly implies. Full detail: `docs/swy/research_notes.md`'s two
+    2026-09-11 entries.
+  - **Report, map, and shared package all re-rendered/re-copied with the complete-run numbers** —
+    but **the version the user uploaded to Drive last night reflects the incomplete run's
+    framing and needs re-uploading.**
 - **Devstack pilot restructure — done and verified, 2026-09-09.** `calculate_bitemporal_change.py`
   split into `run_/tasks_/functions_` files, verified two ways: 5 new pytest tests
   (`Python_scripts_tests/`) all pass, and — the real test — original vs. refactored script outputs
@@ -125,14 +135,14 @@ session in `c:\projects\global_NCP` to resume.
    NDVI, precip, ET0 all downloaded and content-verified. Nothing left to acquire; see the
    "SWY — every raw input" note above and `docs/swy/workflow.md` for what's actually left
    (Kc/CN raster construction, rain events derivation, then the model call itself).
-3. **Before Friday: upload `data/swy_shared_package/` to the shared Google Drive** — now ~1.1GB
-   (grew from 892MB, then trimmed back down from ~2.1GB by scoping NDVI to 2020 only), the user's
-   own action (Drive access, not something to do from a session).
-4. **Before Friday: build the Kc/CN rasters, derive rain events, then attempt the actual Borneo
-   SWY run, in-house** (per the two-audience note above). Rich runs it if this doesn't work. This
-   is now the critical path — not blocked on data, blocked on writing the masking/regression code.
-5. **Friday: meeting with Becky and Rich together** — SWY (Borneo results/blockers), paper,
-   devstack, all converging here.
+3. ~~Upload `data/swy_shared_package/` to the shared Google Drive~~ — **done, 2026-09-11**, user
+   confirmed uploaded and Becky notified.
+4. **The Borneo SWY run itself — see the detailed status above** (first attempt completed but
+   `L_sum`/baseflow was cut short by a Docker crash; a clean rerun was in progress as of the last
+   session, outcome to confirm before the 11am meeting).
+5. **Today (2026-09-11): meeting with Becky and Rich together, ~11am** — SWY (Borneo results),
+   paper, devstack, all converging here. Camila Cammaert meeting is earlier the same morning,
+   ~8am, user prepping separately.
 6. **How did the Camila Cammaert meeting go?** — ask, fold in whatever came of it.
 7. **Decide what to do with the stale Rich draft** — resend trimmed, fold into Friday's live
    conversation, or something else. Ask, don't pick unilaterally.

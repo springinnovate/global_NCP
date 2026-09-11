@@ -25,7 +25,7 @@ flowchart TD
     end
 
     subgraph RUN["Model run — first attempt uses the CSV biophysical-table path, not raster-overrides (pragmatic choice for this round, see swy_methods.qmd)"]
-        SWYRUN["inspring.seasonal_water_yield.execute()<br/>via Docker (project's own image + inspring built on top)<br/>COMPLETED 2026-09-11 — QF mean 406.8mm/yr, AET mean 1288mm/yr,<br/>both plausible. One real issue: ~4.6% of L_sum pixels blow up"]:::done
+        SWYRUN["inspring.seasonal_water_yield.execute()<br/>via Docker (project's own image + inspring built on top)<br/>COMPLETE, full coverage confirmed, 2026-09-11 (2nd attempt)<br/>QF/AET plausible; L_sum anomaly (~5% of pixels) confirmed<br/>real, not a crash artifact — clusters at one river mouth"]:::done
     end
 
     subgraph OUT["Output"]

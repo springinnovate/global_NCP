@@ -31,11 +31,12 @@ format:
 read directly at the code level, not from descriptions: basin batching, per-basin routing, global-mosaic stitching, and direct CN/Kc raster overrides all work as expected. One real bug found in `inspring` itself along the way (a dead `root_depth` parameter).
 :::
 ::: {.finding}
-**The plan is test-then-scale, decided with Becky 2026-09-09: Borneo — and the first real
-in-house attempt ran.** Quickflow (mean 406.8mm/year) and actual ET (mean 1288.0mm/year) both
-land in physically plausible ranges for tropical rainforest. One genuine, diagnosable issue
-found, not hidden: ~4.6% of local-recharge pixels show a flow-accumulation anomaly, likely an
-unresolved DEM sink — detail below. Meeting with Becky and Rich together today, 2026-09-11.
+**The plan is test-then-scale, decided with Becky 2026-09-09: Borneo — and a complete in-house
+run exists.** Quickflow (mean 406.8mm/year) and actual ET (mean 1288.0mm/year) both land in
+physically plausible ranges for tropical rainforest. One genuine, diagnosable issue found, not
+hidden: ~5% of local-recharge pixels show a flow-accumulation anomaly, most visibly clustered at
+one coastal river-mouth location — detail below. Meeting with Becky and Rich together today,
+2026-09-11.
 :::
 :::
 
@@ -123,28 +124,39 @@ yet) — lower-risk for a first pass; the raster-override path is worth a follow
 
 **Decided with Becky, 2026-09-09: test in Borneo.** Every raw input the model needs is downloaded
 and content-verified — AOI, DEM, routing parameters, LULC, soil group, precipitation, ET0, NDVI,
-and the CN base (`data/swy_shared_package/`, ~1.1GB, ready to upload). The CN/Kc biophysical
-table and a placeholder rain-events table are built. **A first real in-house run attempt was made
-2026-09-11 via Docker, and it worked**: the full standard SWY output set exists, including the
-final aggregated-results shapefile with a real computed baseflow value. Quickflow and actual ET
-both land in physically plausible ranges. Whole pipeline consolidated into real, reproducible
-scripts: `Python_scripts/swy_borneo_run/` (see that directory's own README for the exact pipeline
-and known compromises in this run). Rich has everything needed — data and scripts both — to pick
-this up or extend it with his own tooling; see "Findings for Rich" below for concrete,
-reproducible issues found in `inspring`'s own packaging along the way.
+and the CN base (`data/swy_shared_package/`, ~1.1GB, uploaded to Drive). The CN/Kc biophysical
+table and a placeholder rain-events table are built. **Two real in-house run attempts were made
+2026-09-11 via Docker; the second completed cleanly.** Whole pipeline consolidated into real,
+reproducible scripts: `Python_scripts/swy_borneo_run/` (see that directory's own README for the
+exact pipeline and known compromises in this run). Rich has everything needed — data and scripts
+both — to pick this up or extend it with his own tooling; see "Findings for Rich" below for
+concrete, reproducible issues found in `inspring`'s own packaging along the way.
 
 ::: {.validation-note}
 **The run outcome, plainly**: quickflow mean 406.8mm/year (range 2.3–4837.2mm), actual ET mean
 1288.0mm/year — both physically reasonable for tropical rainforest, where most rainfall
-infiltrates rather than running off quickly. **One real, genuine issue, flagged rather than
-hidden**: ~4.6% of local-recharge (`L_sum`) pixels show runaway flow-accumulation values (up to
-10.9 billion, where the bulk of the distribution sits in the thousands) — the classic signature
-of an unresolved DEM sink or pit-fill issue, not random corruption (the rest of the raster is
-fine). Worth investigating before trusting `L_sum`-derived outputs, including the aggregated
-baseflow figure, quantitatively. A Docker crash (the laptop sleeping mid-run killed Docker
-Desktop's backend) initially looked like a run failure — the actual output files on disk tell a
-different, better story, confirmed by directly reading and sanity-checking them, not by trusting
-the process exit code alone.
+infiltrates rather than running off quickly. These held identical across both run attempts.
+
+**Two separate things worth being precise about, not conflated**:
+
+1. **The first attempt was cut short by an infrastructure failure** — the laptop sleeping killed
+   Docker's backend mid-run, which interrupted the local-recharge routing step (`L_sum`) partway
+   through the basin (spatial coverage stopped almost exactly at the equator). Fixed for the
+   rerun: the actual sleep cause (a battery timeout still active despite AC sleep already being
+   off) plus an active keep-awake safeguard for the run's duration. **The rerun has full spatial
+   coverage confirmed** (matches the stream network and quickflow rasters exactly).
+2. **A separate, genuine numerical issue persists in both runs, coverage gap or not**: ~5% of
+   `L_sum` pixels (4.6% in the first, incomplete run; 5.4% in the second, complete one — same
+   order of magnitude) show runaway flow-accumulation values into the billions, against a median
+   around 5,000. This is not an artifact of the interrupted run — it reproduced independently once
+   full coverage existed to check it against. Visually, it's not random scatter either: the
+   clearest cluster sits at a specific river-mouth/estuary location on the island's east coast,
+   consistent with SRTM's known difficulty in flat, tidally-influenced coastal terrain (a real,
+   named hypothesis, not confirmed) rather than one arbitrary DEM error. Worth investigating
+   before trusting `L_sum`-derived quantities, including the aggregated baseflow figure,
+   spatially — though notably, **the aggregated `qb` figure itself came out numerically identical
+   between the incomplete and complete runs** (1705.005), suggesting the AOI-wide aggregate is
+   more robust than the pixel-level anomaly might suggest.
 :::
 
 Two things worth being explicit about, since they're a real shift from where this research
@@ -197,7 +209,7 @@ to `springinnovate/inspring`, not yet attempted.
 | # | Item | Blocked on |
 |---|---|---|
 | 1 | Upload the built data package (`data/swy_shared_package/`, ~1.1GB — every raw input plus the derived biophysical/rain-events tables) to shared Google Drive | Nobody — just needs doing |
-| 2 | Investigate the L_sum flow-accumulation anomaly (~4.6% of pixels) — likely an unresolved DEM sink | Real diagnostic work, not blocking the headline "it runs" finding |
+| 2 | Investigate the L_sum flow-accumulation anomaly (~5% of pixels, clustered at a coastal river mouth) — plausibly SRTM noise in flat tidal terrain | Real diagnostic work, not blocking the headline "it runs" finding |
 | 3 | Real daily-CHIRPS-derived rain events table (current one is a placeholder) | Google Earth Engine access, not yet configured |
 | 4 | Region-correct FAO-56 cropland Kc (current run uses the NDVI regression uniformly instead) | Crop-calendar research, including an oil-palm-specific gap |
 | 5 | Build CN/Kc as raster overrides instead of the CSV table (architecturally preferable, see above) | Follow-up round, not blocking this test |

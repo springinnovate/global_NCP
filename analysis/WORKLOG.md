@@ -33,6 +33,19 @@ street basemap, pan/zoom) embedded directly in `docs/reports/swy_status_report.q
 useful diagnostically, not just presentational: seeing `L_sum`'s spatial pattern is what made the
 incomplete-coverage issue legible in the first place.
 
+**Resolution, 2026-09-11 morning**: the rerun completed cleanly (exit code 0). QF/AET reproduced
+byte-identical to the first run, as expected. `L_sum` now has full spatial coverage, confirming
+the crash really was the cause of the earlier gap — but **the flow-accumulation anomaly itself
+persisted at the same order of magnitude with full coverage (5.4% of pixels vs. 4.6% before)**,
+proving it's a genuine, reproducible issue, not a crash artifact. The interactive map made this
+legible in a second way: the anomaly isn't random scatter, it clusters most visibly at one
+specific coastal river-mouth location, consistent with (not confirmed as) SRTM's known difficulty
+in flat tidal terrain. Separately notable: the aggregated baseflow figure came out numerically
+identical between the broken and complete runs (`qb = 1705.005` both times), suggesting the
+AOI-wide aggregate was already robust to the coverage gap even though the pixel-level anomaly
+wasn't. Status report, embedded map, and the shared Drive package all corrected and re-rendered
+to reflect the complete run.
+
 ### 2026-09-07 through 2026-09-10 — Paper sent to Becky/Steve, Borneo SWY pivot, full input acquisition
 
 Paper draft sent to Becky/Steve 2026-09-07; Becky returned 14 numbered review comments on

@@ -635,8 +635,8 @@ different places were tracking "current status" in overlapping ways):
 
 **The shared Drive package** (`data/swy_shared_package/`) grew from 892MB to ~2.1GB (adding
 DEM/NDVI/precip/ET0) then back down to **~1.1GB** after deliberately trimming NDVI to 2020-only.
-README.md fully rewritten with the complete data dictionary. Still needs the actual Drive upload —
-user's own action.
+README.md fully rewritten with the complete data dictionary. **Uploaded to Drive and Becky
+notified, 2026-09-11** (user's own action, confirmed done).
 
 **Not yet done**: the CN/Kc rasters themselves (masking + regression + merge logic — all inputs
 are in hand, this is implementation work now, not acquisition), the rain-events derivation
@@ -735,3 +735,42 @@ credible thing to bring to Becky and Rich than either "it's perfect" or "it cras
 **Also worth logging**: `data/swy_borneo_workspace/` (gitignored) has the full output set if
 anyone wants to inspect it directly — not copied into the shared Drive package (output, not
 input; the package is scoped to inputs per its own README).
+
+## 2026-09-11 (later) — rerun completed cleanly; the L_sum anomaly is real, not a crash artifact
+
+Fixed the actual sleep cause before rerunning: `powercfg` showed AC sleep was already disabled,
+but DC (battery) sleep was still on a 1-hour timer — almost certainly what caught the first run,
+since it ran close to an hour before dying. Set `standby-timeout-dc 0` and, as a second layer,
+started a `SetThreadExecutionState`-based active keep-awake process for the rerun's duration (the
+same mechanism video players use — works under most managed-device policies since blocking it
+would break legitimate business software). Moved the incomplete first workspace aside
+(`data/swy_borneo_workspace_INCOMPLETE_run1_2026-09-10/`, preserved not deleted) before
+rerunning, since `taskgraph`'s file-existence-based caching could otherwise have silently reused
+the incomplete `L_sum` instead of genuinely recomputing it.
+
+**The rerun completed cleanly (exit code 0, no crash).** Real, decisive results:
+
+- **QF and AET are byte-identical to the first run** (mean 406.8mm/yr and 1288.0mm/yr
+  respectively) — expected, since neither depends on the routing step that got interrupted before.
+- **`L_sum` now has full spatial coverage** — 48.2% valid fraction matching the stream/quickflow
+  rasters exactly, full latitude range (was cut off at the equator before). Confirms the crash
+  really was the cause of the earlier coverage gap.
+- **The flow-accumulation anomaly persists at the same order of magnitude with full coverage**:
+  5.36% of valid pixels > 1,000,000 (vs. 4.58% in the incomplete run) — this is the real finding.
+  It is **not** an artifact of the interrupted run; it reproduced independently once there was
+  full coverage to check it against. Visually (via the interactive map — genuinely useful here,
+  not just presentational), the clearest concentration sits at one specific river-mouth/estuary
+  location on the island's east coast, not random scatter — consistent with a real hypothesis
+  (SRTM's known difficulty resolving flat, tidally-influenced coastal terrain), not confirmed.
+- **The aggregated `qb` (baseflow) value came out numerically identical between the incomplete
+  and complete runs**: 1705.005127 both times. This is genuinely informative: it suggests the
+  AOI-wide aggregate was already robust to the coverage gap (plausibly because the outlet-level
+  routing calculation was already complete in-memory before the crash, even though the full
+  raster hadn't finished flushing to disk) — worth being precise that this doesn't mean the
+  *pixel-level* L_sum anomaly is resolved, just that the one aggregate number tested didn't
+  visibly depend on it.
+
+Status report (`docs/reports/swy_status_report.qmd`), its embedded interactive map, and the
+shared Drive package have all been updated and re-rendered to reflect the complete run — the
+version uploaded to Drive last night reflects the *incomplete* run's framing and should be
+re-uploaded.
