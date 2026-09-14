@@ -1,20 +1,20 @@
-"""Build the Borneo SWY biophysical table (CN_A-D, Kc_1-12, root_depth per lucode).
+"""Build the Philippines SWY biophysical table (CN_A-D, Kc_1-12, root_depth per lucode).
 
-Consolidates the 2026-09-10/11 interactive work into a re-runnable script. Real
-simplification made here, not a full implementation: Kc is computed via the Kamble et al.
-(2013) NDVI regression for ALL vegetated classes (cropland included), not switched to FAO-56
-for cropland — this project does not yet have region-correct crop-calendar timing for FAO-56,
-and the NDVI regression is more defensible than applying the wrong (Northern Hemisphere)
-calendar. See docs/swy/swy_methods.qmd for the full methodology.
+Mirrors `swy_borneo_run/07_build_biophysical_table.py` exactly in method — same simplification
+carried over: Kc is computed via the Kamble et al. (2013) NDVI regression for ALL vegetated
+classes (cropland included), not switched to FAO-56 for cropland. See docs/swy/swy_methods.qmd
+for the full methodology and docs/swy/swy_methods.qmd's "Two CN tables" section for why
+CN_TABLE_PATH below (the ESA-LC crosswalk) is the correct one to use, not the PFT-basis table
+sitting alongside it.
 
 Inputs (must already exist — this script does not download anything):
-    data/swy/borneo/inputs/borneo_aoi.gpkg
-    data/swy/borneo/lulc/lulc_borneo_2020.tif        (built by extract_borneo_lulc_2020.py)
-    data/swy/borneo/inputs/mod13a3_ndvi_2020/*NDVI*.tif and *VI_Quality*.tif
-    data/swy/shared/cn_tables/gcn250_esa_lc_cn_table.csv
+    data/swy/philippines/inputs/ph_aoi.gpkg
+    data/swy/philippines/lulc/lulc_ph_2020.tif          (built by 06_extract_lulc_2020.py)
+    data/swy/philippines/inputs/mod13a3_ndvi_2020/*NDVI*.tif and *VI_Quality*.tif
+    data/swy/shared/cn_tables/gcn250_esa_lc_cn_table.csv   (shared, region-independent)
 
 Output:
-    data/swy/borneo/lulc/borneo_biophysical_table_2020.csv
+    data/swy/philippines/lulc/ph_biophysical_table_2020.csv
 """
 import glob
 import json
@@ -25,11 +25,11 @@ import pandas as pd
 import rasterio
 from rasterio.warp import Resampling, reproject
 
-NDVI_DIR = "data/swy/borneo/inputs/mod13a3_ndvi_2020"
-LULC_PATH = "data/swy/borneo/lulc/lulc_borneo_2020.tif"
+NDVI_DIR = "data/swy/philippines/inputs/mod13a3_ndvi_2020"
+LULC_PATH = "data/swy/philippines/lulc/lulc_ph_2020.tif"
 CN_TABLE_PATH = "data/swy/shared/cn_tables/gcn250_esa_lc_cn_table.csv"
-OUT_DIR = "data/swy/borneo/lulc"
-OUT_TABLE_PATH = os.path.join(OUT_DIR, "borneo_biophysical_table_2020.csv")
+OUT_DIR = "data/swy/philippines/lulc"
+OUT_TABLE_PATH = os.path.join(OUT_DIR, "ph_biophysical_table_2020.csv")
 
 # Non-vegetated / special classes: fixed Kc per InVEST's own guidance, not NDVI-derived.
 # Water set to CN=100 (full runoff, standard convention — CN's premise doesn't apply to
@@ -82,7 +82,7 @@ def compute_class_monthly_ndvi():
             )
 
     os.makedirs(OUT_DIR, exist_ok=True)
-    with open(os.path.join(OUT_DIR, "class_monthly_ndvi.json"), "w") as f:
+    with open(os.path.join(OUT_DIR, "ph_class_monthly_ndvi.json"), "w") as f:
         json.dump(monthly_class_ndvi, f, indent=2)
     return monthly_class_ndvi
 

@@ -19,7 +19,7 @@ import os
 
 import pandas as pd
 
-OUT_PATH = "data/borneo_lulc/rain_events_table.csv"
+OUT_PATH = "data/swy/borneo/lulc/rain_events_table.csv"
 PLACEHOLDER_EVENTS_PER_MONTH = 18  # rough equatorial-climate estimate, NOT derived from data
 
 

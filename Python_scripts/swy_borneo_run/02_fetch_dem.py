@@ -10,8 +10,8 @@ import os
 
 from appeears_common import aoi_to_geojson, download_bundle, login, submit_area_task, wait_for_task
 
-AOI_PATH = "data/swy_shared_package/borneo_aoi.gpkg"
-OUT_DIR = "data/swy_shared_package/dem_srtmgl3"
+AOI_PATH = "data/swy/borneo/inputs/borneo_aoi.gpkg"
+OUT_DIR = "data/swy/borneo/inputs/dem_srtmgl3"
 
 LAYERS = [
     {"product": "SRTMGL3_NC.003", "layer": "SRTMGL3_DEM"},

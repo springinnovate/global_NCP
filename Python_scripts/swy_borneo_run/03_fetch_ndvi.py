@@ -16,7 +16,7 @@ import argparse
 
 from appeears_common import aoi_to_geojson, download_bundle, login, submit_area_task, wait_for_task
 
-AOI_PATH = "data/swy_shared_package/borneo_aoi.gpkg"
+AOI_PATH = "data/swy/borneo/inputs/borneo_aoi.gpkg"
 
 LAYERS = [
     {"product": "MOD13A3.061", "layer": "_1_km_monthly_NDVI"},
@@ -31,11 +31,11 @@ def main():
 
     if args.full:
         start_date, end_date = "01-01-2000", "12-31-2026"
-        out_dir = "data/mod13a3_borneo_full_record"
+        out_dir = "data/swy/borneo/raw_downloads/mod13a3_borneo_full_record"
         task_name = "swy_borneo_mod13a3_ndvi_full_record"
     else:
         start_date, end_date = "01-01-2020", "12-31-2020"
-        out_dir = "data/swy_shared_package/mod13a3_ndvi_2020"
+        out_dir = "data/swy/borneo/inputs/mod13a3_ndvi_2020"
         task_name = "swy_borneo_mod13a3_ndvi_2020"
 
     token = login()

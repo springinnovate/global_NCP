@@ -11,7 +11,7 @@ are the executable version.
 
 | # | Script | What it does | Needs |
 |---|---|---|---|
-| 1 | `01_build_aoi.py` | Dissolve HydroBASINS AU/Oceania level-6 units into the Borneo AOI polygon | HydroBASINS shapefiles already in `data/swy_shared_package/hydrobasins/` |
+| 1 | `01_build_aoi.py` | Dissolve HydroBASINS AU/Oceania level-6 units into the Borneo AOI polygon | HydroBASINS shapefiles already in `data/swy/shared/hydrobasins/` |
 | 2 | `02_fetch_dem.py` | Download SRTMGL3 DEM (90m) via AppEEARS | NASA Earthdata `.netrc` (see below) |
 | 3 | `03_fetch_ndvi.py` | Download MOD13A3 NDVI + QA (2020, or `--full` for 2000-present) via AppEEARS | same `.netrc` |
 | 4 | `04_fetch_precip_chirps.py` | Download + clip 2020 monthly CHIRPS precipitation | none (public, unauthenticated) |

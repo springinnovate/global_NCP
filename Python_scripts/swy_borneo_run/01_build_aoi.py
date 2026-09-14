@@ -1,6 +1,6 @@
 """Build the Borneo AOI polygon from HydroBASINS.
 
-Reconstruction note: `data/swy_shared_package/borneo_aoi.gpkg` was originally built
+Reconstruction note: `data/swy/borneo/inputs/borneo_aoi.gpkg` was originally built
 interactively (2026-09-10) and the exact bbox parameters used weren't captured in a script at
 the time. This script is a faithful reconstruction using Borneo's standard geographic extent,
 not a guaranteed byte-identical replay — if regenerating, verify the computed area against the
@@ -17,8 +17,8 @@ import os
 import geopandas as gpd
 from shapely.geometry import box
 
-HYBAS_LEV06_PATH = "data/swy_shared_package/hydrobasins/hybas_au/hybas_au_lev06_v1c.shp"
-OUT_PATH = "data/swy_shared_package/borneo_aoi.gpkg"
+HYBAS_LEV06_PATH = "data/swy/shared/hydrobasins/hybas_au/hybas_au_lev06_v1c.shp"
+OUT_PATH = "data/swy/borneo/inputs/borneo_aoi.gpkg"
 
 # Borneo's standard geographic extent (WGS84) — chosen tight enough to exclude Sulawesi
 # (starts ~119.3E), Sumatra, and Java, per the "bbox-clipped to avoid leaking into

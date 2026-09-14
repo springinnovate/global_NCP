@@ -1,16 +1,12 @@
-"""Extract the Borneo AOI from the real 2020 Copernicus C3S land cover product.
+"""Extract the Philippines AOI from the real 2020 Copernicus C3S land cover product.
 
-The 300m global C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc file is not stored in this repo's
-data/ (2.3GB) — it lives on the user's WWF OneDrive, at the path below. Update ONEDRIVE_NC_PATH
-if that location changes. Real note (2026-09-10): a local data/raw/LandCovers/landcover_gl_1992.tif
-that this project previously relied on turned out to be an empty/corrupted stub (zero valid
-pixels found anywhere on Earth, not just Borneo) — the user had removed the real data for
-storage reasons at some point. Kept as a cautionary example: verify raster content, not just
-file existence, before trusting a "this input already exists" assumption.
+Mirrors `swy_borneo_run/06_extract_lulc_2020.py` — same global 300m C3S netCDF (not stored in
+this repo's data/, 2.3GB, lives on the user's WWF OneDrive), just clipped to the Philippines AOI
+instead of Borneo's.
 
-Output: data/swy/borneo/lulc/lulc_borneo_2020.tif, clipped to the exact AOI polygon (not just its
-bounding box) with nodata=255 outside it, using the ESA CCI / C3S LCCS class codes (`lccs_class`
-variable) that this project's CN table (gcn250_esa_lc_cn_table.csv) is already keyed to.
+Output: data/swy/philippines/lulc/lulc_ph_2020.tif, clipped to the exact AOI polygon (not just
+its bounding box) with nodata=255 outside it, using the ESA CCI / C3S LCCS class codes
+(`lccs_class` variable) that this project's CN table (gcn250_esa_lc_cn_table.csv) is keyed to.
 """
 import os
 
@@ -25,9 +21,9 @@ ONEDRIVE_NC_PATH = (
     r"C:\Users\JerónimoRodríguezEsc\OneDrive - World Wildlife Fund, Inc\PROJECTS\Global_NCP"
     r"\data\Raw\6e774a4e4a552fd229bcb88b4d3c02e6\C3S-LC-L4-LCCS-Map-300m-P1Y-2020-v2.1.1.nc"
 )
-AOI_PATH = "data/swy/borneo/inputs/borneo_aoi.gpkg"
-OUT_DIR = "data/swy/borneo/lulc"
-OUT_PATH = os.path.join(OUT_DIR, "lulc_borneo_2020.tif")
+AOI_PATH = "data/swy/philippines/inputs/ph_aoi.gpkg"
+OUT_DIR = "data/swy/philippines/lulc"
+OUT_PATH = os.path.join(OUT_DIR, "lulc_ph_2020.tif")
 NODATA = 255
 
 
@@ -39,7 +35,7 @@ def main():
     subdataset = f'NETCDF:"{ONEDRIVE_NC_PATH}":lccs_class'
     with rasterio.open(subdataset) as src:
         # Windowed read first (a 0.1deg pad) — the global 300m raster is far too large to
-        # load in full; only pull the Borneo-adjacent window before doing the exact-polygon mask.
+        # load in full; only pull the Philippines-adjacent window before the exact-polygon mask.
         window = from_bounds(minx - 0.1, miny - 0.1, maxx + 0.1, maxy + 0.1, transform=src.transform)
         data = src.read(1, window=window)
         win_transform = src.window_transform(window)

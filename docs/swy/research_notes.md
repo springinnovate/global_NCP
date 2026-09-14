@@ -774,3 +774,158 @@ Status report (`docs/reports/swy_status_report.qmd`), its embedded interactive m
 shared Drive package have all been updated and re-rendered to reflect the complete run — the
 version uploaded to Drive last night reflects the *incomplete* run's framing and should be
 re-uploaded.
+
+## 2026-09-11 (later still) — Becky/Rich meeting outcome: Philippines comparison, data reorg
+
+Meeting with Becky and Rich happened, went well. Real outcome: Becky couldn't locate the raw
+Borneo/Malaysia input data on her end, but did find and share an existing completed SWY model-run
+workspace for the Philippines (`baseline_historical_climate`, exact year unconfirmed — assuming
+2020 pending her reply). Plan: replicate this project's own from-scratch Borneo approach for the
+Philippines too, then compare against her shared output as a first real external-benchmark data
+point. Downloaded to `data/swy/philippines/rich_shared/` (after the reorg below).
+
+**AOI-building false start, worth recording since it changes how future "use Rich's own output as
+a template" attempts should be done.** First approach: dissolve the shared workspace's
+`watershed_subset_files/*.gpkg` (the exact HydroBASINS/HydroSHEDS routing units `swy_global` used
+for this job) into one polygon — same spirit as reusing Rich's own computational domain rather than
+re-deriving a Philippines boundary independently. Got a ~439,000 km² polygon, ~46% over the
+Philippines' real ~300,000 km² land area. Checked why rather than shrugging it off: the largest
+single piece of that polygon (~118,000 km², bounds ~114–119°E/2.7–7°N) sits in northern Borneo, and
+directly overlaps this project's own `borneo_aoi.gpkg` by a similar amount. Verified directly
+against the actual output raster (`QF_wwf_PH_baseline_historical_climate.tif`) that this Borneo
+chunk has **zero valid pixels** — it's upstream contributing-basin area the router needed for
+physical correctness, never part of the retained output. **Lesson: the routing domain
+(`watershed_subset_files`) and the retained-output footprint are different things — build a
+comparison AOI from the output raster's own valid-data mask (polygonized), not from the routing
+domain.** Corrected `Python_scripts/swy_philippines_run/01_build_aoi_from_rich_mask.py` to do
+exactly that (decimated read of `QF.tif`'s non-nodata mask, ~20x downsample for tractability, then
+polygonize + dissolve) — corrected area **284,981 km²**, 5% under real land area, very plausible
+for an archipelago at ~600m polygon fidelity (small islands lost to decimation). The original
+routing-domain polygon is kept, not deleted, as
+`data/swy/philippines/inputs/ph_routing_domain_reference.gpkg`, in case the actual upstream routing
+context matters later (this project's own new PH run won't need it — Philippine watersheds are
+self-contained per-island, unlike Borneo needing Malaysia/Indonesia mainland context).
+
+**A same-day "free" validation idea was tried and explicitly did not pan out**: since the routing
+domain showed real overlap with the Borneo AOI, tested whether this project's own completed Borneo
+run could be directly compared against Becky's PH workspace in that overlap zone, with zero new
+downloads. Built and ran the comparison — but per the finding above, that overlap zone is exactly
+the chunk with zero valid PH output pixels, so there was nothing real to compare (12.9M valid
+Borneo pixels vs. 62K validless/near-empty PH pixels in the same nominal zone — the small residual
+PH pixel count that did print before this was diagnosed traces to boundary/edge polygons, not real
+interior coverage). Deleted the one-off script once the underlying premise was confirmed false
+rather than leave a permanently-failing assertion in the repo; the finding itself is recorded here
+and in `01_build_aoi_from_rich_mask.py`'s own docstring. **No shortcut exists — a genuine Philippines
+comparison needs this project's own independent PH run** (new DEM/NDVI/precip/ET0/LULC downloads +
+its own `inspring` call), the same lift as Borneo.
+
+**Data reorg, same session, user-requested**: `data/` had become cluttered with SWY-specific
+top-level folders (`swy_shared_package/`, `borneo_lulc/`, `dem_borneo/`, `chirps_borneo_2020/`,
+`terraclimate_borneo_2020/`, `mod13a3_borneo_full_record/`, `swy_borneo_workspace/`, plus the new
+Philippines folders) sitting alongside this project's other-service data. Consolidated all of it
+under `data/swy/{shared,borneo,philippines}/` — `shared/` for genuinely cross-region products
+(`cn_tables/`, `soil_hydrologic_group/`, `hydrobasins/`), `borneo/{inputs,raw_downloads,lulc,
+workspace}/`, `philippines/{inputs,rich_shared}/`. Every path reference in
+`Python_scripts/swy_borneo_run/` and `swy_philippines_run/` updated and re-verified against the new
+layout (`01_build_aoi.py` for Borneo, `01_build_aoi_from_rich_mask.py` for Philippines both rerun
+successfully post-move). Also fixed a real, previously-unnoticed bug while at it:
+`07_build_biophysical_table.py`'s `NDVI_DIR` pointed at `data/mod13a3_borneo_2020_verify`, a path
+that no longer existed (the actual 2020 NDVI+QA files live in the `mod13a3_ndvi_2020/` folder
+inside the shared inputs package) — would have failed on any fresh reproduction attempt. Fixed to
+point at the correct location as part of the same path update.
+
+**Still genuinely open, not yet in this project's control**: the Philippines run's actual year
+(asked Becky, no answer yet — proceeding on the assumption of 2020, matching this project's other
+anchor-year conventions, until she confirms). Whether a single year or a time series is worth
+pulling is also open, same open-ness as the earlier 2020-vs-2000 Borneo question.
+
+## 2026-09-11 (evening) — AppEEARS API blocked mid-session; Rich raises a real Kc gap; PH baseline turns out to be a 30-year CMIP6 climatology, not a year — significant reframe needed
+
+**AppEEARS API access broke between yesterday's Borneo fetch and today's Philippines fetch, same
+account, same script.** `GET`/`POST /task` and `GET /bundle/{id}` all return a generic 403
+("read-protected or not readable") with `X-Cache: Error from cloudfront` in the response headers —
+CloudFront intercepting before the request reaches AppEEARS' own app. `GET /product` (metadata)
+works fine throughout, ruling out a login/credentials problem. Best-supported explanation, not
+confirmed from outside AWS's own logs: a bot/WAF rule on the CloudFront distribution targeting the
+`/task` and `/bundle` paths specifically, likely keyed on `python-requests`'s non-browser request
+signature rather than a real account quota — the browser UI worked immediately once file-format
+issues were sorted out. **Workaround that actually worked**: AppEEARS' web UI has a "load a
+request" file-upload control that, despite an unhelpful `.geojson`-extension/legacy-`crs`-field
+rejection at first, accepts a **complete request JSON** (the same `task_type`/`params.dates`/
+`params.layers`/`params.geo`/`params.output` structure the API itself expects) and submits it as a
+normal browser-authenticated request. Built these by hand for the DEM and NDVI requests
+(`data/swy/philippines/inputs/ph_dem_full_request.json`, `ph_ndvi_full_request.json`) — both
+processed normally once submitted this way. **Also learned**: submitting the AOI as its full
+~115-part, ~96,000-vertex multipolygon produced a 4-6MB request that failed regardless of upload
+path — not the actual cause of the 403 (confirmed separately, since even a 539-byte bounding-box
+geometry got the same 403 via the API), but worth remembering for future AppEEARS submissions:
+**use the bounding box for the AppEEARS request geometry**, clip precisely to the real AOI locally
+afterward (already how `02_fetch_dem.py`/`03_fetch_ndvi.py` were rewritten). DEM and full NDVI
+(12 months, NDVI+QA) both landed this way; LULC extraction (needs no AppEEARS access, just the
+OneDrive C3S netCDF) ran cleanly in parallel. Philippines composition, for the record: 32.7%
+broadleaf evergreen forest (class 50), ~40% combined mosaic cropland/natural-vegetation (classes
+30+40), 15.0% herbaceous cover, 7.2% rainfed cropland, small mangrove/water/urban shares — notably
+**class 20 (irrigated/post-flooding cropland — the CN table's distinct paddy category) doesn't
+appear in the top classes**, meaning real paddy area is likely folded into the mosaic classes
+rather than tagged distinctly; worth flagging to Becky rather than assuming class 20's absence
+means no paddy.
+
+**Rich raised a real, well-grounded Kc objection, live, while all this was happening** — asked
+directly whether Kamble et al. (2013)'s regression is valid for grassland/forest/tropical forest,
+not just agriculture, and named the actual mechanism: NDVI saturates in dense canopy, so a linear
+fit calibrated on agricultural NDVI ranges could underestimate Kc once extrapolated to saturated
+forest NDVI. Checked rather than reassured him blind:
+
+- **Kamble et al. (2013) confirmed agriculture-only** (US High Plains cropping systems) via two
+  independent web searches — direct PDF fetch blocked everywhere tried (MDPI, ResearchGate, UNL
+  repository all 403'd WebFetch). The project's own "corroborated by multiple follow-up studies
+  through 2025" line in `swy_methods.qmd` turned out to cite exactly one specific study by name
+  (`grapevine_kc_2025`) — another agricultural crop, not independent forest evidence. That framing
+  was an overstatement, now corrected in the doc.
+- **Corbari et al. (2017)** (PDF obtained by the user, read in full) measured real Kc at four
+  eddy-covariance sites (pasture, deciduous forest, evergreen conifer forest — Black Hills SD,
+  none tropical). Finding: measured forest Kc came in **lower** than FAO/LAI-based assumptions
+  (evergreen Kc_mid≈0.17–0.20, deciduous≈0.43–0.51, vs. FAO's ~0.78–0.9) — the opposite direction
+  from Rich's underestimation hypothesis, though not tropical, so it doesn't settle the question.
+  Notably, even the highest real-measured forest value here is less than half what the Kamble
+  regression predicts at forest-level NDVI (~0.85–0.90 → Kc≈1.07–1.14) — a real, sizeable
+  discrepancy worth flagging regardless of which direction turns out to be right.
+- **Glenn et al. (2011)** (PDF obtained by the user, read in full) confirms Rich's saturation
+  mechanism directly and independently: NDVI saturates around LAI≈3, EVI/SAVI don't, and EVI is
+  established in this literature as the better-correlated choice for dense canopy specifically
+  because of this — several cited studies found MODIS EVI significantly outperforming MODIS NDVI
+  against ground-measured ET. **Cites an actual tropical rainforest precedent**: Juarez et al.
+  (2008), Amazonia, MODIS EVI + net radiation, r²=0.72–0.86 against flux towers — not yet obtained
+  or read, the next concrete source to chase. General accuracy bound from this literature:
+  flux-tower-calibrated Kc-VI methods run 10–30% RMSE against measured ET (vs. 5–10% for
+  lysimeter-calibrated single crops).
+- **Decision, not yet implemented**: switch the Kc pipeline from NDVI to EVI — no new data source
+  needed, `_1_km_monthly_EVI` is a layer in the same MOD13A3.061 product already fetched for both
+  Borneo and the Philippines (confirmed against AppEEARS' own product catalog). Doesn't fully
+  resolve the tropical-forest calibration gap by itself (EVI reduces saturation, it doesn't supply
+  a validated tropical Kc-VI formula), but it's a concrete, well-supported, low-cost improvement,
+  distinct from the deeper "read Juarez 2008 and find an actual tropical calibration" task.
+- **Bottom line, stated to Rich directly rather than softened**: the mechanism he raised is real
+  and independently documented; direction and size of its actual effect on Borneo/Philippines
+  output specifically is still unknown. Current Borneo forest Kc/AET numbers should not be
+  presented as validated.
+
+**Separately, the original validation plan hit a different, unrelated wall**: asked Rich directly
+for the Philippines baseline's year; his answer was that it isn't a year at all — it's a **30-year
+CMIP6 multi-model average (1984–2014)**, per his own `fetch_precip_scenarios.bat`
+(`github.com/springinnovate/wwf-sipa`), matching how CMIP6 ensembles are conventionally treated
+(averaged across models, then across time). This project's Borneo and Philippines runs both use
+real single-year 2020 data (CHIRPS, TerraClimate, MODIS) — **not directly comparable to Becky's
+output as currently built**, a distinct problem from the Kc question above, not a variant of it.
+Real options, none yet chosen: (a) present the 2020 runs as a second, honestly-labeled data point
+rather than a validation; (b) rebuild a genuine climatology (CHIRPS/TerraClimate averaged
+1984–2014; NDVI/EVI can only be averaged 2000–2014, MODIS doesn't go back further — a documented
+compromise, not a true match); (c) ask Becky/Rich for their actual precip/ET0 input rasters
+directly, cheaper than re-deriving their CMIP6 averaging from scratch. Message drafted to Rich
+covering both threads plainly (`docs/swy/message_draft.md`), user reviewing/sending personally
+rather than this session sending it.
+
+**Net effect: this session's original "replicate Borneo's approach for the Philippines, compare
+to Becky's output" plan needs a real reframe**, not just a status update — both the Kc methodology
+and the comparison target turned out to be less settled than assumed going in. User is re-reading
+`swy_methods.qmd` in full before deciding the next concrete steps; not decided as of this entry.

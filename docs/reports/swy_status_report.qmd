@@ -1,6 +1,6 @@
 ---
 title: "Seasonal Water Yield: preparing global run"
-subtitle: "Status of tools, data, and Borneo test plan"
+subtitle: "Status of tools, data, and the Borneo/Philippines test plan"
 date: last-modified
 date-format: "D MMMM YYYY"
 format:
@@ -105,26 +105,50 @@ CSV table path was used instead** (built from GCN250's own crosswalk, no biome p
 yet) — lower-risk for a first pass; the raster-override path is worth a follow-up round.
 :::
 
-## Crop coefficient: mostly solved by NDVI, not a table
+## Crop coefficient: a real open question, not a solved one — revised 2026-09-11
 
-- **Cropland**: the plan is standard FAO-56 values with region-correct crop-calendar timing (real
-  remaining work — the available reference spreadsheet's defaults are Northern-Hemisphere only,
-  and oil palm, likely Borneo's dominant cropland, isn't a native FAO-56 entry).
-- **Everything else** (forest, grassland, shrubland — most of global land area): **no table
-  needed.** A validated NDVI regression (Kamble et al. 2013, corroborated by multiple follow-up
-  studies through 2025) computes Kc directly per pixel per month from satellite NDVI.
-- **Non-vegetated** (water, wetlands, bare soil, built): fixed values from InVEST's own guidance.
-- **For this first run attempt**: the NDVI regression was applied uniformly across *all* vegetated
-  classes, including cropland, rather than switching cropland to FAO-56 — a real, flagged
-  simplification (no region-correct crop calendar built yet), more defensible than applying the
-  wrong Northern-Hemisphere one. Computed per land-cover class (zonal-averaged NDVI, not
-  per-pixel) and fed via the CSV biophysical table, not the raster-override path described above.
+**This section's earlier framing overstated how settled this is — corrected here rather than left
+standing.** The current pipeline (both Borneo and the in-progress Philippines run) computes Kc
+uniformly for all vegetated classes via a linear NDVI regression (Kamble et al. 2013:
+`Kc = 1.457×NDVI − 0.1725`). Rich raised a direct, well-grounded objection: **Kamble's regression
+was calibrated entirely on agricultural crops** (US High Plains cropping systems), never on
+forest, grassland, or any natural vegetation — applying it to forest (the majority of both AOIs'
+land area) is an extrapolation outside its validated domain, not a like-for-like use. His specific
+mechanism: **NDVI saturates in dense canopy** (around LAI≈3), so a linear fit built on
+agricultural NDVI ranges could underestimate Kc once extrapolated to saturated forest NDVI.
+
+Checked against two more sources rather than taken on faith:
+
+- **Corbari et al. (2017)** measured real Kc at four eddy-covariance sites (pasture, deciduous
+  forest, evergreen conifer forest — none tropical). Result: measured forest Kc came in **lower**
+  than standard FAO/LAI-based assumptions, not higher — the opposite direction from Rich's
+  hypothesis, though temperate-forest data doesn't settle a tropical question either way. Even
+  their highest real-measured forest value is less than half what the Kamble regression predicts
+  at forest-level NDVI (~0.85–0.90 → Kc≈1.07–1.14) — a sizeable discrepancy worth flagging
+  regardless of which direction is ultimately right.
+- **Glenn et al. (2011)** confirms the saturation mechanism directly: NDVI saturates around
+  LAI≈3, EVI/SAVI don't, and EVI is established in this literature as better-correlated with
+  ground-measured ET for dense canopy specifically because of this. It also cites an actual
+  tropical rainforest precedent — Juarez et al. (2008), Amazonia, MODIS EVI + net radiation,
+  r²=0.72–0.86 against flux towers — not yet obtained or read.
+
+**Concrete next steps, not yet done**: switch the pipeline from NDVI to EVI (no new data source —
+`_1_km_monthly_EVI` is a layer in the same MOD13A3.061 product already fetched for both Borneo and
+the Philippines); read Juarez et al. (2008) for an actual tropical-forest calibration reference.
+**Current forest Kc/AET numbers, Borneo included, should not be presented as validated** until
+this is resolved.
+
+Unrelated to the above, still true as originally noted: **cropland Kc** uses the same NDVI
+regression rather than FAO-56 (no region-correct crop calendar built yet — Northern-Hemisphere
+defaults don't fit, and oil palm/Borneo's likely dominant cropland isn't a native FAO-56 entry).
+**Non-vegetated** classes (water, wetlands, bare soil, built) use fixed values from InVEST's own
+guidance, unaffected by any of the above.
 
 ## The test plan
 
 **Decided with Becky, 2026-09-09: test in Borneo.** Every raw input the model needs is downloaded
 and content-verified — AOI, DEM, routing parameters, LULC, soil group, precipitation, ET0, NDVI,
-and the CN base (`data/swy_shared_package/`, ~1.1GB, uploaded to Drive). The CN/Kc biophysical
+and the CN base (`data/swy/borneo/inputs/`, ~1.1GB, uploaded to Drive). The CN/Kc biophysical
 table and a placeholder rain-events table are built. **Two real in-house run attempts were made
 2026-09-11 via Docker; the second completed cleanly.** Whole pipeline consolidated into real,
 reproducible scripts: `Python_scripts/swy_borneo_run/` (see that directory's own README for the
@@ -177,6 +201,40 @@ research lineage, not independent sources). That reasoning is still scientifical
 returning to if a rigor-focused validation is wanted later; it just isn't what this round is for.
 :::
 
+## Philippines comparison — in progress, plan revised 2026-09-11
+
+Becky couldn't locate the Borneo/Malaysia model output originally planned as a comparison target,
+but shared an existing Philippines SWY run instead. Plan: replicate this project's own
+from-scratch approach for the Philippines, then compare. Status:
+
+- **AOI**: built from the Philippines workspace's own output footprint (polygonizing the valid-data
+  mask of Rich's shared `QF.tif`), not independently re-derived — guarantees the same computational
+  domain. A first attempt using the routing-domain files instead overshot by 46% (it includes
+  ~118,000 km² of upstream-contributing Borneo terrain with zero actual retained output) — caught
+  by checking the raster directly, corrected.
+- **DEM, NDVI (12 months), LULC**: all landed. NASA AppEEARS' API started returning a blanket 403
+  on task submission/download mid-session (unrelated to this project's requests — public metadata
+  endpoints stayed open throughout); worked around via AppEEARS' own web UI, submitting a
+  hand-built request JSON directly rather than through the blocked API path.
+- **Not yet run**: the biophysical table and the model call itself — both scripted and ready
+  (`Python_scripts/swy_philippines_run/`), waiting on the Kc question above to settle first.
+
+**A separate, real complication**: Becky's Philippines baseline turns out not to be a single year
+at all — it's a **30-year CMIP6 multi-model climatological average (1984–2014)**. This project's
+own runs use real single-year 2020 data (CHIRPS, TerraClimate, MODIS). These are not directly
+comparable as currently built. Options under consideration, none chosen yet: present the 2020 run
+as a second, honestly-labeled data point rather than a validation; rebuild a genuine 1984–2014
+climatology (NDVI/EVI could only cover 2000–2014, MODIS's actual record — a documented compromise,
+not a true match); or ask Becky/Rich for their actual precip/ET0 input rasters directly.
+
+## Pipeline diagram
+
+Live status map of the whole input chain — kept current in `docs/swy/workflow.md` alongside this
+report rather than duplicated by hand; included here as-is, so this section reflects whatever
+that file's status colors say as of render time.
+
+{{< include ../swy/workflow.md >}}
+
 ## First run output — interactive preview
 
 {{< include _output_map.html >}}
@@ -208,19 +266,22 @@ to `springinnovate/inspring`, not yet attempted.
 
 | # | Item | Blocked on |
 |---|---|---|
-| 1 | Upload the built data package (`data/swy_shared_package/`, ~1.1GB — every raw input plus the derived biophysical/rain-events tables) to shared Google Drive | Nobody — just needs doing |
-| 2 | Investigate the L_sum flow-accumulation anomaly (~5% of pixels, clustered at a coastal river mouth) — plausibly SRTM noise in flat tidal terrain | Real diagnostic work, not blocking the headline "it runs" finding |
-| 3 | Real daily-CHIRPS-derived rain events table (current one is a placeholder) | Google Earth Engine access, not yet configured |
-| 4 | Region-correct FAO-56 cropland Kc (current run uses the NDVI regression uniformly instead) | Crop-calendar research, including an oil-palm-specific gap |
-| 5 | Build CN/Kc as raster overrides instead of the CSV table (architecturally preferable, see above) | Follow-up round, not blocking this test |
-| 6 | Mangrove / flooded-grassland CN patch — needs a documented position | Internal decision |
-| 7 | Small `inspring` packaging fixes (missing `requirements.txt`, a `setup.py` bug) — real candidates for a PR back | Not yet forked/attempted |
+| 1 | Switch the Kc pipeline from NDVI to EVI (same MOD13A3.061 product, no new download) | Not yet done |
+| 2 | Obtain and read Juarez et al. (2008), Amazonia — the only tropical-forest Kc-VI precedent found so far | Not yet obtained |
+| 3 | Decide how to handle the Philippines comparison against a 30-year CMIP6 climatology (see above) | Internal decision |
+| 4 | Investigate the L_sum flow-accumulation anomaly (~5% of pixels, clustered at a coastal river mouth) — plausibly SRTM noise in flat tidal terrain | Real diagnostic work, not blocking the headline "it runs" finding |
+| 5 | Real daily-CHIRPS-derived rain events table (current one is a placeholder) | Google Earth Engine access, not yet configured |
+| 6 | Region-correct FAO-56 cropland Kc (current run uses the NDVI regression uniformly instead) | Crop-calendar research, including an oil-palm-specific gap |
+| 7 | Build CN/Kc as raster overrides instead of the CSV table (architecturally preferable, see above) | Follow-up round, not blocking this test |
+| 8 | Mangrove / flooded-grassland CN patch — needs a documented position | Internal decision |
+| 9 | Small `inspring` packaging fixes (missing `requirements.txt`, a `setup.py` bug) — real candidates for a PR back | Not yet forked/attempted |
 
 : {.terms tbl-colwidths="[10,60,30]"}
 
 <div class="report-footer">
 Full chronological research log, with the reasoning behind each decision:
-<code>docs/swy/research_notes.md</code>. Key literature: Hamel et al. (2020), Mandle et al. (2017),
-Guswa et al. (2018), Kamble et al. (2013), Calero Mosquera et al. (2021), Fábrega et al. (2012),
-Allen et al. (1998, FAO-56).
+<code>docs/swy/research_notes.md</code>. Permanent methods reference, kept current with every
+finding below: <code>docs/swy/swy_methods.qmd</code>. Key literature: Hamel et al. (2020), Mandle
+et al. (2017), Guswa et al. (2018), Kamble et al. (2013), Corbari et al. (2017), Glenn et al.
+(2011), Calero Mosquera et al. (2021), Fábrega et al. (2012), Allen et al. (1998, FAO-56).
 </div>

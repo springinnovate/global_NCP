@@ -6,7 +6,7 @@ reprojecting pixel data — that's fine here since our rasters are already EPSG:
 sits close to the equator (-4.5 to 7.5 degrees latitude), where Web Mercator's cos(latitude)
 distortion is negligible. No reprojection step needed, just downsampling + colormap + alpha.
 
-Outputs base64-encoded PNGs + bounds to data/borneo_lulc/output_maps/, which
+Outputs base64-encoded PNGs + bounds to data/swy/borneo/lulc/output_maps/, which
 build_report_map_html.py then reads to build the embeddable HTML.
 """
 import base64
@@ -18,28 +18,28 @@ import numpy as np
 import rasterio
 from rasterio.enums import Resampling
 
-OUT_DIR = "data/borneo_lulc/output_maps"
+OUT_DIR = "data/swy/borneo/lulc/output_maps"
 MAX_DIM = 1600  # downsample target on the long side — keeps embedded PNG size reasonable
 
 LAYERS = [
     {
         "id": "qf",
         "label": "Annual quickflow (QF), mm",
-        "path": "data/swy_borneo_workspace/QF_borneo_2020_test.tif",
+        "path": "data/swy/borneo/workspace/QF_borneo_2020_test.tif",
         "nodata_extra": [-119988.0],
         "clip_percentile": None,  # QF's real range is already reasonable, no capping needed
     },
     {
         "id": "aet",
         "label": "Actual evapotranspiration (AET), mm",
-        "path": "data/swy_borneo_workspace/intermediate_outputs/aet_borneo_2020_test.tif",
+        "path": "data/swy/borneo/workspace/intermediate_outputs/aet_borneo_2020_test.tif",
         "nodata_extra": [-119988.0],
         "clip_percentile": None,
     },
     {
         "id": "l_sum",
         "label": "Local recharge sum (L_sum), mm — capped at p99 to show the real anomaly",
-        "path": "data/swy_borneo_workspace/L_sum_borneo_2020_test.tif",
+        "path": "data/swy/borneo/workspace/L_sum_borneo_2020_test.tif",
         "nodata_extra": [],
         "clip_percentile": 99,  # cap so the ~4.6% blown-up pixels don't wash out the real signal
     },

@@ -1,15 +1,17 @@
-"""Fetch and clip 2020 monthly reference ET0 (TerraClimate) for Borneo.
+"""Fetch and clip 2020 monthly reference ET0 (TerraClimate) for the Philippines.
 
-No authentication needed — TerraClimate is served publicly, unauthenticated, via UI Boise's
-THREDDS server. This is a source found and vetted for the first time in this project on
-2026-09-10 (CHIRPS is precipitation-only; ET0 needs its own source) — see docs/swy/swy_methods.qmd
-for why this specific product (the `pet` variable = "Reference Evapotranspiration," ASCE
-Penman-Monteith corrected for CO2) is the right fit for InVEST's `et0_dir` input.
+Mirrors `swy_borneo_run/05_fetch_et0_terraclimate.py`. No authentication needed — TerraClimate is
+served publicly, unauthenticated, via U Idaho's THREDDS server. See docs/swy/swy_methods.qmd for
+why this product (the `pet` variable = "Reference Evapotranspiration," ASCE Penman-Monteith
+corrected for CO2) is the right fit for InVEST's `et0_dir` input.
 
-Downloads one global netCDF per year (~110MB, all 12 months bundled), extracts and clips each
-month to the Borneo AOI, applying the file's own scale_factor (0.1) to get real mm.
+Downloads one global netCDF per year (~110MB, all 12 months bundled — same file Borneo's fetch
+already downloaded, so this reuses that cached copy if `data/swy/borneo/raw_downloads/
+terraclimate_borneo_2020/global_raw/` has it, otherwise re-downloads), extracts and clips each
+month to the Philippines AOI, applying the file's own scale_factor (0.1) to get real mm.
 """
 import os
+import shutil
 
 import geopandas as gpd
 import numpy as np
@@ -18,9 +20,11 @@ import requests
 from rasterio.crs import CRS
 from rasterio.mask import mask
 
-AOI_PATH = "data/swy/borneo/inputs/borneo_aoi.gpkg"
-RAW_DIR = "data/swy/borneo/raw_downloads/terraclimate_borneo_2020/global_raw"
-OUT_DIR = "data/swy/borneo/inputs/et0_terraclimate_2020"
+AOI_PATH = "data/swy/philippines/inputs/ph_aoi.gpkg"
+RAW_DIR = "data/swy/philippines/raw_downloads/terraclimate_ph_2020/global_raw"
+OUT_DIR = "data/swy/philippines/inputs/et0_terraclimate_2020"
+# same global file Borneo already fetched — reuse rather than re-download ~110MB if present
+BORNEO_CACHED_NC = "data/swy/borneo/raw_downloads/terraclimate_borneo_2020/global_raw/TerraClimate_pet_2020.nc"
 YEAR = 2020
 URL = f"http://thredds.northwestknowledge.net:8080/thredds/fileServer/TERRACLIMATE_ALL/data/TerraClimate_pet_{YEAR}.nc"
 SCALE_FACTOR = 0.1
@@ -32,10 +36,14 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     nc_path = os.path.join(RAW_DIR, f"TerraClimate_pet_{YEAR}.nc")
     if not os.path.exists(nc_path):
-        r = requests.get(URL)
-        r.raise_for_status()
-        with open(nc_path, "wb") as f:
-            f.write(r.content)
+        if os.path.exists(BORNEO_CACHED_NC):
+            print(f"reusing already-downloaded {BORNEO_CACHED_NC}")
+            shutil.copy(BORNEO_CACHED_NC, nc_path)
+        else:
+            r = requests.get(URL)
+            r.raise_for_status()
+            with open(nc_path, "wb") as f:
+                f.write(r.content)
 
     aoi = gpd.read_file(AOI_PATH).to_crs(4326)
     geoms = [g.__geo_interface__ for g in aoi.geometry]
@@ -65,7 +73,7 @@ def main():
                     "height": out_img.shape[1], "width": out_img.shape[2],
                     "transform": out_transform, "compress": "lzw",
                 })
-            out_path = os.path.join(OUT_DIR, f"terraclimate_et0_borneo_{YEAR}_{month:02d}.tif")
+            out_path = os.path.join(OUT_DIR, f"terraclimate_et0_ph_{YEAR}_{month:02d}.tif")
             with rasterio.open(out_path, "w", **out_meta) as dst:
                 dst.write(out_img)
             os.remove(tmp_path)

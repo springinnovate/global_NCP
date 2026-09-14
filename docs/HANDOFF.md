@@ -5,7 +5,120 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-09-10.*
+*Last updated: 2026-09-14 (evening).*
+
+## LATEST (2026-09-14 evening) — Becky's INPUTS folder is in hand, richer than expected — read this first
+
+**The actual next SWY action, replacing everything below it in this section**: Becky's `INPUTS`
+folder downloaded and sitting at **`data/swy/philippines/INPUTS_SP/`** (renamed from `INPUTS` —
+Windows is case-insensitive, it collided with the already-existing `data/swy/philippines/inputs/`).
+1.7GB. Not yet inspected in detail (deliberately stopped here to write this down before the
+session ends) — inventory only, from a directory listing:
+
+- **`biophysical_template_PH_revised.csv`** — looks like her **actual, real biophysical table**
+  for this run (CN_A-D + Kc, presumably per-lucode), not the generic template of the same rough
+  name found earlier in Rich's `swy_global` repo (`base_data/biophysical_template_PH.csv` —
+  confirm these are actually different files, the "_revised" suffix suggests they are, but check).
+  **This is the single most valuable file here** — it's her real Kc and CN choices, directly
+  comparable to this project's own, not just her raw inputs.
+- **`ph_baseline_lulc_md5_7f29da.tif`** — her actual LULC raster. **Check its classification
+  scheme before assuming it's ESA CCI-compatible** — this project's own CN crosswalk
+  (`gcn250_esa_lc_cn_table.csv`) is keyed to ESA CCI codes; if hers differs, it won't drop in
+  directly. The biophysical template CSV above should reveal the lucode scheme either way.
+- **`reclassified_ph_baseline_lulc_md5_7f29da_biophysical_template_PH_revised_CN_A/B/C/D.tif`** —
+  her CN_A-D already reclassified to **rasters** from the LULC + biophysical table above. She's
+  using the raster-override path directly, not the CSV-table route this project's own Borneo run
+  used. Real, usable precedent for the raster-override approach this project has been treating as
+  "the architecturally preferable long-term path, not yet done."
+- **`Global-ET0_v3_monthly_tifs/`** — her ET0 source is **Global-AI_PET_v3** (CGIAR-CSI/Trabucco &
+  Zomer's Global Aridity Index/PET database, per the bundled readme PDF), a **different product**
+  than this project's own TerraClimate choice. Worth understanding the difference before treating
+  ET0 as equivalent between the two runs.
+- **`precip_PH_historical_climate_50/`** and **`n_events_PH_historical_climate_50/`** — monthly
+  precip and monthly rain-event-count rasters, both named `historical_1985_2014_..._p50` — this is
+  the real CMIP6 climatology (30-year span, "p50" = 50th percentile/median across ensemble
+  members), and critically, **a real, spatially-distributed rain-events derivation** — a genuine
+  upgrade over this project's own flat 18-events/month placeholder (see
+  `08_build_rain_events_table.py` in both pipeline directories).
+- **`wwf_PH_baseline_historical_climate.ini`** — almost certainly her exact `inspring` run
+  configuration (routing parameters, file paths, `alpha_m`/`beta_i`/`gamma`, etc.) — read this
+  first in the next session, it likely answers most remaining "what exactly did she do"
+  questions in one file.
+
+**First concrete steps for the new session**: (1) read the `.ini` file and the biophysical CSV in
+full before touching anything else; (2) confirm the LULC classification scheme; (3) decide, now
+that her real Kc/CN are visible, whether the plan is still "swap in our Kc/CN onto her other
+inputs" or whether seeing her actual numbers changes that plan.
+
+**Philippines EVI landed 2026-09-14 evening** — `data/swy/philippines/inputs/mod13a3_evi_2020/`
+(12 EVI + 12 VI_Quality files; AppEEARS bundles the QA layer even though only EVI was requested,
+same as the NDVI fetch). Downloaded via AppEEARS' manual web UI, landed loose in `inputs/` root,
+moved into its own subfolder to match the `mod13a3_ndvi_2020/` convention. **Borneo EVI still not
+landed** — that request was submitted separately (via Git Bash directly, which still 403'd — see
+below) and would need the same manual-UI resubmission the Philippines one got, if not already
+done. Check status before assuming both regions are ready.
+
+**Real security incident, resolved safely, worth remembering**: while working through the AppEEARS
+manual-download workaround, a fake "verify you're human" popup (the "ClickFix"/fake-CAPTCHA
+malware-delivery pattern — instructs the victim to open Windows+R and paste/execute a command) got
+this session's user close to running an unknown command. **Nothing executed** — the machine's own
+UAC admin-rights prompt blocked it. No remediation needed, but worth being aware this pattern
+exists and specifically targets people mid-technical-task, since a plausible "human verification"
+step doesn't stand out in that context.
+
+## LATEST (2026-09-14, earlier) — Becky gave a concrete SWY path forward; two WWF Colombia messages sent
+
+**SWY: the actual next action is waiting on this session to get a Drive folder.** Becky's
+2026-09-11 meeting went well, but afterward a real, unresolved Kc methodology gap surfaced (see
+below) and blocked the Philippines comparison. Becky's response, 2026-09-14: she put every input
+from her own Philippines baseline run into a new **`INPUTS` folder in the shared SWY Drive
+workspace**, and wants this project to **reuse her exact inputs (her DEM, her land-use map instead
+of ESA CCI, her CMIP6 climate stack) but swap in this project's own Kc and CN** — an isolated-
+variable comparison, not a from-scratch climatology rebuild. **Blocking on: getting that `INPUTS`
+folder downloaded/located** — ask the user for the Drive link, or confirm they've downloaded it,
+before doing anything else on SWY. Two things to check once it's in hand, not yet known: (1) what
+classification scheme her land-use map uses — this project's CN table is keyed to ESA CCI codes,
+and if hers differs the crosswalk needs rebuilding before it can be used; (2) whether her original
+shared baseline output (`data/swy/philippines/rich_shared/`, 8.6GB, still there — was briefly
+"lost" after the 2026-09-11 reorg moved it, since re-confirmed) is still the comparison target or
+superseded by this new approach.
+
+**The Kc/NDVI gap, in brief** (full detail in `docs/swy/swy_methods.qmd`, live reasoning in
+`docs/swy/research_notes.md`'s 2026-09-11 evening entry): Rich asked directly whether Kamble et
+al. (2013)'s NDVI-Kc regression — this project's method for non-cropland Kc, used in the completed
+Borneo run — is valid for forest, not just the agricultural crops it was actually calibrated on.
+Checked rather than reassured: confirmed agricultural-only, found Corbari (2017, real forest Kc
+measurements, lower than assumed) and Glenn et al. (2011, confirms NDVI saturation in dense
+canopy, recommends EVI, cites a still-unread tropical precedent — Negrón Juárez et al. 2008,
+Amazonia, paywalled). **Decision made, not yet executed: switch the Kc pipeline from NDVI to
+EVI** — same MOD13A3.061 product already fetched for both Borneo and the Philippines, just a
+different layer. AppEEARS request files for both regions' EVI already built
+(`data/swy/borneo/inputs/borneo_evi_full_request.json`,
+`data/swy/philippines/inputs/ph_evi_full_request.json`) — **check with the user whether these were
+submitted over the weekend** (NASA's AppEEARS API started blocking programmatic task
+submission/download mid-session on 2026-09-11 — public metadata endpoints stay open, `/task` and
+`/bundle` return a blanket 403 regardless of payload size or browser-like headers tried; worked
+around via AppEEARS' own web UI, uploading a hand-built request JSON — same workaround needed for
+these EVI requests if not already done).
+
+**WWF Colombia — real progress, two messages sent 2026-09-14, both awaiting replies.** Camila
+Cammaert's 2026-09-11 meeting went very well — informally invited into a CIAT sustainable-cacao
+meeting also attended by César Freddy Suárez and Carlos Mauricio Herrera; four ministers
+(Agriculture, Environment, Transportation, Hacienda-adjacent) doing a regional flight that week as
+part of a transformation agenda; WWF Colombia has a deliberately diplomatic relationship with the
+new administration; the "no former C-level holdovers" rule doesn't affect the user (wasn't
+in-country under the prior administration). Two follow-ups drafted and sent: to Camila (glad to
+finally meet, found the CIAT session valuable, offered Altillanura expertise for future meetings,
+asked to stay in the loop and see the slides); to César/Carlos Mauricio, reframed around having
+also been at that same CIAT meeting together rather than as a stale follow-up to their earlier
+email exchange — picked the Smurfit land-cover accuracy-verification work specifically as the
+concrete next step (direct match to LC_orinoquia background), also offered a technical session
+showing this project's ecosystem-services workflow. **Both sent — waiting on responses, nothing
+else to do here until they reply.**
+
+**Session hygiene**: a commit was made 2026-09-14 covering the SWY data reorg, the Philippines
+pipeline, and all the methodology doc updates (see git log). Not pushed. The message drafts
+(`docs/swy/message_draft*.md`) were deleted after sending — don't look for them.
 
 ## Where things actually stand
 
@@ -41,64 +154,29 @@ session in `c:\projects\global_NCP` to resume.
     the spatial-dependency reason discussed" — but that pattern is still visibly present in
     Section 3.2 (Figure 7, Table 4) as drafted. The user deliberately dropped this from the sent
     response to check it themselves first — don't raise it again until they have.
-- **WWF Colombia — two live threads, real openings, nothing scheduled yet.**
-  - César Freddy Suárez Pacheco + Carlos Mauricio Herrera: Bogotá land-cover mapping (Secretaría
-    Distrital de Ambiente, Corine methodology), a Smurfit convenio needing classification-accuracy
-    verification (**strongest capability fit**, direct match to LC_orinoquia background), an
-    ongoing IUCN NbS-criteria discussion.
-  - **Camila Cammaert** (WWF Colombia, Sustainable Food Systems/Agriculture Coordinator) — meeting
-    was scheduled for 2026-09-10 (today, as of this writing). Outcome not yet known to this
-    session — ask the user how it went. Her focus (agricultural supply chains, food-systems
-    sustainability) connects directly to the user's own oil-palm/agricultural-frontier dissertation
-    work, not just the general pipeline — that overlap was the prep angle going in.
-  - Full detail: `project_capability_portfolio_pitch.md` memory, 2026-09-09 entries.
-- **SWY — Borneo pivot decided with Becky 2026-09-09; every raw input downloaded and
-  content-verified as of 2026-09-10.** **Meeting with Becky and Rich together confirmed
-  2026-09-11 (tomorrow) ~11am** — the earlier "Friday 2026-09-12" recorded elsewhere was wrong,
-  corrected by the user directly 2026-09-10. **Also tomorrow: Camila Cammaert meeting, 8am**
-  (before the SWY one) — user is prepping that one themselves (reading her paper), not delegated
-  to this session. Real goal for the SWY meeting, per explicit user framing: a clear report + data
-  uploaded to Drive + one honest attempt at the actual run — success isn't required, but
-  documenting clearly why it didn't work (if it doesn't) is, so Rich can pick it up with the
-  shared data. Paper edits to Becky's 14 comments are a soft target, not a hard deadline — no
-  need to show anything on that tomorrow.
-  DEM, NDVI, precip, and ET0 all landed and were actually sanity-checked (not just "task says
-  done") this session. `data/swy_shared_package/` is ~1.1GB, README rewritten with the full data
-  dictionary. Real architecture correction found: `inspring` accepts CN/Kc as **direct raster
-  overrides**, not only a lucode CSV — shrinks the earlier "lucode master table" gap down to a
-  small 3-way land-cover mask. **Full detail — task IDs, exact verification numbers, gotchas
-  (curl redirects, `.netrc`, R/GDAL segfaults) — lives in `docs/swy/research_notes.md`'s
-  2026-09-09/10 entries, not here.** Current status: `docs/swy/workflow.md`. Permanent
-  conceptual/methods reference: `docs/swy/swy_methods.qmd`.
-  - **Data package uploaded to Drive and Becky notified, 2026-09-11 (user's own action, confirmed
-    done).** No longer an open item — see the corrected `Pending` list below.
-  - **2026-09-10/11, the whole pipeline consolidated into real, re-runnable scripts**:
-    `Python_scripts/swy_borneo_run/` (numbered 01-09, plus `Dockerfile`, `appeears_common.py`,
-    and its own `README.md`) — AOI build through the actual model call, no longer only ad-hoc
-    interactive commands. See that README's "Findings for Rich" section for concrete,
-    reproducible bugs found in `inspring`'s packaging (not vague "it didn't work").
-  - **Two run attempts, 2026-09-11 — the second completed cleanly, and it changed the diagnosis.**
-    First attempt: laptop sleep killed Docker mid-run (battery sleep was still on a 60-min timer
-    despite AC sleep already being off); the `L_sum` routing step was cut off almost exactly at
-    the equator, and the aggregated `qb=1705.005` from that run was suspect. Fixed properly before
-    rerunning: `standby-timeout-dc 0` plus an active `SetThreadExecutionState` keep-awake process
-    for the run's duration (belt-and-suspenders, given this is an AzureAD-managed laptop where
-    `powercfg` couldn't even confirm the lid-close-action setting). Old incomplete workspace moved
-    aside, not deleted (`data/swy_borneo_workspace_INCOMPLETE_run1_2026-09-10/`), so `taskgraph`
-    couldn't silently reuse the broken cached `L_sum`.
-    **Second run: exit code 0, full spatial coverage confirmed.** QF/AET identical to the first
-    run (406.8mm/yr, 1288.0mm/yr — expected, don't depend on routing). **The real finding: the
-    L_sum flow-accumulation anomaly (~5% of pixels, values into the billions) persisted at the
-    same order of magnitude with full coverage — it is a genuine, reproducible issue, not a crash
-    artifact.** Visually (via the new interactive map — see below) it clusters most visibly at one
-    specific coastal river-mouth location, consistent with (not confirmed as) SRTM noise in flat
-    tidal terrain. Separately: the aggregated `qb` value came out **numerically identical** between
-    the broken and complete runs (1705.005), suggesting the AOI-wide aggregate itself is more
-    robust than the pixel-level anomaly implies. Full detail: `docs/swy/research_notes.md`'s two
-    2026-09-11 entries.
-  - **Report, map, and shared package all re-rendered/re-copied with the complete-run numbers** —
-    but **the version the user uploaded to Drive last night reflects the incomplete run's
-    framing and needs re-uploading.**
+- **WWF Colombia — see LATEST above for current status** (Camila meeting detail, César/Carlos
+  Mauricio thread, both messages sent 2026-09-14). Full background: `project_capability_portfolio_pitch.md` memory.
+- **SWY — see LATEST above for the current blocker (Becky's `INPUTS` folder) and the Kc/EVI
+  situation.** Stable historical facts, still accurate background:
+  - Borneo pivot decided with Becky 2026-09-09; every raw input downloaded and content-verified
+    2026-09-10. `data/swy/borneo/inputs/` (~1.1GB) has the full package + README with data
+    dictionary. Real architecture fact: `inspring` accepts CN/Kc as **direct raster overrides**,
+    not only a lucode CSV — the raster-override path is architecturally preferable long-term but
+    the completed Borneo run used the simpler CSV path instead (documented, deliberate).
+  - **The Borneo run itself completed successfully, 2026-09-11, second attempt after a first one
+    was cut short by the laptop sleeping mid-run** (fixed: `standby-timeout-dc 0` + an active
+    keep-awake process). QF mean 406.8mm/yr, AET mean 1288.0mm/yr — both physically plausible for
+    tropical rainforest. **One genuine, still-open numerical issue, unrelated to the Kc question**:
+    ~5% of `L_sum` (flow-accumulation) pixels show a runaway anomaly, clustered at one coastal
+    river-mouth location, consistent with (not confirmed as) SRTM noise in flat tidal terrain —
+    reproduced independently across both run attempts, not a crash artifact. Full detail:
+    `docs/swy/research_notes.md`'s 2026-09-11 entries.
+  - Whole pipeline consolidated into real, re-runnable scripts: `Python_scripts/swy_borneo_run/`
+    (01-11 + Dockerfile + README, including a "Findings for Rich" section on real `inspring`
+    packaging bugs) and, added 2026-09-11, `Python_scripts/swy_philippines_run/` (mirrors the
+    Borneo structure; AOI, DEM, NDVI, and LULC all landed for the Philippines — see that
+    directory's own README for exactly what's done vs. still needed).
+  - Data package uploaded to Drive and Becky notified, 2026-09-11 — done, not an open item.
 - **Devstack pilot restructure — done and verified, 2026-09-09.** `calculate_bitemporal_change.py`
   split into `run_/tasks_/functions_` files, verified two ways: 5 new pytest tests
   (`Python_scripts_tests/`) all pass, and — the real test — original vs. refactored script outputs
@@ -113,48 +191,48 @@ session in `c:\projects\global_NCP` to resume.
   `docs/swy/tuesday_meeting_script.md` — materials for the 2026-07-21 Becky meeting, superseded by
   everything since. Moved to `docs/archive/`, not deleted.
 
-## Drafts — status as of 2026-09-10
+## Drafts — status as of 2026-09-14
 
-- `docs/becky_global_invest_dev_update_2026-09-08.draft.md` — **sent 2026-09-09** (SWY thread
-  reply + separate devstack/meeting-ask message, trimmed by the user before sending).
-- **Paper-comments response to Becky** — drafted and corrected in-conversation this session, not
-  yet saved as a file, **sending status unconfirmed**. If picking this up fresh, ask the user
-  directly rather than assuming either way.
-- `docs/swy/rich_swy_status_and_asks_2026-09-08.draft.md` — **not sent, stale** (Peru/Myanmar/
-  Perrine paragraph no longer applies after the Borneo pivot). The two technical questions
-  (ecoshard version, `root_depth`) are still real — probably better raised live at Friday's
-  meeting with Rich than as a Slack message now. Needs a user decision, not another silent edit.
-- `docs/justin_devstack_outreach_2026-09-08.draft.md` — **not sent**, shouldn't be until the
-  contribution PR happens — deprioritized along with it.
+All message drafts from the 2026-09-11/14 SWY and WWF Colombia threads (Becky, Camila, César/
+Carlos Mauricio) were sent and deleted — don't look for `docs/swy/message_draft*.md`, they're gone
+on purpose. Still outstanding from earlier:
+
+- **Paper-comments response to Becky** — drafted and corrected 2026-09-11, **sending status still
+  unconfirmed as of 2026-09-14** (three days of SWY/WWF Colombia work happened in between without
+  this coming up again — genuinely check with the user, don't assume either way).
+- `docs/swy/rich_swy_status_and_asks_2026-09-08.draft.md` — **not sent, stale**, superseded by the
+  live Slack conversation with Rich that already happened 2026-09-11. Probably dead; confirm with
+  the user before deleting.
+- `docs/justin_devstack_outreach_2026-09-08.draft.md` — **not sent**, still deprioritized behind
+  the devstack contribution PR.
 
 ## Pending — in priority order
 
-1. **Confirm whether the Becky paper-response was actually sent** — check with the user first,
-   don't assume.
-2. **All SWY raw-input acquisition is done** (2026-09-10) — AOI, DEM, soil, routing, CN base,
-   NDVI, precip, ET0 all downloaded and content-verified. Nothing left to acquire; see the
-   "SWY — every raw input" note above and `docs/swy/workflow.md` for what's actually left
-   (Kc/CN raster construction, rain events derivation, then the model call itself).
-3. ~~Upload `data/swy_shared_package/` to the shared Google Drive~~ — **done, 2026-09-11**, user
-   confirmed uploaded and Becky notified.
-4. **The Borneo SWY run itself — see the detailed status above** (first attempt completed but
-   `L_sum`/baseflow was cut short by a Docker crash; a clean rerun was in progress as of the last
-   session, outcome to confirm before the 11am meeting).
-5. **Today (2026-09-11): meeting with Becky and Rich together, ~11am** — SWY (Borneo results),
-   paper, devstack, all converging here. Camila Cammaert meeting is earlier the same morning,
-   ~8am, user prepping separately.
-6. **How did the Camila Cammaert meeting go?** — ask, fold in whatever came of it.
-7. **Decide what to do with the stale Rich draft** — resend trimmed, fold into Friday's live
-   conversation, or something else. Ask, don't pick unilaterally.
-8. **Devstack contribution PR** — resume only after the Becky paper-response sequencing above is
+1. **Get Becky's `INPUTS` Drive folder and start the Philippines re-run using her inputs + this
+   project's Kc/CN** — see LATEST above. The actual next SWY action.
+2. **Switch the Kc pipeline from NDVI to EVI** — decision made, not executed. EVI AppEEARS request
+   files already built for both regions; confirm whether submitted, then build EVI into the
+   biophysical-table script (`07_build_biophysical_table.py` in both `swy_borneo_run/` and
+   `swy_philippines_run/`).
+3. **Read Negrón Juárez et al. (2008)** (Amazonia, tropical rainforest EVI-ET) — paywalled,
+   couldn't get past Taylor & Francis; needs the user's institutional access.
+4. **Confirm whether the Becky paper-response was actually sent** — see Drafts above.
+5. **Check for replies from Camila and César/Carlos Mauricio** — both messages sent 2026-09-14,
+   nothing to do until they respond.
+6. **L_sum flow-accumulation anomaly** (Borneo, ~5% of pixels) — real, diagnosable, not blocking
+   the "it runs" finding, still uninvestigated.
+7. **Devstack contribution PR** — resume only after the Becky paper-response sequencing above is
    actually confirmed done. Fork already exists (user's own GitHub); local remote + branch setup
    not yet done.
-9. **WWF Colombia** — César's three openings, Camila's food-systems angle, both unscheduled.
-10. **NatCap directory + LinkedIn** — headshot still needed; LinkedIn About needs a less-generic
-    rewrite pass.
-11. **Book figure regeneration** — `docs/pipeline_reference.md` row G. No rush.
-12. Mangrove/flooded-grasslands CN patch — not a blocker for Becky, still needs an eventual
-    communicated position (`docs/swy/research_notes.md`).
+8. **NatCap directory + LinkedIn** — headshot still needed; LinkedIn About needs a less-generic
+   rewrite pass.
+9. **Book figure regeneration** — `docs/pipeline_reference.md` row G. No rush.
+10. Mangrove/flooded-grasslands CN patch — not a blocker, still needs an eventual communicated
+    position (`docs/swy/research_notes.md`).
+11. **Broader `data/` cleanup**, user-requested 2026-09-11, not started beyond the SWY reorg. Not
+    urgent; don't start unprompted.
+12. **Push the 2026-09-14 commit** — made locally, not pushed to `origin/feature/devstack-compat`.
+    Ask before pushing.
 
 ## Key file locations
 
@@ -181,8 +259,30 @@ session in `c:\projects\global_NCP` to resume.
   snapshot memo, regenerated fresh rather than kept permanently current.
 - `docs/reports/swy_status_report.qmd` — SWY status memo **source** (own `swy_report_styles.css`
   alongside it). The rendered, standalone copy that actually goes out is
-  `data/swy_shared_package/swy_status_report.html` — re-render and re-copy if the source changes.
-- `data/swy_shared_package/` — the full Borneo data package, own README with data dictionary.
+  `data/swy/borneo/inputs/swy_status_report.html` — re-render and re-copy if the source changes.
+  Now includes a Philippines section and the full Kc/EVI caveat, not just Borneo.
+- `docs/swy/workflow_diagram.qmd`/`.html` — **new 2026-09-11**, a thin Quarto wrapper that
+  `{{< include >}}`s the live `workflow.md` so its mermaid diagram actually renders to SVG (a bare
+  `.md` render leaves it as an inert code block — Quarto's mermaid engine needs real `.qmd`
+  context). `workflow.md` stays the single edited source; this is just how to view it properly
+  rendered, standalone.
+- `Python_scripts/swy_philippines_run/` — **new 2026-09-11**, mirrors `swy_borneo_run/`'s
+  structure (numbered scripts + README). `01_build_aoi_from_rich_mask.py`'s docstring documents a
+  real false start worth reading before reusing the pattern: building an AOI from a partner's
+  *routing domain* (watershed_subset files) overshoots badly (includes upstream contributing area
+  with zero retained output) — build it from the *output raster's valid-data footprint* instead.
+- Two literature PDFs added to `docs/swy/`, both read in full and cited in `swy_methods.qmd`:
+  Corbari et al. (2017, *Sensors*) and Glenn et al. (2011, *Hydrological Processes*) — both were
+  paywalled everywhere WebFetch tried (MDPI, Wiley, ResearchGate all 403'd); the user pulled them
+  via institutional access. Same will likely be needed for Negrón Juárez et al. (2008, still
+  unread, pending item #3 above).
+- `data/swy/` — **reorganized 2026-09-11**, all SWY data now lives here: `shared/` (cn_tables,
+  soil_hydrologic_group, hydrobasins — genuinely cross-region), `borneo/{inputs,raw_downloads,lulc,
+  workspace}/`, `philippines/{inputs,rich_shared}/`. Replaces the old scattered top-level
+  `swy_shared_package/`, `borneo_lulc/`, `dem_borneo/`, etc. — all script path references updated
+  and reverified. `data/swy/borneo/inputs/` is the full Borneo data package, own README with data
+  dictionary. `data/` still has real clutter beyond SWY (other-service data, `raw/`/`processed/`/
+  `interim/`/`external/`) — noted as a future cleanup item in Pending, not done.
 - `docs/manuscript/paper_draft_5service.pdf` — Becky's reviewed draft with her 14 comments
   (gitignored, not in git history).
 - `docs/pipeline_reference.md` — step-by-step tracker; row G is the book-figure-regeneration list.

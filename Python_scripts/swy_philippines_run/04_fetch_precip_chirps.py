@@ -1,10 +1,9 @@
-"""Fetch and clip 2020 monthly precipitation (CHIRPS) for Borneo.
+"""Fetch and clip 2020 monthly precipitation (CHIRPS) for the Philippines.
 
-No authentication needed — CHIRPS is served publicly, unauthenticated, from UCSB's Climate
-Hazards Center (not NASA-distributed, so not reachable via AppEEARS). Downloads global monthly
-GeoTIFFs (~14.5MB/month compressed), clips each to the Borneo AOI locally, and cleans up the
-large intermediate global files afterward (keeps only the small .tif.gz originals for
-provenance).
+Mirrors `swy_borneo_run/04_fetch_precip_chirps.py`. No authentication needed — CHIRPS is served
+publicly, unauthenticated, from UCSB's Climate Hazards Center. Downloads global monthly GeoTIFFs,
+clips each to the Philippines AOI locally, and cleans up the large intermediate global files
+afterward (keeps only the small .tif.gz originals for provenance).
 """
 import gzip
 import os
@@ -15,9 +14,9 @@ import rasterio
 import requests
 from rasterio.mask import mask
 
-AOI_PATH = "data/swy/borneo/inputs/borneo_aoi.gpkg"
-RAW_DIR = "data/swy/borneo/raw_downloads/chirps_borneo_2020/global_raw"
-OUT_DIR = "data/swy/borneo/inputs/precip_chirps_2020"
+AOI_PATH = "data/swy/philippines/inputs/ph_aoi.gpkg"
+RAW_DIR = "data/swy/philippines/raw_downloads/chirps_ph_2020/global_raw"
+OUT_DIR = "data/swy/philippines/inputs/precip_chirps_2020"
 YEAR = 2020
 URL_TEMPLATE = "https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_monthly/tifs/chirps-v2.0.{year}.{month:02d}.tif.gz"
 
@@ -56,7 +55,7 @@ def main():
     for month in range(1, 13):
         print(f"month {month:02d}...")
         global_tif = download_and_decompress(month)
-        out_path = os.path.join(OUT_DIR, f"chirps_precip_borneo_{YEAR}_{month:02d}.tif")
+        out_path = os.path.join(OUT_DIR, f"chirps_precip_ph_{YEAR}_{month:02d}.tif")
         clip_to_aoi(global_tif, geoms, out_path)
         os.remove(global_tif)  # keep the .gz for provenance, drop the large uncompressed copy
 

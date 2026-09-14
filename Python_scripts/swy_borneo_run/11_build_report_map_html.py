@@ -1,6 +1,6 @@
 """Build the self-contained interactive Leaflet map HTML fragment for the SWY status report.
 
-Reads data/borneo_lulc/output_maps/layers.json (built by 10_render_output_maps.py) and writes
+Reads data/swy/borneo/lulc/output_maps/layers.json (built by 10_render_output_maps.py) and writes
 docs/reports/_output_map.html, included into swy_status_report.qmd via
 `{{< include _output_map.html >}}`. Kept as a separate file rather than inlined directly in the
 .qmd because the embedded base64 image data is large (a few MB of text) — better kept out of the
@@ -12,7 +12,7 @@ Mercator's cos(latitude) distortion is negligible.
 """
 import json
 
-LAYERS_JSON = "data/borneo_lulc/output_maps/layers.json"
+LAYERS_JSON = "data/swy/borneo/lulc/output_maps/layers.json"
 OUT_PATH = "docs/reports/_output_map.html"
 
 
