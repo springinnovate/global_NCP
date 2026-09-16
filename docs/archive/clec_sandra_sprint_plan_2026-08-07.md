@@ -4,6 +4,16 @@ status: "STRICT — Mon 9AM to Wed 11AM, 8h/day (Wed: 9-11AM only, 2h)"
 date: "2026-08-07"
 ---
 
+**Archived 2026-09-15 — fully executed, kept for the record only, not an active plan.** All three
+deliverables landed: CLEC abstract submitted 2026-08-12 and later accepted; the Sandra Valenzuela
+meeting happened as scheduled and went well (it's what led directly to the César Suárez/WWF
+Colombia thread that started in September); the Coastal Risk 0.12× denominator issue flagged below
+was root-caused and fixed the same week (`analysis/WORKLOG.md`, 2026-08-11 entry). Current status
+and next steps live in `docs/applications/colombia_capability_portfolio.md`'s "Open threads"
+section, not here. One idea from this plan was never acted on and is still live if the CLEC
+Módulo 5 course goes forward: a Colombia road-network data layer (OSM/INVIAS) for a road-ecology-
+specific audience — see "Open items" below, now also noted in the live portfolio doc.
+
 ## Why this exists
 
 Three deliverables converge on Wednesday (2026-08-12): the CLEC congress abstract deadline, a
