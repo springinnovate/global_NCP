@@ -929,3 +929,127 @@ rather than this session sending it.
 to Becky's output" plan needs a real reframe**, not just a status update — both the Kc methodology
 and the comparison target turned out to be less settled than assumed going in. User is re-reading
 `swy_methods.qmd` in full before deciding the next concrete steps; not decided as of this entry.
+
+## 2026-09-14 evening — Becky's `INPUTS_SP` folder in hand; the isolated-variable comparison actually built and run
+
+Resolves option (c) from the entry above: asked Becky directly for her real Philippines baseline
+inputs rather than re-deriving her CMIP6 climatology from scratch. She delivered more than asked —
+her real biophysical table, her CN rasters (the raster-override path this project had only
+theorized about), her real ET0 product (Global-AI_PET_v3, not TerraClimate), and real
+spatially-distributed monthly rain-event rasters (not a flat placeholder). Landed as
+`data/swy/philippines/INPUTS_SP/` (renamed from `INPUTS` — Windows case-insensitivity collided with
+the existing `inputs/`).
+
+**First real finding, confirmed not assumed**: her LULC (`ph_baseline_lulc_md5_7f29da.tif`) is a
+custom 12-class WWF-SIPA typology (Annual Crop, Brush/Shrubs, Built-up, Closed Forest, Fishpond,
+Grassland, Inland Water, Mangrove Forest, Marshland/Swamp, Open Forest, Open/Barren, Perennial
+Crop) — not ESA CCI, the scheme this project's own CN table is keyed to. Built a hand-matched
+crosswalk (by land-cover semantics, not by numeric closeness to her own CN values) to still use
+`gcn250_esa_lc_cn_table.csv` unmodified — full table in `swy_methods.qmd`.
+
+**Second real finding, this one substantive rather than mechanical**: building her Kc via this
+project's own EVI-regression method (rather than her flat per-class values) gives Closed Forest
+Kc = 0.52–0.70 (monthly-varying) against her flat 1.0 — a large gap, and one that lands in the same
+direction as Corbari et al. (2017)'s real forest Kc measurements discussed above. Not a validation
+of either number (Kamble's regression is still cropland-calibrated), but independent evidence
+pointing the same way as the one real measurement source already reviewed.
+
+**A real documentation error was also caught and fixed today, unrelated to the Philippines work
+itself but found while re-reading `swy_methods.qmd` to plan this comparison**: the document
+claimed `inspring` supports direct raster overrides for CN and Kc (`cn_a/b/c/d_path` etc.),
+"confirmed by reading the code directly." Re-reading `seasonal_water_yield.execute()`'s actual
+source (a cached clone from an earlier session, same commit this project's own Dockerfile builds)
+found no such parameters anywhere in the function — CN/Kc come only from the lucode-indexed CSV
+table. That earlier claim was simply wrong. Corrected throughout `swy_methods.qmd`. Interesting
+possible origin, not confirmed: Becky's own `.ini` for her Philippines run *does* use
+`CN_A_PATH`...`CN_D_PATH` keys — but her `.ini` also uses several other parameter names
+(`TARGET_PIXEL_SIZE`, `SOIL_HYDROLOGIC_MAP`, `MONTHLY_ALPHA` as a literal float rather than a
+boolean) that don't match this project's actual `inspring` build either, so her workflow is most
+likely a different wrapper or fork, not evidence this project's own build ever had the feature.
+
+**Getting the actual run to execute surfaced three more real, unrelated problems**, all found by
+just running it and reading the traceback rather than by inspection in advance — worth recording
+because each easily could have been misdiagnosed as "the method is wrong" instead of "the software
+has a bug" or "the inputs need a preprocessing step":
+
+1. Two genuine upstream `inspring` bugs, both in the `user_defined_rain_events_dir` path (used to
+   ingest Becky's real spatially-distributed rain events instead of a flat placeholder) — neither
+   looks like it has ever actually been exercised end-to-end before. First: `interpolate_list` is
+   sized from `input_align_list` *before* the rain-events block extends that same list by 12 more
+   rasters, causing an immediate length-mismatch crash at the alignment step. Patched in
+   `Python_scripts/swy_borneo_run/Dockerfile` (a small `python -c` source patch applied during the
+   image build, same pattern already used there for the `setup.py` packaging bug). Second, found
+   only after the first was fixed: `n_events_path_list` is built via bare `os.listdir()` (no
+   directory prefix), unlike the precip/ET0 lists two lines above which build full paths — and
+   that same bare-filename list is reused as both the alignment *input* and *output* target. Not
+   patched — a naive fix would have `align_and_resize_raster_stack` write reprojected rasters back
+   out on top of Becky's own original delivered files. Fixing it properly means giving the aligned
+   copies genuinely separate output paths — real feature-completion work, deliberately not rushed.
+   **Reverted to this project's own flat 18-events/month placeholder table for this run** — the
+   real per-month upgrade stays a documented, open follow-up, not silently dropped.
+2. CRS mismatch: her LULC is EPSG:32651 (UTM 51N, meters); the DEM/precip/ET0/soil-group are all
+   WGS84 (degrees). `align_and_resize_raster_stack` doesn't reproject across CRSs on its own — it
+   intersects each input's raw bounding box as reported in its own native CRS, which fails
+   outright when one input is in meters and the rest in degrees ("Bounding boxes do not
+   intersect", from a traceback that doesn't mention CRS at all — would have been a genuinely
+   confusing thing to debug blind). Fixed by reprojecting her LULC to WGS84 first (GDAL Warp, mode
+   resampling to preserve categorical values, matched to the DEM's own pixel size).
+3. ET0 filename casing bug: her `Global-ET0_v3_monthly_tifs/` mixes `et0_v3_0X.tif` (most months)
+   and `et0_V3_0X.tif` (May–Sept) casing. `execute()` sorts filenames as plain strings to infer
+   calendar order — ASCII sorts capital `V` before lowercase `v`, so passed through raw, ET0 would
+   have silently landed on the wrong months with no error at all. Fixed via a normalized staging
+   copy, not by editing her delivered files.
+
+Also decided, at the user's explicit direction rather than as a default assumption: use this
+project's own already-fetched SRTMGL3 DEM, since neither her `INPUTS_SP/` folder nor her `.ini`
+includes a DEM path at all — flag this assumption to Becky in the next communication rather than
+treating it as silently resolved. And: don't spend more time on the mangrove/marshland CN
+simplification (collapsed to the same ESA analog as Closed Forest) — SWY's typical
+downstream-beneficiary use case cares about CN accuracy only where something is actually
+downstream, and mangrove sits at the tidal/estuarine end of the watershed by definition, so this is
+genuinely low-stakes here (noted as not necessarily true for flooded grasslands/savannas, which
+don't share mangrove's structural coastal position).
+
+Two real, clean upstream `inspring` bugs now found across this project's SWY work (the `setup.py`
+packages-list omission from 2026-09-11, plus the `interpolate_list` ordering bug today) — good,
+concrete candidates for a small PR back to Rich's repo once the comparison work itself settles.
+
+Full technical detail (crosswalk table, Kc comparison table, all four fixes) is in
+`swy_methods.qmd`'s new "Test design: Philippines — the Becky-inputs comparison" section — this
+entry is the chronological account, that document is the reference.
+
+**Second update, 2026-09-15 morning, after the user flagged that the first draft to Becky didn't
+make clear whose numbers were whose**: pulled Becky's own baseline output (already shared,
+`data/swy/philippines/rich_shared/...`, not previously compared pixel-for-pixel) and built a real
+side-by-side — whole-AOI means, an interactive map with matched color scales, and a pixel-wise
+scatter plot (her rasters area-averaged down to our coarser grid, colored by her own LULC class).
+Real finding: her/our QF ratio is 0.35 in aggregate but swings from 0.195 to 1.31 depending on
+land-cover class — too wide a spread for one uniform cause (like the flat, spatially-invariant
+rain-events placeholder alone) to explain; the CN/Kc crosswalk's genuine class-dependence is a
+real, additional contributor. B (baseflow) flips direction entirely — ours runs *higher* than
+hers almost everywhere, opposite of QF — not understood yet, flagged as real follow-up work, not
+resolved. Full tables and the scatter plots: `swy_methods.qmd`'s new comparison subsection and
+`swy_status_report.qmd`.
+
+**Update, same evening, after the run actually finished**: it completed successfully — full
+spatial coverage, exit code 0 — but only after 37+ minutes with zero console output, all spent in
+the GDAL LULC-reprojection step (her raster's real, mostly-nodata extent is large even after
+mode-resampling down to the DEM's pixel size; genuinely slow, not stuck — worth remembering before
+assuming a silent long-running step has hung). The alarming-looking wall of threading tracebacks
+at the very start of the log (`Joining executor thread ... would have caused a deadlock, skipping`,
+`currentThread() is deprecated`) is noise from `taskgraph`'s own thread-pool teardown colliding
+with Python 3.13's threading deprecations — unrelated to this run's actual correctness, and worth
+not mistaking for a real failure the next time it shows up (it will, on every run using this
+`taskgraph` version under Python 3.13).
+
+Results: QF mean 257.3mm/yr, AET mean 834.6mm/yr (a first pass at this number came out as a
+misleadingly low 224mm/yr mean with median exactly 0 — turned out to be legitimate zero-value
+ocean pixels outside the actual land mask diluting a naive whole-raster average; re-masked to
+`QF`'s own valid-pixel extent, which is the correct mask, to get the real number), aggregate `qb`
+1321.0mm/yr — physically plausible, same order of magnitude as Borneo's `qb` (1705mm/yr). The
+Borneo `L_sum` flow-accumulation anomaly recurs here, worse: 11.5% of pixels exceed 100,000 against
+a median of 4,465 (Borneo: ~5%) — consistent with (not proof of) the flat-tidal-coastal-terrain
+hypothesis, since an archipelago has far more coastline per unit area than Borneo's single
+landmass. New, unexplained: aggregated `vri_sum` reads exactly 0.0 — not investigated tonight,
+flagged for next session. Full numbers and the water-balance sanity check are in
+`swy_methods.qmd`'s new "Result" subsection.

@@ -1,5 +1,53 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-09-11 through 2026-09-16 — Philippines Becky-inputs comparison built, run, and re-run after catching a real DEM-resolution confound
+
+Full isolated-variable comparison pipeline built for the Philippines: Becky's own WWF-SIPA
+`INPUTS_SP` inputs (LULC, 30-year CMIP6 climate stack) reused directly, this project's own
+EVI-regression Kc / ESA-crosswalk CN substituted in (`Python_scripts/swy_philippines_run/07b`
+through `12`). Along the way, found and worked around two real upstream `inspring` bugs in the
+`user_defined_rain_events_dir` path (one patched in the Dockerfile, one deliberately deferred —
+real data-loss risk if rushed), a CRS mismatch (her LULC is UTM 32651, everything else WGS84), and
+an ET0 filename-casing bug that would have silently scrambled month order. First run completed
+2026-09-14/15 using this project's already-fetched SRTMGL3 (90m) DEM, since her inputs never
+included one.
+
+**Caught before sending anything to Becky**: her `.ini` explicitly sets `TARGET_PIXEL_SIZE = 30`
+(confirmed as exactly 1 arc-second, matching SRTMGL1), meaning the reused 90m DEM introduced a
+second, unintended confound — resolution — on top of the intended one (Kc/CN), undermining the
+whole point of an isolated-variable test. Re-fetched SRTMGL1 (30m) via AppEEARS (needed the same
+manual-web-UI submission workaround as before, and had to split the request into two
+north/south tiles after the full-AOI bbox exceeded AppEEARS' per-request size cap at 30m
+resolution — merged back into one continuous DEM with `rasterio.merge` locally, no Docker needed
+for that step). Confirmed directly against `inspring`'s actual source
+(`seasonal_water_yield.py:279-280`) that `TARGET_PIXEL_SIZE` isn't a real parameter of this
+build at all — resolution is always derived from `dem_raster_path`'s own native pixel size, so
+swapping the DEM file was the only lever that existed, and it happened to be sufficient. Full
+32-bit re-run kicked off in Docker; still in progress as of this entry (started 2026-09-15
+evening, still running into 2026-09-16 — a much bigger raster than any prior run, expected to be
+slow at the flow-routing stage the same way every previous run was, just longer here).
+
+**A real alignment scare, investigated and closed out.** While waiting on the re-run, a water
+body's position looked visibly offset between the WWF-SIPA and NCP layers on the interactive
+comparison map. Chased it properly rather than assuming: coastline transects and a clean lake
+centroid comparison (Laguna de Bay) at first suggested a genuine ~430m registration bug; a second
+lake (Taal) gave a totally different, much smaller offset in a different direction, which
+contradicted a simple systematic-shift explanation; a proper whole-domain cross-correlation of
+both land/water masks settled it definitively — best alignment is at zero shift, 99%+ pixel
+agreement. The apparent misalignment was resolution-driven boundary quantization on one large,
+geometrically complex lake, not a real bug. No co-registration needed.
+
+**Also this stretch**: the interactive comparison map got real usability fixes (crisp
+nearest-neighbor pixel rendering instead of a blurry bilinear fade at zoom, a click-anywhere
+popup showing both runs' raw values/difference/% at a point, an opacity slider defaulting to
+fully opaque) and the two separate map-HTML builder scripts were merged into one
+(`11_build_output_map_html.py`), dropping a redundant QF layer. `docs/reports/` reorganized so
+each report lives in its own self-contained subfolder (`docs/reports/swy/`, matching the
+`colombia_clec/`/`phase4_beneficiary/` pattern already used elsewhere) instead of loose files at
+the top level. Mermaid diagrams across the SWY docs fixed for real after several false starts —
+root cause was Quarto's own theme-CSS variables being undefined under `theme: none`, not a
+mermaid rendering bug at all.
+
 ### 2026-09-10/11 (overnight) — First real SWY Borneo run: consolidated pipeline, a genuine result, a real diagnosed issue
 
 Whole Borneo SWY pipeline consolidated into real, re-runnable scripts —

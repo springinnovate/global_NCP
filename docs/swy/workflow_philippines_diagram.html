@@ -8,7 +8,7 @@
 
 <meta name="dcterms.date" content="2026-09-15">
 
-<title>SWY Borneo test: workflow and status</title>
+<title>SWY Philippines comparison: workflow and status</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -5275,8 +5275,8 @@ z-index: 1000;
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">SWY Borneo test: workflow and status</h1>
-<p class="subtitle lead">Rendered view of <code>workflow.md</code> — that file is the live, edited source; this is a standalone, properly-rendered copy.</p>
+<h1 class="title">SWY Philippines comparison: workflow and status</h1>
+<p class="subtitle lead">Rendered view of <code>workflow_philippines.md</code> — that file is the live, edited source; this is a standalone, properly-rendered copy.</p>
 </div>
 
 
@@ -5300,77 +5300,67 @@ z-index: 1000;
 
 
 <!--
-History, 2026-09-15: getting this diagram to actually render took real work, worth recording so
-the next mermaid problem in this project doesn't repeat the same dead ends. Nothing loaded the
-mermaid.js runtime at all originally — Pandoc tags a plain ```mermaid fence as
-`<pre class="mermaid">` but doesn't auto-render it itself. Tried a hand-rolled client-side loader
-(CDN import, then a locally vendored copy) — both failed with mermaid's own bomb/"Syntax error in
-text" icon specifically in VS Code's internal browser, even after confirming (via a real mermaid
-engine, both jsdom and a genuine headless Chrome) that the diagram text itself was never the
-problem. Also tried pre-rendering to a static SVG at build time — worked, but was unnecessary
-custom tooling: `docs/manuscript/paper_draft_5service.qmd` already renders a mermaid figure
-correctly using Quarto's own native `{mermaid}` executable-cell syntax, which bundles Quarto's own
-tested mermaid runtime and init script automatically. **This file now uses that same native
-syntax** instead. The plain ```mermaid fence stays in `workflow.md` unchanged (deliberately, so
-GitHub/VS Code's own Markdown preview still shows a live diagram there) — the cell below is a
-second copy of the same source, kept in sync by hand when the diagram changes, same bounded
-tradeoff as any other synced-by-hand duplication in this project.
+2026-09-15: uses Quarto's own native `{mermaid}` executable-cell syntax — see
+`workflow_diagram.qmd`'s own comment for the full history of why (hand-rolled client-side loaders,
+CDN or vendored-local, both failed specifically in VS Code's internal browser;
+`docs/manuscript/paper_draft_5service.qmd` already proved this native syntax works, so switched to
+matching it exactly rather than maintaining custom tooling). The plain ```mermaid fence stays in
+`workflow_philippines.md` unchanged, for GitHub/VS Code's own Markdown preview — the cell below is
+a second copy of the same source, kept in sync by hand when the diagram changes.
 -->
 <div class="cell" data-fig-width="13" data-layout-align="default">
 <div class="cell-output-display">
-<div id="fig-workflow-borneo" class="quarto-float quarto-figure quarto-figure-center anchored">
+<div id="fig-workflow-philippines" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
-<div aria-describedby="fig-workflow-borneo-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div aria-describedby="fig-workflow-philippines-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div>
-<pre class="mermaid mermaid-js" data-label="fig-workflow-borneo">%%{init: {&#39;themeVariables&#39;: {&#39;fontSize&#39;: &#39;20px&#39;}, &#39;flowchart&#39;: {&#39;rankSpacing&#39;: 80, &#39;nodeSpacing&#39;: 55, &#39;padding&#39;: 25}}}%%
+<pre class="mermaid mermaid-js" data-label="fig-workflow-philippines">%%{init: {&#39;themeVariables&#39;: {&#39;fontSize&#39;: &#39;20px&#39;}, &#39;flowchart&#39;: {&#39;rankSpacing&#39;: 80, &#39;nodeSpacing&#39;: 55, &#39;padding&#39;: 25}}}%%
 flowchart TD
-    subgraph INPUTS[&quot;Raw inputs — all downloaded and verified as of 2026-09-10&quot;]
-        AOI[&quot;AOI vector&lt;br/&gt;borneo_aoi.gpkg&lt;br/&gt;HydroBASINS AU/Oceania&quot;]:::done
-        DEM[&quot;DEM&lt;br/&gt;SRTMGL3, 90m&lt;br/&gt;verified: max 4041m vs. real 4095m&quot;]:::done
-        ROUTE[&quot;Routing parameters&lt;br/&gt;Rich&#39;s swy_global.ini defaults&quot;]:::done
-        LULC[&quot;LULC raster (2020)&lt;br/&gt;real C3S netCDF found on OneDrive —&lt;br/&gt;local .tif copy was empty/corrupted&quot;]:::done
-        SOIL[&quot;Soil hydrologic group&lt;br/&gt;HYSOGs250m&quot;]:::done
-        NDVI[&quot;NDVI + QA layer&lt;br/&gt;MOD13A3.061, full record 2000-2026&lt;br/&gt;verified: plausible values, correct extent&quot;]:::done
-        PRECIP[&quot;Precipitation, 2020&lt;br/&gt;CHIRPS, verified: July mean 138.9mm&quot;]:::done
-        ET0[&quot;Reference ET0, 2020&lt;br/&gt;TerraClimate pet — NEW source,&lt;br/&gt;not previously vetted before today&lt;br/&gt;verified: 97-118mm monthly means&quot;]:::done
-        GCN[&quot;CN base&lt;br/&gt;GCN250, global&quot;]:::done
+    subgraph SHARED[&quot;Reused directly from the WWF-SIPA INPUTS_SP folder, 2026-09-14&quot;]
+        LULC[&quot;WWF-SIPA LULC&lt;br/&gt;12-class typology, UTM 32651&lt;br/&gt;reprojected to WGS84 for the NCP run&quot;]:::done
+        PRECIP[&quot;Precipitation&lt;br/&gt;30-yr CMIP6 climatology (1985-2014, p50)&quot;]:::done
+        ET0[&quot;ET0&lt;br/&gt;Global-AI_PET_v3 / CGIAR-CSI&quot;]:::done
+        RAINEV[&quot;Real spatially-distributed rain events&lt;br/&gt;monthly rasters&quot;]:::done
     end
 
-    subgraph DERIVED[&quot;Derived layers — built for the first run attempt (simpler than the long-term plan)&quot;]
-        LULC2020[&quot;Real 2020 LULC extracted&lt;br/&gt;from OneDrive C3S netCDF —&lt;br/&gt;local .tif was an empty/corrupted stub&quot;]:::done
-        RAINEV[&quot;Rain events&lt;br/&gt;PLACEHOLDER (18/month uniform)&lt;br/&gt;not derived from real daily CHIRPS&quot;]:::progress
-        BIOTABLE[&quot;Biophysical table (CSV)&lt;br/&gt;lucode + CN_A-D (from GCN250 CSV)&lt;br/&gt;+ Kc_1-12 (NDVI regression per lucode,&lt;br/&gt;uniform across ALL vegetated classes —&lt;br/&gt;not split crop vs. non-crop this round)&quot;]:::done
+    subgraph BASELINE[&quot;WWF-SIPA baseline path — already run, output shared earlier&quot;]
+        BASECNKC[&quot;WWF-SIPA&#39;s own Kc/CN&lt;br/&gt;biophysical_template_PH_revised.csv&lt;br/&gt;+ CN_A-D raster overrides&quot;]:::done
+        BASERUN[&quot;WWF-SIPA baseline run&lt;br/&gt;completed earlier, output shared 2026-09-14&quot;]:::done
     end
 
-    subgraph RUN[&quot;Model run — first attempt uses the CSV biophysical-table path, not raster-overrides (pragmatic choice for this round, see swy_methods.qmd)&quot;]
-        SWYRUN[&quot;inspring.seasonal_water_yield.execute()&lt;br/&gt;via Docker (project&#39;s own image + inspring built on top)&lt;br/&gt;COMPLETE, full coverage confirmed, 2026-09-11 (2nd attempt)&lt;br/&gt;QF/AET plausible; L_sum anomaly (~5% of pixels) confirmed&lt;br/&gt;real, not a crash artifact — clusters at one river mouth&quot;]:::done
+    subgraph NCPPATH[&quot;NCP Kc/CN path — this project, 2026-09-14/15&quot;]
+        DEM[&quot;NCP&#39;s own SRTMGL3 DEM&lt;br/&gt;not in WWF-SIPA inputs — assumed,&lt;br/&gt;still needs confirmation&quot;]:::progress
+        CROSSWALK[&quot;NCP Kc/CN biophysical table&lt;br/&gt;hand-built 12-class to ESA CN crosswalk&lt;br/&gt;plus EVI-regression Kc&lt;br/&gt;07b_build_biophysical_table_becky_inputs.py&quot;]:::done
+        PLACEHOLDER[&quot;Flat 18-events/month placeholder&lt;br/&gt;real product blocked — 2 inspring bugs,&lt;br/&gt;one patched, one deliberately deferred&quot;]:::blocked
+        NCPRUN[&quot;inspring.execute()&lt;br/&gt;NCP Kc/CN run&lt;br/&gt;COMPLETE, 2026-09-14/15&quot;]:::done
     end
 
-    subgraph OUT[&quot;Output&quot;]
-        RESULT[&quot;Borneo quickflow / baseflow output&lt;br/&gt;full output set exists and is readable&quot;]:::done
-        QCHECK[&quot;Plausibility check&lt;br/&gt;QF/AET plausible; L_sum has a real,&lt;br/&gt;diagnosable flow-accumulation anomaly&lt;br/&gt;(NOT a published-benchmark validation —&lt;br/&gt;that&#39;s the deferred Hamel-basin test)&quot;]:::done
-        REPORT[&quot;Report to Becky + Rich, 2026-09-11&quot;]:::progress
+    subgraph COMPARE[&quot;Direct comparison, 2026-09-15&quot;]
+        PIXEL[&quot;Pixel-wise comparison&lt;br/&gt;WWF-SIPA resampled to NCP&#39;s coarser grid&quot;]:::done
+        MAPS[&quot;Interactive map + scatter plots&lt;br/&gt;colored by WWF-SIPA LULC class&quot;]:::done
+        FINDING[&quot;Finding: QF ratio 0.20-1.31 by class,&lt;br/&gt;non-uniform — CN/Kc a real contributor&lt;br/&gt;B flips direction entirely — unexplained&quot;]:::done
     end
 
-    AOI --&gt; SWYRUN
-    DEM --&gt; SWYRUN
-    ROUTE --&gt; SWYRUN
-    LULC --&gt; LULC2020
-    LULC2020 --&gt; BIOTABLE
-    SOIL --&gt; SWYRUN
-    GCN --&gt; BIOTABLE
-    NDVI --&gt; BIOTABLE
-    BIOTABLE --&gt; SWYRUN
-    PRECIP --&gt; RAINEV
-    PRECIP --&gt; SWYRUN
-    ET0 --&gt; SWYRUN
-    RAINEV --&gt; SWYRUN
-    SWYRUN --&gt; RESULT --&gt; QCHECK --&gt; REPORT
+    LULC --&gt; BASECNKC
+    LULC --&gt; CROSSWALK
+    PRECIP --&gt; BASERUN
+    PRECIP --&gt; NCPRUN
+    ET0 --&gt; BASERUN
+    ET0 --&gt; NCPRUN
+    RAINEV --&gt; BASERUN
+    RAINEV -.-&gt; PLACEHOLDER
+    BASECNKC --&gt; BASERUN
+    DEM --&gt; NCPRUN
+    CROSSWALK --&gt; NCPRUN
+    PLACEHOLDER --&gt; NCPRUN
+    BASERUN --&gt; PIXEL
+    NCPRUN --&gt; PIXEL
+    PIXEL --&gt; MAPS --&gt; FINDING
 
     subgraph LEGEND[&quot;Legend&quot;]
         direction LR
         LDONE[&quot;Done&quot;]:::done
-        LPROG[&quot;In progress / partial&quot;]:::progress
+        LPROG[&quot;In progress / unconfirmed&quot;]:::progress
         LBLOCK[&quot;Blocked&quot;]:::blocked
     end
 
@@ -5380,14 +5370,14 @@ flowchart TD
 </pre>
 </div>
 </div>
-<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-workflow-borneo-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure 1: SWY Borneo test pipeline and status, as of 2026-09-11.
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-workflow-philippines-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure 1: Philippines Kc/CN comparison: WWF-SIPA baseline vs. NCP Kc/CN run, both paths side by side.
 </figcaption>
 </figure>
 </div>
 </div>
 </div>
-<p>Full source, in context with the rest of the pipeline status: <code>workflow.md</code>.</p>
+<p>Full source, in context with the rest of the comparison status: <code>workflow_philippines.md</code>.</p>
 
 </main>
 <!-- /main column -->

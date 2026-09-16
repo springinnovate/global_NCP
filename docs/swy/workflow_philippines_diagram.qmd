@@ -1,0 +1,82 @@
+---
+title: "SWY Philippines comparison: workflow and status"
+subtitle: "Rendered view of `workflow_philippines.md` — that file is the live, edited source; this is a standalone, properly-rendered copy."
+date: last-modified
+date-format: "D MMMM YYYY"
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    wrap: none
+---
+
+<!--
+2026-09-15: uses Quarto's own native `{mermaid}` executable-cell syntax — see
+`workflow_diagram.qmd`'s own comment for the full history of why (hand-rolled client-side loaders,
+CDN or vendored-local, both failed specifically in VS Code's internal browser;
+`docs/manuscript/paper_draft_5service.qmd` already proved this native syntax works, so switched to
+matching it exactly rather than maintaining custom tooling). The plain ```mermaid fence stays in
+`workflow_philippines.md` unchanged, for GitHub/VS Code's own Markdown preview — the cell below is
+a second copy of the same source, kept in sync by hand when the diagram changes.
+-->
+
+```{mermaid}
+%%| label: fig-workflow-philippines
+%%| fig-cap: "Philippines Kc/CN comparison: WWF-SIPA baseline vs. NCP Kc/CN run, both paths side by side."
+%%| fig-width: 13
+%%{init: {'themeVariables': {'fontSize': '20px'}, 'flowchart': {'rankSpacing': 80, 'nodeSpacing': 55, 'padding': 25}}}%%
+flowchart TD
+    subgraph SHARED["Reused directly from the WWF-SIPA INPUTS_SP folder, 2026-09-14"]
+        LULC["WWF-SIPA LULC<br/>12-class typology, UTM 32651<br/>reprojected to WGS84 for the NCP run"]:::done
+        PRECIP["Precipitation<br/>30-yr CMIP6 climatology (1985-2014, p50)"]:::done
+        ET0["ET0<br/>Global-AI_PET_v3 / CGIAR-CSI"]:::done
+        RAINEV["Real spatially-distributed rain events<br/>monthly rasters"]:::done
+    end
+
+    subgraph BASELINE["WWF-SIPA baseline path — already run, output shared earlier"]
+        BASECNKC["WWF-SIPA's own Kc/CN<br/>biophysical_template_PH_revised.csv<br/>+ CN_A-D raster overrides"]:::done
+        BASERUN["WWF-SIPA baseline run<br/>completed earlier, output shared 2026-09-14"]:::done
+    end
+
+    subgraph NCPPATH["NCP Kc/CN path — this project, 2026-09-14/15"]
+        DEM["NCP's own SRTMGL3 DEM<br/>not in WWF-SIPA inputs — assumed,<br/>still needs confirmation"]:::progress
+        CROSSWALK["NCP Kc/CN biophysical table<br/>hand-built 12-class to ESA CN crosswalk<br/>plus EVI-regression Kc<br/>07b_build_biophysical_table_becky_inputs.py"]:::done
+        PLACEHOLDER["Flat 18-events/month placeholder<br/>real product blocked — 2 inspring bugs,<br/>one patched, one deliberately deferred"]:::blocked
+        NCPRUN["inspring.execute()<br/>NCP Kc/CN run<br/>COMPLETE, 2026-09-14/15"]:::done
+    end
+
+    subgraph COMPARE["Direct comparison, 2026-09-15"]
+        PIXEL["Pixel-wise comparison<br/>WWF-SIPA resampled to NCP's coarser grid"]:::done
+        MAPS["Interactive map + scatter plots<br/>colored by WWF-SIPA LULC class"]:::done
+        FINDING["Finding: QF ratio 0.20-1.31 by class,<br/>non-uniform — CN/Kc a real contributor<br/>B flips direction entirely — unexplained"]:::done
+    end
+
+    LULC --> BASECNKC
+    LULC --> CROSSWALK
+    PRECIP --> BASERUN
+    PRECIP --> NCPRUN
+    ET0 --> BASERUN
+    ET0 --> NCPRUN
+    RAINEV --> BASERUN
+    RAINEV -.-> PLACEHOLDER
+    BASECNKC --> BASERUN
+    DEM --> NCPRUN
+    CROSSWALK --> NCPRUN
+    PLACEHOLDER --> NCPRUN
+    BASERUN --> PIXEL
+    NCPRUN --> PIXEL
+    PIXEL --> MAPS --> FINDING
+
+    subgraph LEGEND["Legend"]
+        direction LR
+        LDONE["Done"]:::done
+        LPROG["In progress / unconfirmed"]:::progress
+        LBLOCK["Blocked"]:::blocked
+    end
+
+    classDef done fill:#c8e6c9,stroke:#2e7d32,color:#1b1b1b
+    classDef progress fill:#fff9c4,stroke:#f9a825,color:#1b1b1b
+    classDef blocked fill:#ffcdd2,stroke:#c62828,color:#1b1b1b
+```
+
+Full source, in context with the rest of the comparison status: `workflow_philippines.md`.

@@ -5,7 +5,271 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-09-14 (evening).*
+*Last updated: 2026-09-15 (evening).*
+
+## LATEST (2026-09-15 evening) — mermaid diagrams fixed for real; manuscript folder cleaned up
+
+**Mermaid, closed out**: both SWY diagrams now use Quarto's native `{mermaid}` executable-cell
+syntax (matching `docs/manuscript/paper_draft_5service.qmd`'s own already-working figure — that
+was the answer, not any of the custom client-side-loader or static-SVG approaches tried earlier
+today; see `reference-mermaid-local-testing` memory for the full history and a reusable
+Deno-based test harness if this ever breaks again). **User confirmed both diagrams now render in
+all viewers, including VS Code's internal browser.** Just fixed a formatting pass on top: font
+size and node/rank spacing bumped via `%%{init: ...}%%`, a color legend subgraph added (green
+"Done" / yellow "In progress" / red "Blocked" — the diagrams had no legend before, and subgraph
+title labels were being visually crowded by child nodes). Applied to all three files
+(`docs/swy/workflow_diagram.qmd`, `workflow_philippines_diagram.qmd`,
+`docs/reports/swy_status_report.qmd`), re-rendered, no errors.
+
+**User checked, real formatting bugs remain — fix next session, not done yet**:
+1. **Subgraph background boxes are too dark** — currently default mermaid gray, and the subgraph
+   title labels (black text) are barely visible against it. Needs an explicit lighter
+   `clusterBkg`/`clusterBorder` themeVariable (or similar) in the `%%{init: ...}%%` block, not
+   just the font-size bump already applied.
+2. **Text inside the colored (done/progress/blocked) node boxes overflows the box width** — the
+   box itself isn't sizing to fit its own label text. Likely needs explicit node width/padding via
+   `themeVariables` (or shorter label text) rather than relying on mermaid's auto-sizing, which
+   isn't accounting for the multi-line `<br/>` content properly at the current font size.
+
+Same three files affected. Start here next session — quick, bounded CSS/themeVariable tuning, not
+a re-open of the earlier rendering-mechanism saga (that part is confirmed working).
+
+**`docs/manuscript/` cleaned up**: archived the pre-5-service-redesign paper
+(`paper_draft.qmd`/`.html`/`.docx`, `index.tex`, standalone `workflow.qmd`/`.html`) to
+`docs/archive/manuscript_pre_5service/` (README included there explaining what/why), deleted a
+stray Word lock file. **Left alone, pending user confirmation on live/dead status**:
+`agu_abstract_2026.md` (submission was blocked by a portal crash back in August, resolution
+unknown), `becky_reply_ratios_clarification_2026-09-07.draft.md` (may be the same "sent?
+unconfirmed" item already below), `becky_open_questions_2026-09-03.draft.md`,
+`justin_ee_correspondence_provenance_2026-08-31.draft.md`.
+
+**Also today**: `docs/reports/` and `docs/applications/` reorganized (Colombia/Phase4 reports into
+their own subfolders with assets; `colombia_capability_portfolio.md` rewritten as an evergreen
+pitch doc, old dated version + the fully-executed `clec_sandra_sprint_plan.md` archived); a new
+Philippines pipeline diagram built; the SWY status report stripped of "AI-tell" process-narration
+language per direct user feedback (see `feedback-report-vs-log-separation` memory) and given a
+proper References section. Full detail in each section below and in today's memory updates —
+this top entry is intentionally compact given session length.
+
+## LATEST (2026-09-14 late evening) — Becky-inputs comparison run COMPLETED successfully — read this first
+
+**The run finished while the user was asleep — full spatial coverage, exit code 0, real, plausible
+numbers.** It just took 37+ minutes with zero console output because the whole time was spent in
+the GDAL LULC-reprojection step (genuinely slow on her large raster, not stuck — don't assume a
+silent long step has hung without checking `docker ps` first). The wall of threading tracebacks at
+the very start of the log (`Joining executor thread ... would have caused a deadlock`,
+`currentThread() is deprecated`) is harmless `taskgraph`/Python-3.13 teardown noise, unrelated to
+correctness — expect it on every run using this `taskgraph` version, don't mistake it for failure.
+
+**Headline results** (full detail, water-balance sanity check, and caveats in `swy_methods.qmd`'s
+"Test design: Philippines" → "Result" subsection):
+
+| Variable | Mean (mm/yr) |
+| --- | --- |
+| P (precip) | 2399.5 |
+| QF (quickflow) | 257.3 |
+| AET | 834.6 |
+| L (local recharge) | 1359.2 |
+| B (baseflow) | 1333.6 |
+| Aggregate `qb` | 1321.0 |
+
+All physically plausible for a wet tropical archipelago; `QF+AET+L` ≈ `P` within ~2% as an
+aggregate sanity check; `qb` (1321mm/yr) is the same order of magnitude as Borneo's own `qb`
+(1705mm/yr) — a sensible basin-to-basin difference, not a red flag. **Getting AET's real number
+took a second pass**: the first, naive whole-raster mean came out as a misleadingly low
+224mm/yr/median-0, diluted by legitimate zero-value ocean pixels outside the actual land mask;
+re-masking to `QF`'s own valid-pixel extent (the correct mask) gave the real 834.6mm/yr figure —
+worth remembering as a general gotcha for any future stats pulled from these output rasters
+directly, not just this one number.
+
+**Two things to actually look at next session, not urgent, not blockers**:
+1. The Borneo `L_sum` flow-accumulation anomaly recurs here, worse: 11.5% of pixels exceed 100,000
+   (vs. Borneo's ~5%). Consistent with — not proof of — the flat-tidal-coastal-terrain hypothesis
+   already documented for Borneo, since an archipelago has far more coastline per unit area than a
+   single landmass. Same item as pending #6 below, now with a second data point.
+2. **New, unexplained**: the aggregated-results shapefile's `vri_sum` field reads exactly `0.0`,
+   where it should read closer to 1 (`Vri` is `L` normalized by AOI-wide total `L`). Not
+   investigated tonight — could be a real bug, an archipelago-geometry quirk, or a pre-existing
+   `inspring` reporting issue nobody happened to check for Borneo either. Worth a look, then either
+   fix, explain, or note as another open item.
+
+**Update, 2026-09-15 morning — the real her-vs-our comparison, prompted by the user catching that
+the first draft to Becky didn't make clear whose numbers were whose.** Becky's own baseline output
+was already sitting in the repo (`data/swy/philippines/rich_shared/workspace_swy_wwf_PH_baseline_
+historical_climate/` — `QF`, `B`, `B_sum`, `L_avail`, `L_sum_avail`), never previously compared
+pixel-for-pixel against this run. Built: a real side-by-side numbers table, an interactive
+comparison map (her vs. our QF/B, matched color scales), and a pixel-wise scatter plot (her
+rasters area-averaged onto our coarser grid, colored by her own LULC class) — all now in
+`swy_status_report.qmd` and `swy_methods.qmd`'s new comparison subsection.
+
+**The real finding**: her/our QF ratio is 0.35 in aggregate (we're lower), but swings from 0.195
+to 1.31 depending on land-cover class — too wide a spread for the rain-events placeholder alone
+(spatially flat by construction) to explain; the CN/Kc crosswalk's real class-dependence is
+clearly contributing too, not confirmed as the sole cause either. **B (baseflow) flips direction
+entirely** — ours runs *higher* than hers almost everywhere, opposite of QF — genuinely not
+understood, flagged as real follow-up, not resolved. Scripts:
+`Python_scripts/swy_philippines_run/10c_render_comparison_maps.py`,
+`11c_build_comparison_map_html.py`, `12_scatter_comparison.py`.
+
+**Report re-rendered and re-copied** to `data/swy/shared/swy_status_report.html` (the distributed
+location — moved 2026-09-15 from `data/swy/borneo/inputs/`, see Key file locations below) with
+all of the above included — do this again if the source `.qmd` changes.
+
+**Also fixed 2026-09-15**: the workflow.md mermaid diagram embedded in this report was never
+actually rendering — it showed as inert code, not a diagram, in every browser, in both this report
+and the standalone `workflow_diagram.qmd`/`.html`. Root cause: Pandoc correctly tags the block, but
+nothing was loading the Mermaid.js library to draw it — a documentation claim that this "already
+renders to SVG" was never actually verified (same pattern as the raster-override error found
+2026-09-14). Fixed in both files' frontmatter via `include-in-header`, loading mermaid.js from the
+same CDN already used for the Leaflet maps. Confirmed present in both rendered outputs.
+
+**Becky message redrafted** at `docs/swy/message_draft_becky_ph_comparison_results.md` — now
+correctly attributes every number to "her baseline" vs. "our comparison run" explicitly, leads
+with the real comparison rather than our numbers alone, and states both real caveats (rain-events
+placeholder, the unexplained B reversal) plainly. **Borneo dropped from the headline of this
+message at the user's direction** — still mentioned as background context where genuinely
+relevant (e.g. cross-basin sanity checking), not removed from the project, just not co-equal
+framing for a Philippines-focused message. **Not yet sent — check with the user before sending.**
+
+**Update, 2026-09-15 afternoon — mermaid diagrams actually work now, in every viewer, for real this
+time.** Took three real attempts, all now recorded in the `reference-mermaid-local-testing`
+memory so the next mermaid problem here doesn't repeat the same dead ends. (1) Nothing loaded
+mermaid.js at all — fixed by adding a client-side script. (2) That script loaded mermaid via a CDN
+ES-module import — worked in this session's own checks, but the user hit the exact same bomb/
+"Syntax error in text" icon specifically in **VS Code's internal browser**. (3) Vendored
+`mermaid.min.js` locally to remove the CDN dependency — **still failed in VS Code's internal
+browser**, meaning that webview's CSP/sandboxing rejects client-side mermaid execution regardless
+of where the script comes from, not specifically the network fetch. Confirmed at every step that
+the diagram *content* was never the problem: parsed and fully rendered it through a real mermaid
+engine twice — once via Deno+jsdom (bundled inside the Quarto install, no separate Node needed;
+needs hand-built layout polyfills jsdom doesn't provide) for a fast syntax check, and once via a
+genuine headless Chrome (this machine already has Chrome and Edge installed; drove it with
+`puppeteer-core`, no download needed) for a real, properly-laid-out render — both succeeded
+cleanly every time.
+
+**Actually-final fix, found by checking how `docs/manuscript/paper_draft_5service.qmd` does it**
+(the user pointed out its own workflow figure renders correctly, everywhere, without any of this
+trouble): it uses Quarto's own **native `{mermaid}` executable-cell syntax** (curly braces), not a
+plain ```mermaid fence. That's not a pre-rendered static image either — inspecting its rendered
+HTML directly showed it's the *same fundamental mechanism* (mermaid.js inlined + an init script,
+client-side) — but it's Quarto's own bundled, tested `mermaid-init.js` runtime, not any hand-rolled
+loader. Converted all three files (`workflow_diagram.qmd`, `workflow_philippines_diagram.qmd`,
+`swy_status_report.qmd`) to use this same native syntax instead of the custom static-SVG pipeline
+built earlier today (now removed, along with the vendored `mermaid.min.js` and the pre-rendered
+`.svg` files — none needed anymore). Verified all three rendered outputs now contain the exact
+same `mermaid-init.js` / `class="mermaid mermaid-js"` pattern the manuscript's own already-working
+figure uses. The `.md` source files (`workflow.md`, `workflow_philippines.md`) keep their plain
+```mermaid fences unchanged, so GitHub/VS Code's own Markdown preview still shows a live diagram
+there too — the `.qmd` files now carry a second copy of the same diagram source in `{mermaid}`
+cell form, kept in sync by hand when a diagram changes (same bounded tradeoff as before, just via
+a supported mechanism instead of custom tooling). **Not yet re-confirmed by the user in VS Code's
+internal browser** — the Puppeteer/Deno render harness built along the way is still real, useful,
+general-purpose diagnostic tooling (see the memory), just no longer the thing doing the actual
+rendering in these three files.
+
+**Update, 2026-09-15 late morning — three real fixes the user caught, all applied:**
+
+1. **Report location was wrong.** Had been copying the rendered report into
+   `data/swy/borneo/inputs/` (and briefly `data/swy/shared/`) — but `data/` is entirely gitignored
+   (`.gitignore:52`), so anything placed there is invisible to git. Fixed: the report now lives
+   only at its natural Quarto output location, `docs/reports/swy_status_report.html`, which *is*
+   tracked. No more copy-to-`data/` step.
+2. **"Her"/"our" language was unprofessional for a shared technical document.** Replaced
+   throughout (report, `swy_methods.qmd`'s comparison section, and the three map/scatter-
+   generating scripts) with grounded technical names: **WWF-SIPA baseline** (the original run,
+   named for its own `.ini` section header) and **NCP Kc/CN run** (this project's isolated-
+   variable run, matching the `ncp_kc_cn` suffix already used in its own output filenames).
+   Verified zero remaining occurrences of "her"/"our"/"Becky" in the rendered report HTML. The
+   Becky email draft keeps natural "your/mine" address, since it's a personal message directly to
+   her — that's a different, correct register, not the same issue.
+3. **Borneo dropped from the status report** (not from the project — still fully documented in
+   `research_notes.md` and `swy_methods.qmd`), per the user's call that it was distracting from
+   the Philippines comparison now that that's the focus. Removed: the Borneo input-status table,
+   the whole Borneo "test plan" section (AOI/DEM build, run attempts, L_sum detail), the Borneo
+   interactive map, and the Borneo mermaid pipeline diagram. Kept: brief, self-contained
+   cross-basin mentions where genuinely useful (e.g. "qb lands in the same order of magnitude as
+   the earlier Borneo run's own aggregate"). Retitled the report itself: "Seasonal Water Yield:
+   Philippines Kc/CN comparison." "Findings for Rich" and "Open items" also rewritten to be
+   current (added the two rain-events bugs found 2026-09-14/15, dropped stale items already
+   resolved by the WWF-SIPA-inputs approach).
+
+Also found and fixed while doing this: a **second instance of the same "unverified documentation
+claim" pattern** as the raster-override error — `workflow_diagram.qmd` and this report both
+claimed the mermaid pipeline diagram "actually renders to SVG," but neither one actually loaded
+the Mermaid.js runtime; it was inert code in every browser. Fixed via `include-in-header` in both
+files' frontmatter (loading mermaid.js from the same CDN already used for the Leaflet maps),
+confirmed present in the freshly rendered output of both. Worth remembering: this project has now
+found two separate "sounds right, was never actually checked" documentation claims in two days —
+worth a slightly more skeptical read of older unverified claims generally, not just these two.
+
+**With a real result now in hand, the next real decision is what to do with it**: decide
+whether/how this becomes part of the paper or stays a methods-comparison side result, once
+WWF-SIPA has actually seen and responded to it. Not decided; genuinely the user's call.
+
+## LATEST (2026-09-14, earlier in the evening) — the comparison built and debugged, before the run finished
+
+**What happened this session, in order** (this replaces "Becky's INPUTS folder is in hand" below,
+which was the start of this same thread): Becky's `INPUTS_SP` folder (1.7GB, inventoried but not
+yet opened at that point) got fully worked through — read in full, methodology built, run attempted
+four times, three real bugs found and either fixed or deliberately deferred. Full technical detail
+lives in `docs/swy/swy_methods.qmd`'s new "Test design: Philippines — the Becky-inputs comparison"
+section and `docs/swy/research_notes.md`'s new 2026-09-14-evening entry — this is the summary:
+
+1. **Confirmed her LULC is a custom 12-class WWF-SIPA typology, not ESA CCI.** Built a hand-matched
+   crosswalk to this project's own ESA-keyed CN table (`gcn250_esa_lc_cn_table.csv`) — full table
+   in `swy_methods.qmd`. Open/Barren's CN came out an exact match to hers, a good sanity check.
+2. **A real, substantive Kc finding**: recomputed via this project's own EVI-regression method
+   instead of her flat per-class values, Closed Forest Kc comes out at 0.52–0.70 (monthly-varying)
+   against her flat 1.0 — independent evidence in the same direction as Corbari et al. (2017)'s
+   real forest Kc measurements (see the long-running Kc/NDVI-saturation thread in `swy_methods.qmd`
+   and prior HANDOFF entries). Not a validation of either number, but a real, citable data point.
+3. **A real documentation error, unrelated to the Philippines work itself, caught while re-reading
+   `swy_methods.qmd`**: it claimed `inspring` supports direct CN/Kc raster overrides, "confirmed by
+   reading the code directly." Re-reading `seasonal_water_yield.execute()`'s actual source (found
+   no such parameters at all) showed that claim was simply wrong — corrected in `swy_methods.qmd`
+   and `docs/reports/swy_status_report.qmd` both. Likely origin, not confirmed: Becky's own `.ini`
+   for her Philippines run does reference `CN_A_PATH` etc., but also uses several other parameter
+   names that don't match this project's actual `inspring` build either — her workflow is most
+   likely a different wrapper/fork, not evidence this project's own build ever had the feature.
+   Worth asking Rich directly.
+4. **Building the run script surfaced four real technical problems**, each fixed or deliberately
+   deferred (full detail in `swy_methods.qmd`):
+   - Two real upstream `inspring` bugs in the `user_defined_rain_events_dir` path (meant to ingest
+     her real spatially-distributed rain events instead of a flat placeholder). One patched
+     (`Python_scripts/swy_borneo_run/Dockerfile`, a source patch applied during the image build,
+     same pattern as the existing `setup.py` fix). The other — bare filenames reused as both
+     alignment input *and* output target, meaning a naive fix risks overwriting Becky's original
+     files — deliberately **not** patched today; real feature-completion work, not a rushed fix.
+     This run therefore uses the flat 18-events/month placeholder instead of her real product, a
+     real, temporary loss from the original ask, documented rather than silently accepted.
+   - CRS mismatch: her LULC is UTM 32651 (meters), everything else is WGS84 (degrees) —
+     `inspring`'s alignment step doesn't reproject across CRSs itself. Fixed via GDAL Warp
+     (mode resampling) before the run — **this is the step the current run may be stuck in**.
+   - ET0 filename casing bug (`et0_v3_0X.tif` vs `et0_V3_0X.tif`, months 05-09 vs. the rest) would
+     have silently scrambled month order via `execute()`'s plain-string sort — fixed via a
+     normalized staging copy.
+5. **Three real, clean upstream `inspring` bugs now found across this project's SWY work** (the
+   `setup.py` packages-list omission from 2026-09-11, plus the two rain-events bugs today) — good
+   candidates for a batched PR back to Rich's repo once the comparison work settles. Confirmed
+   still relevant when asked directly this session — not urgent, not started.
+6. **Decided at the user's explicit direction, not a default assumption**: use this project's own
+   already-fetched SRTMGL3 DEM, since neither her `INPUTS_SP/` folder nor her `.ini` includes a DEM
+   path at all — flag this assumption to Becky in the next communication rather than treating it as
+   silently resolved. Also decided: don't spend more time on the mangrove/marshland CN
+   simplification (collapsed to the same ESA analog as Closed Forest, mirroring what Becky's own
+   table already does) — SWY's typical downstream-beneficiary/hydropower use case cares about CN
+   accuracy only where something is actually downstream, and mangrove sits at the tidal/estuarine
+   end of the watershed by definition. Explicitly noted as not necessarily true for flooded
+   grasslands/savannas (the Llanos/Orinoquía analogue), which don't share mangrove's structural
+   coastal position — check per-AOI geography before reusing this reasoning elsewhere.
+
+**Concrete next steps for the next session, in order**: (1) check the run from point 4 above —
+resume, restart with a faster reprojection approach, or investigate a real hang; (2) once a run
+completes, sanity-check the actual output numbers and write them up; (3) draft the next Becky
+communication covering the DEM assumption, the rain-events downgrade, and (if the run succeeded)
+the headline Kc/CN comparison numbers; (4) the deferred rain-events bug and the raster-override
+documentation question are both good things to ask Rich about, batched with the other PR-candidate
+bugs — not urgent on their own.
 
 ## LATEST (2026-09-14 evening) — Becky's INPUTS folder is in hand, richer than expected — read this first
 
@@ -257,10 +521,20 @@ on purpose. Still outstanding from earlier:
   = chronological reasoning log (why decisions were made, never "current state"), `swy_methods.qmd`
   = permanent conceptual/methods reference, `swy_status_report.qmd` = disposable, meeting-tied
   snapshot memo, regenerated fresh rather than kept permanently current.
-- `docs/reports/swy_status_report.qmd` — SWY status memo **source** (own `swy_report_styles.css`
-  alongside it). The rendered, standalone copy that actually goes out is
-  `data/swy/borneo/inputs/swy_status_report.html` — re-render and re-copy if the source changes.
-  Now includes a Philippines section and the full Kc/EVI caveat, not just Borneo.
+- `docs/reports/swy/swy_status_report.qmd` — SWY status memo **source** (own
+  `swy_report_styles.css`, one `_output_map_ph.html` interactive-map include, and the two
+  `swy_ph_comparison_scatter_*.png` scatter plots all alongside it in the same folder). The
+  rendered, standalone copy that actually goes out is `docs/reports/swy/swy_status_report.html` —
+  just re-render in place if the source changes, no separate copy step (an earlier
+  `data/swy/shared/` copy step was dropped 2026-09-15 morning since `data/` is gitignored).
+  **Moved into its own `swy/` subfolder 2026-09-15 evening**, mirroring the `colombia_clec/` and
+  `phase4_beneficiary/` report-folder pattern — docs/reports/ top level had accumulated loose
+  per-report qmd/html/css/png files and the user asked for the same self-contained-folder
+  treatment here. The Python scripts that generate the map/scatter assets had their hardcoded
+  output paths updated to match; prose mentions of the old top-level path elsewhere
+  (`research_notes.md`, `swy_methods.qmd`, `workflow_philippines.md`, `WORKLOG.md`) were **not**
+  swept — low-value churn given time spent this session, harmless since
+  they're either historical-log entries or still findable by filename.
 - `docs/swy/workflow_diagram.qmd`/`.html` — **new 2026-09-11**, a thin Quarto wrapper that
   `{{< include >}}`s the live `workflow.md` so its mermaid diagram actually renders to SVG (a bare
   `.md` render leaves it as an inert code block — Quarto's mermaid engine needs real `.qmd`
