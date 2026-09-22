@@ -588,11 +588,24 @@ scatter plots are in `docs/reports/swy_status_report.qmd`.
 SWY's typical downstream-beneficiary use case (e.g., hydropower reliability, dry-season water
 security for downstream users) only cares about CN accuracy in pixels that have something
 *downstream* of them — and mangrove, by definition, sits at the tidal/estuarine end of a
-watershed, with essentially nothing further downstream. This doesn't generalize to every wetland
-type this project's biome-patch work will eventually need to handle: flooded grasslands/savannas
-(the Llanos/Orinoquía analogue) don't share mangrove's structural coastal position and could sit
-meaningfully upstream of real infrastructure in some basins — worth checking per-AOI geography
-before assuming the same low-stakes reasoning applies there.
+watershed, with essentially nothing further downstream. Structurally, mangrove is a **terminal**
+position in the routing network: it's the outlet, so a wrong CN there cannot bias anything routed
+further downstream, because nothing is routed further.
+
+This doesn't generalize to every wetland type this project's biome-patch work will eventually need
+to handle. Flooded grasslands/savannas (the Llanos/Orinoquía analogue) don't share mangrove's
+structural coastal position, and the difference isn't just "could sit upstream of infrastructure"
+— it's a different position in the routing network entirely. A flooded savanna is typically
+**mid-basin, not terminal**: water still flows out of it into the rest of the river system. Even
+granting that dams are unlikely to be sited *in* a flat, low-lying floodplain (a real, separate
+argument — dams need hydraulic head, which flat terrain doesn't offer), a wrong CN at the savanna
+pixels can still bias the routed baseflow/quickflow numbers further downstream, wherever real
+infrastructure or water users actually sit. "Unlikely to be a dam site itself" is a claim about
+*local* stakes; it says nothing about *propagation* of CN error through the routing network — and
+propagation is exactly what mangrove's terminal position rules out categorically. Worth putting to
+Becky directly rather than assuming either way: whether basins like the Orinoquía actually have
+meaningful downstream infrastructure/water use past the flooded-savanna zones, or whether it's flat
+and low-stakes all the way to the outlet there too.
 
 ## Open research questions
 
@@ -601,13 +614,12 @@ before assuming the same low-stakes reasoning applies there.
   Not resolved; named explicitly rather than assumed away.
 - **The mangrove CN gap** — is documenting it as a structural limitation of the curve-number method
   (not merely an unfilled literature gap) the right final position? For the Becky-inputs Philippines
-  comparison specifically, this is lower-stakes than it first appears: SWY's downstream-beneficiary/
-  baseflow-reliability use case (e.g. hydropower) only cares about CN error in pixels that have
-  something *downstream* of them, and mangrove sits at the tidal/estuarine end of the watershed —
-  by definition almost nothing is downstream of it. Worth confirming this holds for each specific
-  AOI's actual geography rather than treating it as a universal rule: flooded grasslands/savannas
-  (the Llanos/Orinoquía analogue) don't share mangrove's structural coastal position and could sit
-  well upstream of real infrastructure in some basins.
+  comparison specifically, mangrove's case is settled: it's a terminal (outlet) position in the
+  routing network, so CN error there cannot propagate downstream — see the full argument above.
+  **Flooded grasslands/savannas remain genuinely open, not settled by the mangrove reasoning**:
+  they're mid-basin, not terminal, so even where a dam is unlikely to be sited directly on flat,
+  low-lying floodplain terrain, a wrong CN there could still bias routed baseflow/quickflow further
+  downstream. A real, direct question for Becky, not an assumption either way.
 - **Where did the raster-override claim in earlier drafts of this document come from?** Direct
   source inspection 2026-09-14 found no such capability in this project's actual `inspring` build —
   see the correction notes above. Worth asking Rich whether an older/different branch ever had it.

@@ -1,5 +1,81 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-09-21 — grid-nesting fix landed, full CN/Kc factorial closes out the Philippines comparison
+cleanly, report reworked around a two-part question, ready to send to WWF-SIPA
+
+Picked up the plan from 2026-09-18 (paused over the weekend, laptop/Docker survived it fine — good
+general data point that completed run *outputs* are safe once written, only work genuinely
+in-progress at the moment of a sleep/interruption is at risk). Grid-snapped 90m re-run completed and
+verified exactly nested inside WWF-SIPA's grid on the actual output. Then a full 2x2 CN/Kc
+factorial (swap her CN alone, her Kc alone, both together, each through this project's own
+pipeline): quickflow's gap traces entirely to CN (her CN alone reproduces her quickflow at r=0.92);
+baseflow's gap needs both CN and Kc together (r=0.39 → 0.92) — correcting either alone leaves a
+real, land-cover-class-dependent residual that fully collapses once both are corrected together. Net
+result: the pipeline is confirmed sound, and the entire QF/B gap traces to the deliberate CN/Kc
+choice, no hidden bug, no unexplained residual.
+
+The report itself went through several real, substantive reworks at the user's direction, not just
+copy-editing: reframed around an explicit two-part question (is the pipeline correct; if results
+differ, can we say why) instead of a single vague comparison; added an explicit "this is a
+model-to-model comparison, not a validation against reality" caveat after the user correctly flagged
+the original framing as close to circular; split future work into what's justified regardless
+(tropical CN correction, crop calendar — backed by independent literature, not this comparison) vs.
+real validation (needs observational data not yet sourced — direct question sent to WWF-SIPA); cut
+a "wrong direction" phrasing that smuggled in an unearned value judgment about baseflow being too
+high, replaced with the actual mechanism (lower CN and Kc both push water toward recharge, so a
+lower quickflow and higher baseflow are an expected pair, not a contradiction); trimmed a detailed
+validation-checks table down to one line once the user judged it too technical for the actual
+reader. A per-class regression breakdown (done after the user spotted a real visual pattern by eye)
+found cropland's CN is compressed toward grassland/brush's in this project's own crosswalk relative
+to WWF-SIPA's much wider separation between the two — a concrete, specific place to focus any future
+CN refinement, logged in full in `docs/swy/research_notes.md` rather than the report itself.
+
+Real process notes worth remembering: caught the user and Claude editing the same report file
+concurrently mid-session (a save race silently reverted one edit — resolved by re-reading before
+re-applying, not trusting a tool's own "success" response alone); a matplotlib legend-transparency
+bug (scatter points' alpha=0.25 was leaking into the legend swatches, making the key as hard to read
+as the plot) fixed in both `12_scatter_comparison.py` and a newly-promoted
+`14_factorial_scatter_comparison.py` (previously three one-off scratchpad scripts across two
+sessions, now a real pipeline script). Report is now considered final by the user, who is sending it
+to WWF-SIPA directly and using it as the basis for their next meeting with her.
+
+### 2026-09-17/18 — checkerboard chase closed out, then four more real problems found by not
+accepting "fixed" at face value, ending in a plan to rebuild the comparison grid properly
+
+Confirmed and closed the checkerboard artifact from the entry below: two independent causes (a
+stock `inspring` resampling bug applying nearest-neighbor to coarse continuous inputs, and a
+separate block artifact in this project's own NatCap-sourced soil-group file, fixed by switching to
+the raw ORNL DAAC source) — both fixed, verified by direct before/after pixel inspection. Also
+found a real masking bug in WWF-SIPA's own shared baseline B raster (nodata flag misses ~55M ocean
+pixels her QF raster correctly excludes) and a genuinely useful undocumented `inspring` feature (a
+per-pixel CN/Kc raster-override path, reversing an earlier "no such path exists" documentation
+error). Folded a completed GCN250-direct CN comparison into the status report: doesn't resolve
+baseflow's core puzzle but improves its spatial correlation.
+
+Then, prompted by the user repeatedly declining to accept "fixed" without checking themselves,
+found four more real, previously-unnoticed problems in the same comparison: (1) the interactive
+map's own display-downsampling used nearest-neighbor decimation, aliasing real fine-scale texture
+into a display-only speckle unrelated to the actual data (fixed: switched to area-averaging); (2) a
+genuinely unresolved, still-open one — a fine per-pixel speckle in AET/local-recharge/baseflow
+(absent from quickflow) that predates this week's fixes and isn't yet root-caused; (3) ~25% of the
+NCP run's own baseflow raster is literally NaN in a clean ring around every coastline, silently
+excluded from every reported statistic with no documentation that this exclusion happens; (4) the
+two runs' output grids (NCP's 90m, WWF-SIPA's 30m) share a clean 3:1 pixel ratio but are not
+pixel-nested — offset by a non-integer fraction of a pixel, which the existing area-weighted
+comparison already handles correctly but the user wants eliminated outright, not just
+correctly-averaged around.
+
+Traced exactly how to fix the grid-nesting without patching `inspring`: it derives its entire
+output grid from whichever raster is passed as the DEM, so a DEM pre-warped onto an exactly-nested
+grid is sufficient. Plan approved with the user: rebuild the DEM on a grid snapped to WWF-SIPA's own
+lattice, re-run the 90m model on it, build an explicit "valid in both datasets" comparison mask
+(replacing each script's own separate ad hoc validity logic) requiring full-block agreement rather
+than partial credit, regenerate the comparison once the run lands, and declutter
+`data/swy/philippines/`'s several superseded workspace copies from this week's iterative debugging
+along the way. Full detail: `docs/swy/research_notes.md`'s 2026-09-18 entry and
+`docs/HANDOFF.md`'s latest entry. Not executed yet as of this entry — the 90m re-run and the mask
+script are in progress; the separate `swy_ph_30m_final` 30m validation run is untouched throughout.
+
 ### 2026-09-11 through 2026-09-16 — Philippines Becky-inputs comparison built, run, and re-run after catching a real DEM-resolution confound
 
 Full isolated-variable comparison pipeline built for the Philippines: Becky's own WWF-SIPA

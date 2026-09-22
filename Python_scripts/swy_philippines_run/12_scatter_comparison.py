@@ -24,15 +24,23 @@ paired pixel, not just the plotted subset.
 Outputs PNGs to docs/reports/swy/swy_ph_comparison_scatter_qf.png and _b.png, printed stats for the
 writeup in swy_methods.qmd.
 """
+import os
+
 import numpy as np
 import rasterio
 from rasterio.warp import Resampling, reproject
 
-NCP_WORKSPACE = "data/swy/philippines/workspace_becky_inputs"
+NCP_WORKSPACE = "data/swy/philippines/workspace_becky_inputs_90m_snapped"
+NCP_SUFFIX = "90m_snapped"
 BASELINE_WORKSPACE = (
     "data/swy/philippines/rich_shared/workspace_swy_wwf_PH_baseline_historical_climate"
 )
 BASELINE_LULC_PATH = "data/swy/philippines/INPUTS_SP/ph_baseline_lulc_md5_7f29da.tif"
+# Explicit "valid in both datasets" masks, built by 13_build_valid_comparison_mask.py once this
+# run's grid is confirmed nested inside WWF-SIPA's own -- replaces the old, undocumented, plain
+# isfinite()-only validity check (found 2026-09-18 to be silently dropping ~25% of NCP's own B
+# domain along every coastline, with no record that this was happening).
+MASK_DIR = "data/swy/philippines/comparison_maps"
 
 LULC_CLASSES = {
     1: "Annual Crop", 2: "Brush/Shrubs", 3: "Built-up", 4: "Closed Forest", 5: "Fishpond",
@@ -77,10 +85,14 @@ def run_pair(var, baseline_path, ncp_path, out_png):
     baseline_resampled = _resample_to_ref(baseline_path, ncp_path, Resampling.average)
     baseline_lulc_resampled = _resample_to_ref(BASELINE_LULC_PATH, ncp_path, Resampling.mode)
 
+    with rasterio.open(os.path.join(MASK_DIR, f"{var.lower()}_valid_mask.tif")) as mask_src:
+        comparison_mask = mask_src.read(1) == 1
+
     valid = np.isfinite(ncp) & np.isfinite(baseline_resampled)
     if ncp_nodata is not None:
         valid &= ~np.isclose(ncp, ncp_nodata)
     valid &= np.isfinite(baseline_lulc_resampled)
+    valid &= comparison_mask
 
     x = baseline_resampled[valid]  # WWF-SIPA baseline
     y = ncp[valid]  # NCP Kc/CN run
@@ -125,7 +137,14 @@ def run_pair(var, baseline_path, ncp_path, out_png):
     ax.set_xlabel(f"WWF-SIPA baseline {var} (mm/yr)")
     ax.set_ylabel(f"NCP Kc/CN run {var} (mm/yr)")
     ax.set_title(f"Philippines {var}: WWF-SIPA baseline vs. NCP Kc/CN run\n(n={n:,} pixels, r={corr:.2f}, colored by WWF-SIPA LULC class)")
-    ax.legend(markerscale=6, fontsize=7, loc="upper left", framealpha=0.9)
+    legend = ax.legend(markerscale=6, fontsize=7, loc="upper left", framealpha=0.9)
+    # The scatter points use alpha=0.25 so overlapping clusters stay readable, but that alpha
+    # carries over into the legend swatches by default, making the key nearly as hard to read as
+    # the plot itself. Force full opacity on the legend markers only -- the data points are
+    # untouched.
+    handles = getattr(legend, "legend_handles", None) or legend.legendHandles
+    for handle in handles:
+        handle.set_alpha(1)
     fig.tight_layout()
     fig.savefig(out_png)
     print(f"Written to {out_png}")
@@ -135,13 +154,16 @@ def main():
     run_pair(
         "QF",
         f"{BASELINE_WORKSPACE}/QF_wwf_PH_baseline_historical_climate.tif",
-        f"{NCP_WORKSPACE}/QF_ph_becky_inputs_ncp_kc_cn.tif",
+        f"{NCP_WORKSPACE}/QF_ph_becky_inputs_{NCP_SUFFIX}.tif",
         "docs/reports/swy/swy_ph_comparison_scatter_qf.png",
     )
+    # Masking-corrected, not the raw shared file — her B raster's own nodata flag (-9999) misses
+    # ~55M pixels that are really ocean/invalid (many exactly 0.0); her QF raster's own nodata flag
+    # correctly excludes them on the same grid, so that mask was applied directly to build this file.
     run_pair(
         "B",
-        f"{BASELINE_WORKSPACE}/B_wwf_PH_baseline_historical_climate.tif",
-        f"{NCP_WORKSPACE}/B_ph_becky_inputs_ncp_kc_cn.tif",
+        "data/swy/philippines/comparison_maps/B_wwf_PH_baseline_historical_climate_masked.tif",
+        f"{NCP_WORKSPACE}/B_ph_becky_inputs_{NCP_SUFFIX}.tif",
         "docs/reports/swy/swy_ph_comparison_scatter_b.png",
     )
 

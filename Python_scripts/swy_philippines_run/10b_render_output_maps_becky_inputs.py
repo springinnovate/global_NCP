@@ -23,7 +23,7 @@ import numpy as np
 import rasterio
 from rasterio.enums import Resampling
 
-WORKSPACE = "data/swy/philippines/workspace_becky_inputs"
+WORKSPACE = "data/swy/philippines/workspace_becky_inputs_90m_snapped"
 OUT_DIR = os.path.join(WORKSPACE, "output_maps")
 MAX_DIM = 1600
 
@@ -35,7 +35,7 @@ LAYERS = [
     {
         "id": "aet",
         "label": "NCP Kc/CN run — Actual evapotranspiration (AET), mm",
-        "path": os.path.join(WORKSPACE, "intermediate_outputs", "aet_ph_becky_inputs_ncp_kc_cn.tif"),
+        "path": os.path.join(WORKSPACE, "intermediate_outputs", "aet_ph_becky_inputs_90m_snapped.tif"),
         "clip_percentile": None,
         # AET's own nodata sentinel doesn't cover the legitimate zero-value ocean pixels seen in
         # the raw stats pull (docs/swy/research_notes.md, 2026-09-14 evening) — mask those out
@@ -45,7 +45,7 @@ LAYERS = [
     {
         "id": "l_sum",
         "label": "NCP Kc/CN run — Local recharge sum (L_sum), mm — capped at p99 to show the real anomaly",
-        "path": os.path.join(WORKSPACE, "L_sum_ph_becky_inputs_ncp_kc_cn.tif"),
+        "path": os.path.join(WORKSPACE, "L_sum_ph_becky_inputs_90m_snapped.tif"),
         "clip_percentile": 99,
     },
 ]
@@ -55,7 +55,13 @@ def render_layer(layer):
     with rasterio.open(layer["path"]) as src:
         scale = min(1.0, MAX_DIM / max(src.width, src.height))
         out_h, out_w = int(src.height * scale), int(src.width * scale)
-        arr = src.read(1, out_shape=(out_h, out_w), resampling=Resampling.nearest)
+        # Resampling.average, not nearest: at this decimation ratio (~7-12x for the whole-
+        # Philippines extent), nearest-neighbor picks one raw pixel per display cell and skips the
+        # rest -- for a field with real per-pixel texture (CN/soil-group-driven), that aliases into
+        # a salt-and-pepper/moire pattern that looks like a data artifact but isn't one (confirmed
+        # 2026-09-18: the underlying full-resolution raster is smooth, only this display decimation
+        # wasn't). average properly box-filters every source pixel into each display cell instead.
+        arr = src.read(1, out_shape=(out_h, out_w), resampling=Resampling.average)
         bounds = src.bounds
         nodata = src.nodata
 

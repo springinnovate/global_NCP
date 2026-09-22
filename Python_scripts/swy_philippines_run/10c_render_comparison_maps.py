@@ -36,6 +36,7 @@ import matplotlib.cm as cm
 import numpy as np
 import rasterio
 from rasterio.enums import Resampling
+from rasterio.warp import reproject
 
 OUT_DIR = "data/swy/philippines/comparison_maps"
 MAX_DIM = 1600
@@ -44,47 +45,95 @@ MAX_DIM = 1600
 # compressed, so it costs a lot more per pixel than the display image does).
 LOOKUP_MAX_DIM = 500
 
-OUR_WORKSPACE = "data/swy/philippines/workspace_becky_inputs"
+# Grid-nested run (2026-09-18) -- every 90m pixel here is exactly 9 whole WWF-SIPA 30m pixels,
+# zero fractional offset (verified by 02e_snap_dem_to_baseline_grid.py and re-verified against the
+# actual model output). Replaces workspace_becky_inputs_90m_rainfix, whose grid was offset from
+# WWF-SIPA's by a non-integer fraction of a pixel.
+OUR_WORKSPACE = "data/swy/philippines/workspace_becky_inputs_90m_snapped"
 HER_WORKSPACE = (
     "data/swy/philippines/rich_shared/workspace_swy_wwf_PH_baseline_historical_climate"
 )
+# Explicit "valid in both datasets" masks (13_build_valid_comparison_mask.py) -- same ones
+# 12_scatter_comparison.py applies, so the map and the reported numbers look at the same pixels
+# instead of each computing its own separate validity logic.
+MASK_DIR = "data/swy/philippines/comparison_maps"
 
 PAIRS = [
     {
         "var": "QF",
         "label": "Annual quickflow (QF), mm",
         "baseline_path": os.path.join(HER_WORKSPACE, "QF_wwf_PH_baseline_historical_climate.tif"),
-        "ncp_path": os.path.join(OUR_WORKSPACE, "QF_ph_becky_inputs_ncp_kc_cn.tif"),
+        "ncp_path": os.path.join(OUR_WORKSPACE, "QF_ph_becky_inputs_90m_snapped.tif"),
         "clip_percentile": None,
     },
     {
         "var": "B",
         "label": "Baseflow (B), mm",
-        "baseline_path": os.path.join(HER_WORKSPACE, "B_wwf_PH_baseline_historical_climate.tif"),
-        "ncp_path": os.path.join(OUR_WORKSPACE, "B_ph_becky_inputs_ncp_kc_cn.tif"),
+        # Masking-corrected, not the raw shared file: her B raster's own nodata flag (-9999)
+        # doesn't cover ~55M pixels that are really ocean/invalid (many exactly 0.0), which her QF
+        # raster's own nodata flag does correctly exclude (same grid, verified). See
+        # comparison_maps/B_wwf_PH_baseline_historical_climate_masked.tif's own generation — QF's
+        # mask applied to B directly, no reprojection needed (identical transform/shape/crs).
+        "baseline_path": os.path.join(
+            "data/swy/philippines/comparison_maps",
+            "B_wwf_PH_baseline_historical_climate_masked.tif",
+        ),
+        "ncp_path": os.path.join(OUR_WORKSPACE, "B_ph_becky_inputs_90m_snapped.tif"),
         "clip_percentile": None,
     },
 ]
 
 
-def _read_downsampled(path, max_dim=MAX_DIM):
+def _read_downsampled(path, max_dim=MAX_DIM, mask_path=None):
     with rasterio.open(path) as src:
         scale = min(1.0, max_dim / max(src.width, src.height))
         out_h, out_w = int(src.height * scale), int(src.width * scale)
-        arr = src.read(1, out_shape=(out_h, out_w), resampling=Resampling.nearest)
+        # Resampling.average, not nearest -- see 10b's own comment on the same fix: nearest at
+        # this decimation ratio aliases real per-pixel texture into a moire/checkerboard-looking
+        # display artifact that isn't present in the actual full-resolution data (confirmed
+        # 2026-09-18). Applies here too, both for the display image and (via this same function)
+        # the click-to-compare numeric lookup grid below.
+        arr = src.read(1, out_shape=(out_h, out_w), resampling=Resampling.average)
         bounds = src.bounds
         nodata = src.nodata
+        dst_transform = src.transform * src.transform.scale(
+            src.width / out_w, src.height / out_h
+        )
+        dst_crs = src.crs
     mask = np.zeros(arr.shape, dtype=bool)
     if nodata is not None:
         mask |= np.isclose(arr, nodata)
     mask |= ~np.isfinite(arr)
+
+    if mask_path is not None:
+        # The comparison mask lives on the (small) NCP grid regardless of which file we're
+        # reading here (baseline native 30m or NCP native 90m) -- reproject it onto this read's
+        # own decimated display grid rather than at full resolution. Cheap either way since the
+        # mask source itself is small (~19405x11581), unlike WWF-SIPA's own ~2.8-billion-pixel
+        # native raster (see 13_build_valid_comparison_mask.py's own comment on why that one has
+        # to be read in chunks instead of all at once).
+        with rasterio.open(mask_path) as msrc:
+            mask_arr = np.zeros(arr.shape, dtype="float32")
+            reproject(
+                source=rasterio.band(msrc, 1),
+                destination=mask_arr,
+                src_transform=msrc.transform,
+                src_crs=msrc.crs,
+                dst_transform=dst_transform,
+                dst_crs=dst_crs,
+                resampling=Resampling.nearest,
+                src_nodata=msrc.nodata,
+                dst_nodata=0,
+            )
+        mask |= mask_arr != 1
+
     return arr, mask, bounds
 
 
-def _build_lookup(path):
+def _build_lookup(path, mask_path=None):
     """A coarse, click-lookup-only grid: nodata/invalid cells become NaN so JS can just check
     Number.isNaN() rather than tracking a parallel mask array."""
-    arr, mask, bounds = _read_downsampled(path, max_dim=LOOKUP_MAX_DIM)
+    arr, mask, bounds = _read_downsampled(path, max_dim=LOOKUP_MAX_DIM, mask_path=mask_path)
     arr = arr.astype(np.float32)
     arr[mask] = np.nan
     return {
@@ -96,8 +145,11 @@ def _build_lookup(path):
 
 
 def render_pair(pair):
-    baseline_arr, baseline_mask, baseline_bounds = _read_downsampled(pair["baseline_path"])
-    ncp_arr, ncp_mask, ncp_bounds = _read_downsampled(pair["ncp_path"])
+    mask_path = os.path.join(MASK_DIR, f"{pair['var'].lower()}_valid_mask.tif")
+    baseline_arr, baseline_mask, baseline_bounds = _read_downsampled(
+        pair["baseline_path"], mask_path=mask_path
+    )
+    ncp_arr, ncp_mask, ncp_bounds = _read_downsampled(pair["ncp_path"], mask_path=mask_path)
 
     all_valid = np.concatenate([baseline_arr[~baseline_mask], ncp_arr[~ncp_mask]])
     vmin = float(all_valid.min())
@@ -142,8 +194,8 @@ def render_pair(pair):
     lookup = {
         "var": pair["var"],
         "label": pair["label"],
-        "baseline": _build_lookup(pair["baseline_path"]),
-        "ncp": _build_lookup(pair["ncp_path"]),
+        "baseline": _build_lookup(pair["baseline_path"], mask_path=mask_path),
+        "ncp": _build_lookup(pair["ncp_path"], mask_path=mask_path),
     }
     return results, lookup
 

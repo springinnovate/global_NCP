@@ -22,7 +22,9 @@ import json
 import os
 
 COMPARISON_WORKSPACE = "data/swy/philippines/comparison_maps"
-STANDALONE_LAYERS_JSON = "data/swy/philippines/workspace_becky_inputs/output_maps/layers.json"
+STANDALONE_LAYERS_JSON = (
+    "data/swy/philippines/workspace_becky_inputs_90m_snapped/output_maps/layers.json"
+)
 OUT_PATH = "docs/reports/swy/_output_map_ph.html"
 
 MAP_BOUNDS = [[4.51, 113.84], [21.13, 126.83]]
@@ -94,11 +96,16 @@ def main():
   from the SRTMGL3 DEM used there, since the WWF-SIPA inputs didn't include a DEM) — a real
   resolution difference visible as finer texture in the WWF-SIPA layers, not a rendering artifact.
   AET and L_sum are NCP-run-only (the WWF-SIPA baseline output never saved either) — L_sum is
-  capped at its 99th percentile so the real spatial signal stays visible against the ~11.5% of
+  capped at its 99th percentile so the real spatial signal stays visible against the ~10% of
   pixels with runaway flow-accumulation values (see the write-up above); AET's legitimate
   zero-value ocean pixels are masked transparent rather than shown as dark purple. Use the layer
   control in the top right to toggle any layer on/off. Click anywhere on the map for both runs'
-  raw QF/B values at that point.</div>
+  raw QF/B values at that point.
+  <div style="margin-top:6px;">Each image here is downsampled from the full-resolution raster for
+  display (area-averaged, not just subsampled) — a speckled look at this zoomed-out scale reflects
+  real fine-scale variation in soil group/land cover being averaged into view, not a data or model
+  artifact. All numbers quoted in this report (ratios, correlations, per-class spreads) come from
+  the full-resolution rasters directly, never from this display image.</div></div>
 </div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />

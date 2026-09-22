@@ -5,7 +5,425 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-09-15 (evening).*
+*Last updated: 2026-09-21 (final) — report considered done by the user, sent to WWF-SIPA, SWY thread genuinely closed. See this entry first.*
+
+## LATEST (2026-09-21, final) — SWY Philippines thread closed out; user is sending the report to WWF-SIPA and using it as her next meeting's topic
+
+Report went through several more real rounds after the factorial result landed, each a substantive
+user-driven correction, not polish: reframed around an explicit two-part question (pipeline
+correctness; if results differ, can we say why); added the "model-to-model, not validated against
+reality" caveat after the user caught the original framing being close to circular; split future
+work into "fix regardless" (tropical CN correction, crop calendar) vs. "real validation" (needs
+observational data, a direct question now sent to WWF-SIPA — has her own baseline ever been checked
+against anything observed); removed a "wrong direction" phrasing that implied baseflow-too-high was
+inherently bad, replaced with the actual mechanism; trimmed a validation-checks table to one line.
+A per-class regression breakdown (user spotted a real pattern by eye in the QF scatter plot) found
+this project's own CN crosswalk compresses cropland toward grassland/brush relative to WWF-SIPA's
+much wider separation between them — logged in full in `research_notes.md`, only a one-line pointer
+in the report itself. Fixed a real matplotlib legend-transparency bug along the way (scatter alpha
+leaking into legend swatches) in both `12_scatter_comparison.py` and a newly-promoted
+`14_factorial_scatter_comparison.py`.
+
+**The user has now made their own manual edits directly to the report, reviewed it, and considers
+it final.** They are sending it to WWF-SIPA and using it as the topic for their next meeting with
+her. Rendered clean as of this writing. Full narrative: `docs/swy/research_notes.md`'s 2026-09-21
+entries; compressed version: `analysis/WORKLOG.md`'s 2026-09-21 entry.
+
+**Nothing further is expected on this thread unless WWF-SIPA or Rich reply, or the user brings it
+back up themselves.** The message draft to both
+(`docs/swy/message_draft_becky_rich_ph_status_2026-09-18.md`) is ready but the user sends it
+manually, not via this session. `swy_ph_30m_final` remains stopped, not retried (see the
+2026-09-18 evening entry below for why, and the two mitigation options if it's ever resumed).
+
+## LATEST (2026-09-21, later) — report cut from ~3000 to ~1700 words at the user's direct request, factorial scatter plots added, message draft tightened to match
+
+**Three factorial scatter plots generated** (her-CN-alone QF, her-CN-alone B, her-Kc-alone B) —
+confirm the table numbers exactly, and reveal something the numbers alone didn't show: in both B
+plots, each WWF-SIPA land-cover class sits on its own tight, straight line, but the different
+classes' lines are offset from each other (parallel, not coincident) and from the 1:1 line by
+different amounts. Correlation improves a lot when either Kc or CN is corrected, but this
+class-dependent structure survives regardless of which one — real evidence that something else,
+tied to land-cover type, is still contributing beyond a simple one-variable swap. Whether it closes
+once `09h` (her CN + Kc together) lands is the open question.
+
+**Report rewritten, not just edited** — the user's direct feedback: it had become "too long and
+convoluted... tries to explain too much... Becky doesn't have time to read a long thing." Cut the
+CN/Kc methodology deep-dives, the full 9-item bug enumeration, the mermaid pipeline diagram, and the
+full parameter-audit table down to one-line pointers into `swy_methods.qmd` and
+`docs/swy/inspring_github_issues_draft.md` — those documents already hold the full detail, no need
+to duplicate it in the reader-facing memo. Added a new **"Where this puts us — path to a global
+run"** section addressing the user's own named concerns directly: no tropical CN correction, no
+region/hemisphere-aware crop calendar, mangrove/flooded-grassland CN gaps, the unconfirmed DEM
+choice, B's residual, and the real compute-infrastructure lesson from this week's 30m crash — framed
+as "here's the honest scope of what's next," not blockers to sending this result now. Re-rendered,
+confirmed clean, reopened for the user.
+
+**Message draft tightened the same way** — now points at the report for numbers/detail instead of
+repeating them, and at the GitHub issues draft for bug detail instead of listing all four inline.
+One placeholder left deliberately for the user to fill in: how the report itself will actually reach
+Becky (attached HTML, hosted link, or key parts pasted into the email body) — not something to guess
+on their behalf.
+
+**Update, same day, `09h` landed — and it closes the whole investigation out cleanly.** Her CN and
+Kc together, through this project's own pipeline: QF ratio 0.99/r=0.92 (same as CN-alone, expected),
+**B ratio 1.04/r=0.92** — essentially perfect, same fidelity as QF. The scatter plot
+(`swy_ph_factorial_scatter_b_herCN_herKc.png`) shows the land-cover-class parallel-banding from the
+single-factor tests fully collapsing back onto the 1:1 line. **Net conclusion: there is no
+unexplained residual anywhere in this comparison.** The entire QF and B gap between this project's
+own parametrization and WWF-SIPA's traces cleanly to the deliberate CN/Kc choice — makes physical
+sense in hindsight (B depends on water left over after both quickflow *and* evapotranspiration are
+accounted for, so correcting only one input still leaves the other's distortion in the water
+balance). Report's factorial table, narrative, "Where this puts us" section, and Open Items all
+updated to reflect this (B's residual removed from the global-scaling gap list — resolved, not
+deferred), re-rendered, reopened for the user. Message draft updated to match — no more "running one
+more test," now states the clean final finding.
+
+**This SWY Philippines thread is now genuinely complete, not just paused.** Nothing technical is
+left blocking on further investigation; what remains is the user's own review of the trimmed report,
+filling in how they'll actually send it to WWF-SIPA (a placeholder was left for this deliberately),
+and the four real global-scaling prerequisites listed in the report's own "Where this puts us"
+section, which are new work, not follow-up on anything unresolved here.
+
+## LATEST (2026-09-21) — Docker survived the weekend fine, factorial decomposition gives a real answer, report restructured, one more confirmatory run running
+
+**Session-start check, since the user was worried about laptop-sleep/VS-Code-close losing work**:
+Docker Desktop's backend wasn't up yet (process alive, engine not responding — needed ~10s to
+finish initializing after being asleep since Friday), but once it came up, everything was exactly
+as left: no orphaned containers, and Friday's `09f`/`09g` factorial outputs were intact on disk
+(files persist independently of Docker/session state — this is a good general reassurance for this
+concern going forward: **completed run *outputs* are safe once written**, regardless of what
+happens to the laptop/session afterward; only a run genuinely *in progress* at the moment of a sleep
+would be at risk).
+
+**The factorial comparison (owed since Friday night, never actually computed then) is in, and it's
+a clean, decisive result**:
+
+| Combination | QF ratio | QF r | B ratio | B r |
+|---|---:|---:|---:|---:|
+| Our CN + our Kc | 0.77 | 0.56 | 1.48 | 0.39 |
+| Her CN + our Kc | 0.99 | **0.92** | 1.27 | 0.70 |
+| Our CN + her Kc | 0.77 | 0.56 | 1.21 | **0.82** |
+
+**QF's gap is essentially all CN** (Kc doesn't feed QF at all — confirmed both by the model's own
+architecture and by these numbers being identical whether Kc is ours or hers; her CN alone gets QF
+to r=0.92). **B's gap is mostly Kc, with CN contributing too** (her Kc alone: r=0.39→0.82; her CN
+alone: r=0.39→0.70). This is a genuinely strong result — not just "which factor matters more" but
+also indirect proof this project's own pipeline is fundamentally sound (r=0.92 on QF when fed her
+real CN would not happen if the DEM/grid/pipeline work were quietly broken).
+
+**One more run launched, in progress as of this writing**: `09h_run_swy_ph_herCN_herKc.py` — her CN
+and Kc together (not split), through this project's own 90m pipeline. This is the direct "are we
+faithfully reproducing her calculation" check the user asked for Monday morning, as a much cheaper
+alternative to a full her-parameters-at-30m replication (which would cost days, per the already-
+crashed 30m run). Own workspace `workspace_becky_inputs_90m_herCN_herKc`; log at
+`data/swy/philippines/diagnostics/09h_run_log.txt`. **Check this before assuming it's done.**
+
+**Real process mistake made and fixed while launching the first two factorial runs Friday night**:
+wrapped chained `docker run` commands in `(...) &` *and* passed `run_in_background: true` to the
+shell tool — double-backgrounding, which made the tool report "completed" almost instantly even
+though the run had only just started. The first run (`09f`) turned out fine (Docker containers run
+independent of the launching shell), but the *chaining* to auto-launch the second (`09g`) could not
+be trusted once the orchestrating subshell's fate was unknown — fixed by using `docker wait
+<container>` instead, which blocks at the Docker-daemon level regardless of shell lifecycle.
+**Never combine `&` with `run_in_background: true` on the same command — pick one.**
+
+**Report restructured** (`docs/reports/swy/swy_status_report.qmd`), per direct user request: the
+grid-nesting/masking narrative that had accumulated inline in prose was pulled out into a new,
+scannable **"Validation checks performed"** table (six checks, one line each: what was checked, what
+was found) placed before the results, and a new **"Decomposing the gap: is it CN, Kc, or something
+else?"** section holds the factorial table above (with a `*pending*` row for `09h`, to fill in once
+it lands). "Where we stand" and Open Item #2 updated to reflect the real, if partial, explanation
+for B. Re-rendered, confirmed clean.
+
+**Message draft updated** (`docs/swy/message_draft_becky_rich_ph_status_2026-09-18.md`) with the
+factorial results in plain language, still not sent — waiting on `09h` for one more number before
+the user sends it.
+
+**Next steps, in order**: (1) check on `09h`; (2) once done, compute its ratio/r the same way as the
+other three cells (reuse the pattern in `factorial_comparison.py`, currently only in this session's
+scratchpad, not saved as a numbered pipeline script — worth promoting to
+`Python_scripts/swy_philippines_run/` if this kind of factorial check gets reused); (3) fill in the
+report's `*pending*` row and the message draft's "will send that number" line; (4) user sends the
+message; (5) resume whatever Becky/Rich reply prompts, or return to the paper review.
+
+## LATEST (2026-09-18 evening) — grid-nesting fix landed, report/maps regenerated, SWY paused to go finish the paper review
+
+**Done, verified, closed out this session:**
+- Grid-snapped 90m re-run (`workspace_becky_inputs_90m_snapped`) completed successfully; verified
+  exactly nested inside WWF-SIPA's grid on the actual output, not just the input DEM.
+- Explicit "valid in both datasets" masks built (`13_build_valid_comparison_mask.py`) and wired into
+  both `12_scatter_comparison.py` (the real numbers) and `10c_render_comparison_maps.py`/`10b`/`11`
+  (the map) — first time these two were guaranteed to look at the same set of pixels.
+- New numbers: QF essentially unchanged (ratio 0.767, r=0.56 — was 0.766/0.567). B moved modestly
+  (ratio 1.48, r=0.39 — was 1.51/0.38) but **the core puzzle is not resolved**: still backwards,
+  still weak, now with an even wider per-class spread (0.47–6.0×) than before.
+- The fine AET/L/B speckle from earlier today: **deprioritized, not solved**. The user checked
+  WWF-SIPA's own independently-built B map and found the same pattern there too, fainter — strong
+  evidence this isn't a bug in this project's own pipeline specifically. Not investigated further.
+- `data/swy/philippines/` decluttered: `workspace_becky_inputs_90m_gcn250_nodata_bug_ARCHIVE`
+  deleted (confirmed superseded); `workspace_becky_inputs_90m_rainfix_nearest_ARCHIVE`,
+  `..._precip_et0_near_ARCHIVE`, `..._srtmgl3_backup`, and now the superseded
+  `workspace_becky_inputs_90m_rainfix` itself all moved into a new `archive/` folder (with its own
+  README). One snag worth remembering: the first archive attempt failed with a file lock — the user
+  had `B_ph_becky_inputs_90m_rainfix.tif` open in QGIS, which left a `.aux.xml` sidecar and blocked
+  the move until closed.
+- Report re-rendered with the corrected numbers, updated Open Items, and a note on why the numbers
+  changed from the pre-grid-fix run.
+- Combined status/bug-report draft for Becky+Rich written and verified: cloned current
+  `springinnovate/inspring` fresh and confirmed every bug claim is still live upstream (last commit
+  touching the relevant file: 2025-02-11) — not stale complaints about already-fixed code. Draft at
+  `docs/swy/message_draft_becky_rich_ph_status_2026-09-18.md`, not sent.
+
+**Real, still-open problem, NOT part of the above — separate from the Philippines Kc/CN work
+entirely: `swy_ph_30m_final` (the 30m native-resolution validation run) crashed after running ~2
+days**, with a genuine I/O error (`TIFFFetchStripThing: IO error during reading of "TileOffsets"`)
+writing `flow_dir_mfd`'s output — confirmed NOT an OOM kill, confirmed `ecoshard.geoprocessing.
+routing` already sets `BIGTIFF=YES` by default (so that's not a missing-flag fix). Best working
+theory: a ~2-billion-pixel domain, written in irregular (non-scanline) order over 2+ days through a
+Docker-Desktop-on-Windows bind mount, is a known weak spot for exactly this kind of corruption —
+infrastructure fragility, not a code bug. **Decision made with the user**: don't just retry blindly
+(no guaranteed fix, could burn another 2-3 days for nothing) — if resumed, try addressing the likely
+cause first (Windows Defender/AV exclusion on `data/`, and/or moving the run's working files onto
+native WSL2 storage instead of a Windows bind mount) before relaunching. **Not started** — paused
+along with everything else in this thread.
+
+**Update, same evening, right before the pause above** — one more test launched at the user's
+request: a 2x2 CN x Kc factorial design to isolate how much of B's gap traces to CN specifically
+vs. Kc specifically. Two cells already exist (her CN+her Kc = her own baseline; our CN+our Kc =
+`workspace_becky_inputs_90m_snapped`); built the two missing hybrid biophysical tables
+(`07c_build_hybrid_biophysical_tables.py` → `ph_biophysical_table_ourCN_herKc.csv` /
+`_herCN_ourKc.csv`, straight column-swaps, confirmed both source tables share row order/`lulc_id`
+before swapping) and two new run scripts (`09f`/`09g`, own workspaces
+`workspace_becky_inputs_90m_ourCN_herKc` / `_herCN_ourKc`, otherwise identical to `09e`). **Real
+process mistake made and caught while launching these**: first attempt wrapped the chained
+`docker run` commands in `(...) &` *and* passed `run_in_background: true` to the shell tool —
+double-backgrounding — which made the tool report "completed" almost instantly even though the
+actual run had only just started, and would likely have silently dropped the second (`09g`) run
+entirely once the orchestrating subshell was torn down. Fixed by using a single, non-doubly-
+backgrounded call built on `docker wait <container>` (blocks on the container at the Docker-daemon
+level, independent of shell process lifecycle) to sequence the two runs reliably. **Worth
+remembering for next time: never combine `&` with `run_in_background: true` on the same command —
+pick one.** As of this writing, `09f` (our CN + her Kc) is running; `09g` (her CN + our Kc) will
+auto-launch via `docker wait` once `09f` exits. Check `docker ps -a` for
+`swy_ph_90m_ourCN_herKc`/`swy_ph_90m_herCN_ourKc` and the two log files in
+`data/swy/philippines/diagnostics/` (`09f_run_log.txt`/`09g_run_log.txt`) to see where this landed.
+The combined Becky/Rich message draft (`docs/swy/message_draft_becky_rich_ph_status_2026-09-18.md`)
+has been updated with the corrected numbers and mentions this factorial test is in flight — the
+user intends to send it without waiting for these last two runs to finish.
+
+**Everything in this SWY thread is now explicitly paused, not abandoned, at the user's direction**
+— a full week has gone into this (their words: "I have already spent more than a week here... I
+need to finish the paper review, pronto"). Next session should read this entry, confirm nothing
+here needs urgent attention (nothing does — the 30m job is stopped, not silently running up cost),
+and hold off on resuming unless the user brings it back up.
+
+## LATEST (2026-09-18, earlier) — status report reviewed and corrected before the grid-nesting work above
+
+## LATEST (2026-09-18) — status report reviewed and corrected, GCN250 result folded in, checkerboard fix re-verified directly on the actual QF/B outputs (not just trusted from the log) — read this first
+
+**Live check on the long-running 30m validation run** (`swy_ph_30m_final`, the run this whole thread is waiting on): still running as of this writing, ~25h elapsed, CPU genuinely active (~31%), not crashed. `flow_dir_mfd_ph_becky_inputs_30m.tif` (pit-filling + flow-direction) finished ~16.5h before this check with no later intermediate file yet — consistent with it now being deep in flow accumulation, the same slow stage that took a previous attempt 24h+. No `aggregated_results` shapefile yet. **Do not restart it.** Separately, `swy_ph_90m_gcn250v2` (the GCN250-direct comparison run) had already exited cleanly (exit 0) — its numbers are the ones folded into the report below.
+
+**Two real, user-requested things done this session:**
+
+1. **Checkerboard fix re-verified directly, not just trusted from the research log.** Rendered matched before/after native-resolution crops (same pixel window, `swy_borneo_run:rainfix4` container, `rasterio`) from three levels: the aligned intermediate continuous inputs (`n_events0`, `et0_a0` — pure fields, no CN texture to obscure anything), and the actual `QF`/`B` model outputs themselves, comparing the pre-fix archive (`workspace_becky_inputs_90m_rainfix_nearest_ARCHIVE`, all-`'near'` resampling) against the corrected live run (`workspace_becky_inputs_90m_rainfix`, bilinear + raw-soil-group fixes). **All four pairs show the same pattern**: hard-edged, grid-aligned rectangular blocks in the "before" crop, smooth/organic texture in the "after" crop, with the block edges specifically gone (not just fainter) in QF and B. This is now confirmed by direct visual inspection this session, independent of the 2026-09-17 log entry's own claim. Diagnostic PNGs and the one-off scripts that made them are in `data/swy/philippines/diagnostics/` and this session's scratchpad — not part of the numbered pipeline, safe to ignore/delete later.
+
+2. **`docs/reports/swy/swy_status_report.qmd` reviewed end-to-end at the user's request and two real problems fixed, then re-rendered:**
+   - **A self-contradiction**: the "Where we stand" summary at the top still claimed *"`inspring` has no raster-override capability for either factor; that is the only path this codebase offers"* — flatly contradicted by the "Curve number" section a few paragraphs down, which correctly documents the real undocumented `cn_a_path`-`cn_d_path` raster-override mechanism. This stale claim had already been flagged as fixed once before (`research_notes.md`'s 2026-09-17 entry says so explicitly) but the fix evidently didn't stick in this specific summary box. Corrected now.
+   - **A stale status line**: the Curve Number section said a GCN250-direct test run was "in progress... not yet complete" — it had actually finished (see the 90m-`gcn250v2` run above). **Judgment call made, not re-litigated with the user**: folded the real result in as a side-by-side comparison table in that same section (not a footnote), since this is a technical memo for domain experts (Becky/Rich) who'd want the actual numbers, not just the CN methodology narrative. Table: QF ratio 0.77→0.70, QF r 0.57→0.57 (unchanged), B ratio 1.51→1.56, B r 0.38→**0.49** (real improvement in spatial pattern, not magnitude), framed as "doesn't resolve B, tracks it better, does slightly worse on QF" — matches the 2026-09-17 entry's own numbers below, not re-derived. If the user wants this demoted to a footnote instead, easy to change.
+   - Re-rendered via `quarto render swy_status_report.qmd` — succeeded (one pre-existing, unrelated Pandoc warning about a raw-HTML table inside the embedded interactive map, not something introduced by these edits). Opened in the default browser for the user to review directly.
+
+**Maps: no regeneration needed.** Verified `_output_map_ph.html` and both scatter PNGs (`swy_ph_comparison_scatter_{qf,b}.png`) already point at the corrected `workspace_becky_inputs_90m_rainfix` run (confirmed via the render scripts' own `WORKSPACE` constants and file timestamps) — they were already current, just re-confirmed rather than assumed.
+
+**Update, same session, immediately after — a real, separate, THIRD checkerboard-looking bug found and fixed, this time in the map-rendering scripts, not `inspring` or the model itself.** The user looked at the freshly-opened report and immediately spotted a speckled/mottled pattern in the "NCP Kc/CN run — Baseflow (B)" map layer, reasonably worried the original bug wasn't actually fixed. Investigated properly rather than reassured:
+
+- Root cause, confirmed directly: `10b_render_output_maps_becky_inputs.py` and `10c_render_comparison_maps.py` both used `rasterio`'s `Resampling.nearest` to downsample the full-resolution rasters for web display (`out_shape=` at `MAX_DIM=1600`) — at this AOI's actual decimation ratio (~7-12x), nearest-neighbor picks one raw pixel per display cell and discards the rest, which aliases the model output's real fine-scale per-pixel texture (CN/soil-group-driven, confirmed smooth and legitimate at full resolution earlier this session) into a salt-and-pepper/moiré pattern in the *display image only*. Confirmed by rendering the same full-extent B layer both ways side by side: `nearest` reproduces the exact speckled look the user flagged; `average` (proper box-filter downsampling) shows smooth, coherent spatial gradients instead — real watershed/terrain structure, not noise.
+- **This is unrelated to the 2026-09-17 `inspring`-side fix and does not call that fix into question** — confirmed separately that `12_scatter_comparison.py` (which produces every ratio/correlation number actually quoted in the report) already used `Resampling.average` correctly and was never affected. The report's numbers were correct throughout; only this map's visual display was misleading.
+- Fixed: both scripts switched to `Resampling.average`; `10b`, `10c`, and `11_build_output_map_html.py` (which assembles `_output_map_ph.html` from both) re-run to regenerate the map with the fix. Also added a short caption directly on the map (in `11`'s own generated HTML) explaining that display images are downsampled/averaged and that a speckled look at zoomed-out scale is expected, not a data problem — so this doesn't cause the same alarm again for a future reader. Report re-rendered and reopened.
+- One thing noticed in passing, not investigated, not urgent: the regenerated `l_sum` layer's reported min came back slightly negative (-893.7, against a max of ~14.8M) — possibly a minor nodata-edge leak from the switch to average resampling, possibly pre-existing. Trivial relative to the layer's own scale and the already-documented, already-open `L_sum` anomaly item; not re-litigated this session.
+
+**Update, same session, later still — two more real, deeper problems found (the user kept
+verifying instead of accepting "fixed"), plus a paused one, and an approved plan to fix them:**
+
+1. **Paused, not solved**: after the map-display fix above, the user checked the raw B GeoTIFF
+   directly in QGIS and still saw a real fine speckle — genuinely present in the data, not a
+   display issue. Traced it to the AET/local-recharge step specifically (present in AET, L, B;
+   absent from QF; confirmed not routing/DEM-related since even pre-accumulation L already shows
+   it; confirmed Kc is genuinely class-uniform by reading `07b`'s code directly, ruling out
+   per-pixel Kc noise; confirmed present identically in the pre-checkerboard-fix archive, so not
+   caused by anything this week). **Not yet root-caused** — deprioritized below two bigger findings
+   at the user's own direction. Resume by reading `inspring`'s actual Budyko-curve AET solver.
+2. **A real, big one**: NCP's own B raster has ~8.16 million NaN pixels (~25% of the valid domain)
+   forming a clean ring around every coastline — confirmed via direct pixel comparison against NCP's
+   own QF (which has no such gap), confirmed it's introduced at the routing/accumulation step (AET
+   and L are both valid at these exact locations). `12_scatter_comparison.py`'s own `isfinite()`
+   filter already silently excludes these pixels from every reported B statistic, undocumented —
+   and it's not a neutral exclusion, since the classes already flagged as most anomalous (Mangrove,
+   Fishpond, built-up) are inherently coastal.
+3. **A real, bigger one, the user's own catch**: the two comparison grids (NCP 90m, WWF-SIPA 30m)
+   share a clean 3:1 pixel-size ratio but their origins are offset by a non-integer fraction of a
+   pixel (~0.91 of a 90m pixel, ~22m). The existing numeric comparison already handles this
+   correctly via proper area-weighted reprojection (verified independently), but isn't literally
+   pixel-nested. Traced the fix: `inspring` derives its entire output grid from whatever raster is
+   passed as the DEM, so a DEM pre-warped onto an exactly-nested grid fixes this without touching
+   `inspring` itself.
+
+**Plan approved with the user** (`C:\Users\JerónimoRodríguezEsc\.claude\plans\curious-gliding-whisper.md`;
+full reasoning trail in `docs/swy/research_notes.md`'s 2026-09-18 entry): build a DEM snapped to
+WWF-SIPA's own grid lattice (`02e_snap_dem_to_baseline_grid.py`, hard-verified for zero fractional
+offset before proceeding), re-run the 90m model on it (`09e_run_swy_ph_snapped_grid.py`, own
+workspace, multi-hour background job), build an explicit per-variable "valid in both datasets" mask
+per the user's own framing (`13_build_valid_comparison_mask.py`, full-3x3-block agreement required,
+consumed by both the map script and the scatter/stats script instead of each computing its own ad
+hoc validity logic), regenerate the comparison once the run lands, and declutter
+`data/swy/philippines/` alongside this (fresh inventory: 81GB total; confirmed-superseded workspace
+copies get deleted, undocumented-but-unreferenced ones get archived, not deleted outright).
+
+**Status as of this writing: plan approved, `02e_snap_dem_to_baseline_grid.py` written, not yet
+run.** Next concrete steps, in order: (1) run `02e` and confirm its hard zero-offset assertion
+passes; (2) launch `09e` in the background; (3) write and test `13_build_valid_comparison_mask.py`
+while `09e` runs; (4) once `09e` finishes, run `13`, then re-run `12`/`10c`/`10b`/`11`, compare new
+numbers against today's as the real payoff check; (5) re-render the status report and update this
+file with the outcome; (6) execute the `data/` decluttering from the plan's Part 4; (7) resume the
+paused AET-speckle investigation. **`swy_ph_30m_final` (30m validation run) is untouched throughout
+all of this** — still running, check `docker ps` before assuming otherwise.
+
+**Superseded by the above — kept only for the record**: the "next steps" list immediately below,
+written before these three findings, treated the GCN250 placement decision and the map-display fix
+as the main remaining items. They're both still true and done, just no longer the critical path.
+
+**Next steps, as they stood right after the GCN250 placement decision and the map-display bug fix, before the three findings above**: (1) keep checking `swy_ph_30m_final`; (2) once it finishes, compare its QF/B ratios against the 90m-aggregated numbers to close the resolution-validation question — this is the one substantive thing still blocking; (3) user posts the GitHub issues (`docs/swy/inspring_github_issues_draft.md`) to Rich manually, or asks for `gh` CLI setup first; (4) the map-caption fix for the toggle-misalignment perception (2026-09-17 point 5a) is still open, cosmetic, not urgent; (5) B's core puzzle (direction reversal, weak-but-improving correlation) remains the single biggest open scientific question.
+
+## LATEST (2026-09-17) — five real inspring bugs found and fixed, a real WWF-SIPA masking bug fixed, alignment re-verified rigorously, a genuinely useful undocumented inspring feature found, two more runs in flight
+
+**This was a very long, winding session** (the user's own words: "I thought I would be done with this by Tuesday, yet here we are still at this") — real, valuable findings throughout, but easy to lose track of. This entry is intentionally thorough because the user asked directly for that.
+
+**In order, what actually happened:**
+
+1. **Confirmed the Philippines rain-events run (from the 2026-09-16 entry below) had a real, separate resampling-method bug.** Visual inspection of the output at native resolution (the user's own catch, not something the numbers alone would have shown) revealed a clear, regular checkerboard in both QF and B. Root cause: `seasonal_water_yield.execute()`'s `interpolate_list = ['near'] * len(input_align_list)` applies nearest-neighbor to *every* aligned input uniformly — correct for LULC/soil-group (categorical), wrong for precip/ET0/rain-events (continuous, and coarser than the 90m DEM here, ~1km native). Fixed: those three now get `'bilinear'`. Confirmed by direct pixel inspection of the aligned intermediate rasters, before and after.
+
+2. **Separately, the hydrologic-soil-group input itself had a real, regular block artifact — confirmed to be in the file, not introduced by this project's processing.** `HYSOGs250m_Soil_Groups_reclassified.tif` (this project's copy, from NatCap's own Data Hub) shows a clean checkerboard even in its own raw, unprocessed native-resolution pixels — visually confirmed directly, not inferred. The genuine ORNL DAAC original (Ross et al. 2018, `daac.ornl.gov/daacdata/global_soil/Global_Hydrologic_Soil_Group/data/HYSOGs250m.tif` — public data, but does need Earthdata login; downloaded successfully via `.netrc` + `curl` with a cookie-jar workaround for the OAuth redirect loop) shows genuine fine-scale texture instead, at the same location. Whatever NatCap's own "reclassified" repackaging did, it introduced this artifact — worth flagging to whoever maintains that Data Hub entry (now an Open Item in the status report). **Also directly relevant**: Becky's own `.ini` references `HYSOGs250m_md5_517bfa.tif`, an MD5-named file (the ORNL DAAC direct-download naming convention) — not the same file this project had been using, and whose pixel-value encoding (1-4 base classes, 11-14 dual classes) matches the *raw* product's documented encoding exactly. Switched this project's own pipeline to the raw file too, clipped to the Philippines AOI and dual-class-collapsed to match her own `SOIL_HYDROLOGIC_MAP` logic exactly.
+3. **Combining both fixes eliminated the checkerboard entirely** — confirmed by direct native-resolution visual inspection of the corrected run's QF and B outputs. Real remaining spread in the maps is now organic land-cover/drainage structure, not a processing artifact.
+4. **A real, separate bug found in WWF-SIPA's own shared baseline B raster**: its nodata flag (-9999) doesn't cover everything her own QF raster's nodata flag does (same grid, verified) — ~55 million pixels she calls "valid" are really ocean, many reading exactly 0.0, which deflates her B mean. Corrected using her QF raster's own clean mask (moves her B mean from 653 to ~699mm/yr in the original full-resolution check, ~699 vs 752 in the paired-comparison version). This is a bug in how the comparison reads her file, not in her model.
+5. **The user pushed hard, correctly, on two things that turned out fine but needed real verification, not reassurance**: (a) a perceived pixel misalignment when toggling map layers — re-verified from scratch on the final corrected data (not assumed from the earlier 2026-09-15/16 investigation): 99.44% land/water agreement, best cross-correlation at exactly zero shift, and a zoomed pixel-diff mask showing every disagreement confined to a one-pixel-wide fringe along coastlines/rivers — real boundary quantization between 30m and 90m grids, not a registration bug. The interactive *map* (unlike the numeric comparison) doesn't put both layers on a shared grid, which is why toggling made this look worse than it is — worth a caption fix, not done yet. (b) whether the valid-data extent genuinely matches — quantified precisely (not just a summary stat): 2.82% of NCP's valid area and 1.45% of baseline's have no counterpart, entirely explained by that same coastline/river fringe, visually confirmed.
+6. **A real, previously-missed `inspring` capability found**: `_reclassify_or_clip()` (used for `cn_a/b/c/d`, `root_depth`, `kc_1`-`kc_12`) checks `args['{factor}_path']` *before* falling back to the CSV table — if set, it warps that raster directly onto the model grid and uses it, bypassing the table entirely. **This directly reverses an earlier documented claim** (2026-09-14, repeated again by mistake in this session's first pass at today's status report) that no such path exists — that claim was checked against `execute()`'s own docstring, which never mentions this, not against the actual runtime logic. Also means Becky's own `.ini` (`CN_A_PATH` etc.) may not be "a different wrapper/fork" as previously assumed — those parameter names map directly onto this real mechanism. **GCN250's own delivery format doesn't map onto this naively**: it's three rasters by antecedent moisture condition (dry/average/wet), not four by soil group — GCN250 already bakes soil group in during its own construction (crosswalked against HYSOGs250m). Correct usage: point all four of `cn_a_path`-`cn_d_path` at the same "average" (ARC-II) GCN250 raster. **In progress as of this writing**: `GCN250_ARCII.tif` downloaded (Figshare, `ndownloader.figshare.com/files/15377363`, 640MB, global) — a 90m test run using it directly (bypassing this project's own hand-built CN table) is the next concrete step, to see if a real per-pixel product changes the comparison. Not yet clipped/launched.
+7. **Three draft GitHub issues written for `springinnovate/inspring`** (`docs/swy/inspring_github_issues_draft.md`), at the user's explicit request — Rich prefers formal issues/PRs over informal messages. Covers: (1) broken Dockerfile/`setup.py` packaging, (2) the three `user_defined_rain_events_dir` bugs plus the resampling-method issue, with our own tested patches as a proposed fix, (3) the undocumented raster-override feature, framed as a documentation-PR ask. **`gh` CLI isn't installed on this machine** — user will post manually via the GitHub web UI, or install `gh` if they want it posted directly later. Not posted yet.
+8. **A second, independent 30m validation run is in progress** (`swy_ph_30m_final`, workspace `data/swy/philippines/workspace_becky_inputs_30m`), launched at the user's explicit request to check whether the 90m-vs-her-30m aggregation methodology is itself sound — if a native 30m run gives materially different QF/B ratios than the 90m-aggregated comparison, that would matter a lot; if it matches, that closes the resolution question for good. Uses the same fully-patched image (`swy_borneo_run:rainfix4`) and the same real rain-events/real-soil-group inputs as the corrected 90m run. **As of this writing, ~4+ hours in, still in DEM flow-routing (pit-filling done, flow-direction not yet)** — this is the exact same slow stage (flat/tidal archipelago terrain) that made an earlier, differently-configured 30m attempt take 24+ hours before being aborted (see the 2026-09-16 entry below) — expect this to potentially take a similarly long time; **do not restart it** for the GCN250 test, since DEM-routing doesn't depend on CN inputs at all — once this run reaches/finishes DEM-routing, TaskGraph's own caching (confirmed: task-level, keyed on function+args+input-file state, stored in `cache_dir/taskgraph_data.db`) should let a GCN250-adjusted 30m variant reuse that expensive work rather than redoing it, **if** it's launched against the same workspace directory with only the CN-related args changed. Checked directly against the routing functions' own signatures: `fill_pits`/`flow_dir_mfd`/`flow_accumulation_mfd` expose zero threading/worker parameters — this bottleneck cannot be sped up with more CPU cores, confirmed, not assumed.
+
+**Current best numbers (90m, both fixes applied, before any GCN250 test)**: QF at ~77% of WWF-SIPA in aggregate (r=0.57, per-class spread 0.55-1.37×, a 2.5× factor — plausible as an ordinary Kc/CN difference). B at ~151% of WWF-SIPA, wrong direction from QF, correlates weakly (r=0.38), per-class spread 0.71-6.0× — real, unexplained, confirmed not an artifact of anything fixed this session. One coherent partial explanation found: Kc feeds AET not QF, and this project's lower EVI-based forest Kc vs. her flat 1.0 shows up as elevated B specifically in forested classes (Closed Forest 1.7×, Open Forest 1.8×, Mangrove 2.9×) — consistent, not proof, since B's overall pattern has other open questions too.
+
+**Report** (`docs/reports/swy/swy_status_report.qmd`) fully rewritten this session as a clean current-state memo (no run-by-run history in the reader-facing text, calibrated to Becky/Rich as domain experts, per direct user feedback — see `feedback-report-vs-log-separation` memory) — then the user made direct edits and left inline bracketed questions, all now addressed (GCN250 citation, the tropical-forest-CN-patch status, the CN raster-vs-table mechanism now corrected per point 6 above, the Kamble/Rich/EVI attribution, how the Kc finding shows up in B not QF, a confusing transition sentence). Rendered clean, zero remaining bracketed comments as of this writing. **Still needs**: folding in the GCN250 test result once it exists, and the map-caption fix for the toggle-misalignment perception (point 5a above).
+
+**Next steps, in order**: (1) check on the 30m run; (2) fold the GCN250 result (below) into the
+report, and decide whether to feature it as a real secondary comparison or a footnote; (3) once the
+30m run finishes, compare its QF/B ratios against the 90m-aggregated numbers to close the
+resolution question; (4) user posts the GitHub issues to Rich manually, or asks for `gh` CLI setup
+first; (5) B's core puzzle (direction reversal, weak correlation) remains the single biggest open
+scientific question, not yet close to explained.
+
+**UPDATE, same session, later — GCN250-direct result in, a real bug found and fixed on the way,
+30m run still going**:
+
+The first GCN250-direct attempt (`workspace_becky_inputs_90m_gcn250`, now archived with a
+`_nodata_bug_ARCHIVE` suffix) hit a **sixth real bug**: `geoprocessing.warp_raster()` (called
+inside `_reclassify_or_clip()`'s raster-override path) has no `nodata` parameter at all and doesn't
+propagate the source's real nodata through — 1.17% of valid model pixels came out with a literal
+CN of 255 (GCN250's nodata sentinel), concentrated in a thin fringe around every coastline where
+GCN250's own coverage doesn't quite match this project's DEM/LULC land mask. Fixed by pre-filling
+GCN250's nodata gaps with `scipy.ndimage.distance_transform_edt`'s nearest-valid-neighbor fill
+before clipping (`data/swy/philippines/inputs/gcn250_arcii_ph_filled.tif`) — confirmed clean on
+retry (`swy_ph_90m_gcn250v2`, zero pixels above CN 100). Added as a fourth sub-item to GitHub Issue
+3 in `docs/swy/inspring_github_issues_draft.md`.
+
+**The actual GCN250-direct result, a genuinely mixed picture, not a clean win**:
+
+| | Table-based CN (current report numbers) | GCN250-direct |
+|---|---:|---:|
+| QF ratio (NCP/WWF-SIPA) | 0.766 | 0.698 |
+| QF correlation | 0.567 | 0.568 |
+| QF per-class spread | 0.55–1.37 (2.5×) | 0.34–1.15 (3.4×, wider) |
+| B ratio | 1.510 | 1.557 |
+| B correlation | 0.376 | **0.486** |
+| B per-class spread | 0.71–6.00 (8.5×) | 0.80–5.88 (7.3×) |
+
+GCN250 doesn't resolve B's core puzzle (same magnitude, same wrong direction) but tracks its
+*spatial pattern* meaningfully better (r 0.376→0.486). It does modestly worse on QF, apparently
+because GCN250's own land-cover crosswalk doesn't map WWF-SIPA's specific 12-class typology onto
+water/wetland/built-up classes as cleanly as this project's hand-built one (Fishpond, Built-up,
+Inland Water all moved notably further from the baseline). **Not yet folded into the report** —
+this needs a real judgment call on presentation (side-by-side comparison vs. secondary footnote),
+raised with the user right as this session ran low on context. Comparison computed via a one-off
+inline script (not `12_scatter_comparison.py`, to avoid disturbing the file the report's current
+numbers depend on) — logic: same `_resample_to_ref`/`run_pair` pattern, `NCP_WORKSPACE =
+workspace_becky_inputs_90m_gcn250`, `NCP_SUFFIX = gcn250_direct`, baseline B via the same masked
+file as everywhere else in this session.
+
+**30m run status at the point this session ran low on context**: `swy_ph_30m_final` still running,
+~21 hours elapsed, CPU active (not stalled), no crash. Milestones so far: pit-filling done ~1hr in,
+the full flat-region/plateau-resolution sequence (flat_region_mask, plateu_drain_mask,
+plateau_distance) done by ~9hr — matching the entire slow stage that took the *previous* aborted
+30m attempt 24h+ to even reach — but `flat_region_mask.tif` was seen being rewritten again at the
+~16hr mark, meaning it's ambiguous whether flow-direction is genuinely finished or still internally
+iterating; flow accumulation (the next real milestone) had not appeared as of the last check.
+**Do not assume this needs restarting** — check `docker ps --filter "name=swy_ph_30m_final"` first;
+Docker runs independent of any Claude Code session, so it kept going through this session ending.
+If it finished or crashed, the workspace at `data/swy/philippines/workspace_becky_inputs_30m` has
+the answer either way (look for `aggregated_results_swy_ph_becky_inputs_30m.shp` for a real
+completion, or `docker ps -a` for a crash).
+
+**To resume in a fresh session**: paste this whole `HANDOFF.md` file in, as the maintenance note at
+the top says. The fresh session should, in order: (1) check `docker ps` for `swy_ph_30m_final`
+(and confirm nothing else is stuck running); (2) if it finished, run the same comparison pattern
+used for GCN250 above against its QF/B outputs vs. the WWF-SIPA baseline, and compare its ratios to
+the 90m-aggregated numbers already in the report — this closes the resolution-validation question
+that was the whole reason this run exists; (3) decide with the user how to present the GCN250
+result in the report; (4) re-render `docs/reports/swy/swy_status_report.qmd` and confirm it's
+still clean before treating anything as final.
+
+## LATEST (2026-09-16) — DEM-resolution confound fixed, alignment scare closed out, three inspring bugs fixed, Becky status update sent — read this first
+
+**Full detail in `docs/swy/research_notes.md`'s new 2026-09-15/16 entry** — this is the compact
+version. In order: caught that the Becky-inputs run reused an unrelated 90m DEM even though her
+`.ini` targets 30m (a real, previously-unnoticed confound on the whole isolated-Kc/CN-variable
+design); fetched SRTMGL1 and re-ran (**still running as of this writing, ~24h+ in** — a much
+bigger raster than anything run before, not stuck, just genuinely big — check `docker ps` and this
+file's own "Docker runs" note below before assuming anything). A water-body misalignment scare on
+the interactive map was investigated properly (not assumed either way) and closed out clean — a
+whole-domain cross-correlation found 99%+ agreement at zero shift; the visual artifact was
+resolution-driven quantization on one complex lake shape, not a real registration bug. Found and
+fixed three real upstream `inspring` bugs in the `user_defined_rain_events_dir` path (all three
+patches now in `Python_scripts/swy_borneo_run/Dockerfile`, image `swy_borneo_run:rainfix2`) — a
+second, isolated test run (90m DEM, her real rain events enabled, fast) is running in parallel to
+the 30m resolution-fix run, to separate the two variables. A status-update message (not final
+results) went to Becky 2026-09-16, archived at
+`docs/archive/message_becky_ph_comparison_status_2026-09-16_sent.md`.
+
+**Docker runs, both still going as of this writing** — check `docker ps` before assuming either
+finished: (1) `upbeat_cohen` (or whatever name `docker ps` shows for the original container) — the
+30m SRTMGL1 resolution-fix run, workspace `data/swy/philippines/workspace_becky_inputs/`; (2)
+`swy_ph_90m_rainfix2` — the rain-events-fix isolated test, 90m DEM, workspace
+`data/swy/philippines/workspace_becky_inputs_90m_rainfix/`. **Next session: check both for
+completion first.** If either changes the comparison numbers, regenerate the maps
+(`10b`/`10c`/`11_build_output_map_html.py`), scatter plots (`12_scatter_comparison.py`), and
+re-render `docs/reports/swy/swy_status_report.qmd` before sending Becky anything further — don't
+reuse the numbers already in that report, they're from the old 90m run.
+
+**New paper task, not started, for a fresh session**: Quarto review-comment blocks in the paper
+draft are rendering visibly into the shared `.docx` export — confusing for external readers (the
+downside of authoring in `.qmd` but sharing as `.docx`). Fix: keep comments out of the `.docx`
+render entirely, and instead of deleting them, move them into a **separate new `.qmd` file**
+alongside a pointer to which section of the paper each one belongs to, so the review/discussion
+context isn't lost, just kept out of the shared document. Not investigated yet which comment
+mechanism the draft actually uses (HTML comments, a custom Quarto callout, margin notes via
+`{.aside}`, etc.) — check `docs/manuscript/paper_draft_5service.qmd` first thing.
+
+**Also still pending on the paper, from before this session** (not touched today, still true as of
+the last time it was checked): Becky's 14 numbered review comments on
+`docs/manuscript/paper_draft_5service.pdf` (gitignored) still need a response — status of whether
+that response was ever actually sent was last recorded as **unconfirmed**, so verify before
+assuming either way. One specific flagged item within that: comment BC6 says a 1.8×
+income-intensity stat "was already removed from Results" but it's still visibly present in Section
+3.2 (Figure 7, Table 4) — the user deliberately deferred checking this personally; don't raise it
+again until they have, but don't assume it's resolved either.
 
 ## LATEST (2026-09-15 evening) — mermaid diagrams fixed for real; manuscript folder cleaned up
 
@@ -520,7 +938,12 @@ on purpose. Still outstanding from earlier:
   place that should claim this — others should point to it, not duplicate it), `research_notes.md`
   = chronological reasoning log (why decisions were made, never "current state"), `swy_methods.qmd`
   = permanent conceptual/methods reference, `swy_status_report.qmd` = disposable, meeting-tied
-  snapshot memo, regenerated fresh rather than kept permanently current.
+  snapshot memo, regenerated fresh rather than kept permanently current. **Folder-level note added
+  2026-09-16, since the split confused a fresh read**: the first three live in `docs/swy/`
+  (working materials); the status report lives separately in `docs/reports/swy/` (shareable
+  rendered output), matching the same `docs/reports/<topic>/` convention already used for
+  `colombia_clec/` and `phase4_beneficiary/` — the two folders sharing the name "swy" is
+  coincidental, not a sign one is stale.
 - `docs/reports/swy/swy_status_report.qmd` — SWY status memo **source** (own
   `swy_report_styles.css`, one `_output_map_ph.html` interactive-map include, and the two
   `swy_ph_comparison_scatter_*.png` scatter plots all alongside it in the same folder). The

@@ -140,7 +140,7 @@ def main():
     from inspring.seasonal_water_yield import seasonal_water_yield
 
     inputs_sp = os.path.join(DATA_ROOT, "swy/philippines/INPUTS_SP")
-    workspace = os.path.join(DATA_ROOT, "swy/philippines/workspace_becky_inputs")
+    workspace = os.path.join(DATA_ROOT, "swy/philippines/workspace_becky_inputs_30m")
     os.makedirs(workspace, exist_ok=True)
 
     et0_staging = _normalize_et0_dir(
@@ -159,18 +159,25 @@ def main():
 
     args = {
         "workspace_dir": workspace,
-        "results_suffix": "ph_becky_inputs_ncp_kc_cn",
+        "results_suffix": "ph_becky_inputs_30m",
         "aoi_path": os.path.join(DATA_ROOT, "swy/philippines/inputs/ph_aoi.gpkg"),
         "dem_raster_path": dem_path,
         "lulc_raster_path": lulc_wgs84_path,
         "lucode_field": "lulc_id",
+        # Raw ORNL DAAC HYSOGs250m, not NatCap's reclassified copy -- see 09c's own comment and
+        # the 2026-09-16 status report for why (a real, regular artifact in NatCap's version,
+        # confirmed absent from the raw source and from Becky's own referenced file family).
         "soil_group_path": os.path.join(
-            DATA_ROOT, "swy/shared/soil_hydrologic_group/HYSOGs250m_Soil_Groups_reclassified.tif"
+            DATA_ROOT, "swy/philippines/inputs/soil_hydrologic_group_hysogs250m_raw_ph.tif"
         ),
         "precip_dir": os.path.join(inputs_sp, "precip_PH_historical_climate_50"),
         "et0_dir": et0_staging,
         "biophysical_table_path": os.path.join(inputs_sp, "ph_biophysical_table_ncp_kc_cn.csv"),
-        "user_defined_rain_events_dir": False,
+        # Real WWF-SIPA rain events, not the flat placeholder -- the three inspring bugs blocking
+        # this are now patched (see 09c / Findings for Rich), same image as the 90m rainfix runs.
+        "user_defined_rain_events_dir": os.path.join(
+            inputs_sp, "n_events_PH_historical_climate_50"
+        ),
         "rain_events_table_path": os.path.join(
             DATA_ROOT, "swy/philippines/lulc/rain_events_table.csv"
         ),
