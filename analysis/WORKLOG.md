@@ -1,5 +1,194 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-09-21 — grid-nesting fix landed, full CN/Kc factorial closes out the Philippines comparison
+cleanly, report reworked around a two-part question, ready to send to WWF-SIPA
+
+Picked up the plan from 2026-09-18 (paused over the weekend, laptop/Docker survived it fine — good
+general data point that completed run *outputs* are safe once written, only work genuinely
+in-progress at the moment of a sleep/interruption is at risk). Grid-snapped 90m re-run completed and
+verified exactly nested inside WWF-SIPA's grid on the actual output. Then a full 2x2 CN/Kc
+factorial (swap her CN alone, her Kc alone, both together, each through this project's own
+pipeline): quickflow's gap traces entirely to CN (her CN alone reproduces her quickflow at r=0.92);
+baseflow's gap needs both CN and Kc together (r=0.39 → 0.92) — correcting either alone leaves a
+real, land-cover-class-dependent residual that fully collapses once both are corrected together. Net
+result: the pipeline is confirmed sound, and the entire QF/B gap traces to the deliberate CN/Kc
+choice, no hidden bug, no unexplained residual.
+
+The report itself went through several real, substantive reworks at the user's direction, not just
+copy-editing: reframed around an explicit two-part question (is the pipeline correct; if results
+differ, can we say why) instead of a single vague comparison; added an explicit "this is a
+model-to-model comparison, not a validation against reality" caveat after the user correctly flagged
+the original framing as close to circular; split future work into what's justified regardless
+(tropical CN correction, crop calendar — backed by independent literature, not this comparison) vs.
+real validation (needs observational data not yet sourced — direct question sent to WWF-SIPA); cut
+a "wrong direction" phrasing that smuggled in an unearned value judgment about baseflow being too
+high, replaced with the actual mechanism (lower CN and Kc both push water toward recharge, so a
+lower quickflow and higher baseflow are an expected pair, not a contradiction); trimmed a detailed
+validation-checks table down to one line once the user judged it too technical for the actual
+reader. A per-class regression breakdown (done after the user spotted a real visual pattern by eye)
+found cropland's CN is compressed toward grassland/brush's in this project's own crosswalk relative
+to WWF-SIPA's much wider separation between the two — a concrete, specific place to focus any future
+CN refinement, logged in full in `docs/swy/research_notes.md` rather than the report itself.
+
+Real process notes worth remembering: caught the user and Claude editing the same report file
+concurrently mid-session (a save race silently reverted one edit — resolved by re-reading before
+re-applying, not trusting a tool's own "success" response alone); a matplotlib legend-transparency
+bug (scatter points' alpha=0.25 was leaking into the legend swatches, making the key as hard to read
+as the plot) fixed in both `12_scatter_comparison.py` and a newly-promoted
+`14_factorial_scatter_comparison.py` (previously three one-off scratchpad scripts across two
+sessions, now a real pipeline script). Report is now considered final by the user, who is sending it
+to WWF-SIPA directly and using it as the basis for their next meeting with her.
+
+### 2026-09-17/18 — checkerboard chase closed out, then four more real problems found by not
+accepting "fixed" at face value, ending in a plan to rebuild the comparison grid properly
+
+Confirmed and closed the checkerboard artifact from the entry below: two independent causes (a
+stock `inspring` resampling bug applying nearest-neighbor to coarse continuous inputs, and a
+separate block artifact in this project's own NatCap-sourced soil-group file, fixed by switching to
+the raw ORNL DAAC source) — both fixed, verified by direct before/after pixel inspection. Also
+found a real masking bug in WWF-SIPA's own shared baseline B raster (nodata flag misses ~55M ocean
+pixels her QF raster correctly excludes) and a genuinely useful undocumented `inspring` feature (a
+per-pixel CN/Kc raster-override path, reversing an earlier "no such path exists" documentation
+error). Folded a completed GCN250-direct CN comparison into the status report: doesn't resolve
+baseflow's core puzzle but improves its spatial correlation.
+
+Then, prompted by the user repeatedly declining to accept "fixed" without checking themselves,
+found four more real, previously-unnoticed problems in the same comparison: (1) the interactive
+map's own display-downsampling used nearest-neighbor decimation, aliasing real fine-scale texture
+into a display-only speckle unrelated to the actual data (fixed: switched to area-averaging); (2) a
+genuinely unresolved, still-open one — a fine per-pixel speckle in AET/local-recharge/baseflow
+(absent from quickflow) that predates this week's fixes and isn't yet root-caused; (3) ~25% of the
+NCP run's own baseflow raster is literally NaN in a clean ring around every coastline, silently
+excluded from every reported statistic with no documentation that this exclusion happens; (4) the
+two runs' output grids (NCP's 90m, WWF-SIPA's 30m) share a clean 3:1 pixel ratio but are not
+pixel-nested — offset by a non-integer fraction of a pixel, which the existing area-weighted
+comparison already handles correctly but the user wants eliminated outright, not just
+correctly-averaged around.
+
+Traced exactly how to fix the grid-nesting without patching `inspring`: it derives its entire
+output grid from whichever raster is passed as the DEM, so a DEM pre-warped onto an exactly-nested
+grid is sufficient. Plan approved with the user: rebuild the DEM on a grid snapped to WWF-SIPA's own
+lattice, re-run the 90m model on it, build an explicit "valid in both datasets" comparison mask
+(replacing each script's own separate ad hoc validity logic) requiring full-block agreement rather
+than partial credit, regenerate the comparison once the run lands, and declutter
+`data/swy/philippines/`'s several superseded workspace copies from this week's iterative debugging
+along the way. Full detail: `docs/swy/research_notes.md`'s 2026-09-18 entry and
+`docs/HANDOFF.md`'s latest entry. Not executed yet as of this entry — the 90m re-run and the mask
+script are in progress; the separate `swy_ph_30m_final` 30m validation run is untouched throughout.
+
+### 2026-09-11 through 2026-09-16 — Philippines Becky-inputs comparison built, run, and re-run after catching a real DEM-resolution confound
+
+Full isolated-variable comparison pipeline built for the Philippines: Becky's own WWF-SIPA
+`INPUTS_SP` inputs (LULC, 30-year CMIP6 climate stack) reused directly, this project's own
+EVI-regression Kc / ESA-crosswalk CN substituted in (`Python_scripts/swy_philippines_run/07b`
+through `12`). Along the way, found and worked around two real upstream `inspring` bugs in the
+`user_defined_rain_events_dir` path (one patched in the Dockerfile, one deliberately deferred —
+real data-loss risk if rushed), a CRS mismatch (her LULC is UTM 32651, everything else WGS84), and
+an ET0 filename-casing bug that would have silently scrambled month order. First run completed
+2026-09-14/15 using this project's already-fetched SRTMGL3 (90m) DEM, since her inputs never
+included one.
+
+**Caught before sending anything to Becky**: her `.ini` explicitly sets `TARGET_PIXEL_SIZE = 30`
+(confirmed as exactly 1 arc-second, matching SRTMGL1), meaning the reused 90m DEM introduced a
+second, unintended confound — resolution — on top of the intended one (Kc/CN), undermining the
+whole point of an isolated-variable test. Re-fetched SRTMGL1 (30m) via AppEEARS (needed the same
+manual-web-UI submission workaround as before, and had to split the request into two
+north/south tiles after the full-AOI bbox exceeded AppEEARS' per-request size cap at 30m
+resolution — merged back into one continuous DEM with `rasterio.merge` locally, no Docker needed
+for that step). Confirmed directly against `inspring`'s actual source
+(`seasonal_water_yield.py:279-280`) that `TARGET_PIXEL_SIZE` isn't a real parameter of this
+build at all — resolution is always derived from `dem_raster_path`'s own native pixel size, so
+swapping the DEM file was the only lever that existed, and it happened to be sufficient. Full
+32-bit re-run kicked off in Docker; still in progress as of this entry (started 2026-09-15
+evening, still running into 2026-09-16 — a much bigger raster than any prior run, expected to be
+slow at the flow-routing stage the same way every previous run was, just longer here).
+
+**A real alignment scare, investigated and closed out.** While waiting on the re-run, a water
+body's position looked visibly offset between the WWF-SIPA and NCP layers on the interactive
+comparison map. Chased it properly rather than assuming: coastline transects and a clean lake
+centroid comparison (Laguna de Bay) at first suggested a genuine ~430m registration bug; a second
+lake (Taal) gave a totally different, much smaller offset in a different direction, which
+contradicted a simple systematic-shift explanation; a proper whole-domain cross-correlation of
+both land/water masks settled it definitively — best alignment is at zero shift, 99%+ pixel
+agreement. The apparent misalignment was resolution-driven boundary quantization on one large,
+geometrically complex lake, not a real bug. No co-registration needed.
+
+**Also this stretch**: the interactive comparison map got real usability fixes (crisp
+nearest-neighbor pixel rendering instead of a blurry bilinear fade at zoom, a click-anywhere
+popup showing both runs' raw values/difference/% at a point, an opacity slider defaulting to
+fully opaque) and the two separate map-HTML builder scripts were merged into one
+(`11_build_output_map_html.py`), dropping a redundant QF layer. `docs/reports/` reorganized so
+each report lives in its own self-contained subfolder (`docs/reports/swy/`, matching the
+`colombia_clec/`/`phase4_beneficiary/` pattern already used elsewhere) instead of loose files at
+the top level. Mermaid diagrams across the SWY docs fixed for real after several false starts —
+root cause was Quarto's own theme-CSS variables being undefined under `theme: none`, not a
+mermaid rendering bug at all.
+
+### 2026-09-10/11 (overnight) — First real SWY Borneo run: consolidated pipeline, a genuine result, a real diagnosed issue
+
+Whole Borneo SWY pipeline consolidated into real, re-runnable scripts —
+`Python_scripts/swy_borneo_run/` (numbered 01-11: AOI build through the model call and output
+map rendering), no longer only ad-hoc interactive commands. Along the way: found this project's
+local `data/raw/LandCovers/landcover_gl_1992.tif` is an empty/corrupted stub (zero valid pixels
+anywhere on Earth) — the real 2020 Copernicus C3S land cover was recovered from the user's WWF
+OneDrive instead. Also found and worked around two real packaging bugs in `inspring` itself
+(missing `requirements.txt`, a `setup.py` bug omitting the `seasonal_water_yield` subpackage) —
+real candidates for a small upstream PR later, not yet attempted. Confirmed the *current* upstream
+`ecoshard` (not the old pinned fork commit) has everything `inspring` needs.
+
+**First run attempt**: laptop sleep killed Docker Desktop mid-run. Checking the actual output
+files (not just the process exit code) showed quickflow and actual-ET were both fully computed
+and physically plausible (QF mean 406.8mm/yr, AET mean 1288.0mm/yr) — but the local-recharge
+routing step (`L_sum`) had only processed roughly the northern half of the AOI before the crash,
+confirmed by comparing valid-pixel latitude ranges against the (fully-complete) stream and
+quickflow rasters. The aggregated baseflow figure computed from that incomplete `L_sum` was
+therefore not trustworthy, despite superficially looking like a normal finished result. Real
+lesson: a non-null final output doesn't prove a routed/iterative computation actually finished —
+check the actual spatial coverage, not just "did it produce a number."
+
+Fixed the actual cause (battery sleep timeout was still on a 1-hour timer despite AC sleep already
+being disabled) and added a `SetThreadExecutionState`-based active keep-awake process for the
+rerun's duration, on top of the power-setting fix. **Rerun in progress as of this entry** from a
+clean workspace (old incomplete one preserved at
+`data/swy_borneo_workspace_INCOMPLETE_run1_2026-09-10/` for reference, not deleted).
+
+Also added: an interactive Leaflet map (viridis, toggleable QF/AET/L_sum layers, real satellite/
+street basemap, pan/zoom) embedded directly in `docs/reports/swy_status_report.qmd` — genuinely
+useful diagnostically, not just presentational: seeing `L_sum`'s spatial pattern is what made the
+incomplete-coverage issue legible in the first place.
+
+**Resolution, 2026-09-11 morning**: the rerun completed cleanly (exit code 0). QF/AET reproduced
+byte-identical to the first run, as expected. `L_sum` now has full spatial coverage, confirming
+the crash really was the cause of the earlier gap — but **the flow-accumulation anomaly itself
+persisted at the same order of magnitude with full coverage (5.4% of pixels vs. 4.6% before)**,
+proving it's a genuine, reproducible issue, not a crash artifact. The interactive map made this
+legible in a second way: the anomaly isn't random scatter, it clusters most visibly at one
+specific coastal river-mouth location, consistent with (not confirmed as) SRTM's known difficulty
+in flat tidal terrain. Separately notable: the aggregated baseflow figure came out numerically
+identical between the broken and complete runs (`qb = 1705.005` both times), suggesting the
+AOI-wide aggregate was already robust to the coverage gap even though the pixel-level anomaly
+wasn't. Status report, embedded map, and the shared Drive package all corrected and re-rendered
+to reflect the complete run.
+
+### 2026-09-07 through 2026-09-10 — Paper sent to Becky/Steve, Borneo SWY pivot, full input acquisition
+
+Paper draft sent to Becky/Steve 2026-09-07; Becky returned 14 numbered review comments on
+`docs/manuscript/paper_draft_5service.pdf` (gitignored). At the 2026-09-09 13:30 call, Becky
+decided the SWY test basin is **Borneo**, not Peru/Myanmar — she isn't treating the mangrove/
+flooded-savannas CN gap or rigorous published-benchmark validation as blockers for this round.
+Meeting with Becky and Rich together confirmed for 2026-09-11.
+
+**2026-09-10, full SWY session**: every raw input the Borneo test needs (AOI, DEM, routing,
+LULC, soil group, precipitation, ET0, NDVI, CN base) is now downloaded and content-verified — not
+just requested, actually opened and sanity-checked. Real architecture finding: `inspring` accepts
+CN/Kc as direct raster overrides rather than only a lucode-indexed biophysical table, which
+substantially shrinks an earlier-flagged "no lucode master table exists" gap. SWY documentation
+restructured: `docs/swy/workflow.md` (new, live status tracker) and `docs/swy/swy_methods.qmd`
+(new, permanent conceptual/methods reference with real formulas and a working bibliography,
+replacing the meeting-dated `model_specification.md`, archived not deleted). Full technical
+detail — task IDs, verification numbers, download gotchas — in `docs/swy/research_notes.md`'s
+2026-09-09/10 entries, not repeated here.
+
 ### 2026-09-03/04 — Full reversal executed (export/risk restored), pipeline/SWY docs brought current, second paper round queued for Becky/Steve
 
 Becky's 2026-09-02 Slack override (see `becky_steve_feedback_plan.md`'s "REVERSAL" section) got
@@ -1480,6 +1669,7 @@ The 700× and 1,700× multipliers previously stated were derived from the wrong 
 *   **Repository Restructuring & Cleanup:** Conducted a major repository cleanup to align with FAIR principles and good industry practices. Transitioned the project from a standard R package structure to a broader reproducible research project structure, acknowledging its evolution into a large-scale analytical pipeline.
 *   **Data Consolidation:** Unified data directories, ensuring that `C:\projects\global_NCP\data` contains the most recent canonical data, while deprecating redundant `home/` directories.
 *   **Git Cleanup:** Removed a large number of temporary and untracked files from the `home/` directory (e.g., temporary Rscript runs and libloc files) from the git repository to ensure a clean and reproducible state.
+*   **Documentation Clarification:** Standardized the definition of 'hotspot' across the repository (including `README.md`, manuscript `index.qmd`, `paper_draft.qmd`, methodology, and book chapters) to explicitly state it is the top 5% of grid cells by rank, not a value-based percentile.
 
 ### 2026-06-12
 *   **Population Exposure Milestone:** Calculated the total 2020 GHSL population captured across the 1.3 million evaluated 10km grid cells (7,855,519,292 people).
@@ -1994,4 +2184,3 @@ This section highlights the major technical and methodological hurdles overcome 
 
 ### 2026-01-05
 *   **AI Context Migration:** Created `ai_context.md`, migrated to AI assistant (Copilot / Gemini).
-`n### 2026-06-16`n- **Documentation Clarification:** Standardized the definition of 'hotspot' across the repository (including `README.md`, manuscript `index.qmd`, `paper_draft.qmd`, methodology, and book chapters) to explicitly state it is the top 5% of grid cells by rank, not a value-based percentile.

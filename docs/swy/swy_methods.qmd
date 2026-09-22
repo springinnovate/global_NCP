@@ -1,0 +1,645 @@
+---
+title: "Seasonal Water Yield: conceptual and methodological foundations"
+subtitle: "Durable technical reference — not tied to any single meeting. For point-in-time status, see `workflow.md`; for the chronological reasoning log, see `research_notes.md`."
+date: last-modified
+date-format: "D MMMM YYYY"
+bibliography: references.bib
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+    number-sections: true
+---
+
+## Why this model, why this is a first attempt
+
+The other services in this project's pipeline arrived as pre-computed InVEST outputs — earlier
+work, by Becky and collaborators, that this project only ever post-processed. Seasonal Water
+Yield (SWY) is different: **nobody has run InVEST SWY at anything approaching global scale
+before**, on this project or, as far as a systematic literature review found, anywhere else. That
+is not a rhetorical claim; it follows from a real precedent review.
+
+## Precedent review
+
+Every InVEST SWY application found in the literature is watershed- or country-scale: a West
+Bengal (India) study, a two-basin Peru/Myanmar study [@hamel2020], and UK-catchment validation
+work. No published global-scale application exists. The closest analogue to a "global" precedent
+isn't InVEST-specific at all — it's GCN250 [@jaafar2019], a global gridded curve-number product
+that solves the same underlying problem (curve number varies by land cover and geography, no
+single number works everywhere) as a general hydrology product, independent of InVEST's own
+workflow.
+
+Reading @hamel2020 in full (not just the abstract) changes the framing in two ways worth being
+explicit about:
+
+1. **Neither of their case studies derived CN or Kc from literature tables cold.** Peru reused CN
+   values from an existing calibrated SWAT model of that exact basin, built years earlier for a
+   payments-for-ecosystem-services program. Myanmar reused CN/Kc from an existing national
+   ecosystem-service assessment [@mandle2017]. The operational lesson: search for an existing
+   calibrated hydrologic study or ecosystem-service assessment covering a representative watershed
+   in each biome that needs a correction, rather than deriving values from cover-type tables from
+   scratch.
+2. **Model reliability appears to degrade at large basin scale, and their largest basin was only
+   114,000 km².** Their own guidance recommends caution with absolute values "in new geographies,"
+   with relative baseflow results in basins under 10,000 km² best supported by their validation
+   data. A genuinely global run is planetary scale — several orders of magnitude beyond anything
+   validated in this literature, InVEST-specific or otherwise. **Whether "one global run" is even
+   the right framing is a live open question**, not a settled premise — a basin-by-basin or
+   regional-mosaic approach (closer to what Hamel et al. actually did: two separate basin-scale
+   applications, not one global one) may be the more defensible framing than a single
+   planetary-scale run.
+
+The quickflow method itself traces to @guswa2018, validated against 544 US watersheds — a reminder
+that the model's core empirical grounding is American in origin, not tropical or global, independent
+of any input-data question.
+
+## Which layer of Rich's pipeline this project actually uses
+
+Worth stating precisely, since "Rich's pipeline" collapses three distinct things that are easy to
+conflate mid-conversation:
+
+1. **Vanilla InVEST** (`natcap.invest.seasonal_water_yield`) — the public, stock model. **Not used
+   anywhere in this project.**
+2. **`inspring`** (`github.com/springinnovate/inspring`) — Rich's extended research fork of the SWY
+   model. Same core science as stock InVEST. **This is what this project calls** — directly, via
+   `inspring.seasonal_water_yield.execute()`. **Correction, 2026-09-14**: an earlier version of this
+   document claimed `inspring` additionally accepts direct raster overrides for CN and Kc
+   (`cn_a/b/c/d_path`, `kc_1...12_path`). Direct inspection of `execute()`'s actual source, prompted
+   by debugging an unrelated alignment-step crash during the Philippines/Becky-inputs comparison run,
+   found no such parameters anywhere in the function — CN and Kc come **only** from the lucode-indexed
+   CSV biophysical table (`biophysical_table_path` + `lucode_field`), the same convention as stock
+   InVEST. That earlier claim was wrong; see "How CN and Kc actually get fed to the model" below for
+   the corrected version, and the open question this raises about where the raster-override idea
+   originally came from.
+3. **`swy_global`** (`github.com/springinnovate/swy_global`) — Rich's *orchestration layer* on top of
+   `inspring`, built for running SWY at planetary scale: it splits a watershed vector into per-basin
+   jobs, pre-warps every input to each job's local UTM zone, runs each basin through `inspring` in
+   parallel via TaskGraph, and stitches results into one continuous global mosaic. **Not used by this
+   project's own test runs** (Borneo, and the Philippines comparison below) — each is called as a
+   single AOI, directly against `inspring`, with no batching or stitching. `swy_global` is the
+   long-term target architecture for an eventual real global run, not what produced any result in
+   this document.
+
+One-line version for a live conversation: *this project uses Rich's `inspring` engine directly, with
+inputs built by hand rather than through his `swy_global` global-run machinery, and runs each test
+basin as a single watershed job.*
+
+## Model inputs — current status
+
+| Input | Status (2026-09-10) |
+|---|---|
+| AOI / watershed vector | Built — `borneo_aoi.gpkg`, dissolved from HydroBASINS Australia/Oceania [@lehner2013] level-6 units, 1.4% area error against Borneo's known extent |
+| DEM | Sourced and verified — SRTMGL3 [@farr2007], 90m. Elevation range -91–4041m against a known high point of 4095m (Mt. Kinabalu) |
+| Routing parameters | Rich's `swy_global.ini` defaults (`THRESHOLD_FLOW_ACCUMULATION=1000`, `ALPHA_M=0.083333`, `BETA_I=1`, `GAMMA=1`) |
+| LULC | ESA CCI 1992 / Copernicus C3S 2020, 300m, already used elsewhere in this pipeline |
+| Soil hydrologic group | HYSOGs250m [@ross2018] |
+| Monthly precipitation | Sourced and verified — CHIRPS [@funk2015], 2020, ~5.5km |
+| Monthly ET0 | Sourced and verified — TerraClimate `pet` [@abatzoglou2018], 2020, ~4km, ASCE Penman-Monteith corrected for CO2 |
+| Rain events table | Derivable from CHIRPS daily via a working script; precip is in hand, derivation not yet run |
+| Curve number (CN) base | GCN250 [@jaafar2019] |
+| NDVI (feeds Kc) | Sourced and verified — MOD13A3 [@didan2021], full 2000–2026 record |
+| `root_depth` | Required by the `inspring` interface but confirmed dead code in this fork — a placeholder raster satisfies it |
+
+: {tbl-colwidths="[25,75]"}
+
+## Why two climate data sources (CHIRPS and TerraClimate) — not a substitution
+
+Worth stating plainly, since it's an easy thing to misremember as "one source was missing
+something so we swapped to the other": **CHIRPS and TerraClimate are not alternatives for the
+same variable.** They feed two different model inputs that InVEST SWY requires simultaneously,
+not one input satisfied two ways:
+
+- **CHIRPS** [@funk2015] → `precip_dir` (monthly precipitation). CHIRPS is a **precipitation-only
+  product** — it has no evapotranspiration variable at all, by design and scope, not because of a
+  data gap.
+- **TerraClimate** `pet` [@abatzoglou2018] → `et0_dir` (reference evapotranspiration). InVEST
+  SWY's water balance needs precipitation and reference-ET as two separate monthly raster stacks:
+  quickflow depends on precipitation and CN; actual evapotranspiration depends on reference-ET,
+  Kc, and leftover precipitation after quickflow. CHIRPS was never a candidate for the ET0 role —
+  it simply doesn't produce that variable. TerraClimate was sourced specifically to fill this
+  separate, always-required input, found and vetted for the first time in this project on
+  2026-09-10 (see `docs/swy/research_notes.md`).
+
+**There is a real, separate CHIRPS limitation — but it's about a different input, and doesn't
+apply to either test basin.** CHIRPS's real spatial coverage is roughly 50°S–50°N. That matters
+for the **rain-events table** (`08_build_rain_events_table.py`'s eventual real derivation, not
+the placeholder currently in use) if this project ever attempts a true global run — daily CHIRPS
+data wouldn't cover high-latitude basins. It is irrelevant for Borneo and the Philippines, both
+well within CHIRPS's coverage. Don't conflate this genuine future-global-run caveat with the
+precipitation-vs-ET0 question above; they're unrelated limitations of the same product.
+
+## How CN and Kc actually get fed to the model
+
+**Corrected 2026-09-14** — this section previously described a raster-override capability that does
+not exist in the code this project actually runs; see the correction note above.
+
+InVEST's documented convention, and the **only** mechanism `inspring.seasonal_water_yield.execute()`
+(`github.com/springinnovate/inspring`) actually has, is a lucode-indexed biophysical table — one CSV
+row per land-cover class, columns for `CN_A`/`CN_B`/`CN_C`/`CN_D` and `Kc_1`...`Kc_12`, joined to
+`lulc_raster_path` via `lucode_field`. Confirmed by reading `execute()`'s source directly (a cached
+clone of the same commit the project's own Dockerfile builds from) — there is no `cn_a_path`,
+`kc_1_path`, or any per-factor raster-override parameter anywhere in the function. `lulc_raster_path`
+is therefore always required, not optional.
+
+Both Borneo and the Philippines (own-LULC and Becky's-LULC comparison) runs use this table-based
+route, and it is not a stopgap for something better — it is the only route this codebase offers.
+`07_build_biophysical_table.py` (own-LULC runs) and `07b_build_biophysical_table_becky_inputs.py`
+(Becky's-LULC comparison) both produce that table by computing CN and Kc as **per-lucode-class**
+values (zonal-mean NDVI/EVI per class, GCN250 CN per class) rather than truly per-pixel-continuous —
+this is a real resolution cost relative to GCN250's and the NDVI/EVI regression's native per-pixel
+granularity, imposed by the table format, not a choice this project made freely.
+
+**Open question worth raising with Rich, not yet resolved**: where the earlier raster-override
+claim came from. Two live possibilities — either an older/different `inspring` branch had it and it
+was later removed, or it was a documentation error not grounded in this project's own code reading in
+the first place. The WWF-SIPA Philippines `.ini` (`wwf_PH_baseline_historical_climate.ini`, in
+`INPUTS_SP/`, received 2026-09-14) does reference `CN_A_PATH`...`CN_D_PATH` raster-override keys, plus
+several other parameter names (`TARGET_PIXEL_SIZE`, `GLOBAL_PIXEL_SIZE_DEG`,
+`SOIL_HYDROLOGIC_GROUP_RASTER_PATH` + `SOIL_HYDROLOGIC_MAP`) that don't match this `execute()`
+signature either — strong evidence the WWF-SIPA workflow runs a different wrapper or fork, not
+evidence that this project's own `inspring` build supports raster overrides.
+
+### Two CN tables — a real distinction, not duplication
+
+`data/swy/shared/cn_tables/` holds two CSVs that are easy to conflate:
+
+- **`gcn250_pft_base_cn_table.csv`** — CN values keyed by **PFT** (Plant Functional Type: "Tree
+  Broadleaf Evergreen," "Shrub Deciduous," "Natural grass," etc.), with an explicit `NEH630_basis`
+  column. This is GCN250's own **native classification** — its authors assigned CN values to NRCS
+  NEH-630 hydrologic-cover categories, which are expressed as PFTs, not as any particular land-cover
+  product's classes.
+- **`gcn250_esa_lc_cn_table.csv`** — the same CN values, **crosswalked onto ESA CCI/Copernicus C3S
+  land-cover codes** (`LC_ID`: 10 = rainfed cropland, 50 = broadleaf evergreen tree cover, etc.) —
+  the actual class codes present in this project's LULC raster.
+
+**Only the second table is read by the pipeline** (`07_build_biophysical_table.py` joins it by
+`lucode`). The PFT table is upstream reference material — it explains *why* the ESA-LC values are
+what they are — but nothing in the pipeline loads it directly, and **no PFT raster exists or is used
+anywhere**; PFT is a classification scheme inside one CN lookup table, never spatial data in this
+project.
+
+(A third, unrelated file that can confuse this further if it comes up: `swy_global`'s own repo ships
+`base_data/biophysical_template_PH.csv`, a schema-example biophysical table Rich included — named
+for the Philippines by coincidence, unrelated to Becky's Philippines model run discussed below. Not
+a third real CN table in play here.)
+
+## Curve number: methodology and the biome-patch decision
+
+InVEST's own documentation is explicit that there is no defensible global shortcut for CN — it
+depends on soil group, cover type, and moisture condition, and region-specific values are preferred
+over blanket defaults [@usda_neh630_2007]. **GCN250** [@jaafar2019] solves the bulk of this: a
+purpose-built, peer-reviewed global CN product combining land cover and soil hydrologic group
+[@ross2018], with three antecedent-runoff-condition variants. Its own authors are candid that it
+differentiates by land-cover granularity, not by region-specific values *within* one land-cover
+class, and that the underlying method is least validated in forested/humid tropical environments.
+
+**Recommended approach: GCN250 as baseline, targeted biome-level correction on top.** This maps onto
+a short list of this pipeline's WWF biome classes, not all sixteen: Tropical & Subtropical Moist
+Broadleaf Forests, Mangroves, and Flooded Grasslands & Savannas are the priority candidates for a
+literature-sourced correction layered on the GCN250 baseline. This is not a hypothetical
+refinement — @hamel2020's own sensitivity analysis found quickflow changing by **factors of
+10–13×** between antecedent-moisture-condition CN settings in a single basin. CN is close to the
+dominant source of variance in this model's output.
+
+Per @hamel2020's own precedent (search for an existing calibrated study rather than deriving from
+cover-type tables cold):
+
+| Biome | Status |
+|---|---|
+| Tropical moist broadleaf forest | Real candidates found [@calero2021; @fabrega2012], both confirming the standard method overestimates runoff under tropical conditions. Patch is buildable. |
+| Flooded grasslands & savannas | Direct hit: @oliveira2016, measured CN from Brazilian Cerrado (undisturbed savanna CN ≈ 81.2 on soil group B) — the closest ecological analogue to the Colombian Llanos/Orinoquía. @nogales2021 is valuable regional precedent but is **not** a CN source (different model, no vegetation-based parameterization) — don't conflate the two. |
+| Mangroves | No usable literature found after three search passes. These are tide-flooded systems — CN's rainfall-runoff premise doesn't describe what drives water movement here. Leaning toward documenting this as a structural limitation of the CN method itself, not a literature gap to keep searching for. |
+
+: {tbl-colwidths="[25,75]"}
+
+## Crop coefficient: methodology
+
+The governing relationship, per FAO-56 [@allen1998]:
+
+$$ET_c = K_c \times ET_0$$
+
+where $ET_0$ is reference evapotranspiration from climate data alone, and $K_c$ is a unitless
+multiplier reflecting what's actually growing on a pixel. `inspring` computes this internally per
+month as $PET_m = K_{c,m} \times ET0_m$.
+
+FAO-56's own tables don't solve this globally: they're built for managed crops with defined growth
+stages, calibrated against Northern-Hemisphere crop calendars — most global land area is not
+cropland, and has no "planting date" for that framework to apply to. The three-way split used here:
+
+- **Cropland**: FAO-56 tables [@allen1998], adapted with region-correct crop-calendar timing (the
+  reference tool's built-in defaults are Northern-Hemisphere only, and does not have a native entry
+  for oil palm — an open question for whichever cropland is actually dominant in a given AOI).
+- **Non-crop vegetation** (forest, grassland, shrubland — most of global land area): the validated
+  NDVI regression from @kamble2013, calibrated against AmeriFlux eddy-covariance flux-tower
+  measurements across multiple vegetation types ($r^2 = 0.90$–$0.91$):
+
+  $$K_c = 1.457 \times NDVI - 0.1725$$
+
+  Corroborated by multiple follow-up studies through 2025, including one Sentinel-2 study
+  reporting an even tighter fit [@grapevine_kc_2025]. This is an empirical, statistical
+  relationship, not a mechanistic one — it assumes the same linear slope holds across vegetation
+  physiologies and regions the original flux towers didn't sample. That is a real simplifying
+  assumption, not a proven universal law, though the same category of assumption GCN250 makes for
+  CN, and one repeatedly replicated rather than a one-off finding.
+- **Non-vegetated** (water, wetlands, bare soil, built): fixed values from InVEST's own guidance
+  [@invest_userguide_2026].
+
+**Open problem, raised directly by Rich (2026-09-11), not yet resolved:** Kamble et al. was
+calibrated **entirely on agricultural crops** (US High Plains cropping systems) — not forest,
+grassland, or any natural vegetation. Applying it to forest pixels (the majority of both Borneo's
+and the Philippines' land area) is an extrapolation outside its validated domain, not a like-for-
+like use. Rich's specific concern: NDVI saturates in dense canopy, so a **linear** fit calibrated
+on agricultural NDVI ranges may *underestimate* Kc once extrapolated to saturated forest NDVI.
+
+**Independent check attempted** [@corbari2017]: four real eddy-covariance sites (pasture, deciduous
+forest, evergreen conifer forest — none tropical) measured Kc directly, no NDVI involved. Result:
+measured forest Kc came in **lower** than standard FAO/LAI-based assumptions, not higher (evergreen
+conifer Kc≈0.17–0.20, deciduous Kc≈0.43–0.51, vs. FAO's ~0.78–0.9). Even the highest of these
+real-measured values is less than half what our Kamble regression predicts at forest-level NDVI
+(~0.85–0.90 → Kc≈1.07–1.14). **This does not confirm Rich's underestimation hypothesis — if
+anything it points the other way** — but it's temperate-forest data, not tropical, so it doesn't
+settle the question either. **No tropical-forest-specific source found yet.** Glenn et al. (2011,
+*Hydrological Processes*) explicitly covers "natural ecosystems" and is the next thing to check —
+not yet obtained (blocked behind a paywall as of this writing).
+
+**Update: Glenn et al. (2011)** [@glenn2011] **read in full — confirms Rich's mechanism is real,
+even though Corbari's numbers didn't point the same direction.** Two concrete findings:
+
+1. **NDVI saturates around LAI≈3; EVI and SAVI don't**, and are established in this literature as
+   the better choice for exactly this reason — several cited studies found MODIS EVI
+   significantly better correlated with ground-measured ET than MODIS NDVI across land-cover
+   types. Kamble's regression uses plain NDVI. **Switching to EVI (same MOD13A3.061 product,
+   different layer — no new data source needed) is a concrete, low-cost improvement**, not yet
+   made.
+2. **A real tropical rainforest precedent exists**: Juarez et al. (2008), Amazonia, MODIS
+   EVI + net radiation, r²=0.72–0.86 against flux towers. Not yet obtained/read — the next actual
+   source to chase, and the first one so far that's tropical-forest-specific rather than temperate.
+
+General accuracy bound from this literature: flux-tower-calibrated Kc-VI methods run
+**10–30% RMSE** against measured ET (vs. 5–10% for lysimeter-calibrated single agricultural
+crops) — worth citing as a realistic uncertainty range rather than treating any single Kc number
+as precise.
+
+**Bottom line: the mechanism Rich raised is real and independently documented; the direction and
+size of its effect on Borneo/Philippines specifically is still unknown.** Concrete next steps, not
+yet done: switch NDVI→EVI in the Kc pipeline; obtain and read Juarez et al. (2008) for an actual
+tropical-forest calibration reference. Don't present current forest Kc as validated until then.
+
+The three are merged per-pixel via a land-cover mask (crop / non-crop-vegetation / non-vegetated) —
+a much smaller artifact than a full lucode-indexed biophysical table, since CN and Kc are otherwise
+raster-overridden as described above.
+
+**In practice, both Borneo and the Philippines test runs skip this three-way split entirely** and
+apply the NDVI regression uniformly to every vegetated class, cropland included — the documented,
+deliberate simplification in `07_build_biophysical_table.py` for both regions, since neither has
+region-correct FAO-56 crop-calendar timing built yet. **The cost of this simplification is not the
+same in both places, worth being precise about rather than treating "same code, same caveat" as
+"equally defensible":**
+
+- **Borneo's cropland is predominantly oil palm (rainfed)** — the gap there is a *calendar*
+  mismatch: FAO-56's built-in defaults are Northern-Hemisphere and don't have a native oil palm
+  entry at all, but the underlying crop is still a normal, non-flooded, continuously-vegetated
+  plantation crop that an NDVI-based Kc curve describes reasonably.
+- **The Philippines' cropland includes substantially more irrigated/flooded rice paddy** — the
+  ESA-LC CN crosswalk already distinguishes this at the CN level (class 10, rainfed cropland,
+  CN 57–78 vs. class 20, irrigated/post-flooding cropland, CN 61–80 — see the two-CN-tables note
+  above), but Kc does **not** make the same distinction; the same NDVI-based formula applies
+  regardless. This is a *regime* mismatch, not just a calendar one: flooded paddy behaves
+  hydrologically much closer to open water during its flooded phase than to the general upland
+  vegetation types the @kamble2013 regression was calibrated against (AmeriFlux towers, not
+  paddy-specific). **This makes the shared simplification a weaker approximation for the
+  Philippines than for Borneo**, specifically wherever paddy rice dominates the cropland fraction —
+  worth stating plainly rather than letting "we did the same thing as Borneo" imply the same
+  confidence level.
+
+## Rain events
+
+Not directly available from any source — derived by counting days with more than 0.1mm of rainfall
+per month from a daily precipitation product. CHIRPS [@funk2015] has the necessary daily
+granularity; a working script (`calculate_average_monthly_events.py`) already exists. Rain-day
+frequency genuinely varies by climate zone, which is InVEST's own stated reason for offering a
+"climate zone" advanced option as an alternative to a single global rain-events table.
+
+## Output variables: what each raster actually means
+
+Pulled directly from `inspring`'s source (`seasonal_water_yield.py` and the Cython core
+`seasonal_water_yield_core.pyx` — `calculate_local_recharge`, `route_baseflow_sum`), not inferred
+from filenames. Two of these (QF, AET) are computed **independently at each pixel**; the rest
+depend on **DEM-derived flow routing** — that distinction is exactly why QF and AET were
+byte-identical between Borneo's crashed and complete runs while `L_sum` was not (see
+`research_notes.md`'s 2026-09-11 entries).
+
+| Variable | File | What it is | Depends on routing? |
+|---|---|---|---|
+| `QF` / `qf_1`...`qf_12` | `QF.tif`, monthly `qf_*.tif` | Quickflow (surface runoff) — computed per pixel per month straight from CN and rainfall statistics via the closed-form stochastic-rainfall expression [@guswa2018]. | No |
+| `AET` | `aet.tif` | Actual evapotranspiration — `min(PET_m, P_m − QF_m + baseflow contribution)` per month, summed. | No |
+| `L` | `L.tif` | Local recharge — the water left over locally once quickflow and AET are subtracted from precipitation; "how much water could recharge groundwater at this pixel." | No |
+| `L_avail` | `L_avail.tif` | `L` capped by the model parameter `gamma` (Eq. 8: `L_avail = min(gamma·L, L)`) — the portion of local recharge actually available to contribute downstream. Borneo's run used `gamma=1`, so `L_avail = L` there. | No |
+| `L_sum` | `L_sum.tif` | **Flow-accumulated** `L` — every pixel's `L` value routed downhill along the DEM-derived Multiple-Flow-Direction (MFD) network and summed over its upstream contributing area: "total upstream recharge draining through this pixel." | **Yes** — this is the layer with Borneo's anomaly, because flow accumulation is exactly the kind of calculation that blows up at DEM sinks or flat, tidally-ambiguous coastal terrain. |
+| `L_sum_avail` | `L_sum_avail.tif` | The same flow-accumulation idea applied to the *available* (bounded) recharge rather than raw `L` — feeds the baseflow-index calculation. | Yes |
+| `B` | `B.tif` | Baseflow — the final per-pixel routed output, computed from `L`, `L_avail`, and `L_sum` along the same MFD network, referenced against the stream raster. This is the model's actual "how much of the accumulated recharge shows up as sustained streamflow" answer. | Yes |
+| `B_sum` | `B_sum.tif` | Upslope-accumulated `B` — routed the same way as `L_sum`, one step further downstream. | Yes |
+| `Vri` | `vri.tif` | `L / (AOI-wide sum of L)` — a per-pixel share of total recharge, used for aggregation, not a routed quantity itself. | No |
+| `aggregated_results_swy*.shp` | — | The final watershed-scale rollup (e.g. `qb` = aggregate baseflow, `vri_sum`) — the very last computational step; its presence with a real value is the strongest single signal a run actually completed. | Yes (depends on everything above) |
+
+**Practical implication for comparing against any external SWY output (Becky's Philippines run
+included)**: `QF` and `AET` are the safest pixel-level layers to compare directly, since they don't
+depend on routing quality. `L_sum`, `L_sum_avail`, `B`, and `B_sum` are only as trustworthy as the
+DEM/flow-direction step — compare these with the routing-anomaly caveat in mind, not as
+unconditionally reliable ground truth.
+
+## Test design: Borneo
+
+**Decided with Becky, 2026-09-09.** The actual goal is a global run; running end-to-end on a real
+basin is a necessary check, not the goal itself. The real question this test answers is whether
+this project's own CN/Kc parametrization — built from public, peer-reviewed global products rather
+than a hand-built regional table — is robust enough to trust at that scale. Borneo, not Indonesia as
+a whole, is the test case: the large, single landmass that allows a real-scale test without the
+added complication of Indonesia's thousands of small islands.
+
+Two things represent a real shift from where this research started, worth stating plainly:
+
+- **The mangrove/flooded-savannas CN gap is not a blocker for this round.** Resolving that patch
+  before testing was this project's own caution, not a condition Becky set.
+- **Rigorous validation against a published result is not the priority for this round either** —
+  confirming the pipeline runs end-to-end on a real basin matters more right now than proving
+  numerical agreement with an external benchmark.
+
+The original, stricter framing — reproducing a known published result closely enough to trust
+further scaling — was to test against one of @hamel2020's own basins (Peru or Myanmar), since they
+have published, granular output to check a result against. Peru's CN came from an existing
+calibrated SWAT model [@abbaspour2019 gives the class of tool, not this specific calibration];
+Myanmar's from an existing ecosystem-service assessment [@mandle2017]. That reasoning remains
+scientifically sound and worth returning to for a rigor-focused validation later — it just isn't
+what this round is for.
+
+## Test design: Philippines — the WWF-SIPA comparison
+
+Terminology used throughout this section, fixed 2026-09-15 (was "her"/"our", flagged as
+unprofessional for a shared technical document): **WWF-SIPA baseline** = the original Philippines
+run, built on WWF-SIPA's own Kc/CN parametrization (named for its own `.ini` section header,
+`wwf_PH_baseline_historical_climate`). **NCP Kc/CN run** = this project's isolated-variable run —
+the same WWF-SIPA inputs (LULC, climate stack), this project's own Kc/CN substituted in (matches
+the `ncp_kc_cn` suffix already used in this run's own output filenames).
+
+**Requested 2026-09-14.** An isolated-variable comparison against the existing WWF-SIPA Philippines
+baseline run: reuse its real inputs (LULC, 30-year CMIP6-derived climate stack), swap in this
+project's own Kc and CN methodology, to see how much of any difference in outcome traces to
+parametrization rather than input data. The WWF-SIPA `INPUTS_SP/` folder (1.7GB, downloaded
+2026-09-14) is the source for everything reused unchanged: `ph_baseline_lulc_md5_7f29da.tif`
+(LULC), `precip_PH_historical_climate_50/` and `n_events_PH_historical_climate_50/` (a real
+1985–2014 30-year climatological median, not this project's own single-year CHIRPS 2020 used
+elsewhere), and `Global-ET0_v3_monthly_tifs/` (Global-AI_PET_v3/CGIAR-CSI, a different ET0 product
+than this project's own TerraClimate choice).
+
+### The WWF-SIPA LULC is not ESA CCI — confirmed, not assumed
+
+Inspection of `ph_baseline_lulc_md5_7f29da.tif` (EPSG:32651, native 30m, values 1–12 exactly
+matching WWF-SIPA's own `biophysical_template_PH_revised.csv`) confirmed it uses a custom 12-class
+WWF-SIPA typology, not ESA CCI codes. This project's own CN source (`gcn250_esa_lc_cn_table.csv`)
+is keyed to ESA CCI — using it required a hand-built, semantics-based crosswalk (matched by land-
+cover meaning, not by which ESA CN number happened to sit numerically closest to the WWF-SIPA
+table's own values):
+
+| WWF-SIPA `lulc_id` / class | ESA analog used | ESA `CN_A,B,C,D` |
+|---|---|---|
+| 1 Annual Crop | 10 Cropland, rainfed | 57,68,75,78 |
+| 2 Brush/Shrubs | 120 Shrubland | 48,66,77,83 |
+| 3 Built-up | 190 Urban areas | 70,82,88,91 |
+| 4 Closed Forest | 50 Tree cover, Br., Ev., closed to open | 31,56,70,77 |
+| 5 Fishpond | WATER_CN convention (=100) | 100,100,100,100 |
+| 6 Grassland | 130 Grassland | 54,71,81,86 |
+| 7 Inland Water | WATER_CN convention (=100) | 100,100,100,100 |
+| 8 Mangrove Forest | same ESA class as Closed Forest (50) | 31,56,70,77 |
+| 9 Marshland/Swamp | same ESA class as Closed Forest (50) | 31,56,70,77 |
+| 10 Open Forest | same ESA class as Closed Forest (50) | 31,56,70,77 |
+| 11 Open/Barren | 200 Bare areas | 77,86,91,94 |
+| 12 Perennial Crop | 30 Mosaic cropland(>50%)/natural veg | 49,64,74,79 |
+
+Classes 8–10 collapse to the same ESA analog as Closed Forest deliberately, for two independent
+reasons, not one: (1) **mirrors what the WWF-SIPA table already does** — its CN for Mangrove and
+Marshland/Swamp is identical to its Closed Forest CN, so this crosswalk doesn't introduce a new
+divergence in a class both approaches already treat generically; (2) **ESA CCI itself doesn't
+split closed/open canopy for broadleaf evergreen** (the dominant Philippine forest type) — that
+split only exists for needleleaf and broadleaf-deciduous types — so Closed Forest and Open Forest
+genuinely have no distinct ESA analog to begin with. The more "correct" alternative — ESA's
+separate flooded-forest (160/170) and flooded-herbaceous (180) classes for mangrove/marshland — is
+deliberately not used here; see the mangrove-CN discussion below for why this is low-stakes for
+SWY's typical use case. Built by `07b_build_biophysical_table_becky_inputs.py`, which starts from
+the WWF-SIPA table (preserving every column this comparison isn't meant to touch — `usle_c`,
+`usle_p`, `root_depth`, `nathab`, `affected_by_infra`) and overwrites only `CN_A-D` and `Kc_1-12`.
+
+**Open/Barren's CN came out an exact match to the WWF-SIPA table's own value (77,86,91,94 both)**
+— not by construction, a genuine coincidence that functions as a sanity check on the crosswalk
+overall.
+
+### Kc: a real, substantive finding, not just a mechanical swap
+
+Kc is computed the same way as `07_build_biophysical_table.py`'s own-LULC pipeline — zonal-mean
+EVI per class per month (not NDVI; the EVI switch decided 2026-09-14, see above, landed in this
+script before the ESA/own-LULC one), QA-masked, through the @kamble2013 regression — rather than
+the WWF-SIPA table's flat per-class values. The two disagree substantially for forest and mangrove:
+
+| Class | WWF-SIPA Kc (flat, all 12 months) | NCP Kc/CN run (EVI-derived, monthly range) |
+|---|---|---|
+| Closed Forest | 1.0 | 0.52–0.70 |
+| Mangrove Forest | 1.1 | 0.33–0.42 |
+| Marshland/Swamp | 0.47 | 0.49–0.60 |
+
+The Closed Forest result lands directly in the same direction as @corbari2017's real forest Kc
+measurements (lower than standard flat-1.0-style assumptions) — see the Kc open-problem discussion
+above. **This is not a validation of either number** — Kamble's regression is still cropland-
+calibrated, extrapolated to forest, the same caveat as everywhere else in this document — but it
+is independent evidence in the same direction as the one real measurement source already reviewed,
+worth citing as such rather than either number being asserted as ground truth.
+
+**One resolution-mismatch caveat, not a modeling error**: Open/Barren picked up a non-trivial Kc
+(0.18–0.32) instead of near-zero. The WWF-SIPA 30m classification calls these pixels barren, but
+EVI is averaged at MODIS's native 1km grid — at that scale, "barren" pixels are mixed with nearby
+vegetation. Worth remembering if Open/Barren area matters to the final comparison; not fixed here.
+
+### Real technical problems found and how each was handled
+
+Four separate, genuine problems surfaced getting this run to actually execute — worth recording
+plainly since it's easy to conflate "the run didn't work" with "the method is wrong":
+
+1. **The `inspring` raster-override claim in earlier drafts of this document was incorrect.**
+   Direct source inspection found no such capability — see the correction notes earlier in this
+   document. Resolved by using the table-based route, this codebase's only route.
+2. **CRS mismatch**: the WWF-SIPA LULC is UTM 32651 (meters); the DEM/precip/ET0/soil-group are
+   WGS84 (degrees). `align_and_resize_raster_stack` doesn't reproject across CRSs itself. Fixed by
+   reprojecting the WWF-SIPA LULC to WGS84 first (GDAL Warp, mode resampling, output resolution
+   matched to the DEM's own pixel size) — a real, necessary preprocessing step, not an `inspring`
+   bug.
+3. **Two real upstream `inspring` bugs**, both in the `user_defined_rain_events_dir` code path —
+   see "Open research questions" below for the detail and the Dockerfile for the one that was
+   patched. Net effect: this run uses the flat 18-events/month placeholder table instead of the
+   real WWF-SIPA spatially-distributed rain events, the same placeholder Borneo and the plain
+   Philippines run already use — a real, temporary loss relative to the original ask, documented
+   as an open follow-up rather than silently accepted.
+4. **ET0 filename casing bug**: the WWF-SIPA `Global-ET0_v3_monthly_tifs/` mixes `et0_v3_0X.tif`
+   and `et0_V3_0X.tif` casing across months. `execute()` sorts filenames as plain strings to infer
+   calendar order — ASCII sorts capital `V` before lowercase `v`, so passed through raw, ET0 would
+   silently land on the wrong months. Fixed by normalizing into a consistently-cased staging copy
+   before the run, not by editing the WWF-SIPA delivered files.
+
+None of these are modeling decisions — each is a real data/software compatibility problem, fixed
+(or explicitly deferred, with a stated reason) before any model output should be trusted.
+
+### Result — run completed 2026-09-14 late evening
+
+Full spatial coverage, exit code 0. Headline numbers (all mm/year, properly masked to the run's
+own valid-data extent — an earlier pass at these numbers used a naive whole-raster mean and got a
+misleadingly low AET, diluted by legitimate zero-value ocean pixels outside the actual land mask;
+`QF`'s own valid-pixel mask is the correct one to apply to every other layer):
+
+| Variable | Mean | Median |
+|---|---|---|
+| `P` (annual precip) | 2399.5 | 2392.7 |
+| `QF` (quickflow) | 257.3 | 188.9 |
+| `AET` | 834.6 | 881.8 |
+| `L` (local recharge) | 1359.2 | 1334.4 |
+| `B` (baseflow) | 1333.6 | 1319.0 |
+| Aggregate `qb` (whole-AOI baseflow) | 1321.0 | — |
+
+Rough water-balance check: `QF + AET + L` ≈ 2451 vs. `P` = 2399 — within ~2%, a reassuring
+aggregate-level sanity check even though these are independent raster means, not a strict
+per-pixel closure test. All values are physically plausible for a wet tropical archipelago
+climate, and `qb` (1321mm/yr) is the same order of magnitude as Borneo's own aggregate `qb`
+(1705mm/yr, from the completed Borneo run) — a sensible basin-to-basin difference, not a red flag.
+
+**The same `L_sum`/flow-accumulation anomaly documented for Borneo recurs here, more severely**:
+11.5% of `L_sum` pixels exceed 100,000 (against a median of 4,465) — worse than Borneo's ~5%. A
+real, testable hypothesis, not yet confirmed: if the root cause is genuinely SRTM noise in flat,
+tidally-influenced coastal terrain (as hypothesized for Borneo), an archipelago with vastly more
+coastline-per-unit-area than a single landmass should show proportionally more such pixels — this
+result is at least consistent with that hypothesis, though it doesn't prove it. Same practical
+implication as Borneo: `QF` and `AET` are safe to compare directly; `L_sum`/`B_sum`/`B`-derived
+spatial patterns should be read with this caveat in mind.
+
+**One unexplained oddity, not investigated further tonight**: the aggregated results shapefile's
+`vri_sum` field reads exactly 0.0, where `Vri` (`L` normalized by AOI-wide total `L`) summed over
+the AOI should read closer to 1. Worth checking next session — could be a real aggregation bug, a
+units/normalization quirk specific to this run's AOI (multi-part archipelago geometry vs. Borneo's
+single polygon), or a reporting-field issue in `inspring` itself. Not yet compared against
+Borneo's own `vri_sum` (not recorded in this project's own documentation) to see if this is
+Philippines-specific or a pre-existing, previously-unnoticed pattern.
+
+### WWF-SIPA baseline vs. NCP Kc/CN run — a direct pixel-wise comparison, not just one side's numbers
+
+The WWF-SIPA baseline output was already shared with this project earlier
+(`data/swy/philippines/rich_shared/workspace_swy_wwf_PH_baseline_historical_climate/` — `QF`, `B`,
+`B_sum`, `L_avail`, `L_sum_avail` only; no `AET`, `L`, `L_sum`, or `CN` saved on that side, which
+limits how complete this comparison can be). **Whole-AOI means, computed with correct nodata
+masking on both sides**:
+
+| Variable | WWF-SIPA baseline mean | NCP Kc/CN run mean | Ratio (NCP/WWF-SIPA) |
+|---|---|---|---|
+| QF | 732.8 mm/yr | 257.3 mm/yr | 0.35 |
+| B | 653.1 mm/yr | 1333.6 mm/yr | 2.04 |
+
+**The gap is real, substantial, and — critically — not a uniform shift.** A pixel-wise comparison
+(WWF-SIPA rasters resampled down to the NCP run's coarser grid via area-average, so each
+comparison is a fair apples-to-apples aggregation rather than mismatched-resolution noise) gives
+moderate, not strong, correlation (QF r=0.53, B r=0.35) and, broken down by the WWF-SIPA LULC's 12
+classes, a ratio that swings far too widely to have one single cause:
+
+| WWF-SIPA LULC class | QF ratio (NCP/WWF-SIPA) | B ratio (NCP/WWF-SIPA) |
+|---|---|---|
+| Marshland/Swamp | 0.195 | 1.14 |
+| Perennial Crop | 0.216 | 2.09 |
+| Annual Crop | 0.248 | 5.53 |
+| Open Forest | 0.337 | 2.09 |
+| Closed Forest | 0.354 | 1.96 |
+| Mangrove Forest | 0.363 | 2.64 |
+| Built-up | 0.388 | 2.32 |
+| Brush/Shrubs | 0.483 | 0.97 |
+| Grassland | 0.723 | 0.99 |
+| Open/Barren | 0.814 | 0.92 |
+| Fishpond | 1.18 | 0.41 |
+| Inland Water | 1.31 | 0.45 |
+
+**Why the non-uniformity matters, methodologically**: this run changed several things
+simultaneously relative to the WWF-SIPA baseline (Kc, CN, the rain-events product, and —
+unintentionally — resolution), so it is not a clean isolated-variable test despite that being the
+original intent. A single spatially-flat swap, like this run's rain-events placeholder (18
+events/month everywhere, zero spatial variation by construction), would be expected to produce
+something closer to a uniform multiplicative shift across land-cover types if it were the dominant
+driver. The observed class-dependent spread instead points at the CN/Kc crosswalk — which
+genuinely does vary by class — as a real, additional contributor, not merely the rain-events
+substitution acting alone. This doesn't cleanly separate the two effects; it just rules out "one
+uniform cause" as sufficient.
+
+**B's direction reversal is the most surprising single finding here, genuinely unexplained**: QF
+is lower in the NCP run almost everywhere (ratio <1 for 8 of 12 classes), but B is higher in the
+NCP run almost everywhere (ratio >1 for 8 of 12 classes) — opposite directions. Candidate
+explanations, none confirmed: the run's own ~11.5% `L_sum` flow-accumulation anomaly could be
+systematically inflating routed quantities like `B`; or a real difference in local recharge (`L`)
+between the two runs that can't be checked directly, since the WWF-SIPA saved output has no `L`
+raster, only `L_avail`. Real follow-up work, not resolved tonight.
+
+Full interactive map (WWF-SIPA vs. NCP QF and B, same color scale per pair) and the underlying
+scatter plots are in `docs/reports/swy_status_report.qmd`.
+
+### Why the mangrove/marshland CN simplification is lower-stakes than it looks, for this use case
+
+SWY's typical downstream-beneficiary use case (e.g., hydropower reliability, dry-season water
+security for downstream users) only cares about CN accuracy in pixels that have something
+*downstream* of them — and mangrove, by definition, sits at the tidal/estuarine end of a
+watershed, with essentially nothing further downstream. Structurally, mangrove is a **terminal**
+position in the routing network: it's the outlet, so a wrong CN there cannot bias anything routed
+further downstream, because nothing is routed further.
+
+This doesn't generalize to every wetland type this project's biome-patch work will eventually need
+to handle. Flooded grasslands/savannas (the Llanos/Orinoquía analogue) don't share mangrove's
+structural coastal position, and the difference isn't just "could sit upstream of infrastructure"
+— it's a different position in the routing network entirely. A flooded savanna is typically
+**mid-basin, not terminal**: water still flows out of it into the rest of the river system. Even
+granting that dams are unlikely to be sited *in* a flat, low-lying floodplain (a real, separate
+argument — dams need hydraulic head, which flat terrain doesn't offer), a wrong CN at the savanna
+pixels can still bias the routed baseflow/quickflow numbers further downstream, wherever real
+infrastructure or water users actually sit. "Unlikely to be a dam site itself" is a claim about
+*local* stakes; it says nothing about *propagation* of CN error through the routing network — and
+propagation is exactly what mangrove's terminal position rules out categorically. Worth putting to
+Becky directly rather than assuming either way: whether basins like the Orinoquía actually have
+meaningful downstream infrastructure/water use past the flooded-savanna zones, or whether it's flat
+and low-stakes all the way to the outlet there too.
+
+## Open research questions
+
+- **Is "one global run" the right framing at all**, or should this proceed as a set of
+  basin-by-basin/regional-mosaic runs combined afterward — closer to what @hamel2020 actually did?
+  Not resolved; named explicitly rather than assumed away.
+- **The mangrove CN gap** — is documenting it as a structural limitation of the curve-number method
+  (not merely an unfilled literature gap) the right final position? For the Becky-inputs Philippines
+  comparison specifically, mangrove's case is settled: it's a terminal (outlet) position in the
+  routing network, so CN error there cannot propagate downstream — see the full argument above.
+  **Flooded grasslands/savannas remain genuinely open, not settled by the mangrove reasoning**:
+  they're mid-basin, not terminal, so even where a dam is unlikely to be sited directly on flat,
+  low-lying floodplain terrain, a wrong CN there could still bias routed baseflow/quickflow further
+  downstream. A real, direct question for Becky, not an assumption either way.
+- **Where did the raster-override claim in earlier drafts of this document come from?** Direct
+  source inspection 2026-09-14 found no such capability in this project's actual `inspring` build —
+  see the correction notes above. Worth asking Rich whether an older/different branch ever had it.
+- **Two more real upstream `inspring` bugs, found 2026-09-14, undocumented until now**: both in the
+  `user_defined_rain_events_dir` code path — `interpolate_list` sized before that path's rasters are
+  added to the alignment list (patched, see `Python_scripts/swy_borneo_run/Dockerfile`), and
+  `n_events_path_list` built from bare filenames reused as both alignment input *and* output targets
+  (not patched — real feature-completion work, and a data-loss risk if rushed; see the Dockerfile's
+  own comment). Both are real PR candidates for Rich's repo, alongside the `setup.py` packages-list
+  bug found 2026-09-11 — worth batching into one small upstream contribution once the comparison
+  work settles, not urgent on its own.
+- **Oil palm and FAO-56** — cropland Kc assumes a native FAO-56 entry exists; it does not for oil
+  palm specifically, the crop most likely to actually dominate Borneo's cropland fraction.
+
+## Figures
+
+Not yet populated — the strongest figures here will be actual Borneo run output (quickflow/baseflow
+maps) once a run exists, rather than input-data maps alone. Revisit after the first successful run.
+
+## References
+
+::: {#refs}
+:::

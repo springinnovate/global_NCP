@@ -55,6 +55,12 @@ analysis already used — everything is internally consistent, no rework needed.
 
 ## Numbers to cross-check against (pct metric)
 
+**Flagged stale 2026-09-09, not re-verified**: these are the pre-reversal (Jul 28) numbers. After
+the Sept 2026-09-02/03 retention-detour-and-reversal, the confirmed current total is **189,932**
+(`docs/pipeline_reference.md` row E2/E5), a 5-cell difference from the 189,927 below. The
+water-overlap/access-overlap/combined-cross sub-splits have **not** been independently re-run
+against the reverted grid — treat them as approximate until they are.
+
 189,927 total 5-service hotspot cells; 110,756 water-overlap; 127,172 access-overlap; 48,001
 combined cross-category. (abs metric, for reference: 191,759 / 111,436 / 125,726 / 45,403 — close
 but not identical, as expected.)

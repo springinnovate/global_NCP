@@ -1,0 +1,92 @@
+---
+title: "SWY Borneo test: workflow and status"
+subtitle: "Rendered view of `workflow.md` — that file is the live, edited source; this is a standalone, properly-rendered copy."
+date: last-modified
+date-format: "D MMMM YYYY"
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    wrap: none
+---
+
+<!--
+History, 2026-09-15: getting this diagram to actually render took real work, worth recording so
+the next mermaid problem in this project doesn't repeat the same dead ends. Nothing loaded the
+mermaid.js runtime at all originally — Pandoc tags a plain ```mermaid fence as
+`<pre class="mermaid">` but doesn't auto-render it itself. Tried a hand-rolled client-side loader
+(CDN import, then a locally vendored copy) — both failed with mermaid's own bomb/"Syntax error in
+text" icon specifically in VS Code's internal browser, even after confirming (via a real mermaid
+engine, both jsdom and a genuine headless Chrome) that the diagram text itself was never the
+problem. Also tried pre-rendering to a static SVG at build time — worked, but was unnecessary
+custom tooling: `docs/manuscript/paper_draft_5service.qmd` already renders a mermaid figure
+correctly using Quarto's own native `{mermaid}` executable-cell syntax, which bundles Quarto's own
+tested mermaid runtime and init script automatically. **This file now uses that same native
+syntax** instead. The plain ```mermaid fence stays in `workflow.md` unchanged (deliberately, so
+GitHub/VS Code's own Markdown preview still shows a live diagram there) — the cell below is a
+second copy of the same source, kept in sync by hand when the diagram changes, same bounded
+tradeoff as any other synced-by-hand duplication in this project.
+-->
+
+```{mermaid}
+%%| label: fig-workflow-borneo
+%%| fig-cap: "SWY Borneo test pipeline and status, as of 2026-09-11."
+%%| fig-width: 13
+%%{init: {'themeVariables': {'fontSize': '20px'}, 'flowchart': {'rankSpacing': 80, 'nodeSpacing': 55, 'padding': 25}}}%%
+flowchart TD
+    subgraph INPUTS["Raw inputs — all downloaded and verified as of 2026-09-10"]
+        AOI["AOI vector<br/>borneo_aoi.gpkg<br/>HydroBASINS AU/Oceania"]:::done
+        DEM["DEM<br/>SRTMGL3, 90m<br/>verified: max 4041m vs. real 4095m"]:::done
+        ROUTE["Routing parameters<br/>Rich's swy_global.ini defaults"]:::done
+        LULC["LULC raster (2020)<br/>real C3S netCDF found on OneDrive —<br/>local .tif copy was empty/corrupted"]:::done
+        SOIL["Soil hydrologic group<br/>HYSOGs250m"]:::done
+        NDVI["NDVI + QA layer<br/>MOD13A3.061, full record 2000-2026<br/>verified: plausible values, correct extent"]:::done
+        PRECIP["Precipitation, 2020<br/>CHIRPS, verified: July mean 138.9mm"]:::done
+        ET0["Reference ET0, 2020<br/>TerraClimate pet — NEW source,<br/>not previously vetted before today<br/>verified: 97-118mm monthly means"]:::done
+        GCN["CN base<br/>GCN250, global"]:::done
+    end
+
+    subgraph DERIVED["Derived layers — built for the first run attempt (simpler than the long-term plan)"]
+        LULC2020["Real 2020 LULC extracted<br/>from OneDrive C3S netCDF —<br/>local .tif was an empty/corrupted stub"]:::done
+        RAINEV["Rain events<br/>PLACEHOLDER (18/month uniform)<br/>not derived from real daily CHIRPS"]:::progress
+        BIOTABLE["Biophysical table (CSV)<br/>lucode + CN_A-D (from GCN250 CSV)<br/>+ Kc_1-12 (NDVI regression per lucode,<br/>uniform across ALL vegetated classes —<br/>not split crop vs. non-crop this round)"]:::done
+    end
+
+    subgraph RUN["Model run — first attempt uses the CSV biophysical-table path, not raster-overrides (pragmatic choice for this round, see swy_methods.qmd)"]
+        SWYRUN["inspring.seasonal_water_yield.execute()<br/>via Docker (project's own image + inspring built on top)<br/>COMPLETE, full coverage confirmed, 2026-09-11 (2nd attempt)<br/>QF/AET plausible; L_sum anomaly (~5% of pixels) confirmed<br/>real, not a crash artifact — clusters at one river mouth"]:::done
+    end
+
+    subgraph OUT["Output"]
+        RESULT["Borneo quickflow / baseflow output<br/>full output set exists and is readable"]:::done
+        QCHECK["Plausibility check<br/>QF/AET plausible; L_sum has a real,<br/>diagnosable flow-accumulation anomaly<br/>(NOT a published-benchmark validation —<br/>that's the deferred Hamel-basin test)"]:::done
+        REPORT["Report to Becky + Rich, 2026-09-11"]:::progress
+    end
+
+    AOI --> SWYRUN
+    DEM --> SWYRUN
+    ROUTE --> SWYRUN
+    LULC --> LULC2020
+    LULC2020 --> BIOTABLE
+    SOIL --> SWYRUN
+    GCN --> BIOTABLE
+    NDVI --> BIOTABLE
+    BIOTABLE --> SWYRUN
+    PRECIP --> RAINEV
+    PRECIP --> SWYRUN
+    ET0 --> SWYRUN
+    RAINEV --> SWYRUN
+    SWYRUN --> RESULT --> QCHECK --> REPORT
+
+    subgraph LEGEND["Legend"]
+        direction LR
+        LDONE["Done"]:::done
+        LPROG["In progress / partial"]:::progress
+        LBLOCK["Blocked"]:::blocked
+    end
+
+    classDef done fill:#c8e6c9,stroke:#2e7d32,color:#1b1b1b
+    classDef progress fill:#fff9c4,stroke:#f9a825,color:#1b1b1b
+    classDef blocked fill:#ffcdd2,stroke:#c62828,color:#1b1b1b
+```
+
+Full source, in context with the rest of the pipeline status: `workflow.md`.
