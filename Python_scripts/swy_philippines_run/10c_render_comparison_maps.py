@@ -45,11 +45,15 @@ MAX_DIM = 1600
 # compressed, so it costs a lot more per pixel than the display image does).
 LOOKUP_MAX_DIM = 500
 
-# Grid-nested run (2026-09-18) -- every 90m pixel here is exactly 9 whole WWF-SIPA 30m pixels,
-# zero fractional offset (verified by 02e_snap_dem_to_baseline_grid.py and re-verified against the
-# actual model output). Replaces workspace_becky_inputs_90m_rainfix, whose grid was offset from
-# WWF-SIPA's by a non-integer fraction of a pixel.
-OUR_WORKSPACE = "data/swy/philippines/workspace_becky_inputs_90m_snapped"
+# Current headline run (2026-09-25): our CN + our per-pixel Kc (09l_run_swy_ph_ndvi_perpixel_kc.py).
+# Same grid-nested 90m grid as the earlier 09e run (every 90m pixel is exactly 9 WWF-SIPA 30m
+# pixels, verified by 02e_snap_dem_to_baseline_grid.py). The other 2x2 cells are compared as
+# scatters in 20_factorial_2x2_comparison.py, not mapped.
+OUR_WORKSPACE = "data/swy/philippines/workspace_becky_inputs_90m_paddy_kc"  # 09n, current best (was 09l)
+# Map reference (2026-09-25, user decision): WWF-SIPA's own CN + Kc run through this pipeline on
+# the 90m DEM (09h), not WWF-SIPA's 30m output. 09h reproduces the 30m run closely (r=0.92 QF and
+# B) and sits on the same grid as our runs, so the map shows only the CN/Kc difference.
+HER_PARAMS_90M_WORKSPACE = "data/swy/philippines/workspace_becky_inputs_90m_herCN_herKc"
 HER_WORKSPACE = (
     "data/swy/philippines/rich_shared/workspace_swy_wwf_PH_baseline_historical_climate"
 )
@@ -62,8 +66,8 @@ PAIRS = [
     {
         "var": "QF",
         "label": "Annual quickflow (QF), mm",
-        "baseline_path": os.path.join(HER_WORKSPACE, "QF_wwf_PH_baseline_historical_climate.tif"),
-        "ncp_path": os.path.join(OUR_WORKSPACE, "QF_ph_becky_inputs_90m_snapped.tif"),
+        "baseline_path": os.path.join(HER_PARAMS_90M_WORKSPACE, "QF_ph_becky_inputs_90m_herCN_herKc.tif"),
+        "ncp_path": os.path.join(OUR_WORKSPACE, "QF_ph_paddy_kc.tif"),
         "clip_percentile": None,
     },
     {
@@ -74,11 +78,8 @@ PAIRS = [
         # raster's own nodata flag does correctly exclude (same grid, verified). See
         # comparison_maps/B_wwf_PH_baseline_historical_climate_masked.tif's own generation — QF's
         # mask applied to B directly, no reprojection needed (identical transform/shape/crs).
-        "baseline_path": os.path.join(
-            "data/swy/philippines/comparison_maps",
-            "B_wwf_PH_baseline_historical_climate_masked.tif",
-        ),
-        "ncp_path": os.path.join(OUR_WORKSPACE, "B_ph_becky_inputs_90m_snapped.tif"),
+        "baseline_path": os.path.join(HER_PARAMS_90M_WORKSPACE, "B_ph_becky_inputs_90m_herCN_herKc.tif"),
+        "ncp_path": os.path.join(OUR_WORKSPACE, "B_ph_paddy_kc.tif"),
         "clip_percentile": None,
     },
 ]
@@ -161,8 +162,8 @@ def render_pair(pair):
 
     results = []
     for run_id, run_label, arr, mask, bounds in [
-        ("baseline", "WWF-SIPA baseline", baseline_arr, baseline_mask, baseline_bounds),
-        ("ncp", "NCP Kc/CN run", ncp_arr, ncp_mask, ncp_bounds),
+        ("baseline", "Her CN + her Kc (90m, our pipeline)", baseline_arr, baseline_mask, baseline_bounds),
+        ("ncp", "Our CN + our Kc", ncp_arr, ncp_mask, ncp_bounds),
     ]:
         normed = np.clip((arr - vmin) / (vmax - vmin), 0, 1)
         rgba = (cm.viridis(normed) * 255).astype(np.uint8)
@@ -187,7 +188,7 @@ def render_pair(pair):
                 "bounds": [[bounds.bottom, bounds.left], [bounds.top, bounds.right]],
                 "vmin": vmin,
                 "vmax": vmax,
-                "shared_scale_note": f"shared {vmin:.1f}–{vmax:.1f} scale with its counterpart",
+                "shared_scale_note": f"same scale for both {pair['var']} layers",
             }
         )
 

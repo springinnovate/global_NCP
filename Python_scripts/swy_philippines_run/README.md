@@ -1,5 +1,44 @@
 # SWY Philippines test — consolidated, reproducible pipeline
 
+## Current state (2026-09-25) — read this first
+
+This folder compares WWF-SIPA's Philippines SWY run against the same model driven by CN and Kc
+built from global data. Everything below this section is the original 2026-09-11 setup log,
+kept for history; most of its "status" column is long out of date.
+
+**Reference run:** WWF-SIPA's CN + Kc through this pipeline on the 90m DEM (`09h`). It reproduces
+WWF-SIPA's own 30m output (r=0.92 QF and B) on the same grid as our runs, so all current
+comparisons are against it. Run and figure dictionary: `docs/reports/swy/FIGURES.md`. Status
+report: `docs/reports/swy/swy_status_report.qmd`. Methods: `docs/swy/swy_methods.qmd`.
+
+**Scripts in the current chain** (everything else here is superseded or a one-off check):
+
+| Step | Script | What it does |
+|---|---|---|
+| inputs | `02e`, `03`/`03b`, `05b`, `06b`, `06c` | snapped 90m DEM; MOD13A3 NDVI/EVI; NASA POWER net radiation; MapSPAM crops; Sacks crop calendar |
+| CN | `07b_build_biophysical_table_becky_inputs.py` | our CN (GCN250 via ESA crosswalk) in the biophysical table; its Kc columns are overridden by the rasters below |
+| Kc forest | `07d_build_kc_forest_negronjuarez.py` | Negrón Juárez (2008) EVI + net-radiation Kc, forest pixels |
+| Kc grass/shrub | `07e_build_kc_grassland_oliveira.py` | Oliveira (2015) EVI Kc |
+| Kc combine | `07f_build_kc_combined_forest_grassland.py` | merges 07d + 07e |
+| Kc other classes | `07g_build_kc_ndvi_perpixel.py` | Kamble (2013) on NDVI, per pixel, for crops/mangrove/marsh/barren (fixes the EVI-into-Kamble error) |
+| Kc paddy (test) | `07h_build_kc_paddy_rice.py` | FAO-56 rice curve on the Sacks calendar, weighted by MapSPAM rice share, Annual Crop only |
+| runs | `09h` (reference), `09l`, `09m`, `09f`, `09n` | see FIGURES.md for the CN/Kc of each |
+| compare | `20_cn_kc_comparison.py` | every run vs `09h`, per class; figures + CSVs |
+| map | `10c`, `10e`, `11` | interactive map: QF/B (09h vs 09l), land cover, shaded DEM |
+
+Runs need Docker (`swy_borneo_run:rainfix4`, see each `09*` docstring for the command; start
+Docker Desktop first). Everything else runs in the project `.venv`.
+
+**Where it stands:** with our CN + per-pixel Kc, baseflow is 1.06x the reference overall, but the
+gap is concentrated in Annual Crop (2.28x), mostly paddy rice. Swapping in WWF-SIPA's CN alone
+brings Annual Crop to 1.25x, so cropland CN is the main open problem; no global CN source
+describes bunded paddy fields. How to parameterize cropland globally is the open question with
+WWF-SIPA.
+
+---
+
+## Original setup notes (2026-09-11)
+
 Written 2026-09-11, mirroring `swy_borneo_run/` (see that folder's own README for the pipeline
 that actually completed end-to-end — this one is the Philippines equivalent, in progress). Goal:
 run this project's own from-scratch SWY pipeline for the Philippines, using Rich/Becky's own

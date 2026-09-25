@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-09-15">
+<meta name="dcterms.date" content="2026-09-25">
 
 <title>SWY Philippines comparison: workflow and status</title>
 <style>
@@ -5276,7 +5276,7 @@ z-index: 1000;
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">SWY Philippines comparison: workflow and status</h1>
-<p class="subtitle lead">Rendered view of <code>workflow_philippines.md</code> — that file is the live, edited source; this is a standalone, properly-rendered copy.</p>
+<p class="subtitle lead">Rendered view of <code>workflow_philippines.md</code>, which is the edited source; this is a standalone rendered copy.</p>
 </div>
 
 
@@ -5287,7 +5287,7 @@ z-index: 1000;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">15 September 2026</p>
+      <p class="date">25 September 2026</p>
     </div>
   </div>
   
@@ -5300,13 +5300,9 @@ z-index: 1000;
 
 
 <!--
-2026-09-15: uses Quarto's own native `{mermaid}` executable-cell syntax — see
-`workflow_diagram.qmd`'s own comment for the full history of why (hand-rolled client-side loaders,
-CDN or vendored-local, both failed specifically in VS Code's internal browser;
-`docs/manuscript/paper_draft_5service.qmd` already proved this native syntax works, so switched to
-matching it exactly rather than maintaining custom tooling). The plain ```mermaid fence stays in
-`workflow_philippines.md` unchanged, for GitHub/VS Code's own Markdown preview — the cell below is
-a second copy of the same source, kept in sync by hand when the diagram changes.
+Uses Quarto's native `{mermaid}` cell (custom client-side loaders failed in VS Code's internal
+browser, 2026-09-15). The plain ```mermaid fence in `workflow_philippines.md` is a second copy of
+the same source for GitHub/VS Code preview, kept in sync by hand. Rewritten 2026-09-25.
 -->
 <div class="cell" data-fig-width="13" data-layout-align="default">
 <div class="cell-output-display">
@@ -5316,62 +5312,70 @@ a second copy of the same source, kept in sync by hand when the diagram changes.
 <div>
 <pre class="mermaid mermaid-js" data-label="fig-workflow-philippines">%%{init: {&#39;themeVariables&#39;: {&#39;fontSize&#39;: &#39;20px&#39;}, &#39;flowchart&#39;: {&#39;rankSpacing&#39;: 80, &#39;nodeSpacing&#39;: 55, &#39;padding&#39;: 25}}}%%
 flowchart TD
-    subgraph SHARED[&quot;Reused directly from the WWF-SIPA INPUTS_SP folder, 2026-09-14&quot;]
-        LULC[&quot;WWF-SIPA LULC&lt;br/&gt;12-class typology, UTM 32651&lt;br/&gt;reprojected to WGS84 for the NCP run&quot;]:::done
-        PRECIP[&quot;Precipitation&lt;br/&gt;30-yr CMIP6 climatology (1985-2014, p50)&quot;]:::done
-        ET0[&quot;ET0&lt;br/&gt;Global-AI_PET_v3 / CGIAR-CSI&quot;]:::done
-        RAINEV[&quot;Real spatially-distributed rain events&lt;br/&gt;monthly rasters&quot;]:::done
+    subgraph SHARED[&quot;Shared by every run: WWF-SIPA inputs + our 90m grid&quot;]
+        LULC[&quot;WWF-SIPA LULC&lt;br/&gt;12 classes&quot;]:::done
+        CLIM[&quot;Precipitation + ET0&lt;br/&gt;30-yr CMIP6 climatology&quot;]:::done
+        RAINEV[&quot;Spatially distributed rain events&lt;br/&gt;(3 inspring bugs patched)&quot;]:::done
+        SOIL[&quot;Soil group: HYSOGs250m&quot;]:::done
+        DEM[&quot;SRTMGL3 DEM, 90m&lt;br/&gt;grid-nested to WWF-SIPA&#39;s grid&quot;]:::done
     end
 
-    subgraph BASELINE[&quot;WWF-SIPA baseline path — already run, output shared earlier&quot;]
-        BASECNKC[&quot;WWF-SIPA&#39;s own Kc/CN&lt;br/&gt;biophysical_template_PH_revised.csv&lt;br/&gt;+ CN_A-D raster overrides&quot;]:::done
-        BASERUN[&quot;WWF-SIPA baseline run&lt;br/&gt;completed earlier, output shared 2026-09-14&quot;]:::done
+    subgraph REF[&quot;Reference: WWF-SIPA parameters&quot;]
+        HER30[&quot;WWF-SIPA&#39;s own 30m run&quot;]:::done
+        REFRUN[&quot;Her CN + Kc through our pipeline (09h)&lt;br/&gt;reproduces the 30m run, r=0.92&lt;br/&gt;= reference for all comparisons&quot;]:::done
     end
 
-    subgraph NCPPATH[&quot;NCP Kc/CN path — this project, 2026-09-14/15&quot;]
-        DEM[&quot;NCP&#39;s own SRTMGL3 DEM&lt;br/&gt;not in WWF-SIPA inputs — assumed,&lt;br/&gt;still needs confirmation&quot;]:::progress
-        CROSSWALK[&quot;NCP Kc/CN biophysical table&lt;br/&gt;hand-built 12-class to ESA CN crosswalk&lt;br/&gt;plus EVI-regression Kc&lt;br/&gt;07b_build_biophysical_table_becky_inputs.py&quot;]:::done
-        PLACEHOLDER[&quot;Flat 18-events/month placeholder&lt;br/&gt;real product blocked — 2 inspring bugs,&lt;br/&gt;one patched, one deliberately deferred&quot;]:::blocked
-        NCPRUN[&quot;inspring.execute()&lt;br/&gt;NCP Kc/CN run&lt;br/&gt;COMPLETE, 2026-09-14/15&quot;]:::done
+    subgraph OURS[&quot;Our parameters (global data)&quot;]
+        CN[&quot;CN: GCN250 via ESA crosswalk&lt;br/&gt;+ HYSOGs soil group per pixel (07b)&quot;]:::done
+        KCF[&quot;Kc forest: Negrón Juárez 2008 (07d)&quot;]:::done
+        KCG[&quot;Kc grass/shrub: Oliveira 2015 (07e)&quot;]:::done
+        KCN[&quot;Kc other classes: Kamble on NDVI,&lt;br/&gt;per pixel (07g, fixes EVI error)&quot;]:::done
+        KCP[&quot;Kc paddy: FAO-56 rice + Sacks calendar&lt;br/&gt;+ MapSPAM rice share (07h)&quot;]:::done
+        OURRUN[&quot;Our current run (09n)&quot;]:::done
     end
 
-    subgraph COMPARE[&quot;Direct comparison, 2026-09-15&quot;]
-        PIXEL[&quot;Pixel-wise comparison&lt;br/&gt;WWF-SIPA resampled to NCP&#39;s coarser grid&quot;]:::done
-        MAPS[&quot;Interactive map + scatter plots&lt;br/&gt;colored by WWF-SIPA LULC class&quot;]:::done
-        FINDING[&quot;Finding: QF ratio 0.20-1.31 by class,&lt;br/&gt;non-uniform — CN/Kc a real contributor&lt;br/&gt;B flips direction entirely — unexplained&quot;]:::done
+    subgraph RESULT[&quot;Comparison against the reference (20)&quot;]
+        OVERALL[&quot;Baseflow 1.03x overall (r=0.66)&lt;br/&gt;forest ~1.3x, most classes close&quot;]:::done
+        CROP[&quot;Gap concentrated in annual crop (2.0x)&lt;br/&gt;her CN alone brings it to 1.25x:&lt;br/&gt;cropland CN is the main open problem&quot;]:::done
     end
 
-    LULC --&gt; BASECNKC
-    LULC --&gt; CROSSWALK
-    PRECIP --&gt; BASERUN
-    PRECIP --&gt; NCPRUN
-    ET0 --&gt; BASERUN
-    ET0 --&gt; NCPRUN
-    RAINEV --&gt; BASERUN
-    RAINEV -.-&gt; PLACEHOLDER
-    BASECNKC --&gt; BASERUN
-    DEM --&gt; NCPRUN
-    CROSSWALK --&gt; NCPRUN
-    PLACEHOLDER --&gt; NCPRUN
-    BASERUN --&gt; PIXEL
-    NCPRUN --&gt; PIXEL
-    PIXEL --&gt; MAPS --&gt; FINDING
+    subgraph NEXT[&quot;Next&quot;]
+        CROPCN[&quot;Cropland CN (runoff):&lt;br/&gt;main remaining gap&quot;]:::todo
+        TABLE[&quot;Global cropland table:&lt;br/&gt;Köppen x crop group x water regime&lt;br/&gt;scoped: 9 cells = 80% of crop area&quot;]:::progress
+        REPO[&quot;Move SWY to its own repo&lt;br/&gt;for handover&quot;]:::todo
+    end
+
+    LULC --&gt; CN
+    LULC --&gt; OURRUN
+    SHARED --&gt; REFRUN
+    HER30 -.-&gt;|check| REFRUN
+    KCF --&gt; OURRUN
+    KCG --&gt; OURRUN
+    KCN --&gt; OURRUN
+    KCP --&gt; OURRUN
+    CN --&gt; OURRUN
+    SHARED --&gt; OURRUN
+    REFRUN --&gt; OVERALL
+    OURRUN --&gt; OVERALL
+    OVERALL --&gt; CROP
+    CROP --&gt; CROPCN
+    CROP --&gt; TABLE
 
     subgraph LEGEND[&quot;Legend&quot;]
         direction LR
         LDONE[&quot;Done&quot;]:::done
-        LPROG[&quot;In progress / unconfirmed&quot;]:::progress
-        LBLOCK[&quot;Blocked&quot;]:::blocked
+        LPROG[&quot;Started / scoped&quot;]:::progress
+        LTODO[&quot;Not started&quot;]:::todo
     end
 
     classDef done fill:#c8e6c9,stroke:#2e7d32,color:#1b1b1b
     classDef progress fill:#fff9c4,stroke:#f9a825,color:#1b1b1b
-    classDef blocked fill:#ffcdd2,stroke:#c62828,color:#1b1b1b
+    classDef todo fill:#f5f5f5,stroke:#9e9e9e,color:#1b1b1b
 </pre>
 </div>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-workflow-philippines-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure 1: Philippines Kc/CN comparison: WWF-SIPA baseline vs. NCP Kc/CN run, both paths side by side.
+Figure 1: Philippines Kc/CN comparison, status 2026-09-25: shared inputs, the reference run, our parameter chain, the result, and next steps.
 </figcaption>
 </figure>
 </div>

@@ -64,15 +64,12 @@ conflate mid-conversation:
    anywhere in this project.**
 2. **`inspring`** (`github.com/springinnovate/inspring`) — Rich's extended research fork of the SWY
    model. Same core science as stock InVEST. **This is what this project calls** — directly, via
-   `inspring.seasonal_water_yield.execute()`. **Correction, 2026-09-14**: an earlier version of this
-   document claimed `inspring` additionally accepts direct raster overrides for CN and Kc
-   (`cn_a/b/c/d_path`, `kc_1...12_path`). Direct inspection of `execute()`'s actual source, prompted
-   by debugging an unrelated alignment-step crash during the Philippines/Becky-inputs comparison run,
-   found no such parameters anywhere in the function — CN and Kc come **only** from the lucode-indexed
-   CSV biophysical table (`biophysical_table_path` + `lucode_field`), the same convention as stock
-   InVEST. That earlier claim was wrong; see "How CN and Kc actually get fed to the model" below for
-   the corrected version, and the open question this raises about where the raster-override idea
-   originally came from.
+   `inspring.seasonal_water_yield.execute()`. CN and Kc can come either from the lucode-indexed CSV
+   biophysical table (`biophysical_table_path` + `lucode_field`, the stock InVEST convention) or,
+   per factor, from a per-pixel raster override (`cn_a_path`...`cn_d_path`,
+   `kc_1_path`...`kc_12_path`). A 2026-09-14 note in this document said the override did not
+   exist; that note was wrong and was retracted 2026-09-24, see "How CN and Kc actually get fed to
+   the model" below.
 3. **`swy_global`** (`github.com/springinnovate/swy_global`) — Rich's *orchestration layer* on top of
    `inspring`, built for running SWY at planetary scale: it splits a watershed vector into per-basin
    jobs, pre-warps every input to each job's local UTM zone, runs each basin through `inspring` in
@@ -132,34 +129,35 @@ precipitation-vs-ET0 question above; they're unrelated limitations of the same p
 
 ## How CN and Kc actually get fed to the model
 
-**Corrected 2026-09-14** — this section previously described a raster-override capability that does
-not exist in the code this project actually runs; see the correction note above.
+`inspring.seasonal_water_yield.execute()` has two routes for each of `cn_a`...`cn_d` and
+`kc_1`...`kc_12` (`_TABLE_BASED_BIOPHYSICAL_FACTORS` and `_reclassify_or_clip()`,
+`inspring/src/inspring/seasonal_water_yield/seasonal_water_yield.py:91-143`):
 
-InVEST's documented convention, and the **only** mechanism `inspring.seasonal_water_yield.execute()`
-(`github.com/springinnovate/inspring`) actually has, is a lucode-indexed biophysical table — one CSV
-row per land-cover class, columns for `CN_A`/`CN_B`/`CN_C`/`CN_D` and `Kc_1`...`Kc_12`, joined to
-`lulc_raster_path` via `lucode_field`. Confirmed by reading `execute()`'s source directly (a cached
-clone of the same commit the project's own Dockerfile builds from) — there is no `cn_a_path`,
-`kc_1_path`, or any per-factor raster-override parameter anywhere in the function. `lulc_raster_path`
-is therefore always required, not optional.
+1. **Raster override.** If `args` contains `{factor}_path`, that raster is bilinearly warped onto
+   the model grid and used directly, per pixel. The biophysical table's column for that factor is
+   ignored.
+2. **Table.** Otherwise the factor is reclassified from `lulc_raster_path` through the
+   lucode-indexed biophysical table (`biophysical_table_path` + `lucode_field`), one value per
+   land-cover class.
 
-Both Borneo and the Philippines (own-LULC and Becky's-LULC comparison) runs use this table-based
-route, and it is not a stopgap for something better — it is the only route this codebase offers.
-`07_build_biophysical_table.py` (own-LULC runs) and `07b_build_biophysical_table_becky_inputs.py`
-(Becky's-LULC comparison) both produce that table by computing CN and Kc as **per-lucode-class**
-values (zonal-mean NDVI/EVI per class, GCN250 CN per class) rather than truly per-pixel-continuous —
-this is a real resolution cost relative to GCN250's and the NDVI/EVI regression's native per-pixel
-granularity, imposed by the table format, not a choice this project made freely.
+The two can be mixed: the Philippines Kc runs from `09i` onward pass `kc_1_path`...`kc_12_path`
+while CN still comes from the table (and varies per pixel anyway, through the soil-group raster
+inside `cn_op()`). Verified 2026-09-24 against the source installed in the `swy_borneo_run:rainfix4`
+Docker image that every Philippines run uses, and empirically: `09k`'s model-side Kc raster
+(`cache_dir/kc_7_*.tif`) holds 1,210 distinct values, not one per class.
 
-**Open question worth raising with Rich, not yet resolved**: where the earlier raster-override
-claim came from. Two live possibilities — either an older/different `inspring` branch had it and it
-was later removed, or it was a documentation error not grounded in this project's own code reading in
-the first place. The WWF-SIPA Philippines `.ini` (`wwf_PH_baseline_historical_climate.ini`, in
-`INPUTS_SP/`, received 2026-09-14) does reference `CN_A_PATH`...`CN_D_PATH` raster-override keys, plus
-several other parameter names (`TARGET_PIXEL_SIZE`, `GLOBAL_PIXEL_SIZE_DEG`,
-`SOIL_HYDROLOGIC_GROUP_RASTER_PATH` + `SOIL_HYDROLOGIC_MAP`) that don't match this `execute()`
-signature either — strong evidence the WWF-SIPA workflow runs a different wrapper or fork, not
-evidence that this project's own `inspring` build supports raster overrides.
+A 2026-09-14 note here claimed the override did not exist and that the table was the only route.
+That was wrong, retracted 2026-09-24. The earlier table-only runs (`07_build_biophysical_table.py`,
+`07b_build_biophysical_table_becky_inputs.py`, per-class zonal-mean NDVI/EVI) were therefore a
+choice, not a constraint of the code. From `07g_build_kc_ndvi_perpixel.py` onward, every vegetated
+class in the Philippines Becky-inputs runs gets per-pixel Kc.
+
+The WWF-SIPA Philippines `.ini` (`wwf_PH_baseline_historical_climate.ini`, in `INPUTS_SP/`)
+references `CN_A_PATH`...`CN_D_PATH` and several parameter names (`TARGET_PIXEL_SIZE`,
+`GLOBAL_PIXEL_SIZE_DEG`, `SOIL_HYDROLOGIC_GROUP_RASTER_PATH` + `SOIL_HYDROLOGIC_MAP`) that don't
+match this `execute()` signature, which suggests the WWF-SIPA workflow calls it through its own
+wrapper (plausibly `swy_global`, see below). The override keys themselves are consistent with this
+project's `inspring`.
 
 ### Two CN tables — a real distinction, not duplication
 
@@ -286,6 +284,21 @@ as precise.
 size of its effect on Borneo/Philippines specifically is still unknown.** Concrete next steps, not
 yet done: switch NDVI→EVI in the Kc pipeline; obtain and read Juarez et al. (2008) for an actual
 tropical-forest calibration reference. Don't present current forest Kc as validated until then.
+
+**Correction, 2026-09-24: Kamble's coefficients were applied to EVI.** The NDVI→EVI switch above
+was made (2026-09-14, `07b_build_biophysical_table_becky_inputs.py`) by feeding EVI into Kamble's
+NDVI-fitted $K_c = 1.457 	imes NDVI - 0.1725$ unchanged. Glenn et al.'s point is that EVI is a
+better *predictor* of ET; it doesn't make coefficients fitted on NDVI transfer to EVI. On the
+Philippines MOD13A3 data EVI runs at ~65% of NDVI for the same pixels, so every class on that
+pathway got a Kc biased low, and not uniformly: Closed Forest drops from the highest-Kc class
+(NDVI-based) to fourth (EVI-based), Spearman r=0.88 across the 9 vegetated classes
+(`analysis/scratch_evi_ndvi_kc_pattern_check.py`). Fixed by `07g_build_kc_ndvi_perpixel.py`:
+Kamble applied per pixel to NDVI, the index it was fit on, for the classes that still use it
+(Annual Crop, Perennial Crop, Mangrove, Marshland/Swamp, Open/Barren). NDVI saturation at high
+biomass, the original reason for EVI, matters mostly for forest, which has its own EVI-native model
+(Negrón Juárez, `07d`); grassland/shrub has Oliveira's (`07e`). Annual-mean Kc for the fixed classes
+rose by 1.6-2.7× (Annual Crop 0.475→0.806, Perennial Crop 0.630→0.990, Mangrove 0.372→0.876,
+Marshland 0.549→0.909, Open/Barren 0.230→0.624; `kc_ndvi_perpixel_2020/class_kc_summary.csv`).
 
 The three are merged per-pixel via a land-cover mask (crop / non-crop-vegetation / non-vegetated) —
 a much smaller artifact than a full lucode-indexed biophysical table, since CN and Kc are otherwise
@@ -448,6 +461,11 @@ the WWF-SIPA table's flat per-class values. The two disagree substantially for f
 | Mangrove Forest | 1.1 | 0.33–0.42 |
 | Marshland/Swamp | 0.47 | 0.49–0.60 |
 
+*Superseded 2026-09-24*: the EVI-derived values in this table carry the Kamble-on-EVI calibration
+error described in the Kc section above, so their agreement with @corbari2017 below is not evidence
+for either number. Forest Kc now comes from Negrón Juárez (`07d`), mangrove/marshland from
+per-pixel NDVI Kamble (`07g`).
+
 The Closed Forest result lands directly in the same direction as @corbari2017's real forest Kc
 measurements (lower than standard flat-1.0-style assumptions) — see the Kc open-problem discussion
 above. **This is not a validation of either number** — Kamble's regression is still cropland-
@@ -465,9 +483,9 @@ vegetation. Worth remembering if Open/Barren area matters to the final compariso
 Four separate, genuine problems surfaced getting this run to actually execute — worth recording
 plainly since it's easy to conflate "the run didn't work" with "the method is wrong":
 
-1. **The `inspring` raster-override claim in earlier drafts of this document was incorrect.**
-   Direct source inspection found no such capability — see the correction notes earlier in this
-   document. Resolved by using the table-based route, this codebase's only route.
+1. **Kc/CN input route.** This run used the table route; the per-pixel raster override was
+   believed not to exist at the time (a 2026-09-14 error, retracted 2026-09-24, see "How CN and
+   Kc actually get fed to the model").
 2. **CRS mismatch**: the WWF-SIPA LULC is UTM 32651 (meters); the DEM/precip/ET0/soil-group are
    WGS84 (degrees). `align_and_resize_raster_stack` doesn't reproject across CRSs itself. Fixed by
    reprojecting the WWF-SIPA LULC to WGS84 first (GDAL Warp, mode resampling, output resolution
@@ -620,9 +638,6 @@ and low-stakes all the way to the outlet there too.
   they're mid-basin, not terminal, so even where a dam is unlikely to be sited directly on flat,
   low-lying floodplain terrain, a wrong CN there could still bias routed baseflow/quickflow further
   downstream. A real, direct question for Becky, not an assumption either way.
-- **Where did the raster-override claim in earlier drafts of this document come from?** Direct
-  source inspection 2026-09-14 found no such capability in this project's actual `inspring` build —
-  see the correction notes above. Worth asking Rich whether an older/different branch ever had it.
 - **Two more real upstream `inspring` bugs, found 2026-09-14, undocumented until now**: both in the
   `user_defined_rain_events_dir` code path — `interpolate_list` sized before that path's rasters are
   added to the alignment list (patched, see `Python_scripts/swy_borneo_run/Dockerfile`), and

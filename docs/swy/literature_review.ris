@@ -334,3 +334,106 @@ DO  - 10.1029/2005RG000183
 UR  - https://doi.org/10.1029/2005RG000183
 N1  - Source mission for SRTMGL3, the DEM used for the Borneo SWY test. Added 2026-09-10 — was previously used in this project without a formal citation.
 ER  -
+
+TY  - JOUR
+AU  - Beck, Hylke E.
+AU  - Zimmermann, Niklaus E.
+AU  - McVicar, Tim R.
+AU  - Vergopolan, Noemi
+AU  - Berg, Alexis
+AU  - Wood, Eric F.
+PY  - 2018
+TI  - Present and future Köppen-Geiger climate classification maps at 1-km resolution
+JO  - Scientific Data
+VL  - 5
+SP  - 180214
+DO  - 10.1038/sdata.2018.214
+UR  - https://www.nature.com/articles/sdata2018214
+N1  - Added 2026-09-22. Global 1km, 30-class Köppen-Geiger climate classification -- downloaded (figshare DOI 10.6084/m9.figshare.6396959) to data/swy/shared/koppen_geiger/. This is the climate-zone routing key for the cropland side of the CN/Kc biome-correction registry (docs/swy/cn_kc_biome_coverage_registry.md) -- WWF biome doesn't have a cropland category at all, so cropland Kc corrections (e.g. Kamble et al. 2013, validated for temperate semi-arid-to-subhumid dryland row-crop agriculture, not tropical paddy) need Koppen zone x crop type instead. Co-author Zimmermann is also on Karger et al. 2017 (CHELSA), already in this project's reference list -- same research community, not an unrelated find.
+ER  -
+
+TY  - JOUR
+AU  - Nagler, Pamela L.
+AU  - Morino, Kiyomi
+AU  - Murray, R. Scott
+AU  - Osterberg, Jeff
+AU  - Glenn, Edward P.
+PY  - 2009
+TI  - An Empirical Algorithm for Estimating Agricultural and Riparian Evapotranspiration Using MODIS Enhanced Vegetation Index and Ground Measurements of ET. I. Description of Method
+JO  - Remote Sensing
+VL  - 1
+IS  - 4
+SP  - 1273
+EP  - 1297
+DO  - 10.3390/rs1041273
+UR  - https://www.mdpi.com/2072-4292/1/4/1273
+N1  - Read in full 2026-09-22 (user obtained the PDF, now in docs/swy/literature_pdfs/nagler2009.pdf), confirming and sharpening the earlier WebSearch-summary version of this note. Equation confirmed exactly: EToF = 1.22 x EVI* (r2=0.55 for saltcedar alone, "low predictive power" -- the paper's own words -- improving somewhat pooled across plant types; ~20% error overall). Real, previously-missed caveat: EVI* is NOT raw EVI -- it's rescaled via EVI* = 1-(EVImax-EVI)/(EVImax-EVImin), using EVImax=0.542/EVImin=0.091 taken from a prior study of three specific western riparian zones. Those bounds are locally-derived, not universal -- reusing them for a totally different vegetation type (e.g. closed-canopy tropical forest, which would have a much higher real EVImax) without re-deriving EVImax/EVImin would repeat exactly the kind of unvalidated-substitution error already found in this project's own Kamble/EVI use. The paper's own authors explicitly warn against this: "the ecophysiological constraints on EG should be characterized by ground studies in a biome of interest, before remote sensing methods are used to scale physiological functions such as EG" -- a direct statement against blind transfer to a new biome, not an incidental caveat. Study vegetation: alfalfa (irrigated cropland), saltcedar, cottonwood, arrowweed -- desert riparian phreatophytes and irrigated cropland in an extreme low-desert environment (<100mm/yr rainfall), Lower Colorado River, AZ/CA. Solves the "wrong vegetation index" problem Kamble has, not the "wrong ecosystem" problem -- confirmed real fallback candidate for semi-arid/desert riparian and irrigated-cropland Kc specifically, not usable elsewhere without new EVImax/EVImin calibration. Full citation to Negron Juarez et al. 2008 appears in this paper's own reference list (ref. 9) -- same research lineage, already linked in the literature independently of this project's own search.
+ER  -
+
+TY  - JOUR
+AU  - Valle Junior, Luiz Claudio Galvão do
+AU  - Rodrigues, Dulce Buchala Bicca
+AU  - Oliveira, Paulo Tarso Sanches de
+PY  - 2019
+TI  - Initial abstraction ratio and Curve Number estimation using rainfall and runoff data from a tropical watershed
+JO  - Revista Brasileira de Recursos Hidricos
+VL  - 24
+SP  - e5
+DO  - 10.1590/2318-0331.241920170199
+UR  - https://doi.org/10.1590/2318-0331.241920170199
+N1  - Read in full 2026-09-22 (open access, PDF in docs/swy/literature_pdfs/vallejunior2019.pdf). NOT a match for the "native vs. thinned dry tropical forest" description an earlier search summary suggested -- correcting that here. Real study: Guariroba basin, Midwestern Brazil (Campo Grande, MS), Koppen Am (tropical monsoon, explicitly stated by the paper itself), 73.27% pasture land use, predominantly sandy soil (hydrologic group A, high infiltration), 30 real rainfall-runoff events. Same Oliveira as oliveira2016 (Cerrado) -- same ongoing research program, not a coincidence. The actual, more important finding: the SCS-CN method itself was found NOT SUITABLE for this basin -- negative Nash-Sutcliffe Efficiency across every CN-fitting method tested (median, geometric/arithmetic mean, nonlinear least-squares, and asymptotic fit under most configurations), "complacent" behavior (CN keeps declining with storm size rather than approaching a stable value), attributed to runoff being dominated by subsurface stormflow rather than the Hortonian infiltration-excess mechanism CN assumes. A simple linear runoff coefficient model (Q=CP, C~0.025) fit far better (R2=0.71, NSE=0.66, PBIAS=-2.02, all "good" by the paper's own thresholds) than any CN variant. This parallels Liu et al. 2017's EBF finding (Kc not correlating with vegetation index at all) -- a second, independent case of "the standard model framework itself breaks down here," not just "needs different parameters." Relevant biome: land use is pasture-dominated, closer to Tropical & Subtropical Grasslands/Savannas/Shrublands than to dry broadleaf forest -- directly answers the open question already flagged elsewhere (whether Oliveira 2016/Cerrado-style findings extend beyond the flooded-grasslands variant). Also: median initial abstraction ratio lambda=0.045 vs. the NRCS standard 0.2, reinforcing the broader pattern that standard US-derived CN parameters don't transfer to tropical settings.
+ER  -
+
+TY  - JOUR
+AU  - Negrón Juárez, Robinson I.
+AU  - Goulden, Michael L.
+AU  - Myneni, Ranga B.
+AU  - Fu, Rong
+AU  - Bernardes, Sergio
+AU  - Gao, Huilin
+PY  - 2008
+TI  - An empirical approach to retrieving monthly evapotranspiration over Amazonia
+JO  - International Journal of Remote Sensing
+VL  - 29
+IS  - 24
+SP  - 7045
+EP  - 7063
+DO  - 10.1080/01431160802226026
+UR  - https://www.tandfonline.com/doi/full/10.1080/01431160802226026
+N1  - Read in full 2026-09-22 (user obtained the PDF via institutional access, docs/swy/literature_pdfs/negronjuarez2008.pdf). DOI confirmed correct via Crossref; "H. Gao" is real, the sixth of six co-authors, not a misattributed lead. This is the paper this project has been trying to obtain for months, and it's genuinely more valuable than Kamble or Nagler -- but structurally different from both, not a drop-in swap. The model is NOT a simple Kc=a*EVI+b regression: ET = C1 + C2*EVI^C3*(Rn-C4), EVI combined multiplicatively with net radiation (from ISCCP), not alone. Fitted general model (ET_grl): C1=2.7, C2=0.05, C3=1.75, C4=140. Trained/validated on 8 upland tropical rainforest flux-tower sites across the Brazilian Legal Amazon (K83, RJA for training; K67, K34 for validation; CRS, DCK, SIN, BRG for comparison) -- genuinely tropical rainforest, unlike Kamble (temperate cropland) or Nagler (desert riparian/irrigated cropland). R2 between modelled and observed ET: 0.61 (K83), 0.55 (K67), 0.8 (K34), but only 0.31 (RJA, where the model also overestimated the annual maximum) -- real, honestly mixed validation, not uniformly strong. Average error ~17%, up to ~30% at the weakest site. Real adoption costs, not a quick fix: (1) needs a net-radiation input layer (ISCCP or equivalent) not currently in this project's Philippines pipeline, in addition to EVI; (2) the fitted constants (especially C4, an Rn offset) are Amazon-specific -- the closest ecosystem analog found so far for tropical moist broadleaf forest, but still a different tropical region (Amazon vs. Philippines/SE Asia), and would need at least a plausibility check, likely re-fitting, before real use; (3) the paper's own conclusion explicitly flags that further study is needed before applying it to land-cover-converted areas, i.e. validated for intact upland forest specifically. Doesn't resolve the Liu et al. 2017 question (whether tropical forest Kc is fundamentally energy-limited rather than vegetation-index-limited) so much as sidestep it -- the multiplicative EVI-times-(Rn-C4) form already builds in an energy term rather than relying on vegetation index alone the way Kamble/Nagler do, consistent with that concern.
+ER  -
+
+TY  - JOUR
+AU  - Liu, Chunwei
+AU  - Sun, Ge
+AU  - McNulty, Steven G.
+AU  - Noormets, Asko
+AU  - Fang, Yuan
+PY  - 2017
+TI  - Environmental controls on seasonal ecosystem evapotranspiration/potential evapotranspiration ratio as determined by the global eddy flux measurements
+JO  - Hydrology and Earth System Sciences
+VL  - 21
+SP  - 311
+EP  - 322
+DO  - 10.5194/hess-21-311-2017
+UR  - https://hess.copernicus.org/articles/21/311/2017/
+N1  - Added 2026-09-22, full text actually read (open access, Copernicus/EGU, no paywall) after a WebSearch summary made it sound like a bigger win than it turned out to be -- worth being precise about what it does and doesn't give us. Global synthesis of Kc (= AET/PET) from 81 FLUXNET eddy-flux sites across 7 IGBP land-cover types, with multiple linear regression models (Table 1) using LAI + site latitude + monthly precipitation as predictors, by land cover and season. Real limitation for this project's actual need: only 5 evergreen broadleaf forest (EBF) sites total, and the paper states most sites are 30-60N, "except three EBF sites" -- almost certainly not dominated by genuine equatorial tropical rainforest the way Negron Juarez (Amazonia-specific) would be. The EBF regression has NO significant LAI/latitude/precipitation relationship in summer or fall (flat constant only, 0.911/0.798), and the paper's own validation explicitly flags EBF (with CRO and OS) as not satisfactorily validated (Fig. 8, off-1:1-line slopes). Uses LAI, not NDVI/EVI, as the vegetation predictor -- not a direct drop-in for a Kc=a*EVI+b form. Genuinely important finding, not just a limitation: EBF is the ONLY land cover in this whole study where Kc does not correlate with the vegetation-index-type variable (LAI) at all -- suggests EBF/tropical forest ET may be fundamentally energy/radiation-limited rather than vegetation-structure-limited, which would mean the whole family of vegetation-index-regression approaches (Kamble, an EVI-adjusted version, this paper's own LAI regression) may be structurally the wrong kind of model for tropical forest Kc, not just missing better-fit coefficients -- worth raising with Becky/Rich directly. One solid usable number regardless: mean annual EBF Kc = 0.75 (+/-0.03) across this study's sites, a real global reference/sanity-check value, though not tropical-specific enough to replace a real regression.
+ER  -
+
+TY  - JOUR
+AU  - Oliveira, Paulo Tarso S.
+AU  - Wendland, Edson
+AU  - Nearing, Mark A.
+AU  - Scott, Russell L.
+AU  - Rosolem, Rafael
+AU  - da Rocha, Humberto R.
+PY  - 2015
+TI  - The water balance components of undisturbed tropical woodlands in the Brazilian cerrado
+JO  - Hydrology and Earth System Sciences
+VL  - 19
+SP  - 2899
+EP  - 2910
+DO  - 10.5194/hess-19-2899-2015
+UR  - https://hess.copernicus.org/articles/19/2899/2015/
+N1  - Found and read in full 2026-09-23 (open access, Copernicus/HESS, no paywall), while searching for a grassland/savanna/shrubland Kc source to fill the registry's "not yet checked" gap for that biome. Same P.T.S. Oliveira as oliveira2016 (the existing Cerrado CN-analog citation for Flooded Grasslands) and a co-author on vallejunior2019 (tropical pasture, CN framework breaks down) -- one coherent Brazilian Cerrado hydrology research program feeding three separate registry cells, not a coincidence. Two real cerrado savanna-woodland sites (PDG, IAB, "cerrado sensu stricto denso," 50-70% arborous cover, 5-8m trees, Koppen Cwa humid subtropical -- a savanna WOODLAND physiognomy, closer to Brush/Shrubs than open Grassland in WWF-SIPA's own typology, worth being precise about). Empirical ET model, following the same Nagler et al. (2013) structural form already known from nagler2009: ET = ETo[a(1-e^(-b*EVI)) - c], fitted via genetic algorithm against PDG flux-tower data (2001-2003): a=10.36, b=12.31, c=9.74. R2=0.73 (daily, full time series), R2=0.78 (monthly), RMSE ~17-21% (daily) -- comparable error magnitude to Negron Juarez's own ~17% average. Annual ET: 822 mm/yr (PDG, model-fit site) and 823 mm/yr (IAB, independent validation site, using field-measured water-balance components) -- essentially identical, real cross-site consistency, not just a single-site fit. Real candidate for the Tropical & Subtropical Grasslands/Savannas/Shrublands Kc cell; doesn't conflict with vallejunior2019's CN-framework-breaks-down finding since that's about runoff generation (CN), this is about ET/Kc, separate mechanisms in the SWY model.
+ER  -

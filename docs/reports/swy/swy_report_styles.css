@@ -150,6 +150,15 @@ table.terms td:last-child { color: var(--ink-2); }
 #tab-un:checked ~ .panels .panel-un,
 #tab-in:checked ~ .panels .panel-in { display: block; }
 
+/* Scatter-plot tabsets (Comparison, Decomposing the gap) — same CSS-only pattern, new IDs */
+.map-tabs img { max-width: 100%; display: block; border-radius: 3px; }
+#tab-cmp-qf:checked ~ .panels .panel-cmp-qf,
+#tab-cmp-b:checked ~ .panels .panel-cmp-b,
+#tab-fact-hercn:checked ~ .panels .panel-fact-hercn,
+#tab-fact-herkc:checked ~ .panels .panel-fact-herkc,
+#tab-fact-hercnkc:checked ~ .panels .panel-fact-hercnkc,
+#tab-fact-nj:checked ~ .panels .panel-fact-nj { display: block; }
+
 .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px 24px; margin-top: 14px; }
 @media (max-width: 620px) { .chart-grid { grid-template-columns: 1fr; } }
 .panel-title { font-size: 13.5px; font-weight: 650; color: var(--ink); margin-bottom: 2px; }
@@ -174,3 +183,9 @@ code { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 11p
 
 /* quiet quarto's default chrome we don't want */
 #quarto-margin-sidebar, nav.quarto-secondary-nav, #quarto-header { display: none !important; }
+
+/* bordered cells for the report's plain markdown tables (not the map popup or term tables) */
+table:not(.swy-popup-table):not(.terms) { border-collapse: collapse; margin: 10px 0; }
+table:not(.swy-popup-table):not(.terms) th,
+table:not(.swy-popup-table):not(.terms) td { border: 1px solid var(--line); padding: 6px 10px; }
+table:not(.swy-popup-table):not(.terms) th { background: rgba(0, 0, 0, 0.035); }

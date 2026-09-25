@@ -1490,3 +1490,378 @@ behavior "might provide a better perspective" on what to refine and which paths 
 softer, more exploratory claim than "here is the fix," and the report was deliberately kept to a
 one-line pointer at this raw detail rather than the full breakdown, per direct instruction that the
 report is for someone (WWF-SIPA) without time to read a long, sophisticated document.
+
+## 2026-09-22 — inspring PRs opened; Becky's homogeneity pushback leads to a real CN/Kc coverage-registry architecture; three real papers obtained and read in full
+
+**inspring**: both fixes deferred from the prior session's low-context stopping point were made
+real. Fork remote set up (`git@github.com:Cumaribo/inspring.git` as `origin`, `springinnovate/
+inspring` as `upstream`). Packaging fix: `setup.py`'s `packages` list was missing not just
+`inspring.seasonal_water_yield` (as previously documented) but also `inspring.floodplain_extraction`
+— both have real `.py` modules alongside their Cython cores, both omitted; `Dockerfile`'s two dead
+`requirements.txt` references removed rather than reconstructed, since git history showed the last
+version before its 2022 deletion was actually natcap.invest's own requirements file, not inspring's.
+Rain-events fix: verified line-for-line against current `upstream/main` (still e333835, 2025-02-11,
+unchanged) that all three `user_defined_rain_events_dir` bugs plus the resampling issue are exactly
+where the already-tested Dockerfile patch anchors on. Both committed by the user to their fork
+(commit messages written to scratchpad files and applied via `git commit -F` after a heredoc/CRLF
+paste failure in the user's Git Bash — a known Windows trap, not user error), PRs opened against
+`springinnovate/inspring:main`. `root_depth` (accepted via table or raster-override, confirmed via
+direct trace through `_calculate_curve_number_raster()` to never actually feed into CN, quickflow,
+or local recharge) filed as a plain issue, not a PR, per the user's call.
+
+**Data package sent to Becky**, per her direct request to load both runs into a viewer:
+`data/swy/philippines/shared_data_philipines/` (user renamed from `package_for_becky_viewer/`
+mid-upload, same content), split into `inputs/`/`outputs/` at her request, README as data
+dictionary with an explicit provenance section (her delivered files vs. our computed ones vs. the
+one deliberate mix). Two real corrections made before sending: her baseline QF/B kept under her own
+exact original filenames rather than renamed (more trustworthy); the DEM's description corrected
+from an overclaim ("her SRTM GL3 data") to an explicit unconfirmed-assumption caveat, since her
+`INPUTS_SP` folder and `.ini` never actually specify a DEM path.
+
+**Becky's real pushback, and what it led to**: "I'm worried the way you've done it is too
+homogenous... misses the spatial variability we see in the original runs." Verified, not just
+reassured: GCN250 is a categorical lookup (land cover crosswalked into classical NRCS NEH-630
+categories, then a table value read off per category × soil group) with zero geographic
+differentiation by design — the product's own documented limitation, now with concrete numbers.
+Pulled both CN tables directly and compared CN_B class by class: WWF-SIPA's cropland-to-forest CN
+gap is 18 points (78→60); this project's is 12 (68→56) — cropland specifically compressed toward
+natural-class behavior, not a general "less contrast everywhere" pattern (brush/grassland are
+actually *more* bunched in her table than ours). Separately, walking her through the CN/Kc
+mechanism step by step (she asked directly: "this just shows Kc in the table like usual... walk me
+through what you did") surfaced a real, previously-uncaught gap: the Kamble et al. (2013) Kc
+regression was fit on NDVI, but this project's `07b_build_biophysical_table_becky_inputs.py`
+substitutes EVI into the same coefficients, unvalidated, following Rich's earlier NDVI-saturation
+concern without re-deriving the regression for the new index.
+
+**The architecture that followed, agreed with the user across several exchanges**: not a
+Philippines-specific fix, but a systematic coverage registry, because "different locations/crops/
+biomes behave differently... a single solution applicable homogeneously globally is not feasible...
+but we don't need to parametrize hundreds of individual model runs to handle that." The registry
+(`docs/swy/cn_kc_biome_coverage_registry.md`) sorts land-cover types into three buckets: (1)
+natural vegetation, keyed by WWF terrestrial biome (`data/vector_basedata/Biome.gpkg`, already used
+elsewhere in this project's own 8-service pipeline — not new sourcing, just wiring in) since biome
+captures the climate-and-vegetation-structure variation that actually drives CN/Kc and matches the
+granularity the calibration literature itself organizes around; (2) cropland, keyed by Köppen
+climate zone × crop type instead, since biome describes potential vegetation, not what's actually
+farmed and how (Kamble's own US High Plains calibration is a real landscape-type match wherever
+that climate-and-cropping-system recurs globally, not a US-specific result, once a crop-type layer
+lets it be applied by analog); (3) water and built-up, physically near-universal, no correction
+needed, already handled as fixed values in the existing pipeline. Sourced the Köppen layer same
+day: Beck et al. (2018), 1km global 30-class classification, figshare DOI 10.6084/m9.figshare.
+6396959, downloaded to `data/swy/shared/koppen_geiger/`. Crop-type layer (SAGE/Sacks 2010 or
+MapSPAM candidates) still not sourced.
+
+**Three papers chased down and read in full** (a repeated, useful lesson: WebSearch summaries are
+not reliable enough to build on without reading the actual text — Liu et al. 2017 looked like a
+much bigger win from its abstract than it turned out to be once read properly):
+
+- **Nagler et al. (2009)**, MDPI/Remote Sensing, bot-blocked from automated fetch, obtained by the
+  user directly: real EVI-native equation, `EToF = 1.22×EVI*` (r²=0.55, ~20% error), but `EVI*` is
+  rescaled against locally-derived bounds (EVImax=0.542/EVImin=0.091) from one specific riparian
+  vegetation study, not universal — and the authors explicitly warn against reusing it in a
+  different biome without new ground calibration. Real fallback for semi-arid/desert riparian and
+  irrigated-cropland Kc specifically, confirmed not portable beyond that.
+- **Valle Junior, Rodrigues & Oliveira (2019)**, open access (SciELO/RBRH), obtained by the user:
+  turned out not to be the "native vs. thinned dry tropical forest" study originally hoped for (that
+  lead remains unidentified) but a genuinely bigger finding — in a pasture-dominated, sandy-soil,
+  Köppen-Am basin in Brazil, every CN-fitting method tested returned negative Nash-Sutcliffe
+  Efficiency, and the paper's own conclusion is that the SCS-CN framework itself doesn't describe
+  the runoff mechanism there (subsurface stormflow dominant, not infiltration-excess). A simple
+  linear runoff coefficient (Q=CP, C≈0.025) fit far better. Filed under Tropical & Subtropical
+  Grasslands/Savannas/Shrublands in the registry — a second independent case (with Liu et al.'s EBF
+  finding) of "the standard framework breaks down here," not just "needs different parameters."
+- **Negrón Juárez et al. (2008)**, International Journal of Remote Sensing — the paper this project
+  has been trying to obtain for months, finally obtained via the user's institutional access. DOI
+  confirmed correct via Crossref after an earlier WebSearch had misattributed it to "H. Gao" (real,
+  but the sixth of six co-authors, not a misattributed lead). Genuinely valuable — 8 upland Amazon
+  rainforest flux-tower sites, the first source found actually calibrated on tropical forest rather
+  than borrowed from temperate cropland or desert riparian vegetation — but not a quick fix: the
+  model is `ET = C1 + C2×EVI^C3×(Rn−C4)`, EVI combined multiplicatively with net radiation rather
+  than a simple linear regression, fitted constants C1=2.7/C2=0.05/C3=1.75/C4=140, R² 0.31–0.8
+  across sites (honestly mixed, not uniformly strong). Adopting it needs a net-radiation input layer
+  this pipeline doesn't have, and at minimum a plausibility check of the Amazon-fitted constants
+  against Philippine/SE-Asian forest before reuse — confirmed via a targeted citation search that no
+  one has published a replication or application of this model elsewhere, so there's no shortcut
+  available on the portability question. All three PDFs archived in `docs/swy/literature_pdfs/`
+  (gitignored, real copyrighted content, not for the public repo), full `.ris`/`.bib` entries with
+  complete honest notes on what each source does and doesn't cover.
+
+**A precise correction caught along the way, worth remembering as a pattern**: an early message
+draft to Becky said "a registry tracking, per land-cover type, what real calibration data we've
+found" — wrong. The registry's actual organizing unit is biome (bucket 1) or climate×crop-type
+(bucket 2), not land-cover type — a single biome covers multiple land-cover classes at once.
+Land-cover type is what gets *routed* into a bucket, not what the registry is indexed by. Caught by
+the user directly asking "is that... by land-cover type, or by other unit," not by review.
+
+**Status update drafted and sent to Becky**, covering the architecture, the three-bucket framing,
+both real findings (the tropical-CN-breaks-down case and the Negrón Juárez adoption cost), honestly
+framed as real progress with a real open decision, not a finished fix. The registry file itself
+attached/shared alongside it. **User is stopping here for today and returning to the paper review
+tomorrow** — this SWY thread is paused, not blocking, same pattern as every previous pause this
+month (2026-09-16, -18, -21).
+
+**Update, confirmed sent**: message and registry actually went to Becky 2026-09-22. One real bug
+caught before it went out, worth remembering as a pattern — the registry's own opening line still
+said "tracks, per land-cover type," the exact imprecise phrasing already caught and fixed in the
+message itself, just never carried back into the file. Caught by the user via a direct IDE
+selection, not by review. Fixed. **Next real step: waiting to hear from Becky, no date set yet for
+a meeting on this.**
+
+## 2026-09-23 — Negrón Juárez forest Kc actually built and tested, not just planned; net radiation sourced from scratch; a real "meanwhile" test launched while waiting on Becky
+
+No reply from Becky yet. Rather than let the whole tropical-forest-Kc question sit idle, the user
+proposed a cheaper framing than full recalibration: transfer Negrón Juárez's Amazon-fitted
+constants to the Philippines as-is (no local flux data exists to recalibrate against anyway) and
+let the existing WWF-SIPA comparison framework say whether the transfer holds, the same empirical
+pattern every other CN/Kc question in this investigation has used. This cut the earlier "2-3 day"
+estimate down to real, same-session work.
+
+**Net radiation sourced from NASA POWER, not ERA5-Land** — chosen over ERA5-Land for lower setup
+friction (POWER's regional API needs no account) and because a monthly-mean energy-availability
+term doesn't need ERA5-Land's finer ~9km resolution the way a categorical input like land cover
+would; flagged as a documented, revisitable choice, not a definitive one. Real API constraints
+found only by testing live, not from docs: POWER's regional endpoint caps at 1 parameter per
+request and a max (and min 2°) span per axis on BOTH longitude and latitude, not just latitude as
+first assumed — required 2D tiling (`05b_fetch_net_radiation_power.py`). A second real bug: POWER's
+own radiation parameters (ALLSKY_SFC_SW_DWN, CLRSKY_SFC_SW_DWN) come from a different underlying
+source grid (SYN1DEG, ~1°) than its temperature/humidity parameters (T2M_MAX/MIN, RH2M, MERRA2,
+~0.5°×0.625°) — caught by a shape-mismatch crash, not assumed; fixed by reprojecting everything
+onto the finer grid with bilinear before combining, this pipeline's established rule for continuous
+fields. Net radiation computed via the standard FAO-56 method (eq. 34-39: net shortwave using a
+tropical-forest albedo of 0.13, not FAO-56's 0.23 grass default; net longwave from Tmax/Tmin/RH2M
+and the Rs/Rso clear-sky ratio) — the same derivation FAO's own ETo tools use when POWER is the
+only available input, not an improvised shortcut.
+
+**Output sanity-checked, not just computed**: AOI-wide net radiation ranges 77-217 W/m² across all
+12 months (full year checked, not just a couple of sample months) — physically plausible for the
+tropics. Real, useful finding: five months (Oct-Feb) have substantial fractions of the AOI below
+140 W/m², December worst (79/82 land pixels, mean 117.3).
+
+**Confirmed C4=140 is in W/m², not assumed** — read the actual paper (`docs/swy/literature_pdfs/
+negronjuarez2008.pdf`, eq. 2 and its surrounding text: "RnISCCP (measured in Wm⁻²)... C1=2.7,
+C2=0.05, C3=1.75 and C4=140") rather than trusting the earlier registry note's units. Also newly
+confirmed from the same read: the model outputs ET directly in mm/day, not a Kc value — a real
+implementation step not previously accounted for (Kc_forest = ET_negronjuarez / ETo_daily, using
+this project's own TerraClimate ETo, itself confirmed to be a monthly total needing division by
+days-in-month, not a daily value, by inspecting real pixel values before assuming). Also newly
+confirmed: the paper's own reported Amazon-forest ET range (2-4mm/day) brackets this project's
+completed Borneo run's own AET mean (1288mm/yr ≈ 3.5mm/day) almost exactly — independent, unplanned
+consistency, not tuned to match.
+
+**Worked through what "below the C4 threshold" actually means, since an earlier loose description
+("ET goes to zero") was wrong and needed correcting.** The model is additive
+(`ET=C1+C2×EVI^C3×(Rn−C4)`), not a single term — below C4 the EVI-scaled term flips from adding to
+subtracting rather than zeroing ET out, closer to a light-compensation-point mechanism than a hard
+cutoff. Worked the actual numbers at December's extreme (Rn=77.3, a 62.7 W/m² deficit): ET comes
+out around 1.45 mm/day at a plausible forest EVI (~0.6), not zero. Solving for what EVI would
+actually drive ET negative at that same Rn gives ~0.92 — beyond what EVI typically reaches before
+canopy saturation (the literal reason this project uses EVI over NDVI). So the mechanism engages
+for real, substantially, across a big share of the AOI for several months, but doesn't degenerate
+into a special case needing a floor/clip.
+
+**`07d_build_kc_forest_negronjuarez.py` built**: 12 monthly per-pixel Kc rasters, Negrón Juárez's
+model applied only to Closed Forest (4) and Open Forest (10) — Becky's own WWF-SIPA lulc codes,
+matching the registry's "Tropical & Subtropical Moist Broadleaf Forests" row — every other class
+keeps whatever Kc `07b`'s existing Kamble/EVI regression already gives it, unchanged. Real output:
+forest Kc ranges roughly 0.78-0.90 across the year, in the right neighborhood of Liu et al.
+(2017)'s independent EBF reference point (mean annual Kc=0.75±0.03) without having been tuned
+toward it. **This does not replace EVI as an input or the Kamble/EVI regression generally** — Kamble
+is still what's running for cropland, grassland, shrubland, mangrove, marshland; only forest
+changed, and Negrón Juárez's own formula still consumes EVI, just multiplicatively with net
+radiation instead of as a standalone linear fit.
+
+**`09i_run_swy_ph_negronjuarez_forest_kc.py` launched** — identical to `09e_run_swy_ph_snapped_grid.py`
+(grid-snapped DEM, this project's own CN, real WWF-SIPA rain events/precip/ET0) except
+`kc_1_path`...`kc_12_path` now point at the new forest-Kc rasters instead of leaving Kc to the flat
+per-lucode table. Confirmed `kc_1_path`...`kc_12_path` are real, valid `inspring` args by reading a
+locally cloned copy of `seasonal_water_yield.py`'s actual source directly, not assumed from the
+registry's earlier note. Own workspace (`workspace_becky_inputs_90m_negronjuarez_kc`), own
+`results_suffix`, doesn't touch `09e`'s already-reported numbers. Launched in the background
+(container `hopeful_kapitsa`), log at `data/swy/philippines/diagnostics/09i_run_log.txt`. **Check
+this before assuming done or not-yet-started.**
+
+**Next real step, once `09i` finishes**: compare its QF/B ratio and r against WWF-SIPA's baseline
+the same way as every other cell in the factorial series (`12_scatter_comparison.py`'s pattern),
+specifically against the "our CN + her Kc" cell (B ratio 1.21, r=0.82) — the question is whether a
+tropical-forest-native Kc, generated by this project's own methodology rather than borrowed from
+her, closes more of that remaining gap. This is explicitly a generalizability test, not a
+Philippines-fix-for-its-own-sake — the actual goal is a CN/Kc methodology that doesn't need a local
+expert's hand calibration to work, and Philippines is the one place there's an independent baseline
+to check that against.
+
+**`09i` finished clean, `15_negronjuarez_comparison.py` built (same pattern as `12_scatter_
+comparison.py`, pointed at the new workspace) and run — a real, nuanced result, not a clean win or
+a clean null.**
+
+QF sanity check passes exactly: ratio 0.77, r=0.56, identical to the all-Kamble baseline, confirming
+Kc doesn't touch QF as expected. B's AOI-wide aggregate barely moves (ratio 1.48→1.36, r 0.39→0.38)
+— on its own, that would read as a failed transfer. Broken down by class, it isn't one: **Closed
+Forest's B ratio improved from 1.69 to 1.30, Open Forest from 1.78 to 1.45** (both numbers pulled
+directly from the 2026-09-21 factorial entry for the "before" values, not estimated) — real,
+substantial, exactly the two classes this test actually touched, the overestimation roughly halved
+in both. The aggregate doesn't move because **Annual Crop's B ratio is 5.82** (essentially unchanged
+from the pre-existing 5.998 figure, since cropland Kc wasn't part of this test at all) — one class,
+21.4% of the AOI, distorting the AOI-wide number far more than forest's real improvement can offset.
+Mangrove (2.76, was 2.94) is within noise of unchanged, as expected since its Kc wasn't touched.
+
+**Read precisely, this is a genuine, positive, class-specific validation of the Negrón Juárez
+transfer** — the Amazon-fitted constants, applied unchanged to Philippine forest, moved forest B in
+the right direction, on their own, without borrowing anything from WWF-SIPA. It is not evidence the
+overall Philippines comparison is "fixed," because it was never trying to fix cropland, and cropland
+turns out to be the dominant term in the aggregate statistic. This directly confirms the priority
+call made earlier today from the area breakdown (cropland = 43.7% of the AOI, the single largest
+block) — now confirmed from the actual comparison numbers, not just area share.
+
+Report (`docs/reports/swy/swy_status_report.qmd`), the registry, and this file all updated with the
+real numbers; report re-rendered clean. Scatter plots at `docs/reports/swy/
+swy_ph_negronjuarez_scatter_{qf,b}.png`.
+
+**`09j` (Oliveira grassland/shrub Kc) finished and compared (`17_oliveira_comparison.py`) — a real
+but weaker, more mixed result than forest's, not a clean win.** QF sanity check passes (0.767/0.561,
+unchanged). B aggregate barely moves (1.48→1.478, r 0.39→0.407). Of the two classes actually
+touched: Brush/Shrubs improved modestly (B ratio 0.703→0.746, closer to 1.0); Grassland barely
+moved (0.669→0.665, noise-level). Untouched classes (forest) came back at their exact original
+values, confirming the isolated-variable design held. Consistent with the registry's own caveat
+that Oliveira's calibration sites are savanna *woodland*, a better physiognomic match for
+Brush/Shrubs than open Grassland — real signal for one, essentially none for the other — plus the
+same routing/propagation effect forest's before/after comparison already surfaced (a pixel's own
+Kc change doesn't map cleanly onto that same pixel's own B). Registry, report, and HANDOFF not yet
+updated with this specific result as of this writing (deferred, session running low on tokens,
+paper work is the actual priority right now) — do that before treating this as fully documented.
+
+**Next step, in order**: (1) start the cropland/crop-calendar work (MapSPAM SPAM2020 + Sacks et al.
+2010), the highest-leverage remaining gap by a wide margin, now doubly so given grassland/shrub's
+weaker result; (2) fold `09j`'s result into the registry/report/HANDOFF properly; (3) once cropland
+lands, re-run the full comparison and see where the AOI-wide aggregate actually settles.
+
+**Direct before/after comparison built** (`16_negronjuarez_vs_own_baseline.py`), this project's own
+prior run (`09e`, all-Kamble Kc) vs. `09i` (forest-Kc swapped) directly, no WWF-SIPA involved — a
+different question from the comparison above (how much did this project's own output move, not how
+much closer did it get to hers). Both runs share the exact same grid (same snapped DEM), so this is
+a direct pixel comparison, no resampling.
+
+QF: 100% pixel-identical, zero change anywhere, exactly as expected. B: only 37.6% of pixels
+unchanged — and classes this test never touched show real movement (Built-up -29.8%, Open/Barren
+-27.1%, Mangrove -12.0%, Inland Water +23.3%). **Not a bug** — B is a routed, accumulated quantity,
+not a local function of a pixel's own Kc. Water that infiltrates at a forest pixel and becomes
+baseflow surfaces downstream, wherever the flow network carries it, which can be a built-up or
+barren pixel with no forest nearby. Changing Kc at 22.8% of the AOI (the two forest classes)
+propagates through routing and touches B well beyond that footprint. Worth remembering for how any
+future class-level comparison gets read — "only class X's Kc changed" does not mean "only class X's
+B changed." Coherent with the WWF-SIPA result: forest B dropped substantially (Closed Forest -23.0%,
+Open Forest -17.7%), consistent with the ratio improvement already reported, and that water shows
+up redistributed downstream rather than vanishing.
+
+**Interactive map extended** (`10d_render_output_maps_negronjuarez.py`, new, mirrors `10b`'s
+standalone-layer pattern — no WWF-SIPA comparison/click-popup for this pair, unlike the main QF/B
+layers, since this is still a test run): `09i`'s QF and B added as toggleable viridis layers
+alongside AET/L_sum. `11_build_output_map_html.py` updated to merge three layer sources instead of
+two. Report re-rendered clean.
+
+**Three real bugs found and fixed in the map/tabset work, same session, each caught by the user
+actually looking at the rendered output rather than trusting a "rendered clean" quarto log**:
+1. The user-requested exclusive-layer radio picker and the CSS-only scatter-plot tabsets (replacing
+   `.panel-tabset`, which needs Bootstrap this report's `minimal: true` config strips out) both
+   initially rendered as literal escaped text, not real controls — Quarto runs `{{< include >}}`ed
+   HTML through its Markdown parser, and any line indented 4+ spaces trips Markdown's own
+   "this is a code block" rule. Fixed by removing all leading whitespace from the legend/picker
+   body in `11_build_output_map_html.py` and from the tab markup in the qmd — not just the first
+   offending div, the whole block, since a partial fix (radio rows only) still left
+   `opacitySlider = document.getElementById(...)` returning `null` downstream and threw at runtime,
+   caught via a temporary error-surfacing `<div>` added to the page (`try/catch` around the map's
+   IIFE, writes `err.message`/`err.stack` visibly) rather than guessing blind without browser
+   console access.
+2. The Negrón Juárez QF/B map layers (`10d`) showed visibly more valid area than
+   QF_baseline/QF_ncp — traced to `10d` only masking the raster's own nodata, while `10c` (which
+   renders QF_baseline/QF_ncp) also applies the "valid in both datasets" comparison mask
+   (`13_build_valid_comparison_mask.py`'s output). The *numbers* already reported
+   (`15_negronjuarez_comparison.py`) already used this mask correctly — only the map display was
+   inconsistent. Fixed by applying the same mask in `10d`.
+
+The temporary error box (`#swy-map-error` in `11_build_output_map_html.py`) is still in the page —
+harmless if nothing fails, safe to remove once this map has been stable for a while.
+
+## 2026-09-24 — Kamble-on-EVI calibration error fixed, per-pixel NDVI Kc run (09l)
+
+The EVI-based Kc pathway (`07b`, every Becky-inputs run from `09b` on) fed EVI into Kamble et
+al. (2013)'s NDVI-fit regression. EVI runs ~65% of NDVI on the same MOD13A3 pixels, so every class
+on that pathway got a low Kc, and not uniformly (Closed Forest dropped from #1 to #4 of 9 classes,
+Spearman r=0.88; `analysis/scratch_evi_ndvi_kc_pattern_check.py` →
+`analysis/scratch_evi_vs_ndvi_kc_by_class.csv`). Decision: apply Kamble to NDVI, the index it was
+fit on, rather than fitting a new EVI→Kc regression. NDVI saturation matters mostly for forest,
+which already has Negrón Juárez (EVI-native); refitting EVI to reproduce NDVI-Kamble would carry
+the saturation over anyway.
+
+Also found while checking Becky's per-pixel question: `swy_methods.qmd`'s 2026-09-14 note that
+`inspring` has no CN/Kc raster override was wrong. Confirmed against the source in the
+`swy_borneo_run:rainfix4` image and empirically (09k's model-side `kc_7` raster holds 1,210
+distinct values). Retracted in `swy_methods.qmd`.
+
+`07g_build_kc_ndvi_perpixel.py` starts from `07f`'s combined forest/grassland rasters and
+overwrites Annual Crop, Perennial Crop, Mangrove, Marshland/Swamp and Open/Barren with per-pixel
+Kamble-on-NDVI (QA-failed pixels get the class-month NDVI mean). Annual-mean Kc rose 1.6-2.7×
+(Annual Crop 0.475→0.806). QA-fill share is high for Mangrove (36%) and Open/Barren (46%). Per-class
+NDVI means match the independent check script exactly.
+
+`09l` (identical to `09k` apart from the Kc dir) vs WWF-SIPA baseline, `19_ndvi_perpixel_comparison.py`:
+
+| | 09k B ratio | 09l B ratio | 09k r | 09l r |
+|---|---|---|---|---|
+| AOI | 1.37 | 1.10 | 0.39 | 0.56 |
+| Annual Crop | 5.84 | 3.91 | 0.57 | 0.55 |
+| Perennial Crop | 1.67 | 0.91 | 0.91 | 0.85 |
+| Closed Forest | 1.30 | 1.30 | 0.91 | 0.91 |
+| Open Forest | 1.46 | 1.43 | 0.87 | 0.88 |
+| Mangrove | 2.77 | 1.67 | 0.55 | 0.71 |
+| Marshland/Swamp | 0.99 | 0.46 | 0.91 | 0.82 |
+| Open/Barren | 0.59 | 0.41 | 0.14 | 0.10 |
+
+QF identical (max |diff| 0). The Closed Forest result from 09i/09k holds with cropland corrected.
+Annual Crop is still the largest gap, but its Kc (0.81) is now close to WWF-SIPA's (0.91 annual
+mean). GCN250 cropland CN (57/68/75/78) is ~10 points under theirs (67/78/85/89) and our Annual
+Crop QF is 0.55× theirs, so CN is the likely remaining driver for that class. Not yet tested.
+Scatter: `docs/reports/swy/swy_ph_ndvi_perpixel_scatter_b.png`; class table:
+`data/swy/philippines/comparison_maps/ndvi_perpixel_class_comparison.csv`.
+
+## 2026-09-25 — reference switched to her parameters at 90m; cropland CN identified as the main gap
+
+Her CN + Kc through our pipeline on the 90m DEM (`09h`) reproduces her 30m run (r=0.92 QF and B)
+and sits on the same grid as our runs, so the user switched every comparison to it: resolution
+and pipeline differences drop out and only the CN/Kc choice remains. `20_cn_kc_comparison.py`
+compares all runs against `09h`.
+
+| B vs 09h | our CN + our Kc (09l) | her CN + our Kc (09m) | our CN + her Kc (09f) |
+|---|---|---|---|
+| AOI | 1.06 (r 0.62) | 0.90 (r 0.83) | 1.16 (r 0.88) |
+| Annual Crop | 2.28 | 1.25 | 1.91 |
+| Perennial Crop | 0.89 | 0.54 | 1.43 |
+| Closed Forest | 1.29 | 1.19 | 1.09 |
+| Open Forest | 1.38 | 1.25 | 1.12 |
+
+CN carries most of the Annual Crop gap; Kc sets forest (our 0.84 vs her flat 1.0) and perennial
+crop (0.99 vs 0.70). Her Annual Crop CN 67/78/85/89 matches TR-55 row crops, straight row, good
+condition; GCN250 cropland rainfed 57/68/75/78, irrigated 61/71/77/80. Within-class r is higher
+with her Kc because it is flat per class (each class a line); our per-pixel Kc adds within-class
+variation her run can't have, so part of the lower r is that, not error.
+
+Paddy Kc test (`07h`, run `09n`): FAO-56 rice (1.05/1.20/0.75, stages 20/20/40/20%) on the Sacks
+rice_main calendar (plant DOY ~130, ~171 days; no second season in Sacks for this AOI), weighted
+by MapSPAM rice share of annual-crop area (mean 0.60 on Annual Crop pixels; 8,144 of 79,658 pixels
+had no Sacks data, filled with the AOI median). Annual Crop annual-mean Kc 0.81→0.88 (her 0.91).
+Result (`09n` vs `09h`): Annual Crop B 2.28 → 1.99, AOI 1.06 → 1.03 (r 0.62 → 0.66); every other
+class essentially unchanged. About the same as her whole Kc on our CN (1.91), consistent with Kc
+now being close to hers; the cropland remainder is CN.
+
+Global scoping (`Python_scripts/swy_global_scoping/`): MapSPAM 2020 physical area, 46 crops in six
+groups (row crops, small grains, tree & perennial, paddy rice, pulses, sugarcane), over Beck et al.
+(2018) Köppen aggregated to 5 arcmin by majority. 1,274 Mha total; 9 main-group × crop cells cover
+80%, 12 cover 90% (41 cells at the 30-class level). Paddy rice 109 Mha physical. Dominant-crop map
+matches known agricultural geography, used as the plausibility check. Plan:
+`docs/swy/global_cropland_parameterization_plan.md`.
+
+Feasibility, discussed with the user: the CN literature is dominated by site calibrations
+(e.g. Yu et al. 2025, vegetation-cover-adjusted CN on Chinese slope plots) that can't be assembled
+into one global product. Agreed direction: global defaults + targeted corrections for the classes
+that dominate error (paddy/irrigated cropland first) + a sensitivity range, and a test of whether
+the between-period change signal is robust across that range. Proposed to Becky in the 2026-09-25
+message.

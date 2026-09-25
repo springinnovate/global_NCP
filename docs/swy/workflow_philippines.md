@@ -1,74 +1,86 @@
 # SWY Philippines comparison: workflow and status
 
-Working diagram for the Philippines Kc/CN comparison — both paths side by side, so the shared
-inputs and the two divergence points (DEM, Kc/CN, rain events) are visible at a glance. Status
-colors: 🟩 done · 🟨 in progress / partial or unconfirmed · 🟥 blocked. Update this alongside
-`HANDOFF.md` and `research_notes.md` rather than letting it drift — this is the map, those are the
-log. Terminology: **WWF-SIPA baseline** = the original run, WWF-SIPA's own Kc/CN. **NCP Kc/CN
-run** = this project's isolated-variable run, same WWF-SIPA inputs with this project's own Kc/CN
-substituted in.
+Working diagram for the Philippines Kc/CN comparison, status 2026-09-25. Status colors: 🟩 done ·
+🟨 started / scoped · ⬜ not started. Update this alongside `HANDOFF.md` and `research_notes.md`;
+this is the map, those are the log. Run and figure dictionary: `docs/reports/swy/FIGURES.md`.
 
 ```mermaid
 flowchart TD
-    subgraph SHARED["Reused directly from the WWF-SIPA INPUTS_SP folder, 2026-09-14"]
-        LULC["WWF-SIPA LULC<br/>12-class typology, UTM 32651<br/>reprojected to WGS84 for the NCP run"]:::done
-        PRECIP["Precipitation<br/>30-yr CMIP6 climatology (1985-2014, p50)"]:::done
-        ET0["ET0<br/>Global-AI_PET_v3 / CGIAR-CSI"]:::done
-        RAINEV["Real spatially-distributed rain events<br/>monthly rasters"]:::done
+    subgraph SHARED["Shared by every run: WWF-SIPA inputs + our 90m grid"]
+        LULC["WWF-SIPA LULC<br/>12 classes"]:::done
+        CLIM["Precipitation + ET0<br/>30-yr CMIP6 climatology"]:::done
+        RAINEV["Spatially distributed rain events<br/>(3 inspring bugs patched)"]:::done
+        SOIL["Soil group: HYSOGs250m"]:::done
+        DEM["SRTMGL3 DEM, 90m<br/>grid-nested to WWF-SIPA's grid"]:::done
     end
 
-    subgraph BASELINE["WWF-SIPA baseline path — already run, output shared earlier"]
-        BASECNKC["WWF-SIPA's own Kc/CN<br/>biophysical_template_PH_revised.csv<br/>+ CN_A-D raster overrides"]:::done
-        BASERUN["WWF-SIPA baseline run<br/>completed earlier, output shared 2026-09-14"]:::done
+    subgraph REF["Reference: WWF-SIPA parameters"]
+        HER30["WWF-SIPA's own 30m run"]:::done
+        REFRUN["Her CN + Kc through our pipeline (09h)<br/>reproduces the 30m run, r=0.92<br/>= reference for all comparisons"]:::done
     end
 
-    subgraph NCPPATH["NCP Kc/CN path — this project, 2026-09-14/15"]
-        DEM["NCP's own SRTMGL3 DEM<br/>not in WWF-SIPA inputs — assumed,<br/>still needs confirmation"]:::progress
-        CROSSWALK["NCP Kc/CN biophysical table<br/>hand-built 12-class to ESA CN crosswalk<br/>plus EVI-regression Kc<br/>07b_build_biophysical_table_becky_inputs.py"]:::done
-        PLACEHOLDER["Flat 18-events/month placeholder<br/>real product blocked — 2 inspring bugs,<br/>one patched, one deliberately deferred"]:::blocked
-        NCPRUN["inspring.execute()<br/>NCP Kc/CN run<br/>COMPLETE, 2026-09-14/15"]:::done
+    subgraph OURS["Our parameters (global data)"]
+        CN["CN: GCN250 via ESA crosswalk<br/>+ HYSOGs soil group per pixel (07b)"]:::done
+        KCF["Kc forest: Negrón Juárez 2008 (07d)"]:::done
+        KCG["Kc grass/shrub: Oliveira 2015 (07e)"]:::done
+        KCN["Kc other classes: Kamble on NDVI,<br/>per pixel (07g, fixes EVI error)"]:::done
+        KCP["Kc paddy: FAO-56 rice + Sacks calendar<br/>+ MapSPAM rice share (07h)"]:::done
+        OURRUN["Our current run (09n)"]:::done
     end
 
-    subgraph COMPARE["Direct comparison, 2026-09-15"]
-        PIXEL["Pixel-wise comparison<br/>WWF-SIPA resampled to NCP's coarser grid"]:::done
-        MAPS["Interactive map + scatter plots<br/>colored by WWF-SIPA LULC class"]:::done
-        FINDING["Finding: QF ratio 0.20-1.31 by class,<br/>non-uniform — CN/Kc a real contributor<br/>B flips direction entirely — unexplained"]:::done
+    subgraph RESULT["Comparison against the reference (20)"]
+        OVERALL["Baseflow 1.03x overall (r=0.66)<br/>forest ~1.3x, most classes close"]:::done
+        CROP["Gap concentrated in annual crop (2.0x)<br/>her CN alone brings it to 1.25x:<br/>cropland CN is the main open problem"]:::done
     end
 
-    LULC --> BASECNKC
-    LULC --> CROSSWALK
-    PRECIP --> BASERUN
-    PRECIP --> NCPRUN
-    ET0 --> BASERUN
-    ET0 --> NCPRUN
-    RAINEV --> BASERUN
-    RAINEV -.-> PLACEHOLDER
-    BASECNKC --> BASERUN
-    DEM --> NCPRUN
-    CROSSWALK --> NCPRUN
-    PLACEHOLDER --> NCPRUN
-    BASERUN --> PIXEL
-    NCPRUN --> PIXEL
-    PIXEL --> MAPS --> FINDING
+    subgraph NEXT["Next"]
+        CROPCN["Cropland CN (runoff):<br/>main remaining gap"]:::todo
+        TABLE["Global cropland table:<br/>Köppen x crop group x water regime<br/>scoped: 9 cells = 80% of crop area"]:::progress
+        REPO["Move SWY to its own repo<br/>for handover"]:::todo
+    end
+
+    LULC --> CN
+    LULC --> OURRUN
+    SHARED --> REFRUN
+    HER30 -.->|check| REFRUN
+    KCF --> OURRUN
+    KCG --> OURRUN
+    KCN --> OURRUN
+    KCP --> OURRUN
+    CN --> OURRUN
+    SHARED --> OURRUN
+    REFRUN --> OVERALL
+    OURRUN --> OVERALL
+    OVERALL --> CROP
+    CROP --> CROPCN
+    CROP --> TABLE
+
+    subgraph LEGEND["Legend"]
+        direction LR
+        LDONE["Done"]:::done
+        LPROG["Started / scoped"]:::progress
+        LTODO["Not started"]:::todo
+    end
 
     classDef done fill:#c8e6c9,stroke:#2e7d32,color:#1b1b1b
     classDef progress fill:#fff9c4,stroke:#f9a825,color:#1b1b1b
-    classDef blocked fill:#ffcdd2,stroke:#c62828,color:#1b1b1b
+    classDef todo fill:#f5f5f5,stroke:#9e9e9e,color:#1b1b1b
 ```
 
 ## Reading the diagram
 
-**Two divergence points, both real and both flagged elsewhere in the comparison's caveats**: the
-DEM (WWF-SIPA's inputs never included one — this project assumed standard SRTM, unconfirmed with
-WWF-SIPA) and the rain events (WWF-SIPA's baseline presumably used the real spatially-distributed
-product directly; the NCP run tried to reuse that same file and hit two real upstream `inspring`
-bugs, falling back to a flat placeholder instead). Both are genuine, unintended departures from a
-clean isolated-variable test — not modeling choices, real software/data compatibility problems,
-documented in `swy_methods.qmd`'s "Real technical problems found and how each was handled."
+**Every run shares the same inputs and the same 90m grid.** The only thing that differs between
+runs is CN and Kc. WWF-SIPA's own CN and Kc, run through this pipeline (09h), reproduce their 30m
+run (r=0.92 for quickflow and baseflow), so the pipeline and resolution are ruled out and 09h is
+the reference for every comparison.
 
-**The LULC and climate stack are the one thing held constant** — reused directly, unmodified in
-classification (only reprojected geometrically). That's what makes the CN/Kc crosswalk finding
-meaningful at all: whatever else changed, the land-cover input itself didn't.
+**Our parameters come from global data.** CN from GCN250; Kc per pixel and per month from MODIS,
+using the closest published calibration for each land-cover type, plus a paddy rice Kc for annual
+crop.
 
-Full numbers, the crosswalk table, and the scatter-plot analysis: `swy_methods.qmd`'s "Test
-design: Philippines" section and `docs/reports/swy_status_report.qmd`.
+**The result points to one place.** Overall baseflow is close to the reference (1.03x), but annual
+crop is 2.0x, and swapping in WWF-SIPA's CN alone brings it to 1.25x. Cropland CN is the main open
+problem; the global cropland table (climate x crop group x water regime) is the proposed way to
+handle it at global scale, scoped in `docs/swy/global_cropland_parameterization_plan.md`.
+
+Full numbers and figures: `docs/reports/swy/swy_status_report.qmd`.
