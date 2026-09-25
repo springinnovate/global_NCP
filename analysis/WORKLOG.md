@@ -1,5 +1,70 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-09-22 — inspring PRs opened, Becky's homogeneity pushback led to a real CN/Kc coverage
+registry architecture, three papers obtained and read in full, message to her drafted and sent
+
+Two inspring fixes (packaging: `setup.py` missing `seasonal_water_yield`/`floodplain_extraction`,
+`Dockerfile`'s dead `requirements.txt` refs; the three `user_defined_rain_events_dir` bugs plus the
+coarse-input resampling fix) committed to the user's own fork and opened as real PRs against
+`springinnovate/inspring:main` — not yet merged.
+
+Becky pushed back on the sent report: our output looked too spatially homogeneous versus her
+original. Real, verified finding, not reassurance: GCN250 (this project's CN source) is a
+categorical lookup with zero geographic differentiation by design — confirmed directly in its own
+published methodology — and this project's own crosswalk compresses cropland toward natural-class
+CN values relative to WWF-SIPA's own wider table (18-point vs. 12-point CN gap, cropland to
+forest, on soil group B). Separately, walking her through the mechanism surfaced a real,
+previously-uncaught gap: the Kc regression (Kamble et al. 2013) was fit on NDVI, but this project
+substitutes EVI into it unvalidated.
+
+That led to a real architecture proposal, not just a Philippines patch: a coverage registry keyed
+on WWF biome for natural vegetation, and (new) Köppen climate zone × crop type for cropland, since
+biome doesn't capture agricultural management practice. `data/vector_basedata/Biome.gpkg` (already
+used elsewhere in this project) and a newly-sourced Köppen-Geiger layer (Beck et al. 2018,
+`data/swy/shared/koppen_geiger/`) are the two keys; a crop-type layer is still needed. Full detail
+and current coverage status: `docs/swy/cn_kc_biome_coverage_registry.md`.
+
+Three real papers chased down and read in full (not just search summaries — one, Liu et al. 2017,
+looked stronger from its abstract than it turned out to be on a full read, a useful lesson repeated
+here): Nagler et al. 2009 (real EVI-native Kc equation, but its scaling bounds are locally-derived
+from one desert riparian study, and the authors explicitly warn against reuse elsewhere without new
+calibration); Valle Junior et al. 2019 (a real, striking independent finding: in a Brazilian
+pasture-dominated basin, the SCS-CN method itself failed — negative predictive skill across every
+method tested — with a simple linear runoff coefficient fitting far better); and Negrón Juárez et
+al. 2008, the Amazon-forest paper this project has been trying to obtain for months. It's real and
+directly relevant but not a quick fix — the model isn't a simple EVI regression, it's EVI combined
+multiplicatively with net radiation, needs a data layer this pipeline doesn't have, and its fitted
+constants are Amazon-specific. All three PDFs in `docs/swy/literature_pdfs/` (gitignored), full
+citations in `docs/swy/literature_review.ris`/`references.bib`.
+
+Status update drafted and sent to Becky covering all of this, honestly framed as real progress with
+real open decisions, not a finished fix. User is stopping here for today and returning to the
+paper review tomorrow — this SWY thread is paused, not blocking, same as previous pauses this month.
+Confirmed sent 2026-09-22; one real leftover bug in the registry's own opening line (still said
+"per land-cover type," the exact thing already fixed in the message) caught and fixed before/around
+send time. No meeting date with Becky set yet as of this writing.
+
+### 2026-09-23 — Negrón Juárez forest Kc built and tested end-to-end as a cheap "meanwhile" while
+still waiting on Becky's reply
+
+Net radiation sourced from NASA POWER (chosen over ERA5-Land for lower setup friction), computed
+via the standard FAO-56 method — two real bugs hit and fixed along the way (POWER's regional API
+tiles on both lon/lat, not just lat; its own radiation and temperature/humidity parameters come
+from different source grids, needing a reproject step). C4=140 confirmed in W/m² by reading the
+actual paper, not assumed; also newly found the model outputs ET directly (mm/day), needing one
+more conversion step (Kc=ET/ETo) not previously accounted for. Per-pixel forest Kc rasters built
+(`07d_build_kc_forest_negronjuarez.py`, Closed/Open Forest only, Amazon-fitted constants used
+unchanged as a transfer test) — real output ~0.78-0.90 across the year, near Liu et al. (2017)'s
+independent EBF reference (0.75±0.03). An isolated run (`09i_run_swy_ph_negronjuarez_forest_kc.py`)
+launched against WWF-SIPA's baseline, same pattern as the earlier factorial series, and compared
+(`15_negronjuarez_comparison.py`). Real result: Closed Forest B ratio improved 1.69→1.30, Open
+Forest 1.78→1.45 — a genuine, positive, class-specific validation of the Amazon transfer. AOI-wide
+aggregate barely moved because Annual Crop's own 5.82× B distortion (21.4% of the AOI, untouched by
+this test) dominates the aggregate stat — confirms cropland as the real next priority. Also found
+and cited: Oliveira et al. (2015), a real Kc candidate for Brush/Shrubs (20% of the AOI). Full
+detail: `docs/swy/research_notes.md`'s 2026-09-23 entry; report, registry, and `docs/HANDOFF.md`
+all updated to match.
+
 ### 2026-09-21 — grid-nesting fix landed, full CN/Kc factorial closes out the Philippines comparison
 cleanly, report reworked around a two-part question, ready to send to WWF-SIPA
 
