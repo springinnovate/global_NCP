@@ -533,7 +533,7 @@ the 2 global NCPs are included).
 
 ## Related repositories
 
-- **[swy_parameterization](https://github.com/Cumaribo/swy_parameterization)**: the Seasonal Water
+- **[swy_parameterization](https://github.com/springinnovate/swy_parameterization)**: the Seasonal Water
   Yield work (CN/Kc parameters from global data, tested against a regional Philippines run, and
   scoping for a global cropland parameterization). Developed here until September 2026, then moved
   to its own repository; its code, docs and data no longer live in this one.
