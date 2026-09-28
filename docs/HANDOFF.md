@@ -21,7 +21,7 @@ there, with its own handoff; this file stays the global_NCP (paper, hotspots) ha
 
 **Where SWY stands, in one paragraph (use this for handover).** Global-data CN/Kc (GCN250 CN;
 per-pixel monthly Kc from Negrón Juárez forest, Oliveira grass/shrub, Kamble-on-NDVI elsewhere)
-land within ~30% of WWF-SIPA's regionally-set run for most classes. WWF-SIPA's own CN + Kc through
+match the overall total of WWF-SIPA's regionally-set run, but classes are off 30-40% both ways (forest high, shrubs/grassland low) and annual crop 2x; the total matches because errors cancel. WWF-SIPA's own CN + Kc through
 our pipeline at 90m reproduces their 30m run (r=0.92), so the pipeline and resolution are ruled
 out; that run (`09h`) is now the reference for everything. Against it: our CN + our Kc gives B
 1.06x (r 0.62); the gap is concentrated in Annual Crop (B 2.28x, QF 0.56x), mostly paddy rice.
