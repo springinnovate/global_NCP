@@ -9,6 +9,15 @@ session in `c:\projects\global_NCP` to resume.
 for handover. The user's WWF contract ends ~2026-10-24; handover-readiness of the
 SWY work is now an explicit goal.*
 
+## SWY MOVED (2026-09-28): all SWY work now lives in its own repository
+
+`C:\projects\swy_parameterization`, pushed to https://github.com/Cumaribo/swy_parameterization
+(Apache 2.0; to be transferred to springinnovate once Rich grants repo-creation rights or accepts
+the transfer). Moved: `Python_scripts/swy_*`, `docs/swy/`, `docs/reports/swy/`, the EVI/NDVI check
+scripts, and `data/swy/` (159 GB, git-ignored there too). SWY paths in the entries below refer to
+that repository now. Its README has setup, run commands and script order. Continue SWY work
+there, with its own handoff; this file stays the global_NCP (paper, hotspots) handoff.
+
 ## LATEST (2026-09-25) — SWY: gap traced to cropland CN, reference switched to 90m, report/message ready, repo split planned
 
 **Where SWY stands, in one paragraph (use this for handover).** Global-data CN/Kc (GCN250 CN;
