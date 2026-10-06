@@ -57,7 +57,7 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
 7. **Hand-off** before 10-23: runbook and `docs/how_to_extend.md` reviewed, data README, one
    walkthrough session.
 
-Other repos touched this session: `C:projectsandcover-validation-toolkit` (Zone 2 validation
+Other repos touched this session: `C:/projects/landcover-validation-toolkit` (Zone 2 validation
 committed; second round sent; Zone 3 labels arriving; read its HANDOFF.md "UPDATE 2026-10-05").
 Open paper fixes noted but not done: Introduction still says "show a declining trend" and
 "populations with limited adaptive capacity"; 14.6% vs 13.8% hotspot-share denominator; Annex KS and
