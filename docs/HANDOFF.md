@@ -5,7 +5,7 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-05. Start with MILESTONE 2026-10-05 just below. The user's WWF contract ends
+*Last updated: 2026-10-06. Start with MILESTONE 2026-10-05 just below; work continues on branch `housekeeping`. The user's WWF contract ends
 ~2026-10-23 (last working day); access to springinnovate's git is expected to continue afterwards.*
 
 ## MILESTONE 2026-10-05 — paper sent to the PI (read first)
@@ -17,8 +17,11 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
 
 **Next session: housekeeping strategy (decide before doing).** Suggested order:
 
-1. **Branches.** Squash-merge `paper_review` into `main` with one name-free message (repo is
-   public). Then open a `housekeeping` branch for steps 2-5, so cleanup never mixes with paper edits.
+1. **Branches. DONE 2026-10-06.** `paper_review` merged into `main` (PR #26, merge commit eb53f74;
+   it was a regular merge, so the branch's individual commits are on `main`). Branch `housekeeping`
+   created from that `main`; steps 2-5 and 7 happen there. Step 6 (analysis chain restructure) gets
+   its own branch off `main` (e.g. `pipeline-restructure`), so `main` stays the working backup.
+   **Start the next session with step 2's inventory.**
 2. **Repo organization (whole repo, on the housekeeping branch).** First an inventory, then a target
    layout, then staged moves with a render/run check after each. Known starting point (10-05): 701
    tracked files, ~134 MB tracked; `outputs/` alone is 325 files (49 in `plots/maps`, 33 in
