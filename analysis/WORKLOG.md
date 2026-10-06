@@ -1,5 +1,32 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-10-05 — paper revision closed and sent to the PI (milestone)
+
+Becky's first-round comments closed except those needing her input. Main changes:
+
+- **Scope:** land cover attribution dropped as a research question (BC14). Title now "Global Change in
+  Ecosystem Services: Hotspots of Decline and Who Is Exposed"; three questions (WHAT/WHERE/WHO). The
+  co-occurrence analysis is a short exploratory supplement; the Discussion frames attribution as future
+  work and states that land cover change alone is not enough to track service provision.
+- **Coastal risk denominator bug found and fixed.** `hotspot_area_stats.csv` used all land for coastal
+  risk and counted both tails (7,724 hotspots vs the production 3,974). Mangroves' "15x" coastal risk
+  prevalence was an artefact (~1.0 against coastal cells). Rebuilt from the production hotspot set by
+  `analysis/rebuild_hotspot_area_stats.R`, shares among grouped cells (about 40-45% of coastal hotspots
+  have no group). Lower-middle vs high-income OECD ratio now 2.4 over the four land-based services.
+- **Coastal risk** reported by region and income group only, in its own figures (BC9): a six-panel map
+  from the InVEST shoreline points (four populated coasts where risk rose, two where it fell), plus
+  prevalence and boxplots. `coastal_risk_tnc_esa1992_2020_ch.gpkg` found to be broken (2020 column out of
+  row order); the 20251224 file is the good one.
+- **Figures restyled and regenerated** (orange/teal, names on axes, no numbered keys): change figures
+  with the 10-01 nitrogen reruns, prevalence, boxplots, KS heatmap (now labelled with Cliff's Delta;
+  directionality chart dropped), driver-overlap heatmap (recomputed, de-duplicated crosswalk), dumbbells.
+- **Text:** Results stripped of conclusions (moved to Discussion or cut); Discussion section rewritten
+  around one takeaway (BC13: inequality and exposure); comparator literature moved to the Introduction;
+  Methods rewritten for the end-of-paper position; Supplement cut from ~1,760 to ~440 words; outdated
+  HTML notes removed. Numbers fixed: 7,584 M, 96.5%, ~13% low-income share, Annex hotspot-metric table
+  from the production sets.
+- Sent as a new version, not as tracked changes against her commented copy.
+
 ### 2026-09-22 — inspring PRs opened, Becky's homogeneity pushback led to a real CN/Kc coverage
 registry architecture, three papers obtained and read in full, message to her drafted and sent
 

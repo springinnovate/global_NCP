@@ -145,7 +145,7 @@ Working version of a structured workflow for extracting, analyzing, and visualiz
 
 The core extraction workflow uses Python (`taskgraph` + `exactextract`) for zonal summaries; R/Quarto is used for consolidation, change calculations, hotspot extraction, and KS tests.
 
-For a detailed technical description of the pipeline, see the project's official documentation in the `/docs` directory, particularly `docs/methodology.md` and `docs/runbook.md`.
+For a detailed technical description of the pipeline, see the project's official documentation in the `/docs` directory, particularly `docs/methodology.md` and `docs/runbook.md`. To extend the analysis (new grouping, service, metric, threshold, co-occurrence test or scale), start with `docs/how_to_extend.md`.
 
 ### Pipeline Architecture
 

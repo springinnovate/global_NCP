@@ -5,9 +5,483 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-09-25. Read the first LATEST entry; it has a one-paragraph SWY summary meant
-for handover. The user's WWF contract ends ~2026-10-24; handover-readiness of the
-SWY work is now an explicit goal.*
+*Last updated: 2026-10-05. Start with MILESTONE 2026-10-05 just below. The user's WWF contract ends
+~2026-10-23 (last working day); access to springinnovate's git is expected to continue afterwards.*
+
+## MILESTONE 2026-10-05 — paper sent to the PI (read first)
+
+The revised paper went to Becky on 10-05 as a new version (not tracked changes; too many edits to
+reconcile). Full list of changes: `analysis/WORKLOG.md` 2026-10-05. Committed on `paper_review`.
+Becky comments still open: none that we can close without her (climate inputs and run provenance,
+the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to bar charts) not done.
+
+**Next session: housekeeping strategy (decide before doing).** Suggested order:
+
+1. **Branches.** Squash-merge `paper_review` into `main` with one name-free message (repo is
+   public). Then open a `housekeeping` branch for steps 2-4, so cleanup never mixes with paper edits.
+2. **Purge and organize.** Inventory tracked files that do not feed the paper, the book or the
+   pipeline: stale outputs (old figure variants, retention-era boxplots such as
+   `boxplots_volumetric_*`, `boxplots_ratios_*`, `boxplots_coastal_pct`), presentation-only material
+   for external venues (Sandra/Colombia, IDB-WWF, CLEC decks and their plots), drafts in `docs/`
+   (`justin_devstack_outreach_*.draft.md`), and the ~7 GB of `data/processed` dry runs/backups listed
+   in the 10-02 status below. Decide per group: delete, move to `docs/archive/`, or move to a separate
+   repo/Drive and untrack. Check every candidate is unreferenced first (grep the qmd/R/py files).
+   `CLAUDE.md` is untracked on purpose; decide whether it belongs in a public repo (it names people).
+3. **Lab presentation** (`docs/presentations/presentation.qmd`): update to the paper as sent:
+   three questions, new figures, coastal figure, corrected prevalence (2.4x, mangroves ~1.0 coastal),
+   land cover as future work.
+4. **Book** (`docs/manuscript/chapters/`): align with the paper (scope, corrected numbers, figures);
+   plan how the book, the paper and the pipeline share figure scripts instead of duplicating them.
+5. **Analysis chain restructure (own branch, e.g. `pipeline-restructure`, off `main` after the
+   merge; never on the paper branch).** After the zonal summary stats, the analysis runs across ~4 qmd
+   notebooks (`analysis/hotspot_extraction.qmd`, `hotspot_synthesis.qmd`, `KS_tests_hotspots.qmd`,
+   plus the exposure/multiplier step) with config duplicated between them. Turn this into one script
+   chain (run_/tasks_/functions_ pattern already piloted for `calculate_bitemporal_change.py`) with a
+   single service config. Fold today's patches into it properly: the coastal-risk denominator and
+   two-tail bug in `hotspot_synthesis.qmd` (currently bypassed by
+   `analysis/rebuild_hotspot_area_stats.R`), and the paper figure scripts in `scripts/mapping/`.
+   Verify outputs match the current tables before switching over.
+6. **Hand-off** before 10-23: runbook and `docs/how_to_extend.md` reviewed, data README, one
+   walkthrough session.
+
+## STATUS 2026-10-05 (working notes from the session; superseded by the milestone above)
+
+- **Goal today: send Becky a reviewed copy.** Applied 10-05 (uncommitted, in the same qmd diff):
+  Annex @tbl-hotspot-metric-overlap regenerated from the PRODUCTION hotspot sets
+  (`data/processed/hotspots/{pct,abs}/global/`, 189,932 SPC cells) by the new
+  `analysis/hotspot_metric_overlap.R` -> `outputs/tables/hotspot_metric_overlap.csv` (coastal risk
+  3,974 cells, other services 68,632/67,731; overlaps 57/32/97/35/43%), Methods sentence updated;
+  population exposure fixed (7,584 M, 96.5% of the global population, "about" not "over" 7.6
+  billion, low-income ~13%). docx renders clean.
+- **1,372,621 cells in Methods is CORRECT** for hotspot selection: 68,632 = ceil(5% x 1,372,621).
+  The 1,302,099 in `hotspot_area_stats.csv` is a smaller universe (grouped cells only). Open: the
+  "14.6% of the evaluated land area" uses 1,302,099 (189,932 / 1,302,099); against 1,372,621 it
+  would be 13.8%. Pick one denominator and say which.
+- **FOUND 10-05: coastal-risk relative prevalence uses the wrong denominator.** In
+  `hotspot_area_stats.csv`, C_Risk rows use ALL land cells per group (e.g. Deserts n_total
+  255,777) and global_n_hot 7,724, not the coastal cells where coastal risk exists and the
+  production 3,974 hotspots (the synthesis code comment says this was fixed 2026-08-11; the table
+  says otherwise). Mangroves' 15.25x for coastal risk is an artefact: against coastal cells it is
+  ~1.0 (113 of 2,185 biome-assigned hotspots vs 2,181 of 41,535 coastal cells; 1,789 coastal
+  hotspots have no biome). Income groups, coastal: OECD 1.08, upper-middle 0.93, lower-middle 0.81,
+  low 1.34. The 1.8x lower-middle vs high-income OECD ratio survives (1.85). Affects Results
+  paragraph on mangroves (line ~158: "15 times", "4.5 times", "bimodal ... coastal vulnerability"),
+  the C_Risk panels of the prevalence figures, and the coastal zoom figure's framing. Fix: rebuild
+  C_Risk rows of hotspot_area_stats on coastal cells + production hotspots, regenerate figures.
+- **SCOPE CHANGE 10-05 (user decision):** land cover attribution dropped as a research question.
+  Title now "...Hotspots of Decline and Who Is Exposed"; three questions (WHAT/WHERE/WHO); Discussion
+  keeps "Understanding the Drivers of Change Needs a Different Analysis" (BC14, future-work framing);
+  LCC Methods subsections + co-occurrence analysis moved to the Annex as exploratory; Conclusions
+  para on attribution replaced by future work (distance-decay test); attribution Limitation removed.
+  Scripts/outputs untouched for a follow-up paper. BC13 also done (Discussion section "People in More
+  Unequal Places Are More Exposed..."). BC11 done (KS figures to Annex). BC9 done (coastal figure).
+  Still: mermaid diagram shows the WHY pillar; Intro overclaims ("declining trend", "limited
+  adaptive capacity"); 14.6% vs 13.8% denominator; subtitle "IN PROGRESS".
+- **Rebuilt 10-05:** `analysis/rebuild_hotspot_area_stats.R` -> `hotspot_area_stats.csv` from the
+  production hotspots, per-service eligible cells, shares among grouped cells (old table kept as
+  `hotspot_area_stats_synthesis_20260903.csv`). Prevalence figures regenerated. Paper text at line
+  ~158 (mangroves) and ~262 (income shares, 1.8x -> 1.85) NOT yet rewritten.
+- **Broken data file:** `data/coastal_risk_tnc_esa1992_2020_ch.gpkg` has its 2020 column out of row
+  order relative to 1992 (98% of points "change", SPC +-25% IQR). Use
+  `coastal_risk_tnc_esa1992_2020_20251224_013825.gpkg` (63,494 changed points, SPC within +-18%,
+  consistent with the grid). Check which file fed the grid (`summarize_cp_points_grid.py` read a
+  `_ch_f` variant; grid values match the good file's range).
+- Coastal zoom figure (now from shoreline points, 6 panels: 4 populated increase, 2 decrease):
+  `scripts/mapping/make_coastal_risk_zooms.R` ->
+  `outputs/plots/maps/coastal_risk_change_zooms.png` (not in the paper yet; placement and caption
+  to decide).
+- Still for the user before sending: review the diff, remove the "IN PROGRESS, not for
+  circulation" subtitle, commit, then tracked-changes docx against Becky's OneDrive baseline.
+
+## STATUS 2026-10-02 (end of session)
+
+- **Done 10-01/02, uncommitted, awaiting the user's review (one diff in `paper_draft_5service.qmd`):**
+  BC2, BC4, BC5; hotspot-metric option (a) (Methods + Limitations + Annex table, the Annex table is
+  still WRONG for coastal risk and must be regenerated); null model (Methods paragraph, Annex
+  paragraph + @tbl-attribution-null, 3 web-verified references, Conclusions future-work sentence);
+  Conclusions rewritten (regional caveat on the 7.3 risk ratio; new paragraph "answers depend on
+  metric, baseline, grouping and scale"; framework paragraph); SPC note marked decided. Review in VS
+  Code's Source Control diff, then commit (no names in the message).
+- **N retention ratio DONE** (map_data rows updated; details in the queue item below). Path A
+  combined-diffs figures still to regenerate as a preview for the user.
+- **SWY DONE for this round** (separate repo): 09p rerun, report/package updated, message + figure
+  sent to Rich 10-02 (`swy_parameterization` commit 26a6080; a later Kc-calibration paragraph in
+  the SWY report is uncommitted there).
+- **Not started (Week 1 plan):** BC11 and BC12 (Claude; build as separate files first, wire into the
+  qmd only after the user's review is committed, to avoid editing the qmd at the same time); BC13,
+  BC14 (user writes); BC9 (cut first if short).
+- **Waiting for the user's OK:** global_NCP data cleanup, ~7 GB: `data/processed/` dry runs and
+  08-31 backups (`10k_change_calc_DRYRUN_all3.gpkg` = identical md5 to canonical,
+  `10k_change_calc_DRYRUN_coastal.gpkg`, `10k_change_calc_BACKUP_2026-08-31.gpkg`,
+  `hotspots_BACKUP_2026-08-31/`, `hotspots_5service_BACKUP_2026-08-31/`, unreferenced
+  `10k_change_calc_epsg8857.gpkg` and `grid_10km_land_synth_zonal_2026_06_03_15_33_39.gpkg`) plus the
+  rerun scratch `data/raw/n_ret_ratio_aligned/workdir*` and `data/raw/path_a_rerun/workdir`. The
+  external `~/data/global_ncp/Raw` (65 GB) is NOT in this list (belongs to the data reorganization).
+- **Tracked-changes docx for Becky:** `scripts/compare_docx_tracked.ps1` works (tested). Baseline =
+  the version Becky commented on, which the user will download from OneDrive's version history
+  (NOT the local 09-24 docx). Run after the review commit.
+- **Side work 10-02 in `landcover-validation-toolkit`** (Zone 2 validation results, 9-class scheme
+  for zones 1/3): see that repo's HANDOFF.md LATEST section.
+
+## THREE-WEEK PLAN TO 2026-10-23 (agreed 2026-10-01)
+
+**Priority: a sound, coherent paper draft, delivered well before the contract ends.** The user is
+measured on submitting/sharing that draft. The repo transfer matters but comes second; refinements
+can continue after 10-23 through springinnovate's git. Becky is travelling: no milestone depends
+on her replying in time.
+
+**Week 1, Fri 10-02 to Wed 10-07: close Becky's comments (about 2.5 working days of work; the
+user's review time is the real bottleneck).**
+- 10-02: finish today's runs (N retention ratio rows in map_data; SWY 09p comparison, report,
+  package to Rich). Preview the regenerated Path A figures (user OKs before swapping). Claude starts
+  BC11 (KS table + heatmap to Supplement, one sentence in Results) and BC12 (dumbbell -> two bar
+  charts).
+- 10-05: user reviews every applied, uncommitted edit (BC2, BC4, BC5, hotspot-metric option (a),
+  null model, Conclusions), then commit. BC13 (one takeaway per Discussion section) and BC14
+  (land-cover section as future work, with the climate-input caveat): user writes, Claude drafts
+  on request.
+- 10-06: BC9 (coastal-risk figure; first to cut if short). Figures swapped in after user OK.
+- **Milestone 1 (Wed 10-07): every Becky comment addressed** except those that need her input.
+
+**Wed 10-07 to Wed 10-14: make it defensible.**
+- Numbers audit steps 2-4: ledger, `analysis/verify_paper_numbers.py`, one batch of fixes (known:
+  7,584 M, 96.5%, ~13% low-income share, 1,372,621-cell wording, Annex sensitivity table and
+  attribution heatmap regenerated on the production hotspot universe).
+- Methods: model-mechanics text for nature access and coastal risk.
+- Full read-through for coherence (abstract to conclusions tell one story; numbers agree across
+  sections); re-render HTML and docx.
+- **How the new version is shared (decided 2026-10-01):** NOT pasted into the online doc and NOT a
+  silent replacement. Baseline = the exact version Becky commented on, downloaded by the user from OneDrive
+  the online doc's version history (before the user's manual edits, ~2026-09-10; the commented PDF
+  `paper_draft_5service.pdf` was printed from it on 09-10; the local 09-24 docx is a later render,
+  NOT the baseline). Render the qmd to docx, then `scripts/compare_docx_tracked.ps1` (Word Compare
+  via COM; formatting ignored, word-level, comments carried over) -> one docx with every change as
+  Word tracked changes. Upload it as a NEW file next to hers; her commented original stays intact.
+  Tested 2026-10-01 (09-24 render vs today): 125 changes, all real insertions/deletions, no
+  formatting noise. Comments anchored to heavily rewritten text (4.1, Conclusions) may be dropped;
+  the response-to-comments table covers them.
+- **Milestone 2 (Wed 10-14): review-ready draft to Becky (and Steve)**, with a short note mapping
+  each of their comments to what changed, and the open questions (model-run provenance and climate
+  inputs; ee_correspondence citation). SPC as the primary criterion is DECIDED by the user (2026-10-01), not an open question.
+
+**Thu 10-15 to Fri 10-23: buffer, presentations, hand over.**
+- Fold in any quick responses from Becky/Steve.
+- Transfer plan essentials: verify script in the repo, `docs/how_to_extend.md` reviewed, minimal
+  data README, SWY handover (already in its own repo).
+- One walkthrough session with the team (~Wed 10-21): paper status, how to rerun and extend.
+  Record it, so it can be reused for the presentations below.
+- **Presentations (book now; they can happen after 10-23):** a WWF Global Science session; a lab
+  meeting at UMN (NatCap); Colombia (builds on the 2026-08-20 deck for Sandra Valenzuela). One core
+  deck from the paper figures, trimmed per audience; political framing decided per venue. If a
+  date falls after 10-23, present remotely or hand the deck and recording to a co-author.
+- **Milestone 3 (Fri 10-23): final handoff** (HANDOFF.md, open items, who owns what, presentation
+  dates and owners).
+
+**After 10-23 (through springinnovate git):** pipeline stage restructuring and runbook refresh
+(transfer item 6), full data reorganization, worked regional example, distance-decay analysis,
+review of `docs/devstack_compat_research_notes.md`.
+
+**Cut order if behind:** BC9 coastal figure -> Methods mechanics detail -> Annex heatmap
+regeneration (state it as pending in the draft). Never cut: Becky's text comments, the numbers
+audit fixes, the read-through.
+
+## LATEST (2026-09-30) — paper: change-metric problem found in §4.1 draft; hotspot metric sensitivity measured
+
+### PAPER REVIEW QUEUE (the user's running checklist; read this when asked "where are we / what's pending")
+
+Keep this list current: tick items when done, add new ones as they come up.
+
+**Waiting on the user's review (nothing applied/committed until reviewed):**
+- [x] §4.1 text reviewed and INSERTED by the user into `paper_draft_5service.qmd` ("Global and
+      Regional Trajectories", 3 paragraphs + an HTML-only provenance note). Draft file
+      `results_4.1_draft.md` removed (`git rm`, staged). Numbers still from the OLD Path A run:
+      refresh after Rich's rasters (see technical checks).
+- [ ] `paper_draft_5service.qmd`, option (a) for the hotspot metric (added 2026-09-30):
+      Methods "Hotspot Identification" (one sentence appended to the existing paragraph + one
+      new paragraph ending "We retain SPC..."), Limitations new paragraph "Proportional versus
+      absolute change in hotspot definition", Annex table "Hotspot Sensitivity to the Change
+      Metric" (@tbl-hotspot-metric-overlap).
+- [ ] Commit once reviewed (staged already: removal of stale `HANDOFF_NOTES.md`). No names in the
+      commit message.
+- [ ] After 4.1 is inserted: decide whether Discussion gets a short paragraph on "global averages
+      hide heterogeneity; each variable needs its own reading" (pollination rise from abandonment,
+      baseline driving sediment rankings), tied to the change-metric point in Methods/Limitations.
+      Results 4.1 stays descriptive; the interpretation belongs in Discussion if anywhere.
+      User's framing (2026-09-30): aggregates are one lens, not the headline; the contribution is
+      the analytical machinery plus showing that answers depend on metric, baseline and slicing
+      (4.1 now shows relative vs absolute leaders diverging for sediment and nature access by
+      biome, and for most services by income group). Specific contextual questions are
+      applications/future work, not this paper.
+
+**Waiting on Becky (travelling; not reachable for a while):**
+- [x] SPC as the primary hotspot criterion: DECIDED by the user 2026-10-01 ("we have spent quite a lot of time getting that straight"). Inform Becky, do not ask her to confirm.
+
+**Becky's 14 PDF comments vs. current paper (checked 2026-09-30 against the actual PDF text,
+`docs/manuscript/paper_draft_5service.pdf`, Word comment balloons; extract with
+`pdftotext -layout`). CORRECTION: earlier notes said BC6 was the 1.8x figure — wrong. BC6 is the
+attribution-gap clause in the abstract (resolved). The 1.8x is BC5, and she asks to REPHRASE it,
+not remove it.**
+- Done: BC1 (notes hidden in docx), BC3 ("East Asia & Pacific"), BC6, BC7 (Methods at end),
+  BC8 (§4.1, numbers to refresh), BC10 (no "hotness").
+- [~] BC2: APPLIED 2026-09-30, awaiting user review (abstract: 3.4% / 1.3% / -8.9%, nature access
+      steepest in Flooded Grasslands and MENA; numbers to refresh after Rich's rasters).
+- [~] BC4: APPLIED 2026-09-30, awaiting review ("hotspots occupy 14.6% of the evaluated land area,
+      yet ... affect 7.6 billion (96.7%)").
+- [~] BC5: APPLIED 2026-09-30, awaiting review. 1.8x = hotspots per unit land (not people); stated
+      as land vs hotspot shares in Population Exposure. Also fixed an approved sentence that
+      contradicted the data (upper-middle leads Local Residents, lower-middle leads Connected
+      Beneficiaries). Open: 12.4% low-income share vs 12.8-13.1% in the multiplier table.
+- [ ] BC13: one takeaway per Discussion section; "Differentiated Vulnerability Tiers" ->
+      e.g. "people experiencing greater inequality are disproportionately impacted".
+- [ ] BC14: reframe "Sufficiency of Land Cover Monitoring" as future work (signal looked for,
+      not found; models accumulate impacts far from where change occurs).
+- [ ] BC9: separate coastal-risk figure with zoomed panels.
+- [ ] BC11: KS table + heatmap to Supplement, one sentence in Results.
+- [ ] BC12: replace log-scale dumbbell with two bar charts (residents / beneficiaries).
+
+**NUMBERS AUDIT (started 2026-09-30; user priority: every number traceable to repo data,
+consistent across sections — a model-equipped reviewer can replicate everything):**
+- Step 1 done: `analysis/paper_numbers_inventory.py` -> `docs/manuscript/numbers_inventory.csv`
+  (294 numbers in prose, by line/section/sentence; code, HTML notes, refs, citation years excluded).
+- [ ] Step 2: `docs/manuscript/numbers_ledger.csv` — per claim: source file/column, computation,
+      recomputed value, status (match / differs / no source). Start with results that repeat
+      across sections (Abstract, Results, Discussion, Conclusions).
+- [ ] Step 3: `analysis/verify_paper_numbers.py` — recompute every ledger claim from the data;
+      rerun before submission and after Rich's rasters.
+- [ ] Step 4: apply all fixes in one batch. Known so far:
+  - 7,596.0 million (Population Exposure, entered 2026-08-11, stale run) -> 7,584 million
+    (`outputs/tables/exposure_comparison.csv`, union >=1 service = 7,583,959,903).
+  - 96.7% (Abstract + Population Exposure) -> 96.5% (7,584 / 7,855.5 M = GHSL 2020 total on the
+    grid); "of the evaluated global population" is wrong wording: denominator is the world total.
+  - "12.4%" low-income share: no source reproduces it -> ~13% (974.5 M / 7,584 M = 12.9%, or 13.1%
+    of the income table's own total; `multiplier_summary_income_grp.csv`).
+  - "1,372,621 valid land cells" (Data Sources) vs production hotspot universe 1,302,099 (sum of
+    n_total in `data/processed/tables/hotspot_area_stats.csv`) = the "1.30 million" used elsewhere;
+    14.6% = 189,932 / 1,302,099 is consistent. Trace what 1,372,621 is and fix the Methods text.
+  - **Annex table "Hotspot Sensitivity to the Change Metric" is WRONG for coastal risk**: my
+    reproduction used a 1,317,153-cell universe (production: 1,302,099); production C_Risk hotspots
+    = 4,750 vs my 1,978, other services ~66-67k vs my ~65.9k. Regenerate the whole table (and the
+    overlap % in Methods) from the production hotspot set/universe before anyone reads it.
+  - [x] DONE 2026-10-01 (Methods definition + §4.1 two sentences + HTML note; user confirmed the
+    unit). **Pollination was mis-defined in the paper.** Data = `realized_polllination_on_ag_*`
+    (Rich's rasters), unit "equivalent people fed/ha" (`docs/ncp_data_catalog.md`): realized
+    pollination on agriculture. Methods says "habitat suitability and foraging range support for
+    wild pollinator guilds", and §4.1 (written 2026-09-30) says "pollinator habitat suitability".
+    Fix Methods + §4.1 + any abstract mention together. Interpretation: realized pollination rises
+    when pollinator-dependent cropland expands next to remaining habitat (fits Flooded Grasslands:
+    nature access falls while pollination rises).
+- Done: stray duplicate code fence after the mermaid diagram removed (no output change).
+
+**Technical checks before submission (not blocking the review):**
+- [ ] Reconcile hotspot count: reproduction gives 181,842 cells vs 189,932 in Results; regenerate
+      the Annex table from the production hotspot set.
+- [ ] Global Path A figures are reconstructed from region rows; get a direct global run from
+      zonal_stats_toolkit. N export differs between grid totals (+1.6%) and Path A (+3.4%).
+- [ ] **Rich's fresh 300 m rasters HAVE ARRIVED (user, 2026-09-30) — not processed yet, do soon.**
+      Order: (1) rerun zonal_stats_toolkit with them -> regenerate
+      `outputs/plots/output_plots_diff/*_map_data.csv` and the biome/region/income figures;
+      (2) refresh every number in §4.1 of the qmd (now inserted; see its HTML note) from the new
+      CSVs, adjusting a sentence if a leader changes; (3) remove the "placeholder" note on the
+      Path A figure. Rasters: `data/raw/base_years/` (12 files, 1992+2020: n_export,
+      n_retention, sed_export, usle, nature_access (2 km projected), realized pollination).
+      Per-ha conversion (volumetric only, BEFORE zonal stats; not ratios/indices/coastal/nature
+      access) uses `C:\Users\JerónimoRodríguezEsc\data\global_ncp\vector_basedata\
+      esa_pixel_area_ha_md5_1dd3298a7c4d25c891a11e01868b5db6.tif` via
+      `zonal_stats_toolkit/convert_to_ha.py` (WarpedVRT aligns area to each service grid; new
+      rasters are sub-pixel offset and N export stops at 60N — fine). Before launching: read the
+      toolkit README/configs to confirm order (change -> /ha -> regional zonal stats) and test one
+      service first.
+      **Checked 2026-10-01:** Rich's rasters are the same model outputs as before for sediment
+      export and pollination (Path A's March per-ha change rasters reproduce to 1e-8..1e-10), but
+      **Path A used an OLDER nitrogen export** (different grid: origin -179.9, 43,200 rows vs
+      -180 / 41,731; totals differ 6-18%). Path B (`analysis_configs/services_slim.yaml`) already
+      uses the current N export (md5 728edc/1d3c17). This likely explains the N export
+      discrepancy (grid +1.6% vs Path A +3.4%). Also: the local "raw" copy
+      `~/data/global_ncp/Raw/global_n_export_..._728edc.tif` is actually PER-HA (= Rich's file /
+      pixel area to 1e-11). Rerun scope: N export (+ check N retention the same way); pipeline =
+      `Python_scripts/batch_raster_diff.py` (2020-1992; hard-coded Linux paths) ->
+      `zonal_stats_toolkit/convert_to_ha.py` (-> `data/raw/base_years_ha/`) ->
+      `global_ncp_diff_consolidated.ini` (change) + `global_ncp_consolidated.ini` (base years ->
+      `calculate_spc_from_summary.R`). Configs use relative `data/...` paths; the toolkit has no
+      data dir (runs used `~/data/global_ncp/Raw/...` mounted). `global_ncp_change_analysis.ini`
+      is corrupted/legacy, ignore.
+      **Later 2026-10-01:** N retention also identical -> ONLY N export changes. The base-year run
+      (`zonal_stats_toolkit/output_raw/*_20260218_*.csv`, raw per-pixel values, CURRENT N version)
+      already gives the SPCs used in §4.1, so all SPC percentages are correct; only N export's
+      absolute change per unit area (`mean_val`) uses the old version (affects one §4.1 sentence:
+      "largest absolute increase per unit area ... East Asia & Pacific"). Global figures recomputed
+      directly from summed regional totals and APPLIED in abstract + §4.1: N +1.6% (was 3.4,
+      now matches the grid), sediment +1.4, pollination +6.9, nature access -8.7.
+      **N-export rerun LAUNCHED 2026-10-01 in Docker** (`Python_scripts/rerun_n_export_path_a.py`
+      + `analysis_configs/path_a_n_export_rerun.ini`; image geopy311 env + pip datasketches/tqdm/
+      fiona). Log: `data/raw/path_a_rerun/run.log`; outputs: `data/raw/2020_1992_chg/`,
+      `data/raw/2020_1992_ch_ha/`, `data/raw/path_a_rerun/output/` (country/region/income/biome
+      CSVs). NEXT: replace N_export `mean_val` in `outputs/plots/output_plots_diff/*_map_data.csv`
+      (keep a backup), re-check the §4.1 N absolute-per-area sentence, regenerate the combined
+      diffs figures. Side effect: convert_to_ha.py creates an empty
+      `zonal_stats_toolkit/data/2020_1992_chg_ha/` on import (harmless).
+      **DONE 2026-10-01 evening:** rerun finished (country/region/income/biome CSVs in
+      `data/raw/path_a_rerun/output/`; a final "readonly database" traceback is harmless — runner
+      tried to touch the mounted vector gpkg). Sanity: MENA 0.34/ha consistent with the current
+      base-year run (~0.30). `outputs/plots/output_plots_diff/{biome,region_wb,income_grp,country}
+      _map_data.csv` N_export rows updated (mean/stdev/count/se/status_abs; all rows matched);
+      backups `*_map_data.backup_20261001.csv`. §4.1 corrected: N by region now leads on BOTH
+      measures in MENA; N by biome: Mediterranean Forests leads absolute (+2.5% rel), Tropical
+      Coniferous/Moist Broadleaf lead relative. MY ERROR found: earlier biome checks used
+      `awk -F,` and silently dropped the 3 biome names containing commas — always parse CSVs with
+      a real CSV reader.
+      [ ] NEXT: regenerate `*_combined_diffs.png` figures. `zonal_stats_toolkit/
+      compare_and_plot_changes.R` rebuilds map_data from `output_diff_consolidated/` +
+      `output_consolidated/` (NOT on this machine) and `unlink`s its out_dir first — do NOT run it
+      as is. Adapt: run only its plotting part (after line ~223) reading the updated map_data, into
+      a new folder, then compare with the old PNGs. **User wants to SEE new figures before they
+      replace anything in the paper** — write to a preview folder, show side by side, wait for OK.
+      Quick-look map of the new N change already at
+      `outputs/plots/preview_20261001/n_export_change_per_ha_preview.png` (not used in the paper).
+      Path B maps (10 km grid) are unaffected (already used the current N version).
+      **Full input check (2026-10-01):** identical to Path A inputs -> no rerun: sediment export,
+      pollination, N retention, nature access (exact). Stale -> rerun: N export (DONE) and
+      **N retention RATIO** (= retention/(retention+export); Path A's ratio diff used the old
+      export; aligned comparison corr ~0). [ ] FIRST technical task next session: recompute the
+      N retention ratio. Catch: current export grid starts at -180 / 60.000417, retention at
+      -179.9 / 60.0 (36-px x offset, 0.15-px y); `Python_scripts/calculate_ratios.py` reads both by
+      pixel index -> must align grids first. Also check how Path B's ratio handled this offset
+      (possible misalignment bug there). Ratios are secondary context, not hotspot variables.
+      **DONE 2026-10-02:** `Python_scripts/rerun_n_ret_ratio_path_a.py` aligns the grids (export
+      read with a 36-col shift; coordinate spot check max diff 7.6e-8), writes ratio 1992/2020/
+      change to `data/raw/n_ret_ratio_aligned/`, zonal stats in `.../output/` (income_grp run one
+      raster at a time via `analysis_configs/run_ratio_income_per_raster.sh`: the toolkit aborts on
+      >95% memory with 3 rasters, and an empty-result cache needs `workdir*` cleared before reruns).
+      `analysis/update_n_ret_ratio_map_data.R` replaced the N_Ret_Ratio rows in all four
+      `*_map_data.csv` (backups `*.backup_20261001_pre_nratio.csv`). Effect: changes roughly halve
+      in most groups; sign flips in 3 biomes, 18/174 countries, and South Asia; MENA becomes the
+      largest regional decline (SPC -0.28%). The paper's prose cites no ratio numbers; only the
+      combined-diffs figures change (regenerate with the other Path A figures, preview first).
+      Path B's ratio (10 km grid) is still unchecked for the same offset (rasters not on this
+      machine).
+      [ ] Figure idea (user likes it): per-pixel change map per service in the style of the
+      preview — smaller ticks, simpler caption, colour-blind-safe diverging palette (PuOr /
+      blue-brown). Candidate for BC9 (coastal-risk figure) too. Show previews before use.
+      Also: 4.1's reference to @fig-regional-trajectories covers biomes only; regions/income
+      figures are in the Annex — point there too on insertion.
+- [ ] Re-render the .docx (only the HTML was re-rendered on 2026-09-30).
+
+**TRANSFER PLAN: make the machinery a reusable codebase, not a one-off paper pipeline (user,
+2026-10-01).** The contribution is the analytical machinery: global and regional analyses sliced
+any way (vector groupings, metric, baseline, scale), with the same checks applying to each. Goal
+before the contract ends (~2026-10-24): someone else can rerun it, trust it, and extend it.
+Estimates are working days.
+
+1. [~] **One service definition.** `R/service_config.R` has been the single source since 2026-09-01
+   and most R consumers load it. 2026-10-01: `scripts/mapping/make_faceted_maps.R` now derives its
+   good/bad lists from it, and both it and `make_attribution_map.R` assert their facet order
+   matches it (fails loudly on drift). Left: `zonal_stats_toolkit/compare_and_plot_changes.R` keeps
+   its own service list (separate repo; document or read a shared file); the paper's tables are
+   hardcoded by design. ~0.5 day.
+2. [ ] **Data organization** (block below): one data tree, README per folder with sources, producing
+   scripts and md5s; original configs run unchanged. ~2 days, mostly machine time.
+3. [ ] **Verify script = regression test.** Numbers audit steps 2-3 (`numbers_ledger.csv`,
+   `analysis/verify_paper_numbers.py`). Recomputes every paper number from the data; a newcomer runs
+   it to confirm they reproduce the work before extending it. ~2-3 days.
+4. [ ] **One worked regional example**, end to end from a README: one country or biome, sliced its
+   own way, showing the "however you slice it" claim in practice. ~1-2 days after 2 and 3.
+5. [~] **"How to ask a new question" guide**: DRAFT v1 written 2026-10-01 as `docs/how_to_extend.md`
+   (linked from README), awaiting review. Covers adding a raster, a grouping vector, a metric or a null
+   model, with the exact files to touch. Builds on `docs/runbook.md`. ~1 day.
+6. [ ] **Revisit the Path B stage boundaries + refresh the runbook (user, 2026-10-01; eventually,
+   not now).** The split between `process_data.qmd` (-> `10k_change_calc.gpkg`),
+   `hotspot_extraction.qmd`, `hotspot_synthesis.qmd` and `KS_tests_hotspots.qmd` is arbitrary
+   (grew by accretion; extraction also does plots, driver overlap and exports). Same idea as the
+   parked "split computation from presentation per pipeline stage" sketch in
+   `docs/devstack_compat_research_notes.md`. `docs/runbook.md` and `docs/pipeline_reference.md` are
+   partly outdated; `docs/how_to_extend.md` points into the runbook, so refresh both together once
+   the stage boundaries are decided.
+Order: 1 (nearly done) -> 5 (doc only) -> 3 -> 2 -> 4; 6 when there is time. Interoperability with the NCP/spring dev
+stacks stays parked (see below); everything here is within these repos.
+
+**Data organization for full reproducibility (user, 2026-10-01; NOT NOW, after the paper work
+settles):** the lilling server data was not fully downloaded, so Path A is being partly rebuilt
+locally and outputs are scattered (`data/raw/path_a_rerun/`, `data/raw/2020_1992_chg/`,
+`data/raw/2020_1992_ch_ha/`, `data/raw/n_ret_ratio_aligned/`, `~/data/global_ncp/Raw/`,
+`*_map_data.backup_*.csv`). Goal: inputs, intermediates and outputs neatly organized and
+documented so everything is reproducible and traceable.
+- [ ] Rebuild the original toolkit data tree under one root (proposed: `~/data/global_ncp/` with
+      `base_years/`, `2020_1992_chg/`, `2020_1992_ch_ha/`, `ratios/`, `vector_basedata/`,
+      `archive_2026-03_stale/`), mounted as `zonal_stats_toolkit/data` so the original
+      `global_ncp_consolidated.ini` / `global_ncp_diff_consolidated.ini` run unchanged.
+- [ ] README per data root: what each folder holds, source, producing script, md5s.
+- [ ] Regenerate the sediment ratio base years (only the change raster survived locally), with the
+      grid alignment fix.
+- [ ] Full rerun of both configs + `compare_and_plot_changes.R` (into a new folder) to rebuild
+      map_data from scratch instead of the 2026-10-01 row patches; confirm it matches the patched
+      tables. Retire the one-off rerun scripts/inis afterwards.
+
+**Carried over from `docs/archive/paper_review_notes_and_open_items.md` (archived 2026-10-01; the
+live versions of these notes are the HTML-only blocks in `paper_draft_5service.qmd`):**
+- [ ] Climate inputs for 1992 vs 2020 SDR/NDR runs (same or era-specific?). If the same, soften or
+      cut the Discussion's "Climate Forcing" mechanism. Marked "required before submission" in the
+      draft; answered by the model-run provenance question; affects BC14.
+- [ ] Pollination-sufficiency data question to Becky/Justin (sent 2026-08-21, unanswered); gates the
+      new risk/service map grid.
+- [ ] For a conversation with Becky: retention amount vs retention ratio tradeoffs; "directionality
+      ambiguity" (a pixel's change can reflect upstream/downstream redistribution).
+- [ ] Citation for land-cover monitoring as a widely used ES proxy (e.g. IPBES 2019, REDD+) to frame
+      the Discussion's land-cover section as a contribution against that prior.
+- [~] Null model for the attribution overlap: DONE 2026-10-01, AWAITING REVIEW. Stratified null
+      (`analysis/attribution_null_model.R` -> `outputs/tables/attribution_null_model.csv`): observed
+      36.7% vs 9.0% expected globally (4.1x), 21.6% within 1° blocks (1.7x), 24.9% within 0.5°
+      (1.5x). Added to the paper: one Methods paragraph (Spatial Attribution Analysis) + Annex
+      paragraph and @tbl-attribution-null. Part of the 7.3 risk ratio is shared regional geography.
+      Also added (same review): Annex caveat that within-block ratios are a LOWER BOUND (they also
+      remove nearby off-site links such as routing); Conclusions future-work sentence on a
+      distance-decay analysis; 3 web-verified references (Gotelli & Graves 1996; Fortin & Dale 2005;
+      Anderson et al. 2009). Conclusions rewritten (awaiting review): attribution paragraph now
+      carries the regional caveat (1.7x within ~100 km vs 4.1x globally) instead of "strong, highly
+      significant"; NEW paragraph generalizing that every answer depends on metric, baseline,
+      grouping and scale; the last two paragraphs merged into one on the framework making those
+      choices explicit and repeatable.
+- [~] Crosswalk-join bug in `analysis/hotspot_extraction.qmd` (lc-hotspot-overlap-setup chunk): it
+      WAS still there; code fixed 2026-10-01 (same dedup as the 08-31 fix). Effect: driver hotspot
+      sets 0.2-3.4% too large (Crop_Exp most). Headline attribution numbers unaffected (separate
+      script). NOT re-rendered: the Annex heatmap @fig-attribution-gap and
+      `lcc_es_hotspot_overlap_*.csv` need regenerating, together with the cell-universe mismatch
+      (that table uses 67,095 ES hotspots per service vs 65,858 in the paper).
+- [ ] Per-service model-mechanics detail for Nature Access and Coastal Risk in Methods (public InVEST
+      methodology; pollination done 2026-10-01).
+
+**Blocked on others:** model-run provenance, `ee_correspondence` citation (Justin), co-occurrence
+design validation.
+
+**Parked as future work, deliberately (don't reopen):** how SPC and absolute-change hotspots
+overlap and what the divergence means; interoperability with the spring/NatCap dev stacks.
+
+### Detail
+
+- `HANDOFF_NOTES.md` (May 2026, stale) removed from the repo (`git rm`, staged, not committed);
+  nothing in it was unique.
+- **`docs/manuscript/results_4.1_draft.md` v1 was wrong**: it averaged per-cell SPC over the 10 km
+  grid (`analysis/scratch_abstract_stats.R`), which weights low-baseline cells like high-baseline
+  ones and contradicted the section's own Path A figure (e.g. LAC sediment export +15.6% vs -1.4%;
+  v1 also had LAC pollination falling, while Path A has it rising in every region). **v2 rewritten**
+  from Path A per-pixel aggregates (`outputs/plots/output_plots_diff/{biome,region_wb,income_grp}
+  _map_data.csv`, zonal_stats_toolkit, 2026-08-24): SPC of group totals + absolute change per
+  pixel (per area). Text fixes applied (no "century", no em dashes, closing generalization cut).
+  **Not yet applied to the qmd; waiting for the user's review.** Caveats in its header: global
+  numbers reconstructed from region rows; grid raw totals give N export +1.6% vs Path A +3.4%.
+- Settled rule (user, reaffirmed): report absolute change (physical units) and SPC; never plain
+  relative change; group comparisons must account for size/baseline (SPC of totals, change per area).
+- **Hotspot sensitivity (the paper's hotspots = top/bottom 5% of per-cell SPC)**: reproduced 181,842
+  hotspot cells (paper: 189,932). Only ~51% are also hotspots when ranked by absolute change.
+  Overlap by service: coastal risk 97%, N export 56%, nature access 43%, pollination 33%, sediment
+  31%. SPC hotspots for sediment and pollination sit on very low baselines (median 12% and 6% of
+  the typical cell); 16% of pollination and nature-access hotspots are at the ±200 cap. Existing
+  files under `data/processed/hotspots_5service/` are from the retention/protection detour, not the
+  current export/risk set. Options for a decision with Becky: (a) keep SPC, state the question
+  explicitly in Methods, add the overlap table to the supplement; (b) hotspot = extreme under both
+  metrics (rerun everything downstream); (c) SPC with a baseline floor. User leans (a). This may
+  become a core methods contribution ("how to measure change in spatially aggregated service
+  indicators").
+- 1.8x income intensity (BC6) still in Abstract and Population Exposure; user's call.
 
 ## SWY MOVED (2026-09-28): all SWY work now lives in its own repository
 

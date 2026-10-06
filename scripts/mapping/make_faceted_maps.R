@@ -34,11 +34,12 @@ library(rnaturalearth)
 # ------------------------------------------------------------------------------
 
 # RULE 1: Directionality
-# Goods: Increase is Good, Decrease is Bad
-goods <- c("Pollination", "Nature_Access", "N_Ret_Ratio", "Sed_Ret_Ratio", "C_Risk_Red_Ratio")
-
-# Damages: Increase is Bad, Decrease is Good
-damages <- c("N_export", "Sed_export", "C_Risk")
+# From the single service definition (R/service_config.R), not retyped here.
+# Goods: increase is good. Damages: increase is bad. Covers the 5 amounts + 3 ratios.
+source(here::here("R", "service_config.R"))
+.all_svc <- c(SERVICE_AMOUNTS, SERVICE_RATIOS)
+goods   <- vapply(Filter(function(s) s$good_direction == "high", .all_svc), `[[`, character(1), "name")
+damages <- vapply(Filter(function(s) s$good_direction == "low",  .all_svc), `[[`, character(1), "name")
 
 # Helper to determine directionality
 get_direction <- function(service) {
@@ -277,6 +278,8 @@ generate_faceted_map <- function(gpkg_path, grouping_name, value_col = "pct_chg"
   canon_order <- c("C_Risk", "N_export", "Sed_export",
                    "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
                    "Pollination", "Nature_Access")
+  # Display order only; fail loudly if it drifts from the single service definition.
+  stopifnot(setequal(canon_order, c(service_names(), ratio_names())))
   services <- intersect(canon_order, services)
 
   plots <- map(services, ~plot_single_service(sf_data, .x, value_col, shared_limits = service_limits[[.x]]))

@@ -1,5 +1,9 @@
 # Paper: author's own review notes and open items
 
+> **Archived 2026-10-01.** Snapshot from 2026-09-23, now stale. The live notes are the HTML-only
+> blocks inside `docs/manuscript/paper_draft_5service.qmd`; the items still open were moved to the
+> review queue in `docs/HANDOFF.md`.
+
 Extracted 2026-09-23 from the italic-gray note/status/important blocks inside
 `paper_draft_5service.qmd`. These are the author's own working notes and open questions embedded
 in the draft — not Becky's PDF comments (those live in `paper_draft_5service.pdf` itself and in
