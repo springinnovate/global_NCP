@@ -19,7 +19,17 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
 
 1. **Branches.** Squash-merge `paper_review` into `main` with one name-free message (repo is
    public). Then open a `housekeeping` branch for steps 2-4, so cleanup never mixes with paper edits.
-2. **Purge and organize.** Inventory tracked files that do not feed the paper, the book or the
+2. **Repo organization (whole repo, on the housekeeping branch).** First an inventory, then a target
+   layout, then staged moves with a render/run check after each. Known starting point (10-05): 701
+   tracked files, ~134 MB tracked; `outputs/` alone is 325 files (49 in `plots/maps`, 33 in
+   `plots/colombia_report`, a whole `plots_archive_mar20/` tree, `workflow_files/libs`); 82 files in
+   `analysis/` mixing pipeline notebooks, scratch scripts and one-off checks; untracked clutter at the
+   root (`NCP_Global_Hotspots_Deliverables.zip`, `tmp_power_test.nc`, `home/`, `_book/`,
+   `summary_pipeline_workspace*/`, `MONTHLY_REPORT.md`). Proposed layout to discuss: `pipeline/`
+   (the restructured analysis chain, step 5), `paper/` (manuscript + its figure scripts + the figures
+   it uses), `book/`, `presentations/` (or out of the repo), `outputs/` only for regenerable products,
+   `archive/` for anything kept for history. Every move: grep for references, update paths, re-render.
+3. **Purge and organize.** Inventory tracked files that do not feed the paper, the book or the
    pipeline: stale outputs (old figure variants, retention-era boxplots such as
    `boxplots_volumetric_*`, `boxplots_ratios_*`, `boxplots_coastal_pct`), presentation-only material
    for external venues (Sandra/Colombia, IDB-WWF, CLEC decks and their plots), drafts in `docs/`
@@ -27,12 +37,12 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
    in the 10-02 status below. Decide per group: delete, move to `docs/archive/`, or move to a separate
    repo/Drive and untrack. Check every candidate is unreferenced first (grep the qmd/R/py files).
    `CLAUDE.md` is untracked on purpose; decide whether it belongs in a public repo (it names people).
-3. **Lab presentation** (`docs/presentations/presentation.qmd`): update to the paper as sent:
+4. **Lab presentation** (`docs/presentations/presentation.qmd`): update to the paper as sent:
    three questions, new figures, coastal figure, corrected prevalence (2.4x, mangroves ~1.0 coastal),
    land cover as future work.
-4. **Book** (`docs/manuscript/chapters/`): align with the paper (scope, corrected numbers, figures);
+5. **Book** (`docs/manuscript/chapters/`): align with the paper (scope, corrected numbers, figures);
    plan how the book, the paper and the pipeline share figure scripts instead of duplicating them.
-5. **Analysis chain restructure (own branch, e.g. `pipeline-restructure`, off `main` after the
+6. **Analysis chain restructure (own branch, e.g. `pipeline-restructure`, off `main` after the
    merge; never on the paper branch).** After the zonal summary stats, the analysis runs across ~4 qmd
    notebooks (`analysis/hotspot_extraction.qmd`, `hotspot_synthesis.qmd`, `KS_tests_hotspots.qmd`,
    plus the exposure/multiplier step) with config duplicated between them. Turn this into one script
@@ -41,7 +51,7 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
    two-tail bug in `hotspot_synthesis.qmd` (currently bypassed by
    `analysis/rebuild_hotspot_area_stats.R`), and the paper figure scripts in `scripts/mapping/`.
    Verify outputs match the current tables before switching over.
-6. **Hand-off** before 10-23: runbook and `docs/how_to_extend.md` reviewed, data README, one
+7. **Hand-off** before 10-23: runbook and `docs/how_to_extend.md` reviewed, data README, one
    walkthrough session.
 
 ## STATUS 2026-10-05 (working notes from the session; superseded by the milestone above)
