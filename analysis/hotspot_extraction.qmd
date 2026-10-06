@@ -1335,15 +1335,26 @@ if (file.exists(lc_gpkg) && exists("plt_long")) {
   crosswalk_path <- file.path(data_dir(), "processed", "lc_grid_fid_to_master_fid_crosswalk.csv")
   if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df) && file.exists(crosswalk_path)) {
     crosswalk <- readr::read_csv(crosswalk_path, show_col_types = FALSE) %>% dplyr::filter(valid_match)
+    # Same many-to-one fix as the geom_sf enrichment chunk above (2026-08-31), applied here
+    # 2026-10-01: keep only matches within 1 m of each master_fid's best match, then one row per
+    # fid. Without it, a cell counted as a driver hotspot if ANY matched LC row (including a far,
+    # spurious secondary match) passed the cutoff, and the 95th-percentile cutoff was taken over
+    # duplicated rows. Measured effect: driver hotspot sets shrink by 0.2-3.4% (Crop_Exp largest).
+    crosswalk_best <- crosswalk %>%
+      dplyr::group_by(master_fid) %>%
+      dplyr::filter(match_dist_m <= min(match_dist_m) + 1.0) %>%
+      dplyr::ungroup()
     lc_df <- lc_df %>%
-      dplyr::inner_join(crosswalk %>% dplyr::select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
+      dplyr::inner_join(crosswalk_best %>% dplyr::select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
       dplyr::select(-grid_fid) %>%
-      dplyr::rename(fid = master_fid)
+      dplyr::rename(fid = master_fid) %>%
+      dplyr::distinct(fid, .keep_all = TRUE)
     lc_sf_full <- lc_sf_full %>%
-      dplyr::inner_join(crosswalk %>% dplyr::select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
+      dplyr::inner_join(crosswalk_best %>% dplyr::select(lc_grid_fid, master_fid), by = c("grid_fid" = "lc_grid_fid")) %>%
       dplyr::select(-grid_fid) %>%
-      dplyr::rename(fid = master_fid)
-    message(sprintf("LC data remapped to master-grid fid via crosswalk: %d rows.", nrow(lc_df)))
+      dplyr::rename(fid = master_fid) %>%
+      dplyr::distinct(fid, .keep_all = TRUE)
+    message(sprintf("LC data remapped to master-grid fid via crosswalk (deduplicated): %d rows.", nrow(lc_df)))
   } else if ("grid_fid" %in% names(lc_df) && !"fid" %in% names(lc_df)) {
     lc_df <- dplyr::rename(lc_df, fid = grid_fid)
     lc_sf_full <- dplyr::rename(lc_sf_full, fid = grid_fid)

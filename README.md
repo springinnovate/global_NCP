@@ -145,7 +145,7 @@ Working version of a structured workflow for extracting, analyzing, and visualiz
 
 The core extraction workflow uses Python (`taskgraph` + `exactextract`) for zonal summaries; R/Quarto is used for consolidation, change calculations, hotspot extraction, and KS tests.
 
-For a detailed technical description of the pipeline, see the project's official documentation in the `/docs` directory, particularly `docs/methodology.md` and `docs/runbook.md`.
+For a detailed technical description of the pipeline, see the project's official documentation in the `/docs` directory, particularly `docs/methodology.md` and `docs/runbook.md`. To extend the analysis (new grouping, service, metric, threshold, co-occurrence test or scale), start with `docs/how_to_extend.md`.
 
 ### Pipeline Architecture
 
@@ -530,6 +530,13 @@ the 2 global NCPs are included).
 1.  **Adapt analysis for multi-temporal data:** Adapt hotspot_extraction.qmd to handle 3+ time points.
 2.  **Quantify hotspot vs. non-hotspot change:** Develop a method to show the share of total change occurring within vs. outside hotspots (stacked bar approach).
 :::
+
+## Related repositories
+
+- **[swy_parameterization](https://github.com/springinnovate/swy_parameterization)**: the Seasonal Water
+  Yield work (CN/Kc parameters from global data, tested against a regional Philippines run, and
+  scoping for a global cropland parameterization). Developed here until September 2026, then moved
+  to its own repository; its code, docs and data no longer live in this one.
 
 ## License
 

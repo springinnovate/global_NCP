@@ -62,6 +62,9 @@ attr_colors <- c(
 canon_order <- c("C_Risk", "N_export", "Sed_export",
                  "C_Risk_Red_Ratio", "N_Ret_Ratio", "Sed_Ret_Ratio",
                  "Pollination", "Nature_Access")
+# Display order only; fail loudly if it drifts from the single service definition.
+source(here("R", "service_config.R"))
+stopifnot(setequal(canon_order, c(service_names(), ratio_names())))
 
 # Helper function to classify attribution based on LCC services
 classify_attribution <- function(lcc_services, lcc_count) {
