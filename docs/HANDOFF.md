@@ -18,7 +18,7 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
 **Next session: housekeeping strategy (decide before doing).** Suggested order:
 
 1. **Branches.** Squash-merge `paper_review` into `main` with one name-free message (repo is
-   public). Then open a `housekeeping` branch for steps 2-4, so cleanup never mixes with paper edits.
+   public). Then open a `housekeeping` branch for steps 2-5, so cleanup never mixes with paper edits.
 2. **Repo organization (whole repo, on the housekeeping branch).** First an inventory, then a target
    layout, then staged moves with a render/run check after each. Known starting point (10-05): 701
    tracked files, ~134 MB tracked; `outputs/` alone is 325 files (49 in `plots/maps`, 33 in
@@ -29,7 +29,7 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
    `home/` 8.9 GB (looks like a stray copy of a Linux path, check before deleting), `docs/` 1 GB,
    `summary_pipeline_workspace_ha/` 587 MB, `outputs/` 510 MB, `_book/` 480 MB, the deliverables zip
    212 MB. Proposed layout to discuss: `pipeline/`
-   (the restructured analysis chain, step 5), `paper/` (manuscript + its figure scripts + the figures
+   (the restructured analysis chain, step 6), `paper/` (manuscript + its figure scripts + the figures
    it uses), `book/`, `presentations/` (or out of the repo), `outputs/` only for regenerable products,
    `archive/` for anything kept for history. Every move: grep for references, update paths, re-render.
 3. **Purge and organize.** Inventory tracked files that do not feed the paper, the book or the
@@ -56,6 +56,12 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
    Verify outputs match the current tables before switching over.
 7. **Hand-off** before 10-23: runbook and `docs/how_to_extend.md` reviewed, data README, one
    walkthrough session.
+
+Other repos touched this session: `C:projectsandcover-validation-toolkit` (Zone 2 validation
+committed; second round sent; Zone 3 labels arriving; read its HANDOFF.md "UPDATE 2026-10-05").
+Open paper fixes noted but not done: Introduction still says "show a declining trend" and
+"populations with limited adaptive capacity"; 14.6% vs 13.8% hotspot-share denominator; Annex KS and
+driver figures are restyled but the two land cover maps were removed, not restyled.
 
 ## STATUS 2026-10-05 (working notes from the session; superseded by the milestone above)
 
