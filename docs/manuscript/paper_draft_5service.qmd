@@ -108,7 +108,7 @@ Both absolute change (native units) and percentage change (SPC) are shown; the t
 
 ![Global pattern of ecosystem service change, 1992–2020 — percentage change (SPC) per 10km cell, for the same four services.](../../outputs/plots/maps/global_change_5panel_en.png){#fig-global-pattern-pct .quarto-figure-center width="100%"}
 
-Sediment export is reported directly, so an increase in a cell is unambiguously the hotspot-relevant direction: more sediment reaching waterways (see Limitations for how this differs from the retention *ratio*, reported elsewhere as secondary context).
+Sediment export is reported directly, so an increase in a cell is unambiguously the hotspot-relevant direction: more sediment reaching waterways (the sediment retention ratio is not used to define hotspots; see Methods, and @fig-ratios for its change).
 
 Coastal risk is computed at points along the coastline, which are averaged to the 10 km grid for the rest of the analysis. @fig-coastal-risk shows the points themselves. Coastal risk changed at 63,494 of 1.37 million points (4.6%), and changes are small, within about ±18% SPC. Increases and decreases are spread along most coastlines in similar numbers (23,591 points rose and 21,111 fell by at least 1%). The panels show densely populated coasts where risk mostly rose (New York and New Jersey, the Nile delta, Istanbul and the Sea of Marmara, Manila Bay) and two where it mostly fell (the Pearl River delta and the Gulf of Kutch).
 
@@ -122,29 +122,54 @@ Coastal risk is computed at points along the coastline, which are averaged to th
 :::
 
 ## Global Hotspot Distribution
-At the grid scale, 189,932 cells (14.6% of evaluated cells) are a hotspot for at least one service, and they cluster strongly in space (@fig-hotspot-map). To compare groups of different size, we use relative prevalence: a group's share of hotspot cells divided by its share of the area where the service is modelled. A value of 1 means a group holds as many hotspots as its size would predict; 2 means twice as many.
-
-For the four land-based services, Tropical & Subtropical Moist Broadleaf Forests have the highest relative prevalence among biomes (@fig-hotspot-intensity-biome): 2.4 on average, and 3.1 for sediment export. Tropical & Subtropical Coniferous Forests follow (2.0), then Mangroves (1.8), where pollination and nature access reach 2.3 and 2.1. Among income groups (@fig-hotspot-intensity-income), lower-middle-income countries hold 15.6% of the land but 21% of hotspot cells (25% for nature access), while high-income OECD countries hold 25% of the land and 15% of hotspot cells, so per unit area hotspots are about 2.4 times as frequent in lower-middle-income countries. Breakdowns by World Bank region are in the Supplementary Material.
-
-Coastal risk exists only along the coast, so its relative prevalence is measured against coastal cells and reported by region and income group (@fig-coastal-prevalence); a coastal cell's biome describes the land behind it rather than the coast. Coastal risk hotspots are over-represented in South Asia (1.8), Sub-Saharan Africa (1.4) and on low-income coasts (1.3), and under-represented in North America (0.6). Unlike the land-based services, they are slightly over-represented on high-income OECD coasts (1.1) and under-represented on lower-middle-income coasts (0.8).
+At the grid scale, 189,932 cells (14.6% of evaluated cells) are a hotspot for at least one service, and they cluster strongly in space (@fig-hotspot-map). We describe each group of cells in two ways: how often hotspots occur in it, and how large the change is inside them. For frequency we use relative prevalence: a group's share of hotspot cells divided by its share of the area where the service is modelled. A value of 1 means a group holds as many hotspots as its size would predict; 2 means twice as many. For magnitude we use the distribution of SPC within the group's hotspot cells, where an SPC of −200% means the service fell to zero.
 
 ![Intensity of multi-service hotspots. Count of overlapping negative hotspots per 10km cell.](../../outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png){#fig-hotspot-map .quarto-figure-center width="100%"}
 
-![Relative prevalence of hotspots by WWF biome, land-based services. Values above 1 indicate a biome has more hotspot area than expected given its size.](../../outputs/plots/intensity/hotspot_relative_intensity_wwf_biome.png){#fig-hotspot-intensity-biome .quarto-figure-center width="100%"}
+### Land-Based Services
+For the four land-based services, Tropical & Subtropical Moist Broadleaf Forests have the highest relative prevalence among biomes (@fig-hotspot-biome-a): 2.4 on average, and 3.1 for sediment export. Tropical & Subtropical Coniferous Forests follow (2.0), then Mangroves (1.8), where pollination and nature access reach 2.3 and 2.1. Breakdowns by World Bank region are in the Supplementary Material, and by income group in the next section.
 
-![Relative prevalence of hotspots by income group; land-based services.](../../outputs/plots/intensity/hotspot_relative_intensity_income_grp.png){#fig-hotspot-intensity-income .quarto-figure-center width="100%"}
+The size of change inside hotspots adds a second dimension (@fig-hotspot-biome-b). For nitrogen export it varies little between biomes, with median SPC from +35% in Boreal Forests/Taiga to +55% in Deserts & Xeric Shrublands, so for this service biomes differ mainly in how often hotspots occur. For the other services, frequency and severity coincide in some biomes and not in others. Tropical & Subtropical Moist Broadleaf Forests have both the most frequent sediment export hotspots and the largest increases within them (median +124%). Tropical & Subtropical Coniferous Forests have both the most frequent pollination hotspots (3.1) and the steepest losses (median −102%), and 30% of these cells lost realized pollination entirely. Deserts & Xeric Shrublands are the opposite case: nature access hotspots are under-represented there (0.5), but where they occur the loss is the most severe of any biome (median −169%), and 42% of them lost nature access entirely. Flooded Grasslands & Savannas combine both, with over-represented (1.8) and severe (median −132%) nature access hotspots, 34% of them a total loss. Prevalence shows where hotspots cluster; magnitude shows where they are rare but the service is lost outright.
 
-![Relative prevalence of coastal risk hotspots by World Bank region and income group. Values above 1 indicate a group holds more coastal risk hotspots than its share of the coastline.](../../outputs/plots/intensity/hotspot_relative_intensity_coastal_risk.png){#fig-coastal-prevalence .quarto-figure-center width="75%"}
+::: {#fig-hotspot-biome layout-ncol=1}
+![Relative prevalence. Values above 1 (orange) indicate a biome holds more hotspot cells than expected given its size.](../../outputs/plots/intensity/hotspot_relative_intensity_wwf_biome.png){#fig-hotspot-biome-a}
 
-![Symmetric percentage change (SPC) of coastal risk within hotspot cells, by World Bank region and income group. Darker colors indicate larger median change.](../../outputs/plots/boxplots_unified/coastal_risk/boxplots_pct.png){#fig-coastal-boxplots .quarto-figure-center width="75%"}
+![Symmetric percentage change (SPC) within hotspot cells. Boxes show the median and interquartile range; darker boxes indicate larger median change within each service.](../../outputs/plots/boxplots_unified/WWF_biome/boxplots_pct.png){#fig-hotspot-biome-b}
 
-### Hotspot Magnitude by Biome
-Beyond identifying the location of the hotspots, we analyze the magnitude of change within them. The patterns of Symmetric Percentage Change (SPC) values vary substantially across both the assessed services and the biophysical contexts — see the Supplementary Material for the equivalent breakdown across socioeconomic strata.
+Hotspot frequency and magnitude by WWF biome, land-based services.
+:::
 
-![Symmetric percentage change (SPC) within hotspot cells by WWF biome, land-based services. Darker boxes indicate larger median change within each service.](../../outputs/plots/boxplots_unified/WWF_biome/boxplots_pct.png){#fig-boxplots-biome .quarto-figure-center width="100%"}
+### Coastal Risk
+Coastal risk exists only along the coast, so its relative prevalence is measured against coastal cells and reported by region and income group (@fig-coastal-hotspots-a); a coastal cell's biome describes the land behind it rather than the coast. Coastal risk hotspots are over-represented in South Asia (1.8), Sub-Saharan Africa (1.4) and on low-income coasts (1.3), and under-represented in North America (0.6). Unlike the land-based services, they are slightly over-represented on high-income OECD coasts (1.1) and under-represented on lower-middle-income coasts (0.8).
+
+Changes inside coastal risk hotspots are small, with medians between 1% and 2.5% in every group (@fig-coastal-hotspots-b). The two groups where hotspots are most over-represented also have the largest increases: low-income coasts (median +2.3%, against +1.5% to +1.7% for the other income groups) and South Asia (+2.2%). Sub-Saharan Africa is the exception, with over-represented hotspots but a median increase (+1.4%) no larger than North America's.
+
+::: {#fig-coastal-hotspots layout-ncol=1}
+![Relative prevalence. Values above 1 indicate a group holds more coastal risk hotspots than its share of the coastline.](../../outputs/plots/intensity/hotspot_relative_intensity_coastal_risk.png){#fig-coastal-hotspots-a width="75%"}
+
+![Symmetric percentage change (SPC) of coastal risk within its hotspot cells. Darker colours indicate larger median change.](../../outputs/plots/boxplots_unified/coastal_risk/boxplots_pct.png){#fig-coastal-hotspots-b width="75%"}
+
+Coastal risk hotspot frequency and magnitude by World Bank region and income group.
+:::
+
+::: {.content-visible when-format="html"}
+> Figures and within-hotspot statistics by `scripts/mapping/make_hotspot_summary_figures.R` from the
+> production hotspot set (`hotspots_global_pct.gpkg`); numbers in `outputs/tables/hotspot_spc_within_hotspots.csv`
+> and `data/processed/tables/hotspot_area_stats.csv`.
+:::
 
 ## Socioeconomic Profiling: WHO is exposed to ecosystem service decline? 
 ![Global distribution of key socioeconomic context variables (Population, GDP, HDI, and GINI).](../../outputs/plots/maps/global_socioeconomic_context_map.png){#fig-socioeconomic-context .quarto-figure-center}
+
+Hotspots are more frequent in lower-income countries (@fig-hotspot-income-a). Lower-middle-income countries hold 15.6% of the land but 21% of hotspot cells (25% for nature access), while high-income OECD countries hold 25% of the land and 15% of hotspot cells, so per unit area hotspots are about 2.4 times as frequent in lower-middle-income countries. Nature access losses inside hotspots are also deepest there (@fig-hotspot-income-b): a median SPC of −109%, against −62% in high-income OECD countries, with 22% of lower-middle-income nature access hotspots losing access entirely, against 8%.
+
+::: {#fig-hotspot-income layout-ncol=1}
+![Relative prevalence.](../../outputs/plots/intensity/hotspot_relative_intensity_income_grp.png){#fig-hotspot-income-a}
+
+![Symmetric percentage change (SPC) within hotspot cells.](../../outputs/plots/boxplots_unified/income_grp/boxplots_pct.png){#fig-hotspot-income-b}
+
+Hotspot frequency and magnitude by income group, land-based services.
+:::
 
 Hotspots and the landscapes around them differ in their socioeconomic profile for 24 of the 25 combinations of service and socioeconomic variable (Methods; test statistics in @fig-ks-heatmap). The one exception is coastal risk and agricultural field size, where hotspot and background cells are essentially indistinguishable.
 
@@ -365,7 +390,7 @@ The five services were modelled with the InVEST suite (Sharp et al., 2020) at 30
 
 An increase is adverse for nitrogen export, sediment export and coastal risk, and a decrease is adverse for pollination and nature access. Services expressed as amounts were converted to per-hectare values before aggregation; the index-type services were kept in their native units.
 
-The same NDR, SDR and coastal vulnerability runs also give three ratios that are shown in the change figures but not used to define hotspots: the nitrogen retention ratio, $N_{\text{retained}} / (N_{\text{retained}} + N_{\text{export}})$; the sediment retention ratio, $(\text{USLE} - \text{SedExport}) / \text{USLE}$, where USLE is potential soil loss from the Universal Soil Loss Equation; and the coastal risk reduction ratio, the proportional reduction in coastal risk attributable to coastal habitats.
+The same NDR, SDR and coastal vulnerability runs also give three ratios that are not used to define hotspots (their change is shown in @fig-ratios): the nitrogen retention ratio, $N_{\text{retained}} / (N_{\text{retained}} + N_{\text{export}})$; the sediment retention ratio, $(\text{USLE} - \text{SedExport}) / \text{USLE}$, where USLE is potential soil loss from the Universal Soil Loss Equation; and the coastal risk reduction ratio, the proportional reduction in coastal risk attributable to coastal habitats.
 
 ::: {.content-visible when-format="html"}
 > **Open (model run provenance):** which project produced the 1992 and 2020 InVEST rasters (same runs as
@@ -518,6 +543,12 @@ For each service and socioeconomic variable, the distribution in hotspot cells w
 ![Kolmogorov–Smirnov statistic (D, colour) for the difference between hotspot and background cells, by service and socioeconomic variable. Labels give Cliff's Delta: positive values mean higher values in hotspot cells; ns marks the one non-significant difference.](../../outputs/plots/ks/ks_heatmap.png){#fig-ks-heatmap .quarto-figure-center width="80%"}
 
 
+## Retention and Reduction Ratios
+
+The three ratios described in Methods are not used to define hotspots. Their change by biome is shown here for completeness.
+
+![Change in the nitrogen retention, sediment retention and coastal risk reduction ratios by biome, 1992 to 2020: absolute change (left) and relative change, SPC (right). A decrease is shown as adverse. Colours as in @fig-regional-trajectories.](../../outputs/plots/output_plots_diff/biome_combined_diffs_ratios.png){#fig-ratios .quarto-figure-center}
+
 ## Regional Trajectories by World Bank Region
 
 ::: {#fig-annex-wb-trajectories layout-ncol=1}
@@ -533,9 +564,6 @@ For each service and socioeconomic variable, the distribution in hotspot cells w
 
 ::: {#fig-annex-inc-trajectories layout-ncol=1}
 ![Change in ecosystem services by income group, 1992 to 2020: absolute change per unit area (left) and relative change, SPC (right). Colours as in @fig-regional-trajectories.](../../outputs/plots/output_plots_diff/income_grp_combined_diffs.png)
-
-
-![Symmetric percentage change (SPC) within hotspot cells by income group, for the four land-based services.](../../outputs/plots/boxplots_unified/income_grp/boxplots_pct.png)
 :::
 
 ## Geographic Distribution by Country

@@ -5,8 +5,60 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-06. Start with MILESTONE 2026-10-05 just below; work continues on branch `housekeeping`. The user's WWF contract ends
+*Last updated: 2026-10-06. Start with OPEN ITEMS just below, then MILESTONE 2026-10-05; work continues on branch `housekeeping`. The user's WWF contract ends
 ~2026-10-23 (last working day); access to springinnovate's git is expected to continue afterwards.*
+
+## OPEN ITEMS (consolidated 2026-10-06; answer "where are we / what's pending" from here)
+
+Replaces the scattered checklists further down (PAPER REVIEW QUEUE, THREE-WEEK PLAN, "Pending"),
+which are kept for history. Keep this list current.
+
+**Paper** (`docs/manuscript/paper_draft_5service.qmd`, the only living copy; v sent 10-05)
+- [~] Done 10-06, uncommitted, awaiting the user's review: retention/reduction ratios moved out of
+  Figure 1 and the Supplement change figures into one Supplement figure (@fig-ratios); "Global
+  Hotspot Distribution" restructured into a land block and a coastal block, each pairing
+  prevalence with within-hotspot SPC, with the magnitude result interpreted; income-group
+  prevalence and magnitude moved to the start of the WHO section; land boxplots now built from the
+  production hotspot set (`make_hotspot_summary_figures.R`, numbers in
+  `outputs/tables/hotspot_spc_within_hotspots.csv`). docx and HTML render clean. The user replaced
+  the shared docx on OneDrive with this version 10-06; more work on these sections is planned.
+- [ ] BC12: log-scale dumbbell (@fig-multiplier-compound) to two bar charts.
+- [ ] Pick one denominator for "14.6% of evaluated cells" (1,302,099 grouped cells) vs 13.8%
+  (1,372,621 cells used for hotspot selection); state it in Methods.
+- [ ] Methods: model mechanics for nature access and coastal risk (one line each now).
+- [ ] Numbers audit steps 2-4: `numbers_ledger.csv` and `analysis/verify_paper_numbers.py` do not
+  exist yet. This is also the regression test for the hand-off.
+- [ ] Global Path A figures are reconstructed from region rows; a direct global run is pending.
+- [ ] Candidate addition: phase 4 beneficiary-mask result (Gini skew grows at 4+ services). Its
+  numbers (08-07) predate the 08-31 sediment/coastal fix and the 09-03 export/risk reversal, and
+  the masks came from an earlier hotspot set: rerun `analysis/KS_tests_beneficiary_masks.qmd` (and
+  check whether the masks need rebuilding) before citing it.
+- Waiting on Becky: climate inputs / model-run provenance (affects the Discussion's climate
+  mechanism); Gini citation; correspondence-table citation (draft to the model author ready:
+  `docs/manuscript/justin_ee_correspondence_provenance_2026-08-31.draft.md`, unsent).
+
+**Repo housekeeping** (branch `housekeeping`; plan in `docs/repo_reorg_plan.md`)
+- [~] Stages 1-3 done 10-06, uncommitted (rendered files untracked, clutter removed, archives
+  consolidated, stale drafts deleted).
+- [ ] Stage 4 waits for the user's personal copy of the repo (external-venue material moves there).
+- [ ] Stages 5-8; decisions pending on the deliverables zip, `home/jeronimo/data/` (8.8 GB) and
+  `summary_pipeline_workspace_ha/`.
+
+**Presentations**
+- [ ] Lab deck (`docs/presentations/presentation.qmd`): update to the paper as sent, using the
+  paper's figure files; add a beneficiary-mask slide once the phase 4 rerun is done.
+- [ ] Venues to book (from the 10-01 plan): WWF Global Science, UMN lab meeting, Colombia. One core
+  deck, framing per venue.
+
+**Hand-off before 10-23**: verify script (above), `docs/how_to_extend.md` and runbook reviewed,
+data README, root README rewrite, one recorded walkthrough (~10-21).
+
+**Parked (raise when relevant)**: sediment-retention demand artifact follow-ups; field-size
+covariate doubt; per-service critical-asset idea; pollination-sufficiency question (unanswered
+since 08-21); Path B N-retention-ratio grid offset (ratios are Supplement-only now).
+
+**Other repos**: landcover-validation-toolkit (Zone 3 labels, meeting 10-06); SWY in its own repo
+(waiting on the model author); LC_orinoquia (Track A rebuild).
 
 ## MILESTONE 2026-10-05 — paper sent to the PI (read first)
 
@@ -22,7 +74,11 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
    created from that `main`; steps 2-5 and 7 happen there. Step 6 (analysis chain restructure) gets
    its own branch off `main` (e.g. `pipeline-restructure`), so `main` stays the working backup.
    **Start the next session with step 2's inventory.**
-2. **Repo organization (whole repo, on the housekeeping branch).** First an inventory, then a target
+2. **Repo organization (whole repo, on the housekeeping branch).** **Inventory DONE 10-06:
+   `docs/repo_reorg_plan.md`** (inventory, proposed layout, 5 open decisions, staged moves; the
+   size figures below are superseded: 442 MB tracked, ~200 MB of it rendered HTML/DOCX, and
+   `home/` is R's HOME from `.Renviron`, not a stray copy). Next: user decides section 3 of that
+   plan, then stage 1. First an inventory, then a target
    layout, then staged moves with a render/run check after each. Known starting point (10-05): 701
    tracked files, ~134 MB tracked; `outputs/` alone is 325 files (49 in `plots/maps`, 33 in
    `plots/colombia_report`, `workflow_files/libs`; `plots_archive_mar20/`, the old `plots/{abs,pct,ratios,coastal}/` boxplots and `maps/map_native10km_*` were removed 10-06, 44 files); 82 files in
