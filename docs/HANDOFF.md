@@ -22,7 +22,7 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
 2. **Repo organization (whole repo, on the housekeeping branch).** First an inventory, then a target
    layout, then staged moves with a render/run check after each. Known starting point (10-05): 701
    tracked files, ~134 MB tracked; `outputs/` alone is 325 files (49 in `plots/maps`, 33 in
-   `plots/colombia_report`, a whole `plots_archive_mar20/` tree, `workflow_files/libs`); 82 files in
+   `plots/colombia_report`, `workflow_files/libs`; `plots_archive_mar20/`, the old `plots/{abs,pct,ratios,coastal}/` boxplots and `maps/map_native10km_*` were removed 10-06, 44 files); 82 files in
    `analysis/` mixing pipeline notebooks, scratch scripts and one-off checks; untracked clutter at the
    root (`NCP_Global_Hotspots_Deliverables.zip`, `tmp_power_test.nc`, `home/`, `_book/`,
    `summary_pipeline_workspace*/`, `MONTHLY_REPORT.md`). On disk (untracked included): `data/` 82 GB,
@@ -32,7 +32,7 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
    (the restructured analysis chain, step 6), `paper/` (manuscript + its figure scripts + the figures
    it uses), `book/`, `presentations/` (or out of the repo), `outputs/` only for regenerable products,
    `archive/` for anything kept for history. Every move: grep for references, update paths, re-render.
-3. **Purge and organize.** Inventory tracked files that do not feed the paper, the book or the
+3. **Purge and organize.** On 10-06 a name search found ~80 more tracked outputs no source file mentions by name (mostly `plots/maps` 26, `colombia_report` 15, `drivers` 13, `ks` 6, `intensity` 6, `hotness_*` 5); some are built with pasted paths, so check scripts before removing. Inventory tracked files that do not feed the paper, the book or the
    pipeline: stale outputs (old figure variants, retention-era boxplots such as
    `boxplots_volumetric_*`, `boxplots_ratios_*`, `boxplots_coastal_pct`), presentation-only material
    for external venues (Sandra/Colombia, IDB-WWF, CLEC decks and their plots), drafts in `docs/`
