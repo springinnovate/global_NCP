@@ -25,7 +25,10 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
    `plots/colombia_report`, a whole `plots_archive_mar20/` tree, `workflow_files/libs`); 82 files in
    `analysis/` mixing pipeline notebooks, scratch scripts and one-off checks; untracked clutter at the
    root (`NCP_Global_Hotspots_Deliverables.zip`, `tmp_power_test.nc`, `home/`, `_book/`,
-   `summary_pipeline_workspace*/`, `MONTHLY_REPORT.md`). Proposed layout to discuss: `pipeline/`
+   `summary_pipeline_workspace*/`, `MONTHLY_REPORT.md`). On disk (untracked included): `data/` 82 GB,
+   `home/` 8.9 GB (looks like a stray copy of a Linux path, check before deleting), `docs/` 1 GB,
+   `summary_pipeline_workspace_ha/` 587 MB, `outputs/` 510 MB, `_book/` 480 MB, the deliverables zip
+   212 MB. Proposed layout to discuss: `pipeline/`
    (the restructured analysis chain, step 5), `paper/` (manuscript + its figure scripts + the figures
    it uses), `book/`, `presentations/` (or out of the repo), `outputs/` only for regenerable products,
    `archive/` for anything kept for history. Every move: grep for references, update paths, re-render.
