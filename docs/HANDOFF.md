@@ -54,7 +54,18 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
    two-tail bug in `hotspot_synthesis.qmd` (currently bypassed by
    `analysis/rebuild_hotspot_area_stats.R`), and the paper figure scripts in `scripts/mapping/`.
    Verify outputs match the current tables before switching over.
-7. **Hand-off** before 10-23: runbook and `docs/how_to_extend.md` reviewed, data README, one
+7. **Review the rendered analysis notebooks before restructuring them.** Open the HTML/PDF outputs of
+   the pipeline qmds (`analysis/hotspot_extraction`, `hotspot_synthesis`, `KS_tests_hotspots`,
+   `KS_tests_beneficiary_masks`, the LC_change notebooks) and note what is stale, wrong (e.g. the
+   coastal-risk prevalence in `hotspot_synthesis`) or unclear. Fix presentation only; do not change
+   computations there until step 6 replaces them, and re-render to confirm nothing breaks.
+8. **Compatibility with Justin's codebase (`global_invest_dev`).** Before restructuring, read its
+   conventions (config handling, run_/tasks_/functions_ layout, naming, data paths, how services and
+   correspondence tables are loaded) and write down where this repo differs. Make the restructured
+   chain follow them where it costs little; list the rest as known differences. Earlier work:
+   `docs/devstack_compat_research_notes.md`, the `calculate_bitemporal_change.py` pilot, and the
+   unsent `docs/justin_devstack_outreach_2026-09-08.draft.md`.
+9. **Hand-off** before 10-23: runbook and `docs/how_to_extend.md` reviewed, data README, one
    walkthrough session.
 
 Other repos touched this session: `C:/projects/landcover-validation-toolkit` (Zone 2 validation
