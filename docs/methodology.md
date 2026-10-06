@@ -334,7 +334,7 @@ difference), so it's very likely still valid without a rerun — not independent
 against the reverted data as of this note; do that check before actually writing it into the paper.
 Full detail (including the two-stage water/access buffer logic and a mermaid diagram of how Stage 1
 hotspot categories feed Stage 2 buffers) was in `docs/hotspot_redesign_plan.md` (Phase 4), archived
-to `docs/archive/` 2026-09-07 — see there if this section needs expanding.
+to `archive/docs/` 2026-09-07 — see there if this section needs expanding.
 
 ### Land Cover Change Attribution
 To explain *why* hotspots occur, we integrate Land Cover Change (LCC) metrics derived from ESA CCI (1992) and C3S (2020) maps.

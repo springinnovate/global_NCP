@@ -15,7 +15,7 @@ All configs are consumed by `Python_scripts/summary_pipeline_landgrid.py` unless
 
 ## Notes
 
-- `global_ncp_base_ha.ini` — archived; see `archive/` folder
+- `global_ncp_base_ha.ini` — archived; see `archive/analysis_configs/` at the repo root
 - **Path A vs Path B**: Path A extracts *difference rasters* directly to *regional polygons* (bypassing the grid) for unbiased regional totals. Path B extracts *base-year rasters* to the *10km grid* first, then computes change at the cell level. See `docs/methodology.md` for rationale.
 - `services_diff_ha.yaml` and `c_protection_synth.yaml` still reference `AOOGrid_10x10km_land_4326_clean.gpkg` (the pre-enrichment grid). For new runs, update to `landgrid_1_clean_enriched_4326.gpkg`.
 

@@ -52,7 +52,7 @@ All scripts produce maps saved to `outputs/plots/maps/` or `outputs/maps/`.
 | `make_lac_critical_assets_map.R` | LAC "critical natural assets" map (IDB-WWF workshop deck), from Chaplin-Kramer et al. 2022 |
 | `make_lac_hotspot_map.R` | LAC compound hotspot map (IDB-WWF workshop deck) |
 
-## archive/ — One-off scripts (results already produced)
+## archive/scripts/ (repo root) — One-off scripts (results already produced)
 
 | Script | Purpose |
 |:---|:---|

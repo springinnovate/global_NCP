@@ -36,7 +36,7 @@ Run in this order when processing new data (e.g. adding a new year):
 
 ## Archive
 
-`archive/` contains scripts that are no longer active:
+`archive/python/` (repo root) contains scripts that are no longer active:
 
 | Script | Reason archived |
 |:---|:---|

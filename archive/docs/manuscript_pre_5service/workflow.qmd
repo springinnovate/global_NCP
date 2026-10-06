@@ -1,0 +1,52 @@
+---
+format:
+  html:
+    page-layout: full
+---
+
+```{mermaid}
+%%{init: {'flowchart': {'rankSpacing': 70, 'nodeSpacing': 45}}}%%
+flowchart TB
+    RawES["<b>InVEST ES Models</b><br/><i>300m Rasters · 1992 &amp; 2020</i>"]
+    RawGrid["<b>IUCN AOO 10km Master Grid</b><br/><i>Vector + Subregional Attributes</i>"]
+    RawLC["<b>ESA CCI Land Cover</b><br/><i>300m Rasters · 1992 &amp; 2020</i>"]
+    RawSoc["<b>Socioeconomic Data</b><br/><i>Pop, GDP, HDI Rasters</i>"]
+
+    IntA["<b>Path A</b><br/>Pixel-level Zonal Summaries"]
+    MathA["<b>Path A Metrics</b><br/>SPC &amp; Absolute Difference"]
+
+    IntB["<b>Path B</b><br/>10km Grid Zonal Summaries"]
+    MathB["<b>Path B Metrics</b><br/>SPC &amp; Absolute Difference"]
+
+    MathLC["<b>Land Cover Transitions</b><br/>Contingency Matrices per Cell"]
+    MathSoc["<b>KS Tests &amp; Socioeco. Profiling</b><br/>Grid Aggregation &amp; Statistical Comparison"]
+    MathBenef["<b>Serviceshed Routing</b><br/>Downstream Flow Paths + Travel-Access Catchments"]
+
+    P1(["<b>WHAT: Global Trajectories</b><br/>Bar Charts, Summary Tables &amp; Cartographies"])
+    P2(["<b>WHERE: Hotspot Detection</b><br/>Top/Bottom 5% GPKGs, Synthesis Maps"])
+    P3(["<b>WHY: Attribution Gap</b><br/>LCC Overlap CSVs, Heatmaps &amp; Driver Maps"])
+    P4(["<b>WHO: Equity, Exposure &amp; Multiplier</b><br/>KS Tests, In-Situ Population + Beneficiary Counts"])
+
+    RawES ==> IntA & IntB
+    RawGrid ==> IntB & MathLC & MathSoc
+    RawLC ==> MathLC
+    RawSoc ==> MathSoc & MathBenef
+
+    IntA ==> MathA ==> P1
+    IntB ==> MathB ==> P2
+
+    P2 ==> MathLC & MathSoc & MathBenef
+    MathLC ==> P3
+    MathSoc ==> P4
+    MathBenef ==> P4
+
+    classDef c_what fill:#007930,stroke:#004D1E,stroke-width:3px,color:#FFF;
+    classDef c_where fill:#7B8327,stroke:#515619,stroke-width:3px,color:#FFF;
+    classDef c_why fill:#F07D00,stroke:#A85700,stroke-width:3px,color:#FFF;
+    classDef c_who fill:#F5D200,stroke:#B39900,stroke-width:3px,color:#333;
+
+    class RawES,IntA,MathA,P1 c_what;
+    class RawGrid,IntB,MathB,P2 c_where;
+    class RawLC,MathLC,P3 c_why;
+    class RawSoc,MathSoc,MathBenef,P4 c_who;
+```
