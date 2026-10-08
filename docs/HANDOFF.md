@@ -8,10 +8,50 @@ session in `c:\projects\global_NCP` to resume.
 *Last updated: 2026-10-06. Start with OPEN ITEMS just below, then MILESTONE 2026-10-05; work continues on branch `housekeeping`. The user's WWF contract ends
 ~2026-10-23 (last working day); access to springinnovate's git is expected to continue afterwards.*
 
+## PLAN FOR WED 2026-10-07 (agreed 10-06, across repos)
+
+1. **Message to Becky: SENT 10-07 on Slack** (paper received?, pipeline demo meeting, SWY decision,
+   lab talk 10-13 via Natalie). Waiting for her reply.
+2. **Smurfit validation** (`C:\projects\landcover-validation-toolkit`, read its HANDOFF.md):
+   close Zone 2 with the 21 second-round labels (extend `consolidate_labels.R`, re-render the
+   Zone 2 report and the two deck slides), then consolidate Zone 3 and start its report. Data in hand.
+3. **Lab deck** (due 10-13; send to Becky by Fri 10-09): user review pass on the 10-06 revision,
+   then fixes. Phase 4 rerun only if time.
+4. **SWY: PARKED 10-07 (user decision)** until Becky/Rich reply. Uncommitted status-report Kc
+   section + notes stay as they are in `C:\projects\swy_parameterization`.
+5. **Job search**: time-boxed block (memory: capability portfolio, GitHub Pages portfolio idea).
+6. **Repo cleanup / paper small fixes** if energy remains: housekeeping stage 5 (split
+   `analysis/`), BC12, 14.6 vs 13.8%.
+
 ## OPEN ITEMS (consolidated 2026-10-06; answer "where are we / what's pending" from here)
 
 Replaces the scattered checklists further down (PAPER REVIEW QUEUE, THREE-WEEK PLAN, "Pending"),
 which are kept for history. Keep this list current.
+
+**Cell universe SETTLED 10-07** (`docs/cell_universe.md`, check `analysis/verify_cell_universe.R`):
+1,522,073 grid cells -> 1,372,621 evaluated (no Antarctica, open ocean, Lakes, Rock & Ice); every
+hotspot selected there; 189,932 hotspots = 13.8%. Prevalence table rebuilt on that universe
+(income ratio 2.4x -> 2.3x, a few biome values -0.1); paper text updated (13.8%, 1.37 million,
+2.3x), uncommitted. Deck not yet updated.
+
+**Population exposure FIXED 10-07 (paper updated, uncommitted):** the paper quoted the June
+beneficiary run on the old 8-variable hotspots (225,113 cells). The current run exists: Rich's
+2026-07-29 five-service run in `data/processed/hotspots_5service/rasters_5_var/` (LandScan 2023),
+whose input hotspots match production. New numbers: 2,367 M local residents, 7,383 M connected
+(92.5% of LandScan 7,982 M), 5,949 M downstream, 7,164 M travel, ~3.1x; income: upper-middle most
+residents (919 M), lower-middle most connected (2,675 M), low-income ~13%. Scripts
+`scripts/mapping/make_exposure_bars.R` (BC12 figure, now in the paper) and
+`scripts/exposure_by_income.R`. Abstract, Results, Discussion, Conclusions, Methods updated; paper
+HTML renders clean. Deck and book still have the old numbers. Phase 4 masks also come from the 07-29
+run, so phase 4 is likely current (recheck before citing).
+**Data cleanup DONE (first pass) 10-07, uncommitted:** superseded data moved to
+`data/archive/superseded/` (READMEs in each folder), June exposure outputs + `plot_multiplier_effect.R`
+`git mv`-ed to `archive/outputs/2026-06_exposure_8var/` and `archive/scripts/`; current beneficiary
+run renamed to `data/processed/beneficiaries/run_2026-07-29_5service/` and its 4 readers repointed.
+Deck updated to the new exposure numbers and figure (2.4B / 7.4B / 92.5%, 13.8%, 2.3x). Paper and deck
+render clean, all image paths resolve. Registry + remaining "to check" list + scripts still pointing at
+archived files: `docs/data_versions.md`. Book chapters 02 and 06 point at archived exposure files
+(fix with the book review).
 
 **Paper** (`docs/manuscript/paper_draft_5service.qmd`, the only living copy; v sent 10-05)
 - [~] Done 10-06, uncommitted, awaiting the user's review: retention/reduction ratios moved out of
@@ -22,9 +62,11 @@ which are kept for history. Keep this list current.
   production hotspot set (`make_hotspot_summary_figures.R`, numbers in
   `outputs/tables/hotspot_spc_within_hotspots.csv`). docx and HTML render clean. The user replaced
   the shared docx on OneDrive with this version 10-06; more work on these sections is planned.
-- [ ] BC12: log-scale dumbbell (@fig-multiplier-compound) to two bar charts.
-- [ ] Pick one denominator for "14.6% of evaluated cells" (1,302,099 grouped cells) vs 13.8%
-  (1,372,621 cells used for hotspot selection); state it in Methods.
+- [x] BC12 DONE 10-07: two bar charts (`exposure_by_overlap_bars.png`); old dumbbell PNG kept.
+- [ ] Pick one denominator for "14.6% of evaluated cells" vs 13.8%. Checked 10-07: NEITHER
+  1,302,099 nor 1,372,621 reproduces from the current files (grid 1,522,073 rows; hotspot_area_stats
+  region n_total 1,349,556). Trace both in the numbers ledger; rule: divide by the universe the
+  hotspots were selected from. Deferred with the ledger (user, 10-07).
 - [ ] Methods: model mechanics for nature access and coastal risk (one line each now).
 - [ ] Numbers audit steps 2-4: `numbers_ledger.csv` and `analysis/verify_paper_numbers.py` do not
   exist yet. This is also the regression test for the hand-off.
@@ -45,8 +87,18 @@ which are kept for history. Keep this list current.
   `summary_pipeline_workspace_ha/`.
 
 **Presentations**
-- [ ] Lab deck (`docs/presentations/presentation.qmd`): update to the paper as sent, using the
-  paper's figure files; add a beneficiary-mask slide once the phase 4 rerun is done.
+- [ ] **Lab deck, DUE Tue 2026-10-13, 11:00 Bogotá time** (`docs/presentations/presentation.qmd`):
+  restructure to the paper as sent (three questions WHAT/WHERE/WHO; land cover as future work);
+  slide outline (30 min, explore the findings) in `docs/presentations/lab_deck_outline.md`,
+  using the paper's figure files; add a beneficiary-mask slide only if the phase 4 rerun is done.
+  Paper edits resume 10-07 in parallel; BC12 and the 14.6/13.8% choice feed the deck.
+  **10-06: first full revision done, uncommitted** (built on the existing deck, 39 slides incl.
+  section headers and appendix; renders clean; every slide screenshot-checked). New: "Not One
+  Answer: A Pipeline for Many Questions" slide up front and "The Answer Depends on the Question"
+  near the end (user's emphasis: the pipeline, not the specific services/dates/slicing); WHY
+  section replaced by one "what the analysis cannot say yet" slide; all figures are the paper's.
+  `wwf_theme.css` gained caption and column font-size rules. Next: user review; share with Becky
+  before 10-13; phase 4 rerun if time (slide 15 of the outline).
 - [ ] Venues to book (from the 10-01 plan): WWF Global Science, UMN lab meeting, Colombia. One core
   deck, framing per venue.
 
