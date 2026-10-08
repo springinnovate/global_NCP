@@ -40,7 +40,7 @@ from exactextract.raster import RasterioRasterSource
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GRID_GPKG = REPO_ROOT / "data" / "processed" / "10k_change_calc.gpkg"
-RASTERS_DIR = REPO_ROOT / "data" / "processed" / "hotspots_5service" / "rasters_5_var"
+RASTERS_DIR = REPO_ROOT / "data" / "processed" / "beneficiaries" / "run_2026-07-29_5service"
 OUT_CSV = REPO_ROOT / "data" / "processed" / "tables" / "beneficiary_mask_coverage_10km.csv"
 
 # folder-name suffix -> short category label used downstream in the KS test
