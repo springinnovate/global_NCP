@@ -1,5 +1,49 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-10-06 to 2026-10-09 — housekeeping, cell universe, exposure fix, deck, change explorer, book
+
+**Repo housekeeping (10-06/07).** Inventory and plan in `docs/repo_reorg_plan.md`. Rendered HTML/DOCX
+untracked (~240 MB), five archive folders merged into `archive/`, stale correspondence drafts deleted.
+Superseded data moved to `data/archive/superseded/` with READMEs; registry of current vs superseded in
+`docs/data_versions.md`. Branch `housekeeping` squash-merged into `main` on 10-09 (PR #27).
+
+**Paper (10-06 to 10-08), replaced in the shared folder 10-08:**
+- Global Hotspot Distribution restructured: land and coastal blocks, each pairing relative prevalence with
+  SPC within hotspots; income group moved to the WHO section; ratios moved out of Figure 1 into one
+  Supplement figure. Within-hotspot boxplots now built from the production hotspot set
+  (`make_hotspot_summary_figures.R`; they had re-derived a slightly different 5% per grouping).
+- **Cell universe settled** (`docs/cell_universe.md`, `analysis/verify_cell_universe.R`): 1,522,073 grid
+  cells, 1,372,621 evaluated (no Antarctica, open ocean, Lakes, Rock & Ice); every production hotspot lies
+  there; 189,932 hotspots = 13.8%. The old 14.6% / 1,302,099 came from an earlier table and is retired.
+  Prevalence rebuilt on the evaluated cells (group denominators no longer include Lakes / Rock & Ice):
+  lower-middle vs high-income OECD 2.4x -> 2.3x, a few biome values -0.1.
+- **Population exposure was from the wrong run.** The paper quoted the June beneficiary run on the old
+  8-variable hotspots (225,113 cells). Rich's 07-29 five-service run exists and matches the production
+  hotspots (189,918 of 189,932 cells; rest are pollination ties). Now: 2,367 M local residents (LandScan
+  2023), 7,383 M connected (92.5% of 7,982 M), 5,949 M downstream, 7,164 M travel, ~3.1x; income breakdown
+  recomputed (`scripts/exposure_by_income.R`). BC12 done: dumbbell replaced by two bar charts
+  (`scripts/mapping/make_exposure_bars.R`).
+- Introduction names the five services and why; native resolutions stated (300 m; 2 km nature access;
+  shoreline points for coastal risk) in intro, Methods and captions; two overclaims fixed ("declining
+  trend", "limited adaptive capacity"); GHSL and LandScan references added (LandScan DOI still to confirm).
+
+**Lab deck (10-06 to 10-09).** Restructured to the paper's three questions with the pipeline as the
+contribution; reviewed end to end with the user and sent to Becky 10-09. Contains three analyses not in the
+paper (pollination vs cropland expansion, SPC vs absolute hotspot profile with a sediment map, coastal
+windows chosen by population); coastal risk dropped from the SPC-vs-absolute overlap (bounded 1-5 index).
+
+**Change explorer (10-08/09).** Shiny app `scripts/dashboard/app.R` (data prepared by
+`prepare_dashboard_data.R`): hotspots for any country, region, income group or biome; services,
+threshold, decline/improvement/both, local vs global thresholds, SPC or absolute; change by service from
+the Path A tables. Bugs fixed: improvement drew nothing (a scalar 0 made `ifelse()` collapse to the first
+cell), CARTO basemaps now need a key (switched to Esri/OSM), antimeridian cells, zoom to the bulk of the
+selection. Lesson: testServer and headless screenshots missed real layout bugs; check in a real browser.
+
+**Book (10-09).** Branch `book-update`; plan in `docs/manuscript/book_audit.md`. The book renders again
+(ch06 June-run exposure images repointed to `archive/`), but most chapters are stale (still chart the
+ratios, predate the five-service, cell-universe and exposure updates). Chapter HTML files are 6-105 MB
+because of `embed-resources` in a book.
+
 ### 2026-10-05 — paper revision closed and sent to the PI (milestone)
 
 Becky's first-round comments closed except those needing her input. Main changes:

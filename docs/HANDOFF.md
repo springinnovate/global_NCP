@@ -5,8 +5,24 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-09. Start with START HERE just below, then OPEN ITEMS. The user's WWF contract ends
+*Last updated: 2026-10-09. Start with UPDATE 2026-10-09 (evening) and START HERE just below, then OPEN ITEMS. The user's WWF contract ends
 ~2026-10-23 (last working day); access to springinnovate's git is expected to continue afterwards.*
+
+## UPDATE 2026-10-09 (evening): book renders again
+
+- `quarto render` in `docs/manuscript/` works: output `docs/manuscript/_book/index.html` (git-ignored, so
+  VS Code hides it). Only broken links were six June-run exposure images in ch06; repointed to
+  `archive/outputs/2026-06_exposure_8var/plots/` with an updated flag box (uncommitted, branch `book-update`).
+- The book content is still old in many places: it still charts the retention/reduction ratios, and several
+  chapters predate the five-service, cell-universe and exposure updates. `cache: true` may hide chunks
+  that read moved files until their cache is cleared.
+- Chapter HTML files are 6 MB to 105 MB (`embed-resources: true` in a book embeds cumulatively); fix
+  before sharing (drop embed-resources for the book, or render to a site folder).
+- Next, agreed with the user: (1) book cleanup chapter by chapter (`docs/manuscript/book_audit.md`), drop
+  the ratio charts; (2) make sure the analysis workflow is correct end to end across the pipeline qmds
+  (process_data -> hotspot_extraction -> hotspot_synthesis -> KS tests, plus the paper scripts that now
+  bypass parts of it, e.g. `analysis/rebuild_hotspot_area_stats.R`); (3) rewrite the root README, which
+  is badly out of date (paths, pipeline, .venv/Docker setup, cell universe, explorer).
 
 ## START HERE (end of 2026-10-09 session)
 
