@@ -30,15 +30,15 @@ execute:
 
 # Part 1: Motivation {background-color="#004D1E"}
 
-## Ecosystem Services Under Pressure
+## What We Know, and What Is Missing
 
 ::: {.columns style="font-size: 0.82em; align-items: flex-start;"}
 ::: {.column width="50%"}
 
 ### Context
-- Ecosystem services such as pollination, water quality regulation and coastal protection are declining globally
-- Billions of people depend on them for food, water and safety
-- Losses are **geographically uneven**: some regions and populations carry a disproportionate share
+- Ecosystem services such as pollination, water quality regulation and coastal protection are declining globally [(Millennium Ecosystem Assessment, 2005; IPBES, 2019; Brauman et al., 2020)]{style="font-size: 0.8em;"}
+- Billions of people depend on them for food, water, safety, health, and cultural and spiritual well-being [(Chaplin-Kramer et al., 2019, 2023)]{style="font-size: 0.8em;"}
+- Losses are expected to be **geographically uneven**: where people's needs for nature are greatest, its ability to meet them is declining [(Chaplin-Kramer et al., 2019)]{style="font-size: 0.8em;"}
 
 :::
 
@@ -50,11 +50,19 @@ execute:
 - *Who* is exposed to it?
 - A way to ask these questions again, with other services, dates or groupings, and get comparable answers
 
+::: {style="font-size: 0.62em; margin-top: 0.8em; color: #555;"}
+Closest recent work: trends modelled from reconstructed land use and climate, 1900-2050 (Kim et al., 2024, *Science*); a composite supply-demand index by county, 2000-2020 (Peng et al., 2023). Neither combines observed land cover with per-service models at grid resolution, or links where change concentrates to the people exposed.
+:::
+
 :::
 :::
 
 ::: {.notes}
 - Left column: the established situation. Right column: the gap.
+- If asked for numbers: the Millennium Ecosystem Assessment found about 60% of the 24 services it examined (15) degraded or used unsustainably; IPBES (2019) found 14 of the 18 categories of nature's contributions to people declined since 1970, mostly regulating and non-material ones.
+- Dependence: at least 87% of the world's population lives in areas that benefit from critical natural assets for local contributions, while only 16% live on the lands holding them; those areas also contain 96% of the world's languages (Chaplin-Kramer et al., 2023, Nature Ecology & Evolution). Chaplin-Kramer et al. (2019, Science): up to 5 billion people face higher water pollution and insufficient pollination for nutrition under future land use and climate scenarios, especially in Africa and South Asia.
+- Closest work, if asked: Kim et al. (2024, Science) is a multi-model ensemble driven by reconstructed land use and climate, so it gives modelled trends rather than change seen in satellite land cover; Peng et al. (2023, J. Cleaner Production) collapse services into one composite value index at county level. Our contribution is the combination: observed land cover, one process model per service, a 10 km grid, and the link to people.
+- Unevenness is the weakest-established of the three bullets, and that is deliberate: earlier work shows it in snapshots and future scenarios, not as measured change over time. Measuring it is this paper's contribution (right column).
 - Chaplin-Kramer et al. (2019, Science) mapped global NCP and who depends on it. This work extends it to change over time (1992 to 2020), hotspot detection and socioeconomic profiling.
 - The last bullet is the thread for the whole talk: the contribution is as much the machinery as the specific numbers.
 - ~2 min
@@ -62,7 +70,7 @@ execute:
 
 ---
 
-## Three Questions, One Pipeline
+## Three Questions, One Pipeline {.questions}
 
 ::: {.columns}
 ::: {.column width="33%"}
@@ -87,26 +95,26 @@ Which populations live in or depend on the places where services declined most?
 :::
 :::
 
-::: {.callout-note style="font-size: 0.75em; margin-top: 1em;"}
-**What drives the change** (land cover, climate) is not answered here: a cell-by-cell overlay cannot follow the flow paths the models use. It is the next analysis, discussed at the end.
-:::
+![](images/hotspot_banner.png){height="440px" fig-align="center"}
 
 ::: {.notes}
-- Three questions, same structure as the paper: WHAT = Path A (300 m pixels summed to groups), WHERE = Path B hotspots on the 10 km grid, WHO = socioeconomic profiling and population exposure.
+- Three questions, same structure as the paper: WHAT = Path A (native pixels summed to groups), WHERE = Path B hotspots on the 10 km grid, WHO = socioeconomic profiling and population exposure.
+- The map: hotspots of decline, 1992-2020, darker where more services overlap (the paper's hotspot map, shown in full in the WHERE section).
+- If someone asks about drivers (land cover, climate): not answered here; it is the next analysis and comes back at the end.
 - Earlier versions had a fourth pillar (WHY / land cover attribution). The paper now treats attribution as future work; the exploratory overlay is in the Supplement and comes back on one slide at the end.
 :::
 
 ---
 
-## Not One Answer: A Pipeline for Many Questions
+## A Pipeline for Many Questions
 
 ::: {.columns style="font-size: 0.8em; align-items: flex-start;"}
 ::: {.column width="50%"}
 
-### Everything is a parameter
+### Every choice is an input
 - **Services**: any raster (InVEST or another model); five here
-- **Dates**: any two snapshots; 1992 and 2020 here
-- **Groupings**: any vector layer (regions, biomes, income groups, countries, basins, custom units)
+- **Dates**: any two snapshots; 1992 and 2020 here (next: a yearly series, to follow trends rather than two endpoints)
+- **Groupings**: any vector layer (regions, biomes, income groups, countries, basins, custom units, grids)
 - **Metric**: relative (SPC) or absolute change
 - **Hotspot rule**: threshold and direction per service
 - **Scale**: 300 m pixels, 10 km grid, or a finer regional grid
@@ -117,43 +125,50 @@ Which populations live in or depend on the places where services declined most?
 
 ### The same checks apply to every case
 - Hotspot sensitivity to the change metric
-- Null models for spatial co-occurrence
-- Distribution tests (KS + Cliff's δ) for any covariate
+- Do hotspots differ from typical places in population, GDP, HDI or inequality? A test for whether, and an effect size for how much
 - Population exposure through downstream and travel links
 
 ### Already reused
 - Colombia (2026): country and biome cut, overlaid with critical natural assets
-- Beneficiary-area masks: same tests on a different spatial unit
+- An interactive explorer: change maps and hotspots for any country, region, biome or income group (shown at the end)
 
 :::
 :::
 
 ::: {.notes}
 - This is the message to carry through the talk: the findings that follow are one run of a general pipeline. Change the question and the answer changes, and the pipeline shows how much.
-- Examples later in the talk: relative and absolute change pick different leading biomes (WHAT); SPC and absolute hotspots overlap 32-97% depending on the service (WHERE); prevalence and severity point to different places (WHERE).
+- Examples later in the talk: relative and absolute change pick different leading biomes (WHAT); SPC and absolute hotspots overlap 32-57% depending on the service (WHERE); prevalence and severity point to different places (WHERE).
 - Colombia: the same hotspot and prevalence machinery, run at country scale with biome groupings and a critical-asset overlay, for the WWF Colombia / ECLAC work.
 - Global scope is an implementation choice, not an architectural constraint.
+- Dates: ESA CCI land cover is yearly from 1992 to 2020, so a time series is possible; it needs a model run per year, which is the costly part.
+- The "test + effect size" bullet is explained on the Statistical Analysis slide in Methods.
 :::
 
 # Part 2: Methods {background-color="#004D1E"}
 
 ## Data Inputs: 1992 & 2020 Global Layers
 
-::: {.columns style="font-size: 0.85em;"}
+::: {.columns style="font-size: 0.66em;"}
 ::: {.column width="34%"}
 
+![](images/stack_services.png){width="100%"}
+
 ### Ecosystem Services
-**InVEST models, 300 m**
+**InVEST models, native resolution**
 
 - Nitrogen export
 - Sediment export
-- Coastal risk
 - Pollination
 - Nature access
+- Coastal risk (shoreline points, not shown)
+
+300 m (2 km for nature access)
 
 :::
 
 ::: {.column width="33%"}
+
+![](images/stack_landcover.png){width="100%"}
 
 ### Land Cover
 **ESA CCI + C3S, 300 m**
@@ -166,20 +181,26 @@ Which populations live in or depend on the places where services declined most?
 
 ::: {.column width="33%"}
 
-### Socioeconomic
-**Gridded, 2020**
+![](images/stack_socioeconomic.png){width="100%"}
 
-- Population (GHS-POP)
-- GDP
-- Human Development Index
-- Gini coefficient
-- Agricultural field size
+### Socioeconomic
+**Global gridded datasets, ~2020, summarised to the 10 km grid**
+
+- Population: GHS-POP 2020 [(Schiavina et al., 2023)]{style="font-size: 0.8em;"}
+- GDP [(Kummu et al., 2025)]{style="font-size: 0.8em;"}
+- Human Development Index [(Sherman et al., 2026)]{style="font-size: 0.8em;"}
+- Gini coefficient, subnational [(Kummu et al.)]{style="font-size: 0.8em;"}
+- Agricultural field size [(Mehrabi et al., 2021)]{style="font-size: 0.8em;"}
+- Exposure counts: LandScan 2023 [(ORNL)]{style="font-size: 0.8em;"}
 
 :::
 :::
 
 ::: {.notes}
 - Time period: 1992 to 2020 (28 years). Land cover at the endpoints only, no annual transitions.
+- The stacks are illustrations, listed top to bottom as in the text: services are 2020 InVEST outputs (colour by percentile); land cover is the dominant class per 10 km cell (forest, cropland, grassland, urban, other) rebuilt from the land cover change shares; socioeconomic layers are the 10 km grid values.
+- Socioeconomic layers are snapshots around 2020, used to describe where hotspots are, not their change over time. TO CHECK LATER: the Gini citation "Kummu et al." is a placeholder. The layer is `rast_adm1_gini_disp_2020` (subnational Gini of disposable income), most likely from the Kummu group's dataset; confirm the exact reference before the paper is submitted.
+- Two population sources: GHS-POP 2020 is the population variable in the socioeconomic tests; LandScan 2023 is used for all exposure counts (local residents and connected beneficiaries), because the beneficiary run was built on it. The explorer's "people in hotspots" uses GHS-POP, so its numbers differ slightly from the paper's.
 - The same NDR, SDR and coastal vulnerability runs also give three ratios (nitrogen and sediment retention ratios, coastal risk reduction ratio). They are not used to define hotspots and are shown in the paper's Supplement only.
 :::
 
@@ -241,7 +262,7 @@ Which populations live in or depend on the places where services declined most?
 ::: {.columns style="font-size: 0.84em; align-items: flex-start;"}
 ::: {.column width="50%"}
 
-### Path A: pixel level (300 m)
+### Path A: native pixels
 *Compare first, then aggregate*
 
 - Each pixel compared 1992 → 2020 at native resolution
@@ -254,7 +275,7 @@ Which populations live in or depend on the places where services declined most?
 ### Path B: 10 km equal-area grid
 *Aggregate first, then compare*
 
-- 300 m rasters summarised into ~1.37 M evaluated cells before computing change
+- Native rasters summarised into ~1.37 M evaluated cells before computing change
 - Every cell = 100 km², so cells can be ranked globally
 - **Used for:** WHERE and WHO
 
@@ -272,38 +293,42 @@ Which populations live in or depend on the places where services declined most?
 
 ---
 
-## Analytical Pipeline
+## Analytical Pipeline {.pipeline}
 
 ```{mermaid}
-%%{init: {'flowchart': {'rankSpacing': 32, 'nodeSpacing': 18}, 'themeVariables': {'fontSize': '11px'}}}%%
+%%{init: {'flowchart': {'rankSpacing': 38, 'nodeSpacing': 70, 'padding': 16}, 'themeVariables': {'fontSize': '18px'}}}%%
 flowchart TB
-    RawES["InVEST ES Models<br/>300m · 1992 & 2020"]
-    RawGrid["10km Grid +<br/>Grouping Layers"]
-    RawSoc["Socioeconomic Data<br/>Pop · GDP · HDI · Gini"]
+    subgraph Inputs[" "]
+        direction LR
+        RawES["InVEST ES Models<br/>300 m to 2 km · 1992 & 2020"]
+        RawGrid["10km Grid +<br/>Grouping Layers"]
+        RawSoc["Socioeconomic Data<br/>Pop · GDP · HDI · Gini"]
+    end
 
     IntA["Path A<br/>Pixel-level"]
     MathA["Path A Metrics<br/>SPC & Abs. Δ"]
+    P1(["WHAT<br/>Global Trajectories"])
 
     IntB["Path B<br/>10km Grid"]
     MathB["Path B Metrics<br/>SPC & Abs. Δ"]
-
-    MathSoc["KS Tests &<br/>Socioec. Profile"]
-    MathBenef["Serviceshed<br/>Routing"]
-
-    P1(["WHAT<br/>Global Trajectories"])
     P2(["WHERE<br/>Hotspot Detection"])
+
+    MathBenef["Serviceshed<br/>Routing"]
+    MathSoc["KS Tests &<br/>Socioec. Profile"]
     P4(["WHO<br/>Exposure & Profile"])
 
     RawES ==> IntA & IntB
-    RawGrid ==> IntA & IntB & MathSoc
-    RawSoc ==> MathSoc & MathBenef
+    RawGrid ==> IntA & IntB
+    RawSoc ==> MathBenef & MathSoc
 
     IntA ==> MathA ==> P1
     IntB ==> MathB ==> P2
 
-    P2 ==> MathSoc & MathBenef
+    P2 ==> MathBenef & MathSoc
     MathSoc ==> P4
     MathBenef ==> P4
+
+    style Inputs fill:none,stroke:none
 
     classDef c_what fill:#007930,stroke:#004D1E,stroke-width:2px,color:#FFF;
     classDef c_where fill:#7B8327,stroke:#515619,stroke-width:2px,color:#FFF;
@@ -358,6 +383,7 @@ Relative to what the place provided over the period; symmetric around zero; comp
 (47.5th-52.5th percentile of each service's change: typical, stable conditions)
 
 Test variables:
+
 - Population (GHS-POP 2020)
 - GDP
 - Human Development Index (HDI)
@@ -370,10 +396,12 @@ Test variables:
 
 **Two-step interpretation:**
 
-1. *KS statistic + FDR-corrected p-value*: do distributions differ?
-2. *Cliff's Delta (δ)*: direction and magnitude
+1. *Kolmogorov-Smirnov test* (FDR-corrected): are the values in hotspot cells and in background cells two different distributions?
+2. *Cliff's Delta (δ)*: take one hotspot cell and one background cell at random; δ = P(hotspot higher) − P(background higher), from −1 to +1, 0 = no difference
 
-δ > 0: hotspot cells higher; δ < 0: lower. With up to ~68,000 cells per group, almost any difference is significant, so δ carries the interpretation.
+With up to ~68,000 cells per group almost any difference is significant, so δ carries the interpretation.
+
+**Used in WHO:** what kind of places hotspots are (more populated, richer, more unequal?).
 
 :::
 :::
@@ -381,61 +409,103 @@ Test variables:
 ::: {.notes}
 - Background = the middle 5% of the change distribution, which keeps cells with large gains out of the comparison.
 - 25 tests (5 services × 5 variables), Benjamini-Hochberg corrected. 24 of 25 differ; the exception is coastal risk × field size.
+- In plain words: KS compares the whole shape of the two sets of values (e.g. Gini in hotspot cells vs Gini in stable cells), not only their means. With this many cells it says "different" almost always, so it is only the first filter.
+- Cliff's δ reads as a comparison of random pairs: δ = 0 means a random hotspot cell is as likely to be higher as lower than a random background cell; δ = +0.25 means it is the higher one 25 percentage points more often than the lower one. (Converting to "x in 10 pairs" assumes few ties; Gini is subnational, so many cells share a value and that conversion would overstate it.)
+- It works on ranks, so it is not distorted by skewed variables such as population and GDP.
 :::
+
+# Part 3: Results {background-color="#004D1E"}
 
 # WHAT: Change Depends on How You Measure It {background-color="#007930"}
 
-## WHAT: Global and Biome Trajectories, 1992-2020
+## WHAT: Absolute vs. Relative Change Map Different Places
 
-[*Global, 1992-2020: N export +1.6% · sediment export +1.4% · nature access −8.7% · pollination +6.9% · coastal risk <0.1%*]{style="font-size: 0.6em;"}
+::: {.panel-tabset style="font-size: 0.55em;"}
 
-![Change by biome. Left: absolute change per unit area. Right: relative change (SPC). Orange = adverse direction, teal = favourable.](../../outputs/plots/output_plots_diff/biome_combined_diffs.png){height="540px" fig-align="center"}
+### Relative change (SPC)
+
+![](images/global_change_5panel_en_tight.png){height="500px" fig-align="center"}
+
+### Absolute change
+
+![](images/global_change_5panel_abs_en_tight.png){height="500px" fig-align="center"}
+
+### Side by side
+
+::: {.columns .tight-maps}
+::: {.column width="50%"}
+![Absolute change, native units](images/global_change_5panel_abs_en_tight.png){width="100%"}
+:::
+::: {.column width="50%"}
+![Relative change (SPC)](images/global_change_5panel_en_tight.png){width="100%"}
+:::
+:::
+
+:::
+
+::: {.small-note}
+Change per 10 km cell. Sediment export: in absolute terms the Amazon is a modest signal next to high-erosion Southeast Asia; in SPC it becomes the largest pattern globally, because the same physical change is large relative to a low baseline.
+:::
+
+::: {.notes}
+- Path B, native 10 km grid, before any hotspot threshold. Deck copies of the paper's two figures with the white space between panels removed (images/*_tight.png). Coastal risk is too thin to see at this scale; it gets its own slide.
+- SPC flags fast, disproportionate change against each place's own baseline; absolute change flags where the most material moved. The paper uses SPC as the main measure (Methods) and absolute change as a check.
+:::
+
+---
+
+## WHAT: Global Change, Seen Through Different Groupings
+
+[*Global, 1992-2020: N export +1.6% · sediment export +1.4% · nature access −8.7% · pollination +6.9% · coastal risk <0.1%. Left: absolute change per unit area; right: relative change (SPC). Orange = adverse, teal = favourable.*]{style="font-size: 0.55em;"}
+
+::: {.panel-tabset style="font-size: 0.6em;"}
+
+### Biome
+
+![](../../outputs/plots/output_plots_diff/biome_combined_diffs.png){height="470px" fig-align="center"}
+
+### World Bank region
+
+![](../../outputs/plots/output_plots_diff/region_wb_combined_diffs.png){height="470px" fig-align="center"}
+
+### Income group
+
+![](../../outputs/plots/output_plots_diff/income_grp_combined_diffs.png){height="470px" fig-align="center"}
+
+### Countries (largest changes)
+
+![](../../outputs/plots/output_plots_diff/country_combined_diffs.png){height="470px" fig-align="center"}
+
+:::
 
 ::: {.notes}
 - Nature access fell in every biome and every region.
 - The leading biome depends on the measure. Sediment export rose most in relative terms in Boreal Forests/Taiga (+10.3%, low baseline) but most in absolute terms per unit area in Tropical & Subtropical Moist Broadleaf Forests (+4.9% relative). Nature access fell most steeply in relative terms in Flooded Grasslands & Savannas (−48.6%) but lost the most per unit area in Mangroves and Temperate Broadleaf forests.
 - Explore: neither ranking is "the" answer; they answer different questions (share of a place's own capacity vs largest quantities).
-- Region and income-group versions are in the paper's Supplement.
-:::
-
----
-
-## WHAT: Absolute vs. Relative Change Map Different Places
-
-::: {.columns}
-::: {.column width="50%"}
-![Absolute change per 10 km cell, native units.](../../outputs/plots/maps/global_change_5panel_abs_en.png){width="100%"}
-:::
-::: {.column width="50%"}
-![Relative change (SPC) per 10 km cell.](../../outputs/plots/maps/global_change_5panel_en.png){width="100%"}
-:::
-:::
-
-[Sediment export: in absolute terms the Amazon is a modest signal next to high-erosion Southeast Asia; in SPC it becomes the largest pattern globally, because the same physical change is large relative to a low baseline.]{style="font-size: 0.72em;"}
-
-::: {.notes}
-- Path B, native 10 km grid, before any hotspot threshold. Coastal risk is too thin to see at this scale; it gets its own slide.
-- Explore: SPC flags fast, disproportionate change against each place's own baseline; absolute change flags where the most material moved. Which one should drive prioritization? (Back to this in the discussion.)
+- Tabs: the same native-pixel change, summed by biome, World Bank region, income group, and the countries with the five largest increases and decreases per service (smallest 10% of countries by evaluated area excluded). Same pipeline, only the grouping layer changes. Region, income and country versions are in the paper's Supplement.
 :::
 
 ---
 
 ## WHAT: A "Gain" That Signals Conversion
 
-::: {.columns style="font-size: 0.82em; align-items: center;"}
-::: {.column width="45%"}
+::: {.columns style="font-size: 0.74em; align-items: center;"}
+::: {.column width="44%"}
 
 - Pollination here is **realized pollination on agriculture**
 - It rose in every region (+6.9% globally)
 - Flooded Grasslands & Savannas: the **steepest nature access loss (−48.6%)** and the **largest pollination gain (+31.0%)**, in the same biome
+- Across all cells: the more of a cell became cropland, the larger the pollination gain and the deeper the loss of access to nature
 - Reading: pollinator-dependent cropland expanding next to habitat that still remains
-
-:::
-::: {.column width="55%"}
 
 ::: {.callout-important}
 A change in the "favourable" direction is not always good news. Each variable needs its own reading before it is aggregated.
 :::
+
+:::
+::: {.column width="56%"}
+
+![10 km cells grouped by the share that became cropland (ESA CCI, 1992-2020).](images/pollination_vs_cropland.png){height="520px" fig-align="center"}
 
 :::
 :::
@@ -443,34 +513,45 @@ A change in the "favourable" direction is not always good news. Each variable ne
 ::: {.notes}
 - This is the global-average trap: pollination going up looks like an improvement, but here it is the footprint of agricultural expansion into still-habitat-rich landscapes.
 - Same logic for the sediment retention amount (rises with land-conversion erosion), which is why the paper uses export.
+- Chart: 796,003 cells with both land cover change and pollination data (cells are grouped by the share that became cropland; script scripts/mapping/make_deck_pollination_cropland.R). Mean pollination change rises from +3.2 (no new cropland) to +9.2 people fed equiv./ha (>20% new cropland); median nature access change falls from 0 to −81.5%. Cells with no new cropland still gain a little, so cropland expansion is not the only reason pollination rose. Co-occurrence, not attribution.
+- The share of cells where pollination rose is about a third in every group; what grows with cropland expansion is the size of the gain.
 :::
 
 ---
 
 ## WHAT: Coastal Risk at the Shoreline
 
-![Points where coastal risk changed by at least 1% (SPC). Orange = increase, teal = decrease. A-D: populated coasts where risk mostly rose; E-F: where it mostly fell.](../../outputs/plots/maps/coastal_risk_change_zooms.png){height="560px" fig-align="center"}
+![Points where coastal risk changed by at least 1% (SPC). Orange = increase, teal = decrease.](../../outputs/plots/maps/coastal_risk_change_zooms.png){height="530px" fig-align="center"}
+
+::: {.small-note}
+Windows chosen by **population**, not by change intensity: A-D are densely populated coasts where risk rose, E-F where it fell.
+:::
 
 ::: {.notes}
 - Coastal risk changed at 4.6% of 1.37 M shoreline points, and changes are small (within about ±18% SPC).
 - Increases and decreases are spread along most coastlines in similar numbers (23,591 rose and 21,111 fell by at least 1%).
 - Panels: New York/New Jersey, Nile delta, Istanbul/Sea of Marmara, Manila Bay (rose); Pearl River delta, Gulf of Kutch (fell).
+- How the windows were chosen (rule in scripts/mapping/make_coastal_risk_zooms.R, 10-05): coastal 5-degree boxes ranked by the people (GHS-POP 2020) living in cells where coastal risk changed by 1% or more. A-D: the most populated boxes where it rose, one per continent; E-F: the two most populated where it fell. Ranking by size of change would have picked empty coasts, since changes are small and rises and falls are spread along most coastlines; ranking by people ties the figure to exposure. E-F show that risk did not only go up.
+- If asked whether these are exactly the top boxes: approximately. A quick recompute on the 10 km grid puts Manila, New York/New Jersey, Istanbul and the Nile delta near the top, but Mumbai (6.5 M people) edges Manila (6.4 M), Lagos (3.5 M) edges the Nile delta (3.2 M), and Bangladesh (2.2 M) ranks above the Gulf of Kutch (about 1.9 M) for decreases. The differences are small and may come from box alignment or shoreline points vs grid cells; the original ranking was not saved. Safe wording: "densely populated coasts where risk rose or fell".
 :::
 
 # WHERE: How Often and How Severe {background-color="#004D1E"}
 
-## WHERE: Hotspots Cluster in Latin America and East Asia
+## WHERE: Hotspots Cluster in Latin America and East Asia {.tight-figs}
 
-[*189,932 hotspot cells (13.8% of 1.37 M evaluated cells)*]{style="font-size: 0.6em;"}
+::: {.small-note}
+*189,932 hotspot cells (13.8% of 1.37 M evaluated cells)*
+:::
 
-![](../../outputs/plots/maps/global_hotspot_count_heatmap_cap4_pct.png){height="290px" fig-align="center" fig-alt="Number of overlapping hotspots per 10 km cell"}
+![](images/hotspot_map_legend.png){height="385px" fig-align="center" fig-alt="Number of overlapping hotspots per 10 km cell"}
 
-![Relative prevalence by World Bank region (land-based services); > 1 = more hotspots than area predicts.](../../outputs/plots/intensity/hotspot_relative_intensity_region_wb.png){width="72%" fig-align="center"}
+![Relative prevalence by World Bank region (land-based services); > 1 = more hotspots than area predicts.](images/hotspot_relative_intensity_region_wb_tight.png){height="165px" fig-align="center"}
 
 ::: {.notes}
 - Hotspots cluster in space; they are not random scatter.
 - Averaged over the four land-based services, relative prevalence is highest in Latin America & Caribbean (1.9) and East Asia & Pacific (1.3); Sub-Saharan Africa is at 1.0; Europe & Central Asia, North America and MENA around 0.6.
 - Multi-service cells (darkest) are where a single intervention could address several declines.
+- Map: deck version of the paper's hotspot map, cropped to the land (no Antarctica), legend inside the frame; the paper's PNG has a stray line across the Arctic (to fix in the paper figure). Redrawn from the explorer data: 189,927 cells in at least one hotspot vs the paper's 189,932 (ties at the 5% cutoff; numbers-audit item).
 - ~90 seconds
 :::
 
@@ -486,26 +567,30 @@ A change in the "favourable" direction is not always good news. Each variable ne
 ![(b) SPC within hotspot cells by biome. −200% = the service fell to zero.](../../outputs/plots/boxplots_unified/WWF_biome/boxplots_pct.png){width="100%"}
 
 :::
-::: {.column width="38%" .fs66}
+::: {.column width="38%" .fs56}
 
-**Both frequent and severe**
+**How to read:** (a) how often hotspots occur; (b) how much the service changed in the typical hotspot cell
 
-- Tropical moist broadleaf forests, sediment: prevalence 3.0, median +124%
-- Tropical coniferous forests, pollination: 3.0, median −102%; 30% lost it entirely
+**Frequent and severe**
+
+- *Sediment export* in tropical moist forests: 3× as many hotspots as area predicts; typical hotspot cell roughly **quadrupled** (SPC +124%)
+- *Pollination* in tropical coniferous forests: 3×; typical cell lost **about two thirds** (−102%); 30% lost it all
 
 **Rare but severe**
 
-- Deserts & xeric shrublands, nature access: prevalence 0.5, median −169%; **42% lost access entirely**
+- *Nature access* in deserts & xeric shrublands: half as many hotspots as area predicts, but the typical one lost **over 90%** (−169%); **42% lost access entirely**
 
 **Uniform severity**
 
-- Nitrogen export: median +35% to +55% in every biome, so biomes differ only in frequency
+- *Nitrogen export*: typical cell up 40-75% (+35% to +55%) in every biome; biomes differ only in frequency
 
 :::
 :::
 
 ::: {.notes}
 - New in the 10-06 revision of the paper. Prevalence says where hotspots cluster; within-hotspot SPC says how bad they are.
+- Converting SPC to a plain ratio: 2020/1992 = (200 + SPC) / (200 − SPC). +124% -> 4.3× (roughly quadrupled); −102% -> 0.32 (lost about two thirds); −169% -> 0.08 (lost over 90%); +35% -> 1.42 and +55% -> 1.76. SPC runs from −200% (service fell to zero) to +200% (appeared from zero). The conversion is monotonic, so it holds for medians.
+- Source: outputs/tables/hotspot_spc_within_hotspots.csv (e.g. sediment export, tropical moist broadleaf: 30,621 hotspot cells, median +123.8%, IQR +90% to +166%).
 - Two prioritization logics: go where hotspots are frequent (most cells, most co-benefit), or where they are rare but the service is lost outright.
 - Flooded Grasslands & Savannas combine both for nature access (prevalence 1.8, median −132%, 34% total loss).
 :::
@@ -543,53 +628,57 @@ A change in the "favourable" direction is not always good news. Each variable ne
 
 ## WHERE: The Hotspot Set Depends on the Metric
 
-::: {.columns style="font-size: 0.8em; align-items: center;"}
-::: {.column width="45%"}
+::: {.columns style="align-items: flex-start;"}
+::: {.column width="44%" .fs56}
 
-Share of SPC hotspot cells that are also hotspots when ranked by absolute change:
+Hotspots ranked by relative change (SPC) vs absolute change, each the 5% most adverse cells:
 
-| Service | Overlap |
-|:---|---:|
-| Coastal risk | 97% |
-| Nitrogen export | 57% |
-| Nature access | 43% |
-| Pollination | 35% |
-| Sediment export | 32% |
+| Service | Overlap | 1992 level, SPC-only vs absolute-only | People, SPC-only / absolute-only |
+|:---|---:|---:|---:|
+| Nitrogen export | 57% | 25× lower | 191 M / 442 M |
+| Nature access | 43% | 870× lower | 100 M / 975 M |
+| Pollination | 35% | 1,000× lower | 108 M / 546 M |
+| Sediment export | 32% | 1,300× lower | 66 M / 418 M |
+
+- The overlap reads the same either way round: both sets are the same size
+- **SPC only:** a large share of little, in low-provision landscapes (Amazon, boreal, drylands), mostly Latin America and Sub-Saharan Africa
+- **Absolute only:** large amounts in high-provision, densely used landscapes (mountain ranges, East Asia, Europe), with 2-10× more people
+- The metric changes **who** counts as exposed, not only where; the paper's WHO results use SPC
 
 :::
-::: {.column width="55%"}
+::: {.column width="56%"}
 
-- Sediment export and pollination SPC hotspots fall mostly where baseline provision is low: a modest absolute change is a large share of local capacity
-- SPC asks *which places lost the largest share of what they had*; absolute change asks *where the most material moved*
-- The paper uses SPC as primary and reports the overlap as a sensitivity check; the pipeline can run either
+![Sediment export: SPC-only hotspots in the Amazon, boreal forests and drylands; absolute-only along mountain ranges and in East Asia.](images/metric_overlap_sed_export.png){width="100%"}
 
 :::
 :::
 
 ::: {.notes}
-- This is the "answers depend on the metric" point made concrete: for sediment export only a third of the hotspots survive a change of metric.
-- Characterizing where and why the two criteria diverge is listed as future work in the paper.
+- Overlap = share of SPC hotspot cells that are also hotspots by absolute change. Both rankings take the 5% most adverse of the same cells, so the two sets are the same size and the share is identical read the other way round (checked: 57/43/35/32% both ways).
+- 1992 level: median baseline of the cells that are hotspots under only one metric, recovered from the two change columns (SPC = 200(b−a)/(a+b), abs = b−a). For sediment export, SPC-only hotspots started about 1,300 times lower than absolute-only ones.
+- Typical change also differs: sediment export SPC-only hotspots rose by a median +111% SPC vs +22% for absolute-only; pollination −82% vs −9%.
+- People: GHS-POP 2020 living in the cells (local residents), not the LandScan exposure counts.
+- So SPC flags places losing a large share of what little they had (frontier landscapes); absolute change flags where the most material moved (productive, populated landscapes). Both are legitimate questions; the paper chose SPC and says so. A WHO analysis on absolute hotspots would shift toward East Asia, Europe and North America.
+- Coastal risk is left out: it is a unitless exposure index between about 1 and 5 (shoreline points: median 2.4, 1st-99th percentile 1.4-4.4), so the two rankings coincide (97% overlap, Spearman 0.9999) and the row says nothing about the choice of metric.
+- Source: scripts/mapping/make_deck_metric_overlap.R -> outputs/tables/hotspot_metric_overlap_profile.csv.
 :::
 
 # WHO: Inequality, Not Just Poverty {background-color="#007930"}
 
-## WHO: Hotspots by Income Group
+## WHO: Hotspots by Income Group {.tight-figs}
 
-::: {.columns style="align-items: flex-start;"}
-::: {.column width="62%"}
+![(a) Relative prevalence by income group, land-based services.](images/hotspot_relative_intensity_income_grp_tight.png){width="100%"}
 
-![(a) Relative prevalence by income group, land-based services.](../../outputs/plots/intensity/hotspot_relative_intensity_income_grp.png){width="100%"}
+![(b) SPC within hotspot cells.](images/boxplots_pct_income_grp_tight.png){width="100%"}
 
-![(b) SPC within hotspot cells.](../../outputs/plots/boxplots_unified/income_grp/boxplots_pct.png){width="100%"}
-
-:::
-::: {.column width="38%" .fs68}
-
+::: {.columns style="font-size: 0.6em;"}
+::: {.column width="50%"}
 - Lower-middle-income countries: **15.6% of the land, 21% of hotspot cells** (25% for nature access)
 - High-income OECD: 25% of the land, 15% of hotspot cells
+:::
+::: {.column width="50%"}
 - Per unit area, hotspots are **~2.3× as frequent** in lower-middle-income countries
 - Nature access losses are also **deepest** there: median −109% vs −62% in high-income OECD; **22% vs 8%** of hotspots lost access entirely
-
 :::
 :::
 
@@ -602,16 +691,16 @@ Share of SPC hotspot cells that are also hotspots when ranked by absolute change
 
 ## WHO: Inequality Separates the Services
 
-![KS statistic (colour) and Cliff's δ (labels) for hotspot vs background cells, by service and socioeconomic variable.](../../outputs/plots/ks/ks_heatmap.png){height="360px" fig-align="center"}
+![KS statistic (colour) and Cliff's δ (labels) for hotspot vs background cells, by service and socioeconomic variable.](../../outputs/plots/ks/ks_heatmap.png){height="320px" fig-align="center"}
 
 ::: {.columns style="font-size: 0.7em;"}
 ::: {.column width="50%"}
 
 ### Shared by all five services
-Hotspots are more populated and higher-GDP (δ +0.52 to +0.64). Because this holds everywhere, it does not tell services apart.
+Hotspots are more populated and higher-GDP than typical cells (δ +0.52 to +0.64, a large difference). Because this holds everywhere, it does not tell services apart.
 
 ### Land-based services
-Higher inequality (Gini δ +0.22 to +0.30); HDI adds little (δ −0.01 to −0.08).
+Hotspots sit in more unequal places (Gini δ +0.22 to +0.30, smaller but consistent across the four); HDI barely differs (δ −0.01 to −0.08).
 
 :::
 ::: {.column width="50%"}
@@ -626,6 +715,9 @@ Why inequality, and not development level or poverty? Candidates: frontier expan
 :::
 
 ::: {.notes}
+- This is where the KS tests and Cliff's δ from Methods pay off: they are the evidence for "what kind of places are hotspots". Each cell of the heatmap compares hotspot cells with typical (stable) cells of the same service for one variable.
+- Reading δ: compare a random hotspot cell with a random typical cell; δ is how much more often the hotspot cell is the higher one than the lower one. Gini +0.25: the hotspot cell is the more unequal one about 25 percentage points more often than the reverse. Population +0.6: 60 points more often.
+- So the inequality signal is real but smaller than population and GDP (by the usual rule of thumb for δ, about 0.15-0.33 counts as small and above ~0.47 as large). Its value is that it differs between services, while population and GDP do not.
 - This is the slide to open up. Inequality within places, not average development, is what distinguishes where land-based services decline most.
 - These are co-occurrence results, not causal. Testing mechanisms would need sub-national tenure/governance data or case comparisons.
 - Field size (Mehrabi et al.) adds little: δ −0.06 to +0.12.
@@ -671,31 +763,7 @@ Why inequality, and not development level or poverty? Candidates: frontier expan
 - Numbers updated 10-07 to the current beneficiary run (07-29, five-service hotspots); the earlier 3.1B / 7.6B came from a June run on the old 8-variable hotspots.
 :::
 
-# What the Analysis Cannot Say Yet {background-color="#004D1E"}
-
-## Drivers: Land Cover Does Not Explain Hotspots Cell by Cell
-
-::: {.columns}
-::: {.column width="45%"}
-![Share of each service's hotspot cells that also fall in a land cover conversion hotspot (top 5% per driver).](../../outputs/plots/drivers/heatmap_driver_overlap_pct.png){width="100%"}
-:::
-::: {.column width="55%" .fs72}
-
-- **63%** of hotspot cells show no intense land cover conversion in the same cell; 37% do
-- Null model: placing hotspots at random within blocks of decreasing size, the overlap expected by chance rises from 9% (global) to 25% (0.5° blocks), so **part of the co-occurrence is regional co-location**, not same-cell
-- Expected from the models: sediment and nutrient effects accumulate along flow paths; pollination and nature access depend on habitat within foraging or travel distance
-- Next: a distance-decay test (count conversion in neighbouring cells), and model reruns holding land cover or climate fixed
-
-:::
-:::
-
-::: {.notes}
-- Exploratory, in the paper's Supplement. Not a causal partition.
-- Climate inputs: if the 1992 and 2020 SDR/NDR runs used different climate, export could change with no land cover change. Open question to the model authors.
-- Ask the lab: how would you attribute change that the models themselves propagate along flow paths?
-:::
-
----
+# Part 4: Discussion {background-color="#004D1E"}
 
 ## The Answer Depends on the Question
 
@@ -703,7 +771,7 @@ Why inequality, and not development level or poverty? Candidates: frontier expan
 
 | Choice | Example from this analysis |
 |:---|:---|
-| **Metric** | SPC and absolute change select 32-97% of the same hotspots, depending on the service |
+| **Metric** | SPC and absolute change select 32-57% of the same hotspots, depending on the land service |
 | **Baseline** | Sediment export: Boreal forests lead in relative terms, tropical moist forests in absolute terms |
 | **Grouping** | Lower-middle-income countries lead on land services; coastal risk is over-represented on low-income *and* high-income OECD coasts |
 | **Dimension** | Deserts: few nature access hotspots, but the most severe ones |
@@ -722,7 +790,58 @@ These are not inconsistencies to resolve by choosing one measure. A credible ass
 - Regional applications (Amazon basin, Southeast Asia, Sub-Saharan Africa) can reuse it with locally calibrated InVEST inputs and a finer grid.
 :::
 
-# Synthesis {background-color="#004D1E"}
+---
+
+## Asking Your Own Question: The Change Explorer
+
+::: {.columns style="font-size: 0.72em; align-items: flex-start;"}
+::: {.column width="50%"}
+![Change maps: per-cell change with the paper's symbology](images/explorer_change_maps_colombia.png){height="330px"}
+:::
+::: {.column width="50%"}
+![Hotspot map: thresholds within Colombia or worldwide](images/explorer_hotspot_map_colombia.png){height="330px"}
+:::
+:::
+
+::: {style="font-size: 0.6em;"}
+- Any country, World Bank region, biome or income group; any subset of the five services
+- Relative or absolute change; hotspot threshold, direction (decline or improvement) and reference (local or global)
+- Prevalence by sub-unit, change within hotspots, people living in hotspots, cell download
+- A prototype built on this repository's outputs: ideas for what it should show are welcome
+:::
+
+::: {.notes}
+- Live demo if time allows (run `Rscript -e "shiny::runApp('scripts/dashboard')"` before the talk; the whole-world view takes ~15 s the first time). Screenshots are the fallback.
+- Suggested demo: switch the reference from local to global (5% decline, all services, SPC). Share of cells in a hotspot of at least one service: Brazil 12.1% local vs 26.3% global (its extremes are the world's extremes); Germany 13.6% vs 6.8%; Colombia 12.5% vs 14.8%.
+- Main point: it took a few days, not a project, because the pipeline outputs (the 10 km change grid and the native-pixel tables) already exist. I am not a web designer; the value is in the data behind it.
+- Limits: local residents only. Connected beneficiaries (downstream, travel time) exist only for the global 5% decline set; other scenarios would need a new beneficiary run.
+- Could be hosted (e.g. Posit Connect Cloud) if it would be useful to others.
+:::
+
+---
+
+## Drivers: Land Cover Does Not Explain Hotspots Cell by Cell {.tight-figs}
+
+![Share of each service's hotspot cells that also fall in a land cover conversion hotspot (top 5% per driver).](images/heatmap_driver_overlap_pct_tight.png){height="380px" fig-align="center"}
+
+::: {.columns style="font-size: 0.6em;"}
+::: {.column width="50%"}
+- **63%** of hotspot cells show no intense land cover conversion in the same cell; 37% do
+- Null model: placing hotspots at random within blocks of decreasing size, the overlap expected by chance rises from 9% (global) to 25% (0.5° blocks), so **part of the co-occurrence is regional co-location**, not same-cell
+:::
+::: {.column width="50%"}
+- Expected from the models: sediment and nutrient effects accumulate along flow paths; pollination and nature access depend on habitat within foraging or travel distance
+- Next: a distance-decay test (count conversion in neighbouring cells), and model reruns holding land cover or climate fixed
+:::
+:::
+
+::: {.notes}
+- Exploratory, in the paper's Supplement. Not a causal partition.
+- Climate inputs: if the 1992 and 2020 SDR/NDR runs used different climate, export could change with no land cover change. Open question to the model authors.
+- Ask the lab: how would you attribute change that the models themselves propagate along flow paths?
+:::
+
+# Part 5: Conclusions {background-color="#004D1E"}
 
 ## Synthesis
 
@@ -741,24 +860,26 @@ These are not inconsistencies to resolve by choosing one measure. A credible ass
 
 ---
 
-## For Discussion
+## For Discussion {visibility="hidden"}
 
 ::: {style="font-size: 0.85em;"}
 
-1. Is proportional loss (SPC) the right lens for prioritization, or should absolute change lead, or both?
-2. What could link income inequality to ecosystem service decline, and how could we test it?
-3. How should change be attributed when the models propagate it along flow paths?
-4. Which regional application would be most useful next, and with which local inputs?
+1. Where would these maps and the pipeline be most useful: national planning, WWF priorities, ecosystem accounting, global assessments?
+2. Decline concentrates in more unequal places. What would a follow-up study need to explain why?
+3. What questions would you ask with the explorer, and who else should have it?
+4. What would most improve the next round: a yearly series, locally calibrated models, or attributing change to its drivers?
 
 :::
 
 ::: {.notes}
-- Leave ~5 minutes here. These are real open questions for the next phase, not rhetorical.
+- Leave ~5 minutes here. Broad on purpose: the aim is to hear where the lab sees value and what to do next, not to settle technical choices.
+- Q2 is future work, outside this paper's scope (the paper reports co-occurrence, not mechanism).
+- Q3: invite people to try the explorer after the talk; collect ideas.
 :::
 
 ---
 
-## Status
+## Status {visibility="hidden"}
 
 ::: {.columns style="font-size: 0.7em;"}
 ::: {.column width="50%"}
@@ -863,6 +984,10 @@ These are not inconsistencies to resolve by choosing one measure. A credible ass
 
 ### Key Publications & Methods
 - Chaplin-Kramer et al. (2019) *Science*: global NCP baseline — this paper extends it
+- Chaplin-Kramer et al. (2023) *Nature Ecology & Evolution*: critical natural assets
+- Brauman et al. (2020) *PNAS*; IPBES (2019); Millennium Ecosystem Assessment (2005): global trends in nature's contributions
+- Kim et al. (2024) *Science*; Peng et al. (2023) *J. Cleaner Production*: closest global trend studies
+- Socioeconomic layers: Schiavina et al. (2023) GHS-POP; Kummu et al. (2025) *Sci. Data* GDP; Sherman et al. (2026) *Nat. Commun.* HDI; Mehrabi et al. (2021) *Nat. Sustain.* field size; ORNL (2024) LandScan 2023
 - Cliff (1993): Cliff's Delta effect size for ordinal data
 - Benjamini & Hochberg (1995): false discovery rate correction
 - Andam et al. (2008): ecosystem service spillover effects
