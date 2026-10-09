@@ -162,7 +162,7 @@ message("Saved hotspot map.")
 # ------------------------------------------------------------------------------
 
 message("Building beneficiary-reach map...")
-ben_dir <- file.path(data_dir(), "processed", "hotspots_5service", "rasters_5_var",
+ben_dir <- file.path(data_dir(), "processed", "beneficiaries", "run_2026-07-29_5service",
                       "output_jeronimo_2026_07_29_18_49_00_combined_cross_category_beneficiaries")
 coverage_tif <- file.path(ben_dir, "full_raster_extent_union_coverage.tif")
 population_tif <- file.path(ben_dir, "full_raster_extent_union_population.tif")

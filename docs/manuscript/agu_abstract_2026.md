@@ -5,7 +5,7 @@ date: "2026-08-06"
 ---
 
 Adapted from the paper's existing abstract (`docs/manuscript/paper_draft.qmd`, now archived at
-`docs/archive/manuscript_pre_5service/paper_draft.qmd` — the paper has since been redesigned as
+`archive/docs/manuscript_pre_5service/paper_draft.qmd` — the paper has since been redesigned as
 `paper_draft_5service.qmd`, so this abstract's own wording may itself be stale; not re-verified as
 part of this note), tightened to AGU's
 rules: title <=300 characters (title case), abstract <=2,000 characters excluding spaces

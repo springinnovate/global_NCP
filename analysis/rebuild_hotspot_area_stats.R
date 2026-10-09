@@ -19,9 +19,15 @@ exclude_groups <- c("Seven seas (Open Ocean)", "Seven seas (open ocean)", "Antar
                     "2. High income: nonOECD")
 
 cells <- st_read("data/processed/10k_change_calc.gpkg",
-                 query = sprintf('SELECT grid_fid, %s, %s FROM "10k_change_calc"',
+                 query = sprintf('SELECT grid_fid, continent, %s, %s FROM "10k_change_calc"',
                                  paste(groupings, collapse = ", "), paste(services, collapse = ", ")),
-                 quiet = TRUE) |> st_drop_geometry()
+                 quiet = TRUE) |> st_drop_geometry() |>
+  # Evaluated universe: the 1,372,621 cells the hotspots were selected from (hotspot_extraction.qmd:
+  # no Antarctica, open ocean, Lakes or Rock & Ice). Without this, group denominators included
+  # Lakes / Rock & Ice cells that can never be hotspots.
+  filter(is.na(continent) | !continent %in% c("Antarctica", "Seven seas (Open Ocean)"),
+         is.na(WWF_biome) | !WWF_biome %in% c("Lakes", "Rock & Ice"))
+stopifnot(nrow(cells) == 1372621)
 hot <- st_read("data/processed/hotspots/pct/global/hotspots_global_pct.gpkg",
                query = sprintf('SELECT grid_fid, %s FROM "hotspots_global_pct"', paste(names(services), collapse = ", ")),
                quiet = TRUE) |> st_drop_geometry()

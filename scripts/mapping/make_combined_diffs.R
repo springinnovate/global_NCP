@@ -4,6 +4,9 @@
 # rebuilding them from zonal_stats_toolkit outputs that are not on this machine.
 # Groups are named on the axis; no numbered colour legend.
 #
+# The main figures show the five services. The retention and reduction ratios (not used to
+# define hotspots) go to a separate <group>_combined_diffs_ratios.png for the Supplement.
+#
 # Usage: Rscript scripts/mapping/make_combined_diffs.R [out_dir]
 #   default out_dir: outputs/plots/output_plots_diff
 
@@ -15,12 +18,12 @@ args <- commandArgs(trailingOnly = TRUE)
 out_dir <- if (length(args)) args[1] else in_dir
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-services <- c(
-  N_export = "Nitrogen export", Sed_export = "Sediment export", C_Risk = "Coastal risk",
-  N_Ret_Ratio = "Nitrogen retention ratio", Sed_Ret_Ratio = "Sediment retention ratio",
-  C_Risk_Red_Ratio = "Coastal risk reduction ratio",
-  Pollination = "Pollination", Nature_Access = "Nature access"
-)
+amounts <- c(N_export = "Nitrogen export", Sed_export = "Sediment export", C_Risk = "Coastal risk",
+             Pollination = "Pollination", Nature_Access = "Nature access")
+ratios <- c(N_Ret_Ratio = "Nitrogen retention ratio", Sed_Ret_Ratio = "Sediment retention ratio",
+            C_Risk_Red_Ratio = "Coastal risk reduction ratio")
+variants <- list(main = list(services = amounts, suffix = "", rows = 2),
+                 ratios = list(services = ratios, suffix = "_ratios", rows = 1))
 # services where an increase is adverse; for the rest a decrease is adverse
 adverse_if_up <- c("N_export", "Sed_export", "C_Risk")
 
@@ -60,8 +63,10 @@ panel <- function(d, value, title, xlab, show_names, scales) {
           axis.text.y = if (show_names) element_text(size = 9) else element_blank())
 }
 
-for (g in names(groups)) {
+for (g in names(groups)) for (v in names(variants)) {
+  if (g == "country" && v == "ratios") next
   cfg <- groups[[g]]
+  services <- variants[[v]]$services
   d <- read_csv(file.path(in_dir, paste0(g, "_map_data.csv")), show_col_types = FALSE) |>
     filter(service %in% names(services)) |>
     mutate(group = .data[[cfg$col]],
@@ -95,7 +100,8 @@ for (g in names(groups)) {
     plot_layout(guides = "collect") &
     theme(legend.position = "bottom")
 
-  out <- file.path(out_dir, paste0(g, "_combined_diffs.png"))
-  ggsave(out, p, width = 16, height = if (g == "country") 12 else 9, bg = "white", dpi = 300)
+  out <- file.path(out_dir, paste0(g, "_combined_diffs", variants[[v]]$suffix, ".png"))
+  row_h <- if (g == "country") 4.5 else if (g == "biome") 3.4 else 2.2
+  ggsave(out, p, width = 16, height = 1.6 + row_h * variants[[v]]$rows, bg = "white", dpi = 300)
   message("wrote ", out)
 }

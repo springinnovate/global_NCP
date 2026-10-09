@@ -5,8 +5,189 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-05. Start with MILESTONE 2026-10-05 just below. The user's WWF contract ends
+*Last updated: 2026-10-09. Start with START HERE just below, then OPEN ITEMS. The user's WWF contract ends
 ~2026-10-23 (last working day); access to springinnovate's git is expected to continue afterwards.*
+
+## START HERE (end of 2026-10-09 session)
+
+Done 10-09: `housekeeping` (paper edits, lab deck review, change explorer, deck figure scripts) merged into
+`main` by squash PR; work now continues on branch **`book-update`** off the updated `main`.
+
+1. **Book update** (`docs/manuscript/`, a Quarto book): read `docs/manuscript/book_audit.md` first. Agreed
+   10-09: long-form companion to the paper; drivers chapter shortened and moved after WHO; new chapter
+   "Using the pipeline" (explorer, every choice is an input); one chapter at a time, render after each,
+   user reviews before the next. Step 1: fix broken figure paths so it renders; then index -> ch 1 -> ...
+2. **Lab deck** (Tue 10-13, 11:00 Bogotá): reviewed end to end 10-08/09 and sent to Becky. Still to do:
+   user re-reads slide 23 (frequency vs severity) and slides 19 and 25 caveats (new analyses, not in the
+   paper: pollination vs cropland, SPC vs absolute profile). Restart the explorer before any demo.
+3. **Paper:** coastal risk dropped from the SPC-vs-absolute overlap (bounded 1-5 index, 97% is
+   uninformative); candidate addition: the SPC-vs-absolute profile (`scripts/mapping/make_deck_metric_overlap.R`)
+   as the answer to "where and why the two criteria diverge" (limitations paragraph). Gini citation still a
+   placeholder ("Kummu et al."). `docs/methodology.md` calls coastal risk "energy"; it is a 1-5 index.
+4. **Repo cleanup** can run in parallel on its own branch, but keep it out of `docs/manuscript/` to avoid
+   conflicts with `book-update`.
+5. Job search and laptop migration as before (items 4-5 of the 10-08 list below).
+
+## START HERE (end of 2026-10-08 session)
+
+Done 10-08: both repos committed in the morning (global_NCP fe20800..8a06b3f; toolkit 36b4d93), nothing
+pushed. Paper updated and the docx REPLACED on OneDrive by the user (intro names the five services + why,
+native resolutions 300 m / 2 km / shoreline points, overclaims fixed, GHSL + LandScan refs, typo).
+UNCOMMITTED since: paper qmd, deck resolution wording, the whole `scripts/dashboard/` app, HANDOFF.
+
+Next session, in order:
+1. **Hotspot explorer bug check** (`scripts/dashboard/app.R`). Fixed 10-08: "Improvement" drew nothing in
+   any country because a scalar 0 made `ifelse()` collapse to the first cell (now one value per cell);
+   hover labels now list each service and its change; drawing waits for the map (`map_ready`). NOT yet
+   confirmed: a headless-Chrome screenshot opening directly on Tanzania + Improvement still showed an empty
+   map (may be a headless artifact). User to test interactively: Tanzania, switch to Improvement, hover a
+   purple "both" cell. Then commit the app.
+2. **Lab deck** (Tue 10-13; send to Becky, who has not replied): go part by part (table in the 10-08 chat:
+   Part 1 motivation, Part 2 methods (consider trimming), WHAT, WHERE, WHO, limits/flexibility, close).
+   Add a slide with two explorer screenshots (e.g. Colombia local vs global thresholds) replacing a
+   Methods slide. **Late 10-08:** user's bracketed comments on slides 3 and 5 addressed (sources, wording,
+   null-model bullet dropped, KS/Cliff's δ explained in plain words on the Methods slide and in notes);
+   explorer slide added before Synthesis ("Asking Your Own Question"), screenshots in
+   `docs/presentations/images/`. Also: slide titles larger deck-wide, slide 3 retitled with Kim/Peng
+   context, slide 4 hotspot map, slide 7 socioeconomic sources (Gini cited as "Kummu et al." PLACEHOLDER,
+   confirm later). Goal: deck reviewed 10-08/09 and shared with Becky.
+   **10-09:** reviewed through slide 23 (stacked input layers on slide 7, tabs on 17/18, pollination vs
+   cropland chart on 19 = new analysis not in the paper, population-based coastal windows on 20, tight
+   hotspot map on 22). User wants to come back to slide 23 (frequency vs severity: each case is nuanced,
+   check understanding). Next: slides 24-40.
+3. **Book audit** (pass 1: per-chapter list of stale/missing vs paper, WORKLOG and HANDOFF thinking).
+4. **Job search**: daily digest routine (schedule skill) once the user gives target roles, scope, sources
+   and delivery; LinkedIn and CV once the user shares current CV and profile text.
+5. Push repos and work through `C:\projects\MIGRATION_TO_PERSONAL_LAPTOP.md` before the contract ends.
+6. Paper still open: one line each in Methods on how nature access and coastal risk are modelled (needs
+   the model documentation); LandScan 2023 DOI.
+Smurfit: integrated report ready to share; second rounds out for zones 1 and 3; questions to Jorge drafted
+(toolkit HANDOFF). Zone 3 forest omission is structural (validation + GLAD agree).
+
+## 2026-10-08: WORK MOVES TO THE PERSONAL LAPTOP
+
+This machine goes back at contract end. Migration checklist (push repos, copy CLAUDE.md files and the
+Claude memory folder, what data may be copied): `C:\projects\MIGRATION_TO_PERSONAL_LAPTOP.md` (outside the
+repos). Paper edits of 10-08 (uncommitted): intro names the five services and why; two overclaims fixed
+("declining trend", "limited adaptive capacity"); citations at the start of Results; GHSL and LandScan
+references added (LandScan DOI still to confirm); typo. HTML and docx re-rendered; docx ready to replace
+the OneDrive copy after the user's read. Still open: one line each in Methods on how nature access and
+coastal risk are modelled (needs the model documentation, not memory).
+
+## 2026-10-08: HOTSPOT EXPLORER (Shiny dashboard, first version, uncommitted)
+
+`scripts/dashboard/app.R` + `prepare_dashboard_data.R` (writes `data/processed/dashboard/grid_dashboard.rds`,
+the 1,372,621 evaluated cells, ~1 min, rerun when 10k_change_calc changes). Pick a country / WB region /
+income group / biome / whole world, services, threshold (1-20%), direction (decline, improvement, both),
+reference (local thresholds within the selection vs global), metric (SPC or absolute). Tabs: map, summary
+(threshold, hotspot cells, people in them), relative prevalence by sub-unit, change within hotspots,
+CSV download. Path B only (user: Path A cannot give sub-national hotspots). Local residents only:
+connected beneficiaries exist only for the global 5% decline set and would need a new beneficiary run
+per scenario (mention as a possibility). Run: `Rscript -e "shiny::runApp('scripts/dashboard', launch.browser = TRUE)"`.
+Tested with shiny::testServer (Colombia local/global, Mangroves improvement, whole world). Fixes 10-08: keyless
+basemaps (CARTO now needs a key); zoom to the 1-99% range of cell centres (US Aleutians beyond 180 deg
+zoomed the map to the whole world, making one-service improvement cells look absent); stronger palettes;
+31 antimeridian-wrapping cells skipped when drawing. Next: screenshots
+for the lab deck (e.g. Colombia local vs global), possibly host on Posit Connect Cloud.
+**Later on 10-08 (user feedback):** renamed "Ecosystem service change explorer". First tab is now "Change
+maps": per-cell SPC or absolute change with the paper's change-map symbology (Equal Earth, orange = adverse,
+1-99% symmetric range over all cells, near-zero fade), optional range stretched to the selection; coastal
+risk omitted at world scale as in the paper. The old "Change by service" bars were dropped (absolute bars
+shared one axis and nature access swamped the rest); the native-pixel table with ranks stays under the
+maps. The grid is a regular 10 km lattice in cylindrical equal-area, so `prepare_dashboard_data.R` now also
+writes `change_map_layers.rds` (Equal Earth pixel lookups at 10 km for the world, 5 km elsewhere, since
+10 km nearest-cell resampling skips ~16% of cells; plus simplified borders). Hotspot map no longer re-zooms
+when settings change, only when the unit changes. Still: selections with >40,000 hotspot cells (e.g. whole
+world) draw on a 0.5 degree summary for browser speed; could switch to a raster image if wanted.
+
+## OPEN ITEMS (consolidated 2026-10-06; answer "where are we / what's pending" from here)
+
+Replaces the scattered checklists further down (PAPER REVIEW QUEUE, THREE-WEEK PLAN, "Pending"),
+which are kept for history. Keep this list current.
+
+**Cell universe SETTLED 10-07** (`docs/cell_universe.md`, check `analysis/verify_cell_universe.R`):
+1,522,073 grid cells -> 1,372,621 evaluated (no Antarctica, open ocean, Lakes, Rock & Ice); every
+hotspot selected there; 189,932 hotspots = 13.8%. Prevalence table rebuilt on that universe
+(income ratio 2.4x -> 2.3x, a few biome values -0.1); paper text updated (13.8%, 1.37 million,
+2.3x), uncommitted. Deck not yet updated.
+
+**Population exposure FIXED 10-07 (paper updated, uncommitted):** the paper quoted the June
+beneficiary run on the old 8-variable hotspots (225,113 cells). The current run exists: Rich's
+2026-07-29 five-service run in `data/processed/hotspots_5service/rasters_5_var/` (LandScan 2023),
+whose input hotspots match production. New numbers: 2,367 M local residents, 7,383 M connected
+(92.5% of LandScan 7,982 M), 5,949 M downstream, 7,164 M travel, ~3.1x; income: upper-middle most
+residents (919 M), lower-middle most connected (2,675 M), low-income ~13%. Scripts
+`scripts/mapping/make_exposure_bars.R` (BC12 figure, now in the paper) and
+`scripts/exposure_by_income.R`. Abstract, Results, Discussion, Conclusions, Methods updated; paper
+HTML renders clean. Deck and book still have the old numbers. Phase 4 masks also come from the 07-29
+run, so phase 4 is likely current (recheck before citing).
+**Data cleanup DONE (first pass) 10-07, uncommitted:** superseded data moved to
+`data/archive/superseded/` (READMEs in each folder), June exposure outputs + `plot_multiplier_effect.R`
+`git mv`-ed to `archive/outputs/2026-06_exposure_8var/` and `archive/scripts/`; current beneficiary
+run renamed to `data/processed/beneficiaries/run_2026-07-29_5service/` and its 4 readers repointed.
+Deck updated to the new exposure numbers and figure (2.4B / 7.4B / 92.5%, 13.8%, 2.3x). Paper and deck
+render clean, all image paths resolve. Registry + remaining "to check" list + scripts still pointing at
+archived files: `docs/data_versions.md`. Book chapters 02 and 06 point at archived exposure files
+(fix with the book review).
+
+**Paper** (`docs/manuscript/paper_draft_5service.qmd`, the only living copy; v sent 10-05)
+- [~] Done 10-06, uncommitted, awaiting the user's review: retention/reduction ratios moved out of
+  Figure 1 and the Supplement change figures into one Supplement figure (@fig-ratios); "Global
+  Hotspot Distribution" restructured into a land block and a coastal block, each pairing
+  prevalence with within-hotspot SPC, with the magnitude result interpreted; income-group
+  prevalence and magnitude moved to the start of the WHO section; land boxplots now built from the
+  production hotspot set (`make_hotspot_summary_figures.R`, numbers in
+  `outputs/tables/hotspot_spc_within_hotspots.csv`). docx and HTML render clean. The user replaced
+  the shared docx on OneDrive with this version 10-06; more work on these sections is planned.
+- [x] BC12 DONE 10-07: two bar charts (`exposure_by_overlap_bars.png`); old dumbbell PNG kept.
+- [ ] Pick one denominator for "14.6% of evaluated cells" vs 13.8%. Checked 10-07: NEITHER
+  1,302,099 nor 1,372,621 reproduces from the current files (grid 1,522,073 rows; hotspot_area_stats
+  region n_total 1,349,556). Trace both in the numbers ledger; rule: divide by the universe the
+  hotspots were selected from. Deferred with the ledger (user, 10-07).
+- [ ] Methods: model mechanics for nature access and coastal risk (one line each now).
+- [ ] Numbers audit steps 2-4: `numbers_ledger.csv` and `analysis/verify_paper_numbers.py` do not
+  exist yet. This is also the regression test for the hand-off.
+- [ ] Global Path A figures are reconstructed from region rows; a direct global run is pending.
+- [ ] Candidate addition: phase 4 beneficiary-mask result (Gini skew grows at 4+ services). Its
+  numbers (08-07) predate the 08-31 sediment/coastal fix and the 09-03 export/risk reversal, and
+  the masks came from an earlier hotspot set: rerun `analysis/KS_tests_beneficiary_masks.qmd` (and
+  check whether the masks need rebuilding) before citing it.
+- Waiting on Becky: climate inputs / model-run provenance (affects the Discussion's climate
+  mechanism); Gini citation; correspondence-table citation (draft to the model author ready:
+  `docs/manuscript/justin_ee_correspondence_provenance_2026-08-31.draft.md`, unsent).
+
+**Repo housekeeping** (branch `housekeeping`; plan in `docs/repo_reorg_plan.md`)
+- [~] Stages 1-3 done 10-06, uncommitted (rendered files untracked, clutter removed, archives
+  consolidated, stale drafts deleted).
+- [ ] Stage 4 waits for the user's personal copy of the repo (external-venue material moves there).
+- [ ] Stages 5-8; decisions pending on the deliverables zip, `home/jeronimo/data/` (8.8 GB) and
+  `summary_pipeline_workspace_ha/`.
+
+**Presentations**
+- [ ] **Lab deck, DUE Tue 2026-10-13, 11:00 Bogotá time** (`docs/presentations/presentation.qmd`):
+  restructure to the paper as sent (three questions WHAT/WHERE/WHO; land cover as future work);
+  slide outline (30 min, explore the findings) in `docs/presentations/lab_deck_outline.md`,
+  using the paper's figure files; add a beneficiary-mask slide only if the phase 4 rerun is done.
+  Paper edits resume 10-07 in parallel; BC12 and the 14.6/13.8% choice feed the deck.
+  **10-06: first full revision done, uncommitted** (built on the existing deck, 39 slides incl.
+  section headers and appendix; renders clean; every slide screenshot-checked). New: "Not One
+  Answer: A Pipeline for Many Questions" slide up front and "The Answer Depends on the Question"
+  near the end (user's emphasis: the pipeline, not the specific services/dates/slicing); WHY
+  section replaced by one "what the analysis cannot say yet" slide; all figures are the paper's.
+  `wwf_theme.css` gained caption and column font-size rules. Next: user review; share with Becky
+  before 10-13; phase 4 rerun if time (slide 15 of the outline).
+- [ ] Venues to book (from the 10-01 plan): WWF Global Science, UMN lab meeting, Colombia. One core
+  deck, framing per venue.
+
+**Hand-off before 10-23**: verify script (above), `docs/how_to_extend.md` and runbook reviewed,
+data README, root README rewrite, one recorded walkthrough (~10-21).
+
+**Parked (raise when relevant)**: sediment-retention demand artifact follow-ups; field-size
+covariate doubt; per-service critical-asset idea; pollination-sufficiency question (unanswered
+since 08-21); Path B N-retention-ratio grid offset (ratios are Supplement-only now).
+
+**Other repos**: landcover-validation-toolkit (Zone 3 labels, meeting 10-06); SWY in its own repo
+(waiting on the model author); LC_orinoquia (Track A rebuild).
 
 ## MILESTONE 2026-10-05 — paper sent to the PI (read first)
 
@@ -17,9 +198,16 @@ the Gini citation, Justin's correspondence-table citation). BC12 (dumbbell to ba
 
 **Next session: housekeeping strategy (decide before doing).** Suggested order:
 
-1. **Branches.** Squash-merge `paper_review` into `main` with one name-free message (repo is
-   public). Then open a `housekeeping` branch for steps 2-5, so cleanup never mixes with paper edits.
-2. **Repo organization (whole repo, on the housekeeping branch).** First an inventory, then a target
+1. **Branches. DONE 2026-10-06.** `paper_review` merged into `main` (PR #26, merge commit eb53f74;
+   it was a regular merge, so the branch's individual commits are on `main`). Branch `housekeeping`
+   created from that `main`; steps 2-5 and 7 happen there. Step 6 (analysis chain restructure) gets
+   its own branch off `main` (e.g. `pipeline-restructure`), so `main` stays the working backup.
+   **Start the next session with step 2's inventory.**
+2. **Repo organization (whole repo, on the housekeeping branch).** **Inventory DONE 10-06:
+   `docs/repo_reorg_plan.md`** (inventory, proposed layout, 5 open decisions, staged moves; the
+   size figures below are superseded: 442 MB tracked, ~200 MB of it rendered HTML/DOCX, and
+   `home/` is R's HOME from `.Renviron`, not a stray copy). Next: user decides section 3 of that
+   plan, then stage 1. First an inventory, then a target
    layout, then staged moves with a render/run check after each. Known starting point (10-05): 701
    tracked files, ~134 MB tracked; `outputs/` alone is 325 files (49 in `plots/maps`, 33 in
    `plots/colombia_report`, `workflow_files/libs`; `plots_archive_mar20/`, the old `plots/{abs,pct,ratios,coastal}/` boxplots and `maps/map_native10km_*` were removed 10-06, 44 files); 82 files in

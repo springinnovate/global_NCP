@@ -40,7 +40,7 @@ Reusable functions loaded via `devtools::load_all()` in all analysis notebooks. 
 
 | File | Purpose |
 |:---|:---|
-| `percentileR.R` | *(archived in `R/archive/`)* Early percentile-based hotspot definition, superseded by `get_hotspots.R`. |
+| `percentileR.R` | *(archived in `archive/R/`)* Early percentile-based hotspot definition, superseded by `get_hotspots.R`. |
 
 ## Note on pct_change.R vs pct_change_calc.R
 

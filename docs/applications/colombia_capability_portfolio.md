@@ -8,7 +8,7 @@ a hedge for independent/other-org optionality.
 
 **A dated, week-specific version of this document (Workshop 3 talking points, CLEC drafting
 detail, the Aug 12 stacked-day plan) is archived at**
-`docs/archive/colombia_capability_portfolio_2026-08-13.md` — this version keeps only what's
+`archive/docs/colombia_capability_portfolio_2026-08-13.md` — this version keeps only what's
 durable. For "what actually happened and when," check `analysis/WORKLOG.md` and the
 `project-capability-portfolio-pitch` memory rather than this file — this file is the pitch itself,
 not a log of it.

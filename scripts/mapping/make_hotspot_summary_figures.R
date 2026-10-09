@@ -2,8 +2,8 @@
 # group, in the same style as the change figures (make_combined_diffs.R): group names on the axis
 # (no numbered key), full service names, WWF orange instead of red, compact sizes.
 # Same data and rules as hotspot_synthesis.qmd (relative intensity, from hotspot_area_stats.csv)
-# and make_hotspot_boxplots.R (top/bottom 5% per service within cells that have the grouping);
-# only the presentation changes.
+# and, for the boxplots, the production hotspot set in hotspots_global_pct.gpkg; only the
+# presentation changes. Also writes outputs/tables/hotspot_spc_within_hotspots.csv.
 #
 # Usage: Rscript scripts/mapping/make_hotspot_summary_figures.R [out_root]
 #   default out_root: outputs/plots  (writes intensity/ and boxplots_unified/<grouping>/)
@@ -85,24 +85,36 @@ ggsave(out, p, width = 8, height = 2.6, dpi = 300, bg = "white")
 message("wrote ", out)
 
 # --- SPC within hotspot cells -------------------------------------------------------------------
-plt_long <- readRDS("data/processed/plt_long.rds") |>
-  filter(service %in% land_services) |>
-  select(service, pct_chg, all_of(names(groupings)))
+# Production hotspot flags (the 189,932-cell set the paper reports, same as the prevalence table),
+# SPC from the 10 km grid. Earlier versions re-derived the top 5% inside each grouping from
+# plt_long.rds, which gave a slightly different hotspot set (e.g. 70,139 vs 68,632 N export cells).
+suppressMessages(library(sf))
+spc_cols <- c(N_export = "n_export_pct_chg", Sed_export = "sed_export_pct_chg",
+              Pollination = "pollination_pct_chg", Nature_Access = "nature_access_pct_chg")
+prod_hot <- st_read("data/processed/hotspots/pct/global/hotspots_global_pct.gpkg",
+                    query = sprintf('SELECT grid_fid, %s FROM "hotspots_global_pct"', paste(land_services, collapse = ", ")),
+                    quiet = TRUE) |> st_drop_geometry()
+grid <- st_read("data/processed/10k_change_calc.gpkg",
+                query = sprintf('SELECT grid_fid, %s, %s FROM "10k_change_calc"',
+                                paste(names(groupings), collapse = ", "), paste(spc_cols, collapse = ", ")),
+                quiet = TRUE) |> st_drop_geometry()
+hot_long <- lapply(land_services, function(s) {
+  ids <- prod_hot$grid_fid[prod_hot[[s]] %in% 1]
+  grid |> filter(grid_fid %in% ids, !is.na(.data[[spc_cols[[s]]]])) |>
+    transmute(service = s, pct_chg = .data[[spc_cols[[s]]]], across(all_of(names(groupings))))
+}) |> bind_rows()
+exclude_groups <- c("Lakes", "Rock & Ice", "2. High income: nonOECD")
+spc_table <- list()
 for (g in names(groupings)) {
-  hot <- plt_long |>
-    filter(!is.na(.data[[g]]), !(g == "WWF_biome" & .data[[g]] %in% c("Lakes", "Rock & Ice"))) |>
-    group_by(service) |>
-    mutate(loss = service %in% loss_services,
-           cut = if_else(loss, quantile(pct_chg, 0.05, na.rm = TRUE), quantile(pct_chg, 0.95, na.rm = TRUE)),
-           hot = if_else(loss, pct_chg <= cut, pct_chg >= cut)) |>
-    ungroup() |> filter(hot)
-  if (g == "income_grp") hot <- filter(hot, .data[[g]] != "2. High income: nonOECD")
+  hot <- hot_long |> filter(!is.na(.data[[g]]), !.data[[g]] %in% exclude_groups)
   s <- hot |> group_by(service, group = .data[[g]]) |>
-    summarise(middle = median(pct_chg), lower = quantile(pct_chg, .25), upper = quantile(pct_chg, .75),
+    summarise(n = n(), middle = median(pct_chg), lower = quantile(pct_chg, .25), upper = quantile(pct_chg, .75),
               iqr = IQR(pct_chg), ymin = max(min(pct_chg), lower - 1.5 * iqr),
-              ymax = min(max(pct_chg), upper + 1.5 * iqr), .groups = "drop") |>
-    group_by(service) |> mutate(intensity = scales::rescale(abs(middle))) |> ungroup() |>
-    mutate(group = tidy_group(group, g), service = factor(services[service], levels = services))
+              ymax = min(max(pct_chg), upper + 1.5 * iqr),
+              share_total_loss = mean(pct_chg <= -199.9), .groups = "drop") |>
+    group_by(service) |> mutate(intensity = scales::rescale(abs(middle))) |> ungroup()
+  spc_table[[g]] <- mutate(s, grouping_var = g)
+  s <- mutate(s, group = tidy_group(group, g), service = factor(services[service], levels = services))
   p <- ggplot(s, aes(y = group, xmin = ymin, xlower = lower, xmiddle = middle, xupper = upper, xmax = ymax)) +
     geom_boxplot(aes(fill = intensity), stat = "identity", orientation = "y", colour = "grey25",
                  linewidth = 0.3, width = 0.7) +
@@ -119,7 +131,6 @@ for (g in names(groupings)) {
 
 # --- coastal risk: SPC within its hotspot cells, by region and income group ----------------------
 # Production hotspot flags (same set as the prevalence table), SPC from the 10 km grid.
-suppressMessages(library(sf))
 c_hot <- st_read("data/processed/hotspots/pct/global/hotspots_global_pct.gpkg",
                  query = 'SELECT grid_fid FROM "hotspots_global_pct" WHERE C_Risk = 1', quiet = TRUE) |>
   st_drop_geometry()
@@ -149,3 +160,12 @@ out <- file.path(out_root, "boxplots_unified", "coastal_risk", "boxplots_pct.png
 ggsave(out, p, width = 8, height = 2.6, dpi = 300, bg = "white")
 message("wrote ", out)
 print(cs |> select(panel, group, n, middle))
+
+# Numbers behind the boxplots, for the paper text (SPC -200 = the service fell to zero)
+spc_out <- bind_rows(
+  bind_rows(spc_table),
+  cs |> transmute(service = "C_Risk", group, n, middle, lower, upper,
+                  grouping_var = ifelse(panel == "World Bank region", "region_wb", "income_grp"))) |>
+  select(service, grouping_var, group, n, median = middle, q1 = lower, q3 = upper, share_total_loss)
+write_csv(spc_out, "outputs/tables/hotspot_spc_within_hotspots.csv")
+message("wrote outputs/tables/hotspot_spc_within_hotspots.csv")
