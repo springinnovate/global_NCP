@@ -5,8 +5,26 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-09. Start with UPDATE 2026-10-09 (evening) and START HERE just below, then OPEN ITEMS. The user's WWF contract ends
+*Last updated: 2026-10-12. Start with START HERE (Mon 2026-10-12) just below, then OPEN ITEMS. The user's WWF contract ends
 ~2026-10-23 (last working day); access to springinnovate's git is expected to continue afterwards.*
+
+## START HERE (Mon 2026-10-12): lab talk TOMORROW Tue 10-13, 11:00 Bogotá
+
+1. **Deck** (`docs/presentations/presentation.qmd`, the version reviewed 10-09 and committed in PR #27).
+   A VS Code save conflict on 10-12: the user's open buffer was the PRE-review text. Saved as
+   `docs/presentations/presentation_myedits.qmd`; a line-ending-insensitive diff showed NO new edits, only
+   older text (32-97% overlap with the coastal row, old frequency/severity wording, simple overlap table,
+   drivers slide in its old position, discussion slide visible). Pending user confirmation: delete
+   `presentation_myedits.qmd` and revert the editor to the reviewed file. Do not overwrite the reviewed
+   version. Then: re-read slides 19 (pollination vs cropland), 23 (frequency vs severity), 25 (SPC vs
+   absolute profile) for caveats; render; restart and test the change explorer before the meeting.
+2. **Explorer hosting (after the talk):** app is in the public repo (`scripts/dashboard/`), data is not
+   (~350 MB in `data/processed/dashboard/`). Plan: publish the prepared data as a GitHub Release + a
+   download step and README so others can run it locally; ask Rich whether Spring can host it (Shiny
+   Server / Posit Connect / Docker); Posit Connect Cloud or shinyapps.io free tiers may be tight on memory.
+3. **Smurfit** (toolkit HANDOFF "Next steps"): mosaic-split sessions for zones 1 and 3 to test and send today.
+4. Book update (branch `book-update`), workflow end-to-end across the pipeline qmds, README rewrite, job
+   search and laptop migration as in the blocks below.
 
 ## UPDATE 2026-10-09 (evening): book renders again
 
