@@ -22,7 +22,7 @@ session in `c:\projects\global_NCP` to resume.
    (~350 MB in `data/processed/dashboard/`). Plan: publish the prepared data as a GitHub Release + a
    download step and README so others can run it locally; ask Rich whether Spring can host it (Shiny
    Server / Posit Connect / Docker); Posit Connect Cloud or shinyapps.io free tiers may be tight on memory.
-3. **Smurfit** (toolkit HANDOFF "Next steps"): mosaic-split sessions for zones 1 and 3 to test and send today.
+3. **Smurfit** (toolkit HANDOFF "Next steps"): mosaic-split sessions for zones 1 and 3 to test and send; NOT today (user, 10-12), after the lab talk.
 4. Book update (branch `book-update`), workflow end-to-end across the pipeline qmds, README rewrite, job
    search and laptop migration as in the blocks below.
 
