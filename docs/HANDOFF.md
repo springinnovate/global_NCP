@@ -18,6 +18,82 @@ session in `c:\projects\global_NCP` to resume.
    `presentation_myedits.qmd` and revert the editor to the reviewed file. Do not overwrite the reviewed
    version. Then: re-read slides 19 (pollination vs cropland), 23 (frequency vs severity), 25 (SPC vs
    absolute profile) for caveats; render; restart and test the change explorer before the meeting.
+   **DONE 10-13 morning: deck pass complete** (uncommitted, renders clean). Methods reordered to follow the
+   pipeline diagram (diagram updated: grouping polygons vs grid, routing box); click-through highlight boxes
+   on slides 23-24 (arrow keys, not mouse; CSS `.hl-*` in wwf_theme.css); new slide 28 "Who Is Connected to
+   a Hotspot" (phase 4 mask insets); slide 25 (metric overlap) and For Discussion HIDDEN; Discussion rebuilt
+   (Frequent or Severe, Inequality with number boxes, What the Analysis Cannot Say Yet); appendix gained
+   "Reading SPC Values" and "Implementation"; title slide: user as author, "In collaboration with" Rich and
+   Becky. Explorer: start from PowerShell with the Chrome command in the explorer slide notes.
+   **Later 10-12 (user):** the deck needs a sentence-by-sentence pass, part by part, until the user can
+   explain every slide in their own words (unsure whether the text is unclear or the reading is; either
+   way it is a risk for the talk). Checked so far for slides 19/23/25: numbers reproduce; slide 23's
+   "30% lost it all" (pollination, tropical coniferous) are cells with almost no pollination in 1992
+   (median 0.005 vs 3.98 people fed/ha for the biome, 0.24 M people), same wording in the paper (line
+   ~135, numbers-audit item); desert nature access total losses: 2,737 cells, 85 M people, 2/3 in MENA,
+   baselines typical for deserts (ESA CCI sparse/bare switching untested). Wording/notes edits proposed,
+   not applied. Also under discussion: the Discussion section is too thin (explorer slide is not
+   discussion; drivers slide is only a finding).
+   **Found 10-12, exposure method vs paper text (numbers audit, raise with Rich):** the headline
+   connected count (7,383 M; downstream 5,949 M, travel 7,164 M) comes from Rich's `hotspot_count_1plus`
+   run, which applies BOTH 50 km downstream and 1 h travel to EVERY hotspot cell regardless of service
+   (`data/jeronimo_2026_07_beneficiaries_analysis_configs/`). The paper's Methods says downstream for the
+   water services and travel for nature access and pollination. Service-specific runs exist: water
+   hotspots (N, sediment) -> downstream 3,087 M; access/coastal/pollination hotspots -> travel 7,055 M
+   (coastal risk is in the travel group, not mentioned in the paper). Either change the Methods wording or
+   compute a service-specific union (needs the two union rasters). Runner (`workflow_runner.py`) is in
+   Rich's code, not here; inputs: LandScan 2023, ASTER GDEM, HydroBASINS lev06, 2019 friction surface,
+   5 km buffer. Also: Path A biomes come from a separate `Biome.gpkg`, not the correspondence table as the
+   paper says (zonal_stats_toolkit `global_ncp_diff_consolidated.ini`). Checked 10-12: `Biome.gpkg` has
+   16 features with Olson codes 1-14, 98 Lakes, 99 Rock & Ice = WWF Terrestrial Ecoregions biomes; the
+   grid (`AOOGrid_10x10km_land_4326_clean.gpkg`) carries the same `BIOME`/`WWF_biome` fields plus iso3,
+   continent, region_un, region_wb, income_grp, subregion. TO DO in the paper (user, 10-12): fix the
+   Methods sentence in "Socioeconomic and Boundary Data" (biomes not from the correspondence table) and
+   cite Olson, D.M. et al. (2001) Terrestrial ecoregions of the world: a new map of life on Earth.
+   BioScience 51(11): 933-938. Deck already says so (Spatial Framework slide).
+   **Paper wording (10-13):** Results/Population Exposure say lower-middle-income countries hold "15.6% of the
+   land but 21% of hotspot cells". The 21% (and OECD's 15%) is pooled over the four land services, counting a
+   cell once per service it is a hotspot for (`hotspot_area_stats.csv`, income_grp rows summed); say "of
+   service hotspots" or give the per-service range (1.13-1.61 vs 0.36-0.81). Deck slide 26 reworded.
+   **Paper wording (small, user 10-12):** relative prevalence should not say "predict": paper line ~128
+   ("as many hotspots as its size would predict") -> "a share of hotspots equal to its share of the area"
+   (a share ratio, not a prediction; deck already reworded).
+   **Paper wording (small):** Hotspot Identification (line ~437) says SPC hotspots mark change "relative
+   to what the cell provided in 1992"; SPC's denominator is the mean of 1992 and 2020, so say "relative
+   to the cell's own baseline (mean of 1992 and 2020)", as the deck now does.
+   **Pollination gain is concentrated (found 10-12, affects deck slide 19 and the paper's Discussion):** on
+   the 10 km grid 65% of cells have no pollination change, 19% gain, 16% lose; the top 1% of cells hold
+   75% of all gains. Only the MEAN absolute change rises with cropland gain; median ~0 and SPC slightly
+   negative with more cropland. So "cropland expanding next to remaining habitat raises pollination" is
+   an aggregate effect driven by few cells, not typical behaviour: say so in the paper (Discussion
+   paragraph on realized pollination). Deck slide 19 reworded and its notes carry the numbers.
+   **Explorer vs pipeline cleanup rules (found 10-13):** `analysis/hotspot_extraction.qmd` builds `plt_long`
+   (long reshape of `10k_change_calc.gpkg`, cached as `data/processed/plt_long.rds`) and applies two rules:
+   Inf SPC -> ±200, and SPC -> 0 where |abs change| < 1e-6 ("floating point dust"). The explorer
+   (`scripts/dashboard/prepare_dashboard_data.R`) reads the wide gpkg and applies neither: no Inf exist, but
+   17 dust cells enter its pollination hotspot set (others identical). Fix after the talk: apply the dust rule
+   in the prep script and rerun. For the pipeline restructure: one shared function (read the gpkg, apply the
+   cleanup rules, return long or wide) used by notebooks, figure scripts and the explorer. Caching stays a
+   speed choice (the explorer caches too: `grid_dashboard.rds`); what matters is that the rules live in one
+   place. The `plt_long` code holds the validated rules (dust scrub, Inf clamp, service-name normalization)
+   and is where the shared function should come from.
+   **Presenter support (user, 10-12):** revisit the Cliff's δ / KS / FDR explanations given in the 10-12
+   session (what δ computes, why δ + KS, thresholds, ties) and fold them into the speaker notes of slides
+   14 and 28, or into a short companion text to keep at hand while presenting. Partly done 10-12: notes for
+   slides 1-14 checked and updated (slide 13 had none; slide 14 now has δ computation, thresholds, ties,
+   KS D on the ECDF, FDR). Gini citation now "source to confirm" on both slides 8 and 11.
+   **KS/ECDF checks (found 10-12):** the Gini ECDF x-axis (`outputs/plots/ks/ecdf/ecdf_rast_adm1_gini_disp_2020_mean.png`)
+   runs past 1.0, so some cells may have Gini > 1 (impossible): check the layer/aggregation. The red
+   (hotspot) curves show large vertical steps (e.g. sediment export at ~0.55): many hotspot cells share one
+   admin-1 Gini value, so a few large unequal regions may drive the Gini δ; worth a robustness check
+   (e.g. drop LAC, or one value per admin unit). GDP in the tests is TOTAL GDP (`rast_gdpTot`), largely a
+   population proxy: avoid "richer" in text (deck slide 14 fixed). Deck slide 14 now shows a crop of the
+   sediment-export panel (`docs/presentations/images/ecdf_gini_sed_export.png`).
+   **After the talk, small figure fix:** `outputs/plots/maps/global_socioeconomic_context_map.png` (deck
+   slide 11, paper @fig-socioeconomic-context): population density legend runs 1e-11 to 1e+01 and GDP
+   1e-02 to 1e+06 with no units (likely per m2 or a units slip in the plotting script); add units, check
+   the scaling. Also make the Gini citation consistent (deck slide 8 still says "Kummu et al.", slide 11
+   says "source to confirm").
 2. **Explorer hosting (after the talk):** app is in the public repo (`scripts/dashboard/`), data is not
    (~350 MB in `data/processed/dashboard/`). Plan: publish the prepared data as a GitHub Release + a
    download step and README so others can run it locally; ask Rich whether Spring can host it (Shiny
@@ -186,6 +262,13 @@ archived files: `docs/data_versions.md`. Book chapters 02 and 06 point at archiv
   numbers (08-07) predate the 08-31 sediment/coastal fix and the 09-03 export/risk reversal, and
   the masks came from an earlier hotspot set: rerun `analysis/KS_tests_beneficiary_masks.qmd` (and
   check whether the masks need rebuilding) before citing it.
+  **Upgraded 10-13 (user): not optional any more.** The paper needs an expanded serviceshed section,
+  not just the one Methods paragraph: (1) how connected beneficiaries are computed (50 km downstream
+  along rivers, 1 h travel, LandScan 2023, union counted once; inputs DEM, HydroBASINS lev06, 2019
+  friction surface; run by Rich), illustrated with the phase 4 mask maps (deck slide 28 uses the
+  Amazon/Andes insets); (2) reconcile the per-service vs all-hotspots buffer question (see "exposure
+  method vs paper text" above); (3) the phase 4 socioeconomic test on the masks, after the rerun.
+  Phase 4 report re-rendered 10-13 (`docs/reports/phase4_beneficiary/...html`).
 - Waiting on Becky: climate inputs / model-run provenance (affects the Discussion's climate
   mechanism); Gini citation; correspondence-table citation (draft to the model author ready:
   `docs/manuscript/justin_ee_correspondence_provenance_2026-08-31.draft.md`, unsent).
