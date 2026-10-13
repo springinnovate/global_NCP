@@ -5,10 +5,58 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-12. Start with START HERE (Mon 2026-10-12) just below, then OPEN ITEMS. The user's WWF contract ends
-~2026-10-23 (last working day); access to springinnovate's git is expected to continue afterwards.*
+*Last updated: 2026-10-13 (after the lab talk). Start with START HERE (Tue 2026-10-13) just below; the
+10-12 block under it holds the detailed findings it refers to. The user's WWF contract ends ~2026-10-23
+(last working day); access to springinnovate's git is expected to continue afterwards.*
 
-## START HERE (Mon 2026-10-12): lab talk TOMORROW Tue 10-13, 11:00 Bogotá
+## START HERE (Tue 2026-10-13, after the lab talk)
+
+The lab talk happened 10-13 11:00 and went OK. Deck final on `book-update` (last commit fb09114), not
+pushed. User forgot to explain a couple of numbers: ask which ones and add them to the deck notes and to
+the paper checklist below (they are likely the paper's weak spots too). `docs/presentations/lab_deck_outline.md`
+removed (superseded by the deck).
+
+**Order agreed for the final stretch** (one fresh Claude session per block, starting from this file):
+
+1. **Smurfit mosaic packages (overdue, people waiting):** separate session in
+   `C:\projects\landcover-validation-toolkit`, its HANDOFF "Status 2026-10-12": AcATaMa test, threshold
+   rule, zip, PDF, send the drafted team message.
+2. **Message to Becky today:** send the deck (rendered `docs/presentations/presentation.html`) with a
+   short note: what changed since the version she saw, the open questions on the "Where I Would Like Your
+   Input" slide, and permission to host the explorer (unpublished results).
+3. **Paper: what is still missing** (consolidated checklist; details in the 10-12 block below):
+   - Exposure: reconcile method vs Methods text (both buffers on every hotspot vs one pathway per
+     service); expand the serviceshed section (how connected is computed, mask maps); decide on phase 4.
+   - Methods fixes: biomes come from `Biome.gpkg` (WWF ecoregions, Olson et al. 2001; verify the
+     citation), not the correspondence table; Gini source citation; one line each on how nature access
+     and coastal risk are modelled; SPC baseline is the mean of both years, not 1992.
+   - Wording: relative prevalence without "predict"; "21% of hotspot cells" is pooled over services;
+     pollination gain is concentrated in few cells (not typical behaviour); "30% lost it all" for
+     pollination refers to near-zero baselines.
+   - Numbers: 14.6% vs 13.8% denominator; numbers ledger + `analysis/verify_paper_numbers.py`; coastal
+     Gini δ +0.07 (heatmap) vs +0.08 (text).
+   - Robustness: Gini signal driven by a few large regions? (one value per admin unit / drop LAC).
+   - Waiting on Becky: climate inputs of the 1992/2020 runs, Gini citation, correspondence-table citation.
+4. **Phase 4 (beneficiary-mask socioeconomic test): is it worth adding?** What it adds: the profile of
+   the connected areas (people's places, not hotspot cells): wealthier and denser (δ ~0.5, close to
+   circular since buffers are built around people), HDI-neutral, more unequal, and the Gini skew GROWS
+   with hotspot overlap (0.22 -> 0.33 at 4+). Only the last point is new and interesting. Masks are from
+   the current 07-29 run, but the numbers (08-07) predate the 08-31/09-03 fixes: rerun
+   `analysis/KS_tests_beneficiary_masks.qmd` first. Suggested placement if it holds: one sentence in the
+   WHO results + a Supplement paragraph and figure; not a main-text section. Decide after the rerun.
+5. **SWY:** read `C:\projects\swy_parameterization` HANDOFF for its state (waiting on the model author).
+6. **Pipeline and repo, scoped to what fits before 10-23:** shared function for the `plt_long` cleanup
+   rules (fixes the explorer's 17 pollination cells); remove stray files (inventory first, grep for
+   references); README rewrite; one full rerun test. Alignment with `global_invest_dev`: document the
+   differences and a plan, not a full refactor.
+7. **Explorer hosting** (after Becky's OK): private Hugging Face Space (Docker, 16 GB RAM, free) now;
+   public later; or Spring's server if Rich agrees. Needs the ~350 MB `data/processed/dashboard/` files
+   with it (Space storage or a GitHub Release + download step). shinyapps.io free is too small;
+   Shinylive cannot hold the data.
+8. **Analysis idea (not started):** share of each service's total change inside its hotspots (see the
+   note further down).
+
+## Mon 2026-10-12: lab talk prep (DONE; kept for the findings)
 
 1. **Deck** (`docs/presentations/presentation.qmd`, the version reviewed 10-09 and committed in PR #27).
    A VS Code save conflict on 10-12: the user's open buffer was the PRE-review text. Saved as
@@ -67,6 +115,13 @@ session in `c:\projects\global_NCP` to resume.
    negative with more cropland. So "cropland expanding next to remaining habitat raises pollination" is
    an aggregate effect driven by few cells, not typical behaviour: say so in the paper (Discussion
    paragraph on realized pollination). Deck slide 19 reworded and its notes carry the numbers.
+   **Analysis idea (user, 10-13, not started):** what share of each service's total change happens inside
+   its hotspots? Per service on the 10 km grid (equal-area cells, per-ha means, so cell sums are
+   comparable): sum of absolute change in hotspot cells ÷ sum over all evaluated cells, reported for the
+   adverse direction (gross) and for the net change. Quick from `grid_dashboard.rds` or `plt_long`; would
+   give a "5% of cells carry X% of the decline" headline (pollination already shows gains are
+   concentrated: top 1% of cells hold 75% of gains). Note SPC hotspots favour low baselines, so the share
+   of absolute change could be small; compare with the absolute-change hotspot set too.
    **Explorer vs pipeline cleanup rules (found 10-13):** `analysis/hotspot_extraction.qmd` builds `plt_long`
    (long reshape of `10k_change_calc.gpkg`, cached as `data/processed/plt_long.rds`) and applies two rules:
    Inf SPC -> ±200, and SPC -> 0 where |abs change| < 1e-6 ("floating point dust"). The explorer
@@ -283,7 +338,7 @@ archived files: `docs/data_versions.md`. Book chapters 02 and 06 point at archiv
 **Presentations**
 - [ ] **Lab deck, DUE Tue 2026-10-13, 11:00 Bogotá time** (`docs/presentations/presentation.qmd`):
   restructure to the paper as sent (three questions WHAT/WHERE/WHO; land cover as future work);
-  slide outline (30 min, explore the findings) in `docs/presentations/lab_deck_outline.md`,
+  slide outline (30 min, explore the findings) in `docs/presentations/lab_deck_outline.md` (removed 10-13, in git history),
   using the paper's figure files; add a beneficiary-mask slide only if the phase 4 rerun is done.
   Paper edits resume 10-07 in parallel; BC12 and the 14.6/13.8% choice feed the deck.
   **10-06: first full revision done, uncommitted** (built on the existing deck, 39 slides incl.
