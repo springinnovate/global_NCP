@@ -1,5 +1,56 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-10-14 to 2026-10-20 — phase 4 audit, change maps from native pixels, section 2.1 rewritten, draft ready for co-authors
+
+**Phase 4 (beneficiary masks) audited and rebuilt (10-14).** The 12 published Cliff's δ reproduce from current
+inputs (max diff 0.0016). Total GDP is a population proxy (GDP per capita δ +0.03 to +0.08), so "wealthier" was
+wrong. The mask Gini skew (+0.17 to +0.33) is between-country: within countries −0.18 to +0.08. Weighted by
+people, the connected 92% are better off than the rest (HDI δ +0.42, GDP pc +0.38) and in slightly less unequal
+places. Report rebuilt with data-driven charts (`docs/reports/phase4_beneficiary/`), scripts
+`analysis/beneficiary_mask_profile.R`, `analysis/ks_hotspots_stratified.R`.
+
+**The paper's Gini result is between-country.** Land-service hotspot Gini δ +0.22 to +0.31 pooled, −0.18 to
++0.01 within countries; Latin America holds 21–39% of these hotspots vs 8–14% of background cells. HDI reverses
+within countries (+0.16 to +0.20). WHO results, Discussion heading, Intro and Conclusions reworded (regions
+with higher Gini of disposable income; places, not people); new Supplement table. Data error: the Gini layer
+has Suriname and French Guiana = 1.39, Guyana ~0.78 (2,416 cells); effect on any δ < 0.005.
+
+**Change maps now from native pixels (10-19).** The paper described change "per 10 km cell" while the raw 300 m
+rasters (`data/raw/base_years/`) are now available. SPC needs no per-area conversion (same pixel both years;
+values are per-ha densities). Chain: `analysis/native_spc.py` (per-pixel SPC, 0.05-degree aggregates, native
+int16 rasters) -> `analysis/native_grid_lookup.R` -> `analysis/change_map_stats_native.R`; maps
+`scripts/mapping/make_native_change_maps.py` (one SPC scale for all services, square-root stretch, one
+favourable/adverse legend; the ggplot version took >1 h and was replaced), insets
+`scripts/mapping/make_native_change_insets.py` (areas ranked by `analysis/find_change_insets.py`, Chaco and SE
+China placed by `analysis/best_change_area.py`). Text statistics are shares of land AREA, which differ a lot
+from shares of cells (pollination changed on 5% of the area vs 28% of cells). A Latin America vs Africa
+nitrogen contrast in cropland-expansion cells turned out to be a cell-aggregation artifact and was dropped.
+Hotspots and everything downstream stay on the 10 km grid (Methods says so).
+
+**N and sediment export are modelled only between 56 S and 60 N.** The 10 km grid stores 0 (no change), not
+missing, for the 168,152 cells north of 60 N, so their 5% hotspot threshold equals 5.7% of modelled cells.
+Stated in Methods; input-data limit, left as is.
+
+**Section 2.1 rewritten (10-15 to 10-20) after PI feedback** ("describe what the maps show"): map first, then
+examples chosen by a stated rule (4-degree areas ranked by share of land with strong change), region bar chart
+in the main text, biome chart to the Supplement. Removed: ad hoc "landscapes", a cropland-expansion
+comparison (arbitrary 10% threshold), and visual interpretations (field-scale patches, plantation edges,
+steppe strips). The Paraguayan Chaco inset showed almost no pollination change despite cropland gain similar
+to Argentina (pollination zero in 92% of the area both years); likely the pollination model's crop data,
+unverified, so the inset stays in Argentina (highest overall change in the Chaco).
+
+**Sahel line corrected (10-20).** The 15–18 N band (N export up, sediment down) was first described as having
+almost no land cover change; that metric was the binary natural/transformed switch. Granular metrics show the
+largest grassland gain on the belt there (3–7% of land per degree band). Text and co-author note fixed
+(`analysis/sahel_profile.R`). Land cover method moved into Methods; overlap result now in Results.
+
+**Wording.** SPC defined by the initial year, not "1992"; ±200% = disappears / newly appears; 0 -> 0 treated as
+no change, as are differences < 1e-6. Introduction gap sentence narrowed (Kim et al. 2024 is a global trend
+analysis); section 3.1 softened (no ROI claim, no unsupported country list, no mechanism claim).
+
+**To do after the draft goes out:** consolidate the scripts added this week (see HANDOFF TODO); update the deck
+and the book to the native maps and the Gini wording; integration with `global_invest_dev` standards.
+
 ### 2026-10-06 to 2026-10-09 — housekeeping, cell universe, exposure fix, deck, change explorer, book
 
 **Repo housekeeping (10-06/07).** Inventory and plan in `docs/repo_reorg_plan.md`. Rendered HTML/DOCX

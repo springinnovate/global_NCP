@@ -104,4 +104,17 @@ for (g in names(groups)) for (v in names(variants)) {
   row_h <- if (g == "country") 4.5 else if (g == "biome") 3.4 else 2.2
   ggsave(out, p, width = 16, height = 1.6 + row_h * variants[[v]]$rows, bg = "white", dpi = 300)
   message("wrote ", out)
+
+  # one metric per figure (SPC for the main text, absolute change for the Supplement)
+  if (v == "main" && g != "country") {
+    single <- list(spc = list(d = d_pct, val = "sym_pct_change", x = "Symmetric percentage change (%), 1992 to 2020"),
+                   abs = list(d = d_abs, val = "mean_val", x = "Absolute change per unit area, 2020 minus 1992"))
+    for (m in names(single)) {
+      s <- single[[m]]
+      p1 <- panel(s$d, s$val, NULL, s$x, TRUE, scales) + theme(legend.position = "bottom")
+      out1 <- file.path(out_dir, paste0(g, "_", m, ".png"))
+      ggsave(out1, p1, width = 11, height = 1.2 + row_h * 2, bg = "white", dpi = 300)
+      message("wrote ", out1)
+    }
+  }
 }

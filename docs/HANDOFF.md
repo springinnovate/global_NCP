@@ -5,9 +5,163 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-13 (after the lab talk). Start with START HERE (Tue 2026-10-13) just below; the
-10-12 block under it holds the detailed findings it refers to. The user's WWF contract ends ~2026-10-23
-(last working day); access to springinnovate's git is expected to continue afterwards.*
+*Last updated: 2026-10-20 (draft ready for co-authors; committed and pushed on `book-update`). Start with
+START HERE (10-20) just below. The user's WWF contract ends ~2026-10-23 (last working day); access to
+springinnovate's git is expected to continue afterwards.*
+
+## START HERE (Tue 2026-10-20): draft goes to co-authors, then a pause
+
+Paper (`docs/manuscript/paper_draft_5service.qmd`) is final for the co-author round; HTML and docx rendered
+10-20. The user sends it with the cover note (drafted in the 10-19 session; ~1 month for comments, by Fri
+2026-11-20; explorer link "to follow"; add a personal email since the WWF address ends 10-23). Details of the
+week in `analysis/WORKLOG.md` (2026-10-14 to 10-20) and the 10-19/10-20 blocks below.
+
+Next, in order (agreed 10-20), then park the project while the integration is thought through:
+
+1. **Clean the repo**: consolidate the scripts added 10-14 to 10-20 (TODO block below), then the older
+   reorg backlog (`docs/repo_reorg_plan.md`).
+2. **Update the lab deck** (`docs/presentations/presentation.qmd`) to the latest paper: native-pixel change
+   maps and insets, region bars, Gini as a between-country pattern, Sahel grassland line, SPC wording.
+3. **Update the book** (`docs/manuscript/`, `docs/manuscript/book_audit.md`) the same way.
+4. **Park** and decide how to align with `C:\projects\global_invest_dev` standards (plan first, no refactor).
+
+Open with the PI / model authors (no answers yet): climate inputs of the 1992/2020 runs; which land cover
+each model used; how the pollination model treats new cropland (Paraguayan Chaco); Gini source citation and
+the Guiana Shield values; explorer hosting (private, co-authors only).
+
+## TODO after the draft goes out: consolidate the analysis scripts added 10-14 to 10-20 (user, 10-20)
+
+Not now. Many helper scripts were added in quick succession; they overlap and are not yet fit for a
+published repo. Consolidate into a small number of documented pipeline steps (shared helpers in `R/`), one
+place for the cell-universe filter, the crosswalk join and the strong-change definition, and remove what
+the paper no longer uses. Inventory:
+
+- Native-pixel change (used by the paper): `analysis/native_spc.py`, `analysis/native_grid_lookup.R`,
+  `analysis/change_map_stats_native.R`, `analysis/find_change_insets.py`, `analysis/best_change_area.py`,
+  `analysis/sahel_profile.R`, `scripts/mapping/make_native_change_maps.py`,
+  `scripts/mapping/make_native_change_insets.py`, `R/landscapes.R` (now unused by the paper).
+- Cell-based versions, superseded by the native ones: `analysis/change_map_stats.R`,
+  `analysis/change_geography.R` (and their outputs in `outputs/tables/change_map_stats/`).
+- Socioeconomic checks: `analysis/ks_hotspots_stratified.R` (paper Supplement table),
+  `analysis/beneficiary_mask_profile.R` (phase 4 report).
+- Overlaps to resolve: the LC crosswalk join is repeated in 5+ scripts; the `plt_long` cleanup rules (dust,
+  Inf clamp) are repeated; the Cliff's delta helper exists in three versions; mixed R/Python for one chain.
+
+## Mon 2026-10-19: send the draft to co-authors today (last week of the contract)
+
+Met Becky Fri 10-16. Agreed: send the draft to co-authors ASAP with the change explorer; ~1 month for their
+feedback (they read the draft and use the app to look at their own places/cases); integrate; submission-ready
+by year's end. Her main comment: 2.1 must describe what the maps show, the geography of change in broad terms
+(e.g. agricultural frontiers in South America vs Africa, Southeast Asia), not disconnected statistics.
+Done 10-19 (uncommitted): 2.1 now leads with the map, organised by theme rather than by continent (user: SA vs
+Africa is context, not the frame): where adverse change is most intense (Chaco, Indonesia/Malaysia, Amazon), which
+service leads where (sediment in 10/14 landscapes, nature access in drylands), where decline and improvement sit
+side by side, what runs against expectation (Europe/South Asia net improvement, boreal sediment without cropland,
+Cerrado less marked), then a cropland-expansion comparison across regions (new cropland >= 10% of cell: sediment up and nature access down
+everywhere, 72-94% of cells; pollination 57% loss / 7% gain in LAC vs 26% / 38% in SSA; N export 77% LAC vs 36%
+SSA), then the biome bars and short per-service biome/region paragraphs. New Supplement section "Geography of
+Change" with @tbl-landscapes and @tbl-frontier (read from CSVs). Script: `analysis/change_geography.R`
+(landscapes approximated from country x biome x latitude; cropland via the LC crosswalk). HTML + docx rendered.
+Open before sending: explorer hosting (needs the user's account; private, co-authors only); cover note.
+**Gini precision (user, an economist: be exact):** applied 10-19. WHO results now say hotspots lie in REGIONS
+with higher Gini of disposable income (admin-1), add the between-country paragraph (within-country δ −0.18 to
++0.01; LAC 21-39% of hotspots vs 8-14% of background; HDI reverses within countries), GDP per capita line; new
+Supplement @tbl-gini-strata; Discussion heading -> "Decline Concentrates in Countries with High Income
+Inequality", places-not-people caveat; Intro and Conclusions sentences reworded.
+**SPC wording (user):** the issue is the initial year t0 (conventional % change divides by t0), not "1992";
+both SPC passages reworded, incl. the cost of the ±200% bound (15-16% of pollination/nature access hotspots).
+**Native-resolution change maps (user, long avoided):** the paper says change is assessed per 10 km cell;
+raw 300 m rasters now in `data/raw/base_years/` (47 GB; nature access 2 km Eckert IV). SPC needs no per-ha
+conversion (same pixel both years). `analysis/native_spc.py <service>` streams both years and writes a 0.05 deg
+aggregate (mean of pixel SPC, SPC of sums, share strong adverse/favourable, n) to `data/processed/native_spc/`.
+Testing on sed_export first; decide map basis after comparing; the app should use the same basis.
+**DONE 10-19 (option A, user):** maps and all 2.1 map statistics now from native pixels (shares of land
+AREA in the evaluated universe); hotspots and downstream stay on the 10 km grid (Methods says so, plus the
+56S-60N coverage of N/sed export and its 5.7% threshold consequence). Chain: `analysis/native_spc.py`
+(per service; also writes native int16 SPC `<svc>_spc_native.tif` for insets/app) ->
+`analysis/native_grid_lookup.R` (block -> grid_fid) -> `analysis/change_map_stats_native.R`
+(`outputs/tables/change_map_stats_native/`) ; figures `scripts/mapping/make_native_change_maps.py`
+(Fig 1 + Supplement abs; the R/ggplot version took >1 h and was replaced) and
+`make_native_change_insets.py` (new Fig 2, windows from `analysis/find_change_insets.py`). Landscapes in
+`R/landscapes.R` (shared). Pixel numbers differ a lot from cell numbers (pollination 5% of area changed vs
+28% of cells); the N-export LAC-vs-SSA cropland contrast was a cell artifact and was dropped. Cell-based
+`analysis/change_map_stats.R` / `change_geography.R` outputs are no longer used by the paper.
+Next: user reads 2.1; app change-map tab on the native rasters (tabs per service + combined view, zoom).
+**Later 10-19 (user review of 2.1):** "landscapes" removed from the paper (ad hoc country x biome x latitude
+units, never defined elsewhere); examples now chosen by the 4-degree window ranking (Methods sentence +
+Supplement @tbl-windows). The cropland-expansion comparison (cells with >= 10% new cropland, by region; Table 6)
+was REMOVED (user: new framework, arbitrary threshold, not in Methods). Parked finding for the revision /
+land cover Supplement: on such land, pollination losses outweigh gains in LAC (17% vs 7% of area) and gains
+outweigh losses in SSA (21% vs 13%); sediment up and nature access down everywhere. Numbers in
+`outputs/tables/change_map_stats_native/frontier_by_region.csv`. **Sahel line (Becky's question):** 8-12 N =
+cropland expansion, change both ways; 15-18 N = N export up / sediment down with < 2.5% land cover change, so
+another model input (climate?) -> ask Becky with the climate-inputs question (`analysis/sahel_profile.R`).
+**Sahel line CORRECTED 10-20:** the "< 2.5% changed land cover class" metric was the binary natural vs
+transformed switch, which misses change within natural cover. Granular metrics: 15-18 N is the largest
+GRASSLAND GAIN on the belt (3-7% of land per degree band; cropland < 2%). Paper now says so; the co-author
+note now asks re-greening vs ESA CCI reclassification (+ climate inputs). `analysis/sahel_profile.R` writes
+`sahel_landcover_by_band.csv`. **Land cover method now in Methods** ("Land Cover Change") and the overlap
+result in Results ("Hotspots and Land Cover Conversion", end of 2.2); Supplement trimmed to point there.
+**Inset C: briefly moved to the Paraguayan Chaco, then BACK to the Argentine Chaco (28 S, 62.5 W)** = the
+Chaco window with the highest overall change (mean over 4 services of strong change either direction, 29%;
+`analysis/best_change_area.py`, then named chaco_window.py). Inset D added 10-19 = SE China (26.5 N, 114.5 E), the eastern-China area with the highest overall change (27%), same rule; insets now A Sumatra, B S Amazon, C Arg Chaco, D SE China, E Benin-Togo, F N Kazakhstan. User: the Paraguay pollination explanation is too speculative to put in front
+of co-authors now; the Methods question was removed again. Keep for later: the Paraguayan window shows almost
+no pollination change: Paraguayan and Argentine
+windows gained similar ESA cropland (10% / 11% of land), but pollination is zero in 92% of the Paraguayan
+window both years (28% Argentine). Likely the pollination model's crop-type data (which crops count as
+pollinator-dependent, possibly fixed at one date), NOT verified: added to the Methods provenance callout for
+Becky/the model author. Possible reviewer question on Fig 2; the paper makes no Chaco pollination claim.
+
+## Thu 2026-10-15: Becky's comment on the change maps; section 2.1 rewritten (uncommitted)
+
+Becky (Slack 10-15): the paper barely describes the global change maps; make the map Figure 1, then the
+biome bars; one metric in the main text, the other in the Supplement; but she may want to send to
+co-authors as is. Meeting with her 10-16 (calendar invite). Done, for the user to review before the meeting:
+"Global and Regional Trajectories" + "Global Pattern of Change" merged into one SPC-centred section
+"Global Patterns of Change": SPC map = Fig 1, SPC biome bars = Fig 2, coastal = Fig 3, then one paragraph per
+service, bounded by a hierarchy agreed with the user: biome first (Fig 2), then World Bank region (Supplement
+@fig-region-wb), countries only where the map shows a concentration the group totals hide. Absolute change (map, biome bars, the old abs-vs-SPC paragraphs) moved verbatim to a new Supplement
+section "Absolute Change". Numbers: `analysis/change_map_stats.R` -> `outputs/tables/change_map_stats/`;
+`make_combined_diffs.R` now also writes `<group>_spc.png` / `<group>_abs.png`. HTML renders clean; docx not
+re-rendered. Revert with `git checkout docs/manuscript/paper_draft_5service.qmd` if the as-is version goes out.
+
+## Wed 2026-10-14: phase 4 audited and rebuilt; the paper's Gini result is between-country
+
+Wrap-up scope (user, 10-14): wait for Becky's feedback on the draft; consolidate and clean the repo;
+README and docs; explorer hosting; align with `C:\projects\global_invest_dev` standards; phase 4.
+Done this session (all uncommitted, on `book-update`):
+
+- **Phase 4 report rebuilt** (`docs/reports/phase4_beneficiary/phase4_beneficiary_disproportionality_report.qmd`,
+  renders clean, light and dark checked). Every number and chart now comes from CSVs at render time
+  (inline R + generated SVG dot charts); hand-coded SVG coordinates gone. Render from **Git Bash**:
+  quarto under PowerShell fails on any R chunk ("file name conversion problem", path encoding).
+- **New scripts:** `analysis/beneficiary_mask_profile.R` (~6 min; writes `outputs/tables/beneficiary_masks/`:
+  cells, people, strata, by_region, checks, reproduction) and `analysis/ks_hotspots_stratified.R` (~2 min;
+  `outputs/tables/ks_hotspots_stratified.csv`). Run both from PowerShell.
+- **Audit:** the 12 published δ reproduce from current inputs (max diff 0.0016); no rerun of the masks was
+  needed. All 8 mask categories were already extracted to the grid, so 1+, 2+, water-only and access-only
+  are now profiled too.
+- **Findings (see the report):** (1) total GDP is a population proxy; GDP per capita δ is only +0.03 to
+  +0.08 for the masks, so "wealthier" was wrong. (2) The mask Gini skew (+0.17 at 1+ to +0.33 at 4+) is
+  between-country: within countries −0.18 to +0.08 (4+ keeps a small residual, +0.08 / +0.10 per admin unit).
+  (3) Weighted by people, the connected 92% are better off than the rest (HDI δ +0.42, GDP pc +0.38, also
+  within countries) and in slightly LESS unequal places (Gini −0.17): connected = accessible. (4) **The same
+  holds for the paper's WHO test:** land-service hotspot Gini δ +0.22 to +0.31 pooled, −0.18 to +0.01 within
+  countries; LAC holds 21-39% of land-service hotspots vs 8-14% of background. HDI reverses: −0.08 to −0.01
+  pooled, +0.16 to +0.20 within countries (N export, nature access, pollination).
+- **Data errors:** Gini layer has Suriname and French Guiana = 1.39, Guyana ~0.78 (2,416 cells incl. blended
+  Brazilian border cells; explains the ECDF x-axis past 1.0). Effect on any δ < 0.005, but fix at the source
+  and mention to Becky with the Gini citation question. HDI missing on 395,912 cells, nearly all unpopulated.
+- **Paper (proposals, NOT applied; Becky has the draft):** WHO paragraph: "concentrated in countries with high
+  income inequality, above all Latin America; within countries not in the more unequal regions" + HDI reversal;
+  Discussion/Conclusions line "inequality, not only income level, marks where exposure concentrates" needs the
+  same qualification; 7.4 B is reach of accessible, better-off people, not vulnerability; Supplement paragraph +
+  decomposition figure for the serviceshed section. Decide with Becky whether phase 4 goes in (now yes in some
+  form: the people-vs-places contrast is the new result, the "Gini grows at 4+" point does not hold up).
+- **Deck (proposals, not applied):** slide 26/Discussion inequality boxes need "between countries"; slide 28
+  could gain the people-vs-land dot chart; slide 14 notes: δ within countries.
+
+Next in this block: user reads the report; decide whether to send it to Becky with the paper caveat.
 
 ## START HERE (Tue 2026-10-13, after the lab talk)
 
