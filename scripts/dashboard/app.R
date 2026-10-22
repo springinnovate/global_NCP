@@ -1,6 +1,7 @@
 # Ecosystem service change explorer: maps of change 1992-2020 and the hotspot analysis for any
-# country, region, income group or biome (2026-10-08). Works on the 10 km grid (Path B); the data
-# are prepared once by scripts/dashboard/prepare_dashboard_data.R.
+# country, region, income group or biome (2026-10-08). The change maps show change on the native pixels
+# (300 m; 2 km for nature access) as pre-rendered tiles (scripts/dashboard/make_change_tiles.py, colours
+# as paper Figure 1); hotspots work on the 10 km grid (Path B), prepared by prepare_dashboard_data.R.
 #
 # Run from the repo root:  Rscript -e "shiny::runApp('scripts/dashboard', launch.browser = TRUE)"
 
@@ -12,7 +13,8 @@ suppressPackageStartupMessages({
 data_file <- file.path(here::here(), "data", "processed", "dashboard", "grid_dashboard.rds")
 if (!file.exists(data_file)) stop("Run scripts/dashboard/prepare_dashboard_data.R first")
 grid <- readRDS(data_file)
-layers <- readRDS(file.path(dirname(data_file), "change_map_layers.rds"))
+tiles_dir <- file.path(dirname(data_file), "tiles")
+if (dir.exists(tiles_dir)) addResourcePath("tiles", tiles_dir)
 
 # Change per unit from the 300 m / 2 km pixels (Path A), the same tables as the paper's change figures
 pa_dir <- file.path(here::here(), "outputs", "plots", "output_plots_diff")
@@ -63,43 +65,67 @@ hotspots <- function(sel, services, thr, kinds, metric, reference) {
   out
 }
 
-# ---- change maps: the symbology of the paper's change figures (scripts/mapping/make_global_change_5panel.R)
-ABS_UNITS <- c(n_export = "kg N/ha/yr", sed_export = "t/ha/yr", c_risk = "Rt (InVEST)",
-               pollination = "people-fed equiv./ha", nature_access = "access index")
-# symmetric colour range: the larger of |1st| and |99th| percentile
-sym_limits <- function(v) { lim <- max(abs(quantile(v, c(0.01, 0.99), na.rm = TRUE))); c(-lim, lim) }
-# the paper's range: over all evaluated cells, per service and metric
-PAPER_LIMITS <- sapply(as.vector(outer(names(SERV), c("pct", "abs"), paste, sep = "_")),
-                       function(sm) sym_limits(grid[[paste0(sm, "_chg")]]), simplify = FALSE)
-
-change_panel <- function(px, s, metric, limits) {
-  v <- grid[[paste0(s, "_", metric, "_chg")]][px$row]
-  ok <- !is.na(v); px <- px[ok, ]; v <- v[ok]
-  px$value <- pmax(pmin(v, limits[2]), limits[1])
-  # near-zero change fades to the background, as in the paper
-  px$alpha <- pmin(abs(px$value) / max(0.08 * limits[2], 1e-9), 1)
-  hi <- if (s %in% ADVERSE_UP) "#F07D00" else "#009191"
-  lo <- if (s %in% ADVERSE_UP) "#009191" else "#F07D00"
-  ggplot() +
-    geom_sf(data = layers$base, fill = "gray95", color = "gray80", linewidth = 0.1) +
-    geom_raster(data = px, aes(x, y, fill = value, alpha = alpha)) +
-    scale_alpha_identity(guide = "none") +
-    scale_fill_gradient2(low = lo, mid = "white", high = hi, midpoint = 0, limits = limits,
-                         name = if (metric == "pct") "% change" else ABS_UNITS[[s]], na.value = NA) +
-    labs(title = SERV[[s]]) +
-    theme_void() +
-    # the paper's theme, with type sized for the screen rather than a 200 dpi figure
-    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 15, color = "#004D1E"),
-          legend.position = "bottom", legend.key.width = unit(1.4, "cm"), legend.key.height = unit(0.3, "cm"),
-          legend.title = element_text(size = 11, vjust = 0.8), legend.text = element_text(size = 10),
-          plot.margin = margin(6, 8, 6, 8))
+# ---- change maps: native-pixel tiles, symbology of paper Figure 1 ------------------------------------
+# deepest tile level per service (about the native resolution); Leaflet enlarges tiles beyond it
+TILE_MAXZOOM <- c(n_export = 9, sed_export = 9, pollination = 9, nature_access = 7)
+MAP_SERV <- c(names(TILE_MAXZOOM), "c_risk")
+# coastal risk: points along the coast (not tiles), those that changed by 1% or more, cached on first run
+coastal_file <- file.path(dirname(data_file), "coastal_points.rds")
+if (!file.exists(coastal_file) || !"d" %in% names(readRDS(coastal_file))) {
+  pts <- sf::st_read(file.path(here::here(), "data", "coastal_risk_tnc_esa1992_2020_20251224_013825.gpkg"),
+                     query = paste('SELECT Rt_1992, Rt_2020, geom FROM "coastal_risk_tnc_esa1992_2020_20251224_013825"',
+                                   'WHERE Rt_1992 != Rt_2020'), quiet = TRUE)
+  xy <- sf::st_coordinates(sf::st_transform(pts, 4326))
+  spc <- (pts$Rt_2020 - pts$Rt_1992) / ((abs(pts$Rt_2020) + abs(pts$Rt_1992)) / 2) * 100
+  keep <- abs(spc) >= 1
+  saveRDS(data.frame(lon = xy[keep, 1], lat = xy[keep, 2], spc = spc[keep],
+                     d = (pts$Rt_2020 - pts$Rt_1992)[keep]), coastal_file)
 }
+coastal <- readRDS(coastal_file)
+COASTAL_LIM <- 14
+COASTAL_PAL <- colorNumeric(c("#009191", "#ffffff", "#F07D00"), domain = c(-COASTAL_LIM, COASTAL_LIM), na.color = "#F07D00")
+coastal$spc <- pmax(pmin(coastal$spc, COASTAL_LIM), -COASTAL_LIM)
+COASTAL_ABS_LIM <- max(abs(quantile(coastal$d, c(0.01, 0.99), names = FALSE)))
+COASTAL_ABS_PAL <- colorNumeric(c("#009191", "#ffffff", "#F07D00"), domain = c(-COASTAL_ABS_LIM, COASTAL_ABS_LIM),
+                                na.color = "#F07D00")
+coastal$d_clamped <- pmax(pmin(coastal$d, COASTAL_ABS_LIM), -COASTAL_ABS_LIM)
+# absolute change: limits and units per service, written by make_change_tiles.py
+abs_limits <- function() {
+  f <- file.path(tiles_dir, "abs_limits.csv")
+  if (file.exists(f)) read.csv(f, stringsAsFactors = FALSE) else data.frame(service = character(), limit = numeric(), unit = character())
+}
+# one legend for all services: teal = favourable, orange = adverse, square-root stretch over 0-200%
+# (tick positions = (1 +/- sqrt(v / 200)) / 2)
+change_legend <- function() {
+  ticks <- c(-200, -50, -10, 0, 10, 50, 200)
+  pos <- (1 + sign(ticks) * sqrt(abs(ticks) / 200)) / 2 * 100
+  HTML(paste0(
+    '<div style="width:340px;font-size:12px;margin:4px auto 10px;">',
+    '<div style="display:flex;justify-content:space-between;font-weight:bold;">',
+    '<span style="color:#009191;">Favourable</span><span style="color:#F07D00;">Adverse</span></div>',
+    '<div style="height:12px;border:1px solid #888;background:linear-gradient(to right,#009191,#ffffff,#F07D00);"></div>',
+    '<div style="position:relative;height:16px;">',
+    paste0(sprintf('<span style="position:absolute;left:%.1f%%;transform:translateX(-50%%);">%d</span>', pos, abs(ticks)), collapse = ""),
+    '</div><div style="text-align:center;">Change 1992-2020 (SPC, %), native pixels</div></div>'))
+}
+# keep the maps of the "All services" view on the same view: move one and the others follow
+SYNC_JS <- "function(el, x) {
+  var m = this;
+  window.esSync = (window.esSync || []).filter(function(o) { return document.body.contains(o.getContainer()); });
+  window.esSync.push(m);
+  m.on('move', function() {
+    if (m._esLock) return;
+    window.esSync.forEach(function(o) {
+      if (o !== m) { o._esLock = true; o.setView(m.getCenter(), m.getZoom(), {animate: false}); o._esLock = false; }
+    });
+  });
+}"
 
 fmt_n <- function(x) format(round(x), big.mark = ",")
 fmt_pop <- function(x) ifelse(x >= 1e6, sprintf("%.1f M", x / 1e6), sprintf("%s", fmt_n(x)))
 
 ui <- page_sidebar(
-  title = "Ecosystem service change explorer (1992-2020, 10 km grid)",
+  title = "Ecosystem service change explorer (1992-2020)",
   sidebar = sidebar(
     width = 320,
     selectInput("unit_type", "Unit", UNIT_TYPES, selected = "nev_name"),
@@ -117,10 +143,16 @@ ui <- page_sidebar(
   navset_card_tab(
     id = "tab",
     nav_panel("Change maps",
-              radioButtons("scale", NULL, inline = TRUE,
-                           c("Colour range as in the paper (all cells worldwide)" = "paper",
-                             "Colour range stretched to the selection" = "local")),
-              uiOutput("change_maps_ui"), textOutput("change_note"),
+              uiOutput("chg_legend"),
+              do.call(navset_pill, c(
+                list(id = "chg_tab",
+                     nav_panel("All services",
+                               do.call(layout_columns, c(list(col_widths = rep(6, length(MAP_SERV))),
+                                 lapply(MAP_SERV, function(s) card(card_header(SERV[[s]]),
+                                        leafletOutput(paste0("cm_all_", s), height = 330))))))),
+                lapply(MAP_SERV, function(s) nav_panel(SERV[[s]], leafletOutput(paste0("cm_", s), height = 620))),
+                list(nav_panel("Change by group", textOutput("bars_note"), plotOutput("chg_bars", height = "auto"))))),
+              textOutput("change_note"),
               tableOutput("chg_table")),
     nav_panel("Hotspot map", leafletOutput("map", height = 620), textOutput("map_note")),
     nav_panel("Summary", uiOutput("headline"), tableOutput("summary")),
@@ -136,11 +168,13 @@ ui <- page_sidebar(
       "Data: the evaluated 10 km equal-area cells (1,372,621) of `10k_change_calc.gpkg`; population is",
       "GHS-POP 2020 living in the cells (local residents). Relative prevalence = share of hotspot cells",
       "in a sub-unit / its share of the selection's cells.\n\n",
-      "Change maps: change of each service per 10 km cell, with the symbology of the paper's change",
-      "maps (Equal Earth projection; orange = adverse direction, teal = favourable; values beyond the",
-      "colour range are shown at its end; near-zero change fades out). The table below them is the",
-      "change over all native pixels (300 m; 2 km for nature access) of the selected unit, the same",
-      "tables as the paper's change-by-unit figures.\n\n",
+      "Change maps: symmetric percentage change (SPC) of each service on its native pixels (300 m; 2 km",
+      "for nature access), with the symbology of the paper's Figure 1: one scale for all services,",
+      "teal = favourable and orange = adverse for that service, no change transparent. Zoomed out, each",
+      "screen pixel shows the mean change of the native pixels it covers. In *All services* the four",
+      "maps move together. Coastal risk is shown as the coastal points where it changed by 1% or more, on its own scale. The table below",
+      "the maps is the change over all native pixels of the selected unit, as in the paper's",
+      "change-by-unit figures.\n\n",
       "Not included yet: connected beneficiaries (downstream and travel-time reach). They exist only for",
       "the global 5% decline hotspots and need a new beneficiary run for any other scenario.")))
   )
@@ -307,58 +341,117 @@ server <- function(input, output, session) {
       theme_minimal(base_size = 13) + theme(legend.position = "top", strip.text = element_blank())
   })
 
-  # ---- change maps (10 km grid, Equal Earth) -----------------------------------------------------
-  map_services <- reactive({
-    # coastal risk is a one-cell coastal fringe, invisible at world scale (left out of the paper's maps too)
-    if (input$unit_type == "all") setdiff(input$services, "c_risk") else input$services
+  # ---- change maps: native-pixel tiles ------------------------------------------------------------
+  # view of the selection: the bulk of its cells (1st-99th percentile of centres), as on the hotspot map
+  chg_bounds <- reactive({
+    if (input$unit_type == "all") return(c(-170, -58, 180, 80))
+    s <- sel(); q <- function(v, p) quantile(v, p, names = FALSE)
+    cx <- (s$xmin + s$xmax) / 2; cy <- (s$ymin + s$ymax) / 2
+    c(q(cx, 0.01), q(cy, 0.01), q(cx, 0.99), q(cy, 0.99))
   })
-  map_pix <- reactive({
-    world <- input$unit_type == "all"
-    pix <- if (world) layers$pix$world else layers$pix$local
-    if (world) return(pix)
-    keep <- logical(nrow(grid)); keep[sel_rows()] <- TRUE
-    pix[keep[pix$row], ]
+  output$chg_legend <- renderUI({
+    if (input$metric == "pct") change_legend()
+    else HTML(paste('<p style="text-align:center;font-size:13px;margin:4px 0 10px;">Absolute change, 2020 minus 1992,',
+                    'per hectare in each service\'s own units: each map has its own scale (legend on the map).',
+                    'Teal = favourable, orange = adverse.</p>'))
   })
-  map_extent <- reactive({
-    px <- map_pix()
-    # the bulk of the selection, as on the hotspot map, plus a margin
-    q <- function(v) { r <- quantile(v, c(0.005, 0.995), names = FALSE); r + c(-1, 1) * max(0.05 * diff(r), 30000) }
-    if (input$unit_type == "all") list(x = range(px$x), y = range(px$y)) else list(x = q(px$x), y = q(px$y))
+  change_map <- function(s, sync = FALSE) {
+    b <- chg_bounds()
+    metric <- input$metric
+    m <- leaflet(options = leafletOptions(worldCopyJump = TRUE, preferCanvas = TRUE)) |>
+      addProviderTiles(providers$Esri.WorldGrayCanvas, group = "Light") |>
+      addProviderTiles(providers$Esri.WorldImagery, group = "Satellite")
+    if (s == "c_risk") {
+      # coastal points that changed by 1% or more, on their own scale (changes are within about +-14%)
+      if (metric == "pct") {
+        pal <- COASTAL_PAL; val <- coastal$spc; lim <- COASTAL_LIM; ttl <- "Coastal risk (SPC, %)<br>own scale; increase = adverse"
+      } else {
+        pal <- COASTAL_ABS_PAL; val <- coastal$d_clamped; lim <- COASTAL_ABS_LIM; ttl <- "Coastal risk index change<br>increase = adverse"
+      }
+      m <- m |>
+        addCircleMarkers(lng = coastal$lon, lat = coastal$lat, radius = 2.5, stroke = FALSE,
+                         fillColor = pal(val), fillOpacity = 0.9, group = "Change") |>
+        addLegend("bottomright", pal = pal, values = c(-lim, lim), opacity = 1, title = ttl)
+    } else {
+      folder <- if (metric == "pct") s else paste0(s, "_abs")
+      m <- m |> addTiles(urlTemplate = paste0("tiles/", folder, "/{z}/{x}/{y}.png"), group = "Change",
+                         options = tileOptions(maxNativeZoom = TILE_MAXZOOM[[s]], maxZoom = 13, noWrap = TRUE))
+      if (metric == "abs") {
+        al <- abs_limits(); r <- al[al$service == s, ]
+        if (nrow(r)) {
+          # colours run teal -> orange from favourable to adverse; for services where a decrease is adverse
+          # the value axis is reversed, so the legend shows the values as they are drawn
+          up <- s %in% ADVERSE_UP
+          pal <- colorNumeric(if (up) c("#009191", "#ffffff", "#F07D00") else c("#F07D00", "#ffffff", "#009191"),
+                              domain = c(-r$limit, r$limit))
+          m <- m |> addLegend("bottomright", pal = pal, values = c(-r$limit, r$limit), opacity = 1,
+                              title = paste0(SERV[[s]], "<br>", r$unit, " (2020 - 1992)"))
+        }
+      }
+    }
+    m <- m |>
+      addLayersControl(baseGroups = c("Light", "Satellite"), overlayGroups = "Change",
+                       options = layersControlOptions(collapsed = TRUE)) |>
+      addScaleBar(position = "bottomleft") |>
+      fitBounds(b[1], b[2], b[3], b[4])
+    if (sync) m <- htmlwidgets::onRender(m, SYNC_JS)
+    m
+  }
+  for (s in MAP_SERV) local({
+    sv <- s
+    output[[paste0("cm_all_", sv)]] <- renderLeaflet(change_map(sv, sync = TRUE))
+    output[[paste0("cm_", sv)]] <- renderLeaflet(change_map(sv))
   })
-  map_layout <- reactive({
-    n <- length(map_services()); e <- map_extent()
-    aspect <- min(max(diff(e$y) / diff(e$x), 0.45), 1.4)
-    # wide extents (the world, Russia) two per row; tall or square ones three per row
-    ncol <- min(n, if (aspect < 0.8) 2 else 3)
-    list(ncol = ncol, nrow = ceiling(n / ncol), aspect = aspect)
+  # ---- change by group: the selection among its peers, from the native-pixel group totals (Path A) ----
+  peers <- reactive({
+    ut <- input$unit_type
+    if (ut == "all") {
+      list(m = path_a$region_wb, units = unique(path_a$region_wb$unit), hl = NA, what = "World Bank regions")
+    } else if (ut == "nev_name") {
+      reg <- grid$region_wb[match(input$unit, grid$nev_name)]
+      list(m = path_a$nev_name, units = unique(grid$nev_name[grid$region_wb %in% reg]), hl = input$unit,
+           what = paste("countries of", reg))
+    } else {
+      list(m = path_a[[ut]], units = unique(path_a[[ut]]$unit), hl = input$unit,
+           what = tolower(names(UNIT_TYPES)[UNIT_TYPES == ut]))
+    }
   })
-  output$change_maps <- renderPlot({
-    req(length(map_services()) > 0)
-    px <- map_pix(); e <- map_extent(); rows <- sel_rows()
-    panels <- lapply(map_services(), function(s) {
-      col <- paste0(s, "_", input$metric, "_chg")
-      lim <- if (input$scale == "paper") PAPER_LIMITS[[paste0(s, "_", input$metric)]] else sym_limits(grid[[col]][rows])
-      if (!all(is.finite(lim)) || lim[2] == 0) lim <- c(-1, 1)
-      change_panel(px, s, input$metric, lim) +
-        coord_sf(crs = "EPSG:8857", xlim = e$x, ylim = e$y, expand = FALSE, datum = NA)
-    })
-    # pixels of a sparse selection leave gaps between columns, which ggplot reports as an uneven raster;
-    # the drawing is still correct (it uses the smallest spacing, the true resolution)
-    suppressWarnings(print(wrap_plots(panels, ncol = map_layout()$ncol)))
-  }) |> bindCache(input$unit_type, input$unit, input$services, input$metric, input$scale)
-  # the plot's height follows the panel layout and the selection's shape; the width is the page's.
-  output$change_maps_ui <- renderUI({
-    lay <- map_layout()
-    # the tab card is a flex container that shrinks its children to the space left on screen, which
-    # squeezed the maps to a thumbnail; flex-shrink: 0 keeps the set height (the card scrolls instead)
-    div(style = "flex-shrink: 0;",
-        plotOutput("change_maps", height = sprintf("%dpx", round(lay$nrow * (1000 / lay$ncol * lay$aspect + 80))),
-                   fill = FALSE))
+  bars_data <- reactive({
+    p <- peers(); val <- if (input$metric == "pct") "sym_pct_change" else "mean_val"
+    p$m |>
+      filter(unit %in% p$units, service %in% input$services, is.finite(.data[[val]])) |>
+      mutate(value = .data[[val]],
+             direction = ifelse(value == 0, "No change",
+                                ifelse((value > 0) == (service %in% ADVERSE_UP), "Adverse", "Favourable")),
+             selected = !is.na(p$hl) & unit == p$hl,
+             service = factor(unname(SERV[service]), levels = unname(SERV)))
   })
+  output$bars_note <- renderText({
+    p <- peers()
+    paste0("Change 1992-2020 over all native pixels of each unit (", if (input$metric == "pct") "SPC, %" else
+             "absolute change per hectare, own units per service", "), ", p$what,
+           if (!is.na(p$hl)) paste0("; ", p$hl, " outlined") else "", ". Same totals as the paper's change-by-group figures.")
+  })
+  output$chg_bars <- renderPlot({
+    d <- bars_data(); req(nrow(d) > 0)
+    ord <- d |> group_by(unit) |> summarise(o = first(unit)) |> pull(unit) |> sort(decreasing = TRUE)
+    d$unit <- factor(d$unit, levels = ord)
+    ggplot(d, aes(value, unit)) +
+      geom_col(aes(fill = direction), width = 0.75) +
+      geom_col(data = d[d$selected, ], fill = NA, colour = "black", linewidth = 0.7, width = 0.75) +
+      geom_vline(xintercept = 0, colour = "grey40", linewidth = 0.3) +
+      facet_wrap(~ service, nrow = 1, scales = "free_x") +
+      scale_fill_manual(values = c(Adverse = "#F07D00", Favourable = "#009191", `No change` = "grey70"), name = NULL) +
+      labs(x = if (input$metric == "pct") "Symmetric percentage change (%), 1992 to 2020" else "Absolute change per hectare, 2020 minus 1992",
+           y = NULL) +
+      theme_minimal(base_size = 13) +
+      theme(legend.position = "top", strip.text = element_text(face = "bold"), panel.grid.major.y = element_blank())
+  }, height = function() 140 + 22 * max(4, length(peers()$units)))
+
   output$change_note <- renderText({
-    if (input$unit_type == "all" && "c_risk" %in% input$services)
-      "Coastal risk is left out at world scale: it exists only on a one-cell coastal fringe (choose a country or region to see it)."
-    else ""
+    if (!dir.exists(tiles_dir)) "Change-map tiles not found: run scripts/dashboard/make_change_tiles.py all"
+    else paste("Coastal risk is computed at points along the coast; the map shows the points where it changed",
+               "by 1% or more, on its own colour scale (its changes are within about +-14%).")
   })
 
   # change over the native pixels (Path A tables), with the unit's rank among its peers

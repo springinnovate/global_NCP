@@ -5,29 +5,81 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-20 (draft ready for co-authors; committed and pushed on `book-update`). Start with
+*Last updated: 2026-10-21 (draft final and ready to send; next-session plan agreed; afternoon edits of 10-20 and the explorer rebuild NOT yet committed). Start with
 START HERE (10-20) just below. The user's WWF contract ends ~2026-10-23 (last working day); access to
 springinnovate's git is expected to continue afterwards.*
 
 ## START HERE (Tue 2026-10-20): draft goes to co-authors, then a pause
+
+**First thing in the next session: commit and push** (user asks). Uncommitted since `48937fc`:
+- Paper: "strong" defined once (pixel SPC >= 20% either direction, not the hotspot rule) in Results and
+  Methods; coastal-risk opening sentence; relative-prevalence sentence; section 2.2.1 led by World Bank
+  regions (region hotspot figure in the main text, biome hotspot figure to Supplement "Hotspots by
+  Biome"); land cover overlap paragraph moved to the end of "Land-Based Services"; Cliff's Delta defined
+  at first use in the WHO results; exposure-by-overlap text in Results and Discussion rewritten around the
+  estimates; Bullard (1990) replaced by Daw et al. (2011) and Sikor (2013), added to the reference list
+  and to `docs/manuscript/literature_review_novelty_claim.ris` (verify both citations before submission).
+- Explorer: `scripts/dashboard/app.R` (native-pixel change maps, SPC/absolute, coastal points, "Change by
+  group" bar charts) and `scripts/dashboard/make_change_tiles.py` (tiles are git-ignored, see the explorer
+  block below).
+- Style sweep done: bold paragraph labels and em dashes removed from all prose (kept: author line, Keywords,
+  WHAT/WHERE/WHO list labels, reference titles). Typology bullets fixed (no "lower-development" label);
+  Conclusions updated to the native-pixel results. Docx final as of 10-20 evening.
+- Keep out of commits: root `CLAUDE.md` (names, public repo) and `outputs/plots/maps/native_check/`.
+Docx rendered 10-20 late afternoon with all edits; the user sends it with the cover note.
 
 Paper (`docs/manuscript/paper_draft_5service.qmd`) is final for the co-author round; HTML and docx rendered
 10-20. The user sends it with the cover note (drafted in the 10-19 session; ~1 month for comments, by Fri
 2026-11-20; explorer link "to follow"; add a personal email since the WWF address ends 10-23). Details of the
 week in `analysis/WORKLOG.md` (2026-10-14 to 10-20) and the 10-19/10-20 blocks below.
 
-Next, in order (agreed 10-20), then park the project while the integration is thought through:
+**Before Fri 10-23 (contract end), user-side:** the co-author email (final text in the 10-20 chat: subject
+"Draft for your comments: Global change in ecosystem services, 1992-2020 (by 20 Nov)", replies to
+jeronimo.rescobar@gmail.com). The docx is shared as a WWF OneDrive link: move it to a location not owned by
+the user's WWF account (the PI's OneDrive or a shared project folder) or ask WWF IT to transfer ownership,
+otherwise the link and co-authors' comments may disappear when the account is closed. The email links the
+GitHub repo: latest work is on `book-update`, not `main` (squash-merge to `main` or link the branch).
 
-1. **Clean the repo**: consolidate the scripts added 10-14 to 10-20 (TODO block below), then the older
-   reorg backlog (`docs/repo_reorg_plan.md`).
-2. **Update the lab deck** (`docs/presentations/presentation.qmd`) to the latest paper: native-pixel change
-   maps and insets, region bars, Gini as a between-country pattern, Sahel grassland line, SPC wording.
-3. **Update the book** (`docs/manuscript/`, `docs/manuscript/book_audit.md`) the same way.
-4. **Park** and decide how to align with `C:\projects\global_invest_dev` standards (plan first, no refactor).
+Next sessions, in order (user, 10-21), then park the project while the integration is thought through:
+
+0. **Commit and push** the uncommitted work listed above; then squash-merge `book-update` into `main` with one
+   name-free message (repo CLAUDE.md rule), so the repo link in the email shows the current state.
+1. **Clean the repo**: remove presentations and material that do not belong here (external-venue decks and
+   their plots: Sandra/Colombia, IDB-WWF, CLEC; see `docs/repo_reorg_plan.md` stage 4) and move them to the
+   user's own repo; consolidate the scripts added 10-14 to 10-20 (TODO block below); then the older reorg
+   backlog. Inventory first, grep for references before deleting.
+2. **Fork to the user's personal GitHub account** (springinnovate keeps the original; access there is
+   expected to continue). Outward-facing: do it only when the user says so, from his account.
+3. **Review the book** (`docs/manuscript/`, `docs/manuscript/book_audit.md`): bring it to the paper's current
+   state (native-pixel maps and insets, region-first framing, Gini as between-country, Sahel grassland line,
+   SPC wording, land cover in Methods); fix the embed-resources size issue noted 10-09.
+4. **README and the deck**: rewrite the root README (pipeline, native-pixel chain, explorer, data setup,
+   .venv/Docker) and update `docs/presentations/presentation.qmd` the same way as the book (the deck's
+   frequency-vs-severity slide still uses biomes; lead with regions, see memory "regions over biomes").
+5. **Explorer hosting**: decide (see the explorer block below: ~4.8 GB of SPC tiles + similar for absolute
+   at native resolution; zoom 8 is ~1/4; object storage or local only are the alternatives; private,
+   co-authors only until publication).
+6. **Compatibility with `C:\projects\global_invest_dev`**: read its standards, document the differences and a
+   plan (no refactor yet), then park.
 
 Open with the PI / model authors (no answers yet): climate inputs of the 1992/2020 runs; which land cover
 each model used; how the pollination model treats new cropland (Paraguayan Chaco); Gini source citation and
 the Guiana Shield values; explorer hosting (private, co-authors only).
+
+## Explorer change maps rebuilt on native pixels (10-20, uncommitted; not deployed)
+
+`scripts/dashboard/app.R` "Change maps" tab: Leaflet maps of pre-rendered tiles from the native rasters
+(`scripts/dashboard/make_change_tiles.py <service|all> [spc|abs] [max_zoom]`, tiles in
+`data/processed/dashboard/tiles/`, git-ignored). Sub-tabs "All services" (five maps, panning one moves all)
+and one per service; SPC with the paper's Figure 1 scale and shared legend, Absolute (sidebar switch) with a
+legend per service (limits in `tiles/abs_limits.csv`); coastal risk as the coastal points with |SPC| >= 1%
+on its own +-14% scale (`coastal_points.rds`, built on first run). Zooms to the selected unit. Test with
+`Rscript <scratch>/run_app.R` style launch on another port if 4683 is busy.
+**Hosting decision pending (user, next days):** tiles to native resolution (zoom 9; nature access 7) are
+large: SPC ~4.8 GB (sediment 2.7, nitrogen 1.4, pollination 0.7, nature access 0.05) plus about the same
+for absolute change. Options: stop at zoom 8 (~1/4 the size; Leaflet enlarges tiles beyond it), host tiles
+on object storage, or local use only. The tiler had one transient write error and one pool hang between
+services: run services one per process.
 
 ## TODO after the draft goes out: consolidate the analysis scripts added 10-14 to 10-20 (user, 10-20)
 

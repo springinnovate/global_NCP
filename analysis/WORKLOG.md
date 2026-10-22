@@ -48,6 +48,15 @@ largest grassland gain on the belt there (3–7% of land per degree band). Text 
 no change, as are differences < 1e-6. Introduction gap sentence narrowed (Kim et al. 2024 is a global trend
 analysis); section 3.1 softened (no ROI claim, no unsupported country list, no mechanism claim).
 
+**Late 10-20 (final read before sending).** Section 2.2.1 now led by World Bank regions (region hotspot figure
+in the main text, biome hotspot figure to the Supplement); "strong" defined once (pixel SPC >= 20% either
+direction, not the hotspot rule); Cliff's Delta defined at first use; exposure-by-overlap text rewritten
+around the estimates; Bullard (1990) replaced by Daw et al. (2011) and Sikor (2013); typology bullets no
+longer call land-service hotspots "lower-development" (HDI delta -0.01 to -0.08 is negligible); bold
+paragraph labels and em dashes removed from prose; Conclusions updated (strong change covers 2-7% of land,
+most widespread on agricultural frontiers). Explorer change maps rebuilt on native-pixel tiles
+(`scripts/dashboard/make_change_tiles.py`; SPC and absolute; coastal points; "Change by group" bar charts).
+
 **To do after the draft goes out:** consolidate the scripts added this week (see HANDOFF TODO); update the deck
 and the book to the native maps and the Gini wording; integration with `global_invest_dev` standards.
 
