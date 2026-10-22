@@ -5,9 +5,67 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-21 evening (paper + explorer committed as 3cfeb70 on `book-update`; data package
-built; move to the MacBook prepared). Start with START HERE (10-21) just below. The user's WWF contract
-ends ~2026-10-23; the laptop goes back Tue 10-27; access to springinnovate's git is expected to continue.*
+*Last updated: 2026-10-22 evening (clean data package built and being uploaded to the PI's SharePoint
+folder; everything copied to the LaCie; work continues on the user's MacBook). Start with START HERE
+(10-22) just below. WWF contract ends 2026-10-23; laptop returned Tue 10-27; access to springinnovate's
+git is expected to continue (confirm in the first days).*
+
+## START HERE (Thu 2026-10-22): where everything is now
+
+- **Data, shared:** clean package `global_NCP_data_2026-10/` (131 GB, 1,624 files + README + checksums):
+  `data/` = the repo's `data/` layout, current files only, one copy each (superseded runs, older versions,
+  duplicates and unused layers left out; per-file reasons in the build manifest), plus
+  `summary_pipeline_workspace_ha/` (the zonal synthesis `process_data.qmd` reads). Uploaded to the PI's
+  SharePoint folder (Global Science Team > Initiatives > NatCap > NatCap 2024-26). Its README has the
+  current-files table, the public dataset list and the known gaps. Access to that folder probably ends
+  with the WWF account.
+- **Data, the user's own:** LaCie `LACIE_WORK` (exFAT): `projects/` = all of `C:\projects` (repos with
+  history, untracked files, the old full 172 GB package, the clean package, the Mac kit);
+  `claude_home_windows/` (Claude memory, settings, transcripts; no login token);
+  `onedrive_global_NCP_archive/` (intermediates and work products from the WWF OneDrive). Work on the
+  Mac from the clean package so results match the SharePoint copy.
+- **Code:** all repos pushed (list in the 10-21 block below). `book-update` (3cfeb70 + handoff commits)
+  still to squash-merge into `main`.
+- **Mac setup:** `projects/mac_migration_kit/MAC_SETUP.md` (copy route first: line endings, venv, data,
+  Docker on Apple Silicon).
+- **Found while packaging:** `data/raw/LandCovers/landcover_gl_1992.tif` is byte-identical to the 1992 N
+  export raster (mislabelled; `analysis/LC_change_rasters.qmd` reads it). The home-folder
+  `10k_change_calc.gpkg` was the April version on the legacy grid (1,691,819 rows, 37 columns).
+  `scripts/merge_sediment_and_coastal_via_crosswalk.py` hard-codes `C:\projects\...` paths.
+
+## STILL TO DO BEFORE THE LAPTOP GOES BACK
+
+- **Fri 10-23 (last contract day):** co-author email; move the docx off the WWF OneDrive (its shared link
+  and comments die with the account); confirm the SharePoint upload is complete (1,626 files, ~131 GB;
+  re-upload `README.md`, `checksums_sha256.txt` and `summary_pipeline_workspace_ha/` if the upload
+  started before their final versions); CV update (needs the user's current CV and profile text).
+- **Mon 10-26 (last, after the LaCie copy is verified):** delete local data and packages; personal files
+  (personal/Temple OneDrive sign-out, Downloads, Desktop); credentials: `~/.ssh` keys (remove the key
+  from GitHub too), Windows Credential Manager (git), browser profiles and saved passwords, Google
+  sign-in, `.gitconfig`; Claude Code logout last (`~/.claude/.credentials.json`).
+
+## ROADMAP ON THE MACBOOK (agreed 10-22; no deadline except co-author comments by Fri 11-20)
+
+Keep data changes to a minimum: the PI's SharePoint copy cannot be updated by the user after 10-23. If a
+fix changes data, collect the changes and send one updated set with a note.
+1. Set up from the LaCie (MAC_SETUP.md); confirm GitHub access to springinnovate; install `gh`.
+2. Squash-merge `book-update` into `main` (one name-free message).
+3. **Reproducibility branch** (code and docs only): `REPRODUCE.md` (ordered steps from the data package
+   to every output, each with an expected check: 1,522,073 grid cells, 1,372,621 evaluated, 189,932
+   hotspots, key paper numbers); fix the hard-coded paths (list in the package README + the merge
+   script); update root README, `docs/runbook.md`, `docs/pipeline_reference.md`, the qmds; commit
+   `requirements.txt` and an R package list. Test with the LaCie data (verify script, hotspot step, one
+   figure, the explorer) before the PR. Proof: a fresh Claude Code session reproduces the hotspot count
+   and one figure from the docs alone.
+4. **Repo cleanup branch:** move external-venue material (Colombia/ECLAC, IDB-WWF, CLEC decks, plots,
+   scripts) to the user's personal repo, remove it from springinnovate; consolidate the 10-14 to 10-20
+   scripts (TODO block below).
+5. **Account of the work** (doc only, can run alongside): a coherent narrative from `analysis/WORKLOG.md`,
+   this file and the research notes (decisions, what changed and why). Feeds the paper revision, the book
+   and the portfolio.
+6. **Alignment with `global_invest_dev`:** document the differences and a plan first; implement through a
+   data-root resolver so the current `data/` layout (and the SharePoint copy) keeps working.
+7. Paper revision when co-author comments arrive (takes priority over 3-6 then).
 
 ## START HERE (Wed 2026-10-21): backups and the move to the MacBook
 
@@ -19,11 +77,8 @@ ends ~2026-10-23; the laptop goes back Tue 10-27; access to springinnovate's git
   new private repo `Cumaribo/dissertation_defense_vic`.
 - **Data package** `C:\projects\global_NCP_data_package_2026-10\` (~172 GB, same structure as now:
   `repo_data/` = repo `data/`, `home_data_global_ncp/` = `~/data/global_ncp`, explorer tiles as one
-  `tiles.tar`; README + `checksums_sha256.txt`, every file read back without errors). Destination: the
-  Google Drive folder shared with the PI (WWF OneDrive is deleted after the account closes). Route: the
-  LaCie, after it is repaired on the Mac (it is Mac-formatted: APFS 1.34 TB + HFS+ 2.66 TB, partition
-  table intact; Windows cannot read either) and given an exFAT partition; then upload from the Mac. Tell
-  the PI before uploading (draft note in the 10-21 chat).
+  `tiles.tar`; README + `checksums_sha256.txt`, every file read back without errors). Superseded on
+  10-22 by the clean package (see START HERE 10-22); this full version stays on the LaCie as the archive.
 - **Mac kit** `C:\projects\mac_migration_kit\` (Claude memory, CLAUDE.md files, settings, R/Python
   package lists, `MAC_SETUP.md` step by step: tools, SSH, clones with branches, memory folder, data
   restore, explorer). Private: not for the shared Drive folder.
