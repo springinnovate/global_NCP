@@ -5,9 +5,33 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-21 (draft final and ready to send; next-session plan agreed; afternoon edits of 10-20 and the explorer rebuild NOT yet committed). Start with
-START HERE (10-20) just below. The user's WWF contract ends ~2026-10-23 (last working day); access to
-springinnovate's git is expected to continue afterwards.*
+*Last updated: 2026-10-21 evening (paper + explorer committed as 3cfeb70 on `book-update`; data package
+built; move to the MacBook prepared). Start with START HERE (10-21) just below. The user's WWF contract
+ends ~2026-10-23; the laptop goes back Tue 10-27; access to springinnovate's git is expected to continue.*
+
+## START HERE (Wed 2026-10-21): backups and the move to the MacBook
+
+- **Repos all pushed.** global_NCP `book-update` (3cfeb70; squash-merge to `main` still to do, no `gh` on
+  the WWF laptop), swy_parameterization `main`, LC_orinoquia `phase0-package-hardening`, inspring fork
+  branch `fix/setup-py-packaging`, zonal_stats_toolkit fork `main` (Cumaribo; a trial merge of
+  springinnovate's 10 newer commits conflicts in `.gitignore`, `runner.py` and
+  `run_configs/global_ncp_change_analysis_accountforfinite.yml`: resolve on the Mac), dissertation deck in a
+  new private repo `Cumaribo/dissertation_defense_vic`.
+- **Data package** `C:\projects\global_NCP_data_package_2026-10\` (~172 GB, same structure as now:
+  `repo_data/` = repo `data/`, `home_data_global_ncp/` = `~/data/global_ncp`, explorer tiles as one
+  `tiles.tar`; README + `checksums_sha256.txt`, every file read back without errors). Destination: the
+  Google Drive folder shared with the PI (WWF OneDrive is deleted after the account closes). Route: the
+  LaCie, after it is repaired on the Mac (it is Mac-formatted: APFS 1.34 TB + HFS+ 2.66 TB, partition
+  table intact; Windows cannot read either) and given an exFAT partition; then upload from the Mac. Tell
+  the PI before uploading (draft note in the 10-21 chat).
+- **Mac kit** `C:\projects\mac_migration_kit\` (Claude memory, CLAUDE.md files, settings, R/Python
+  package lists, `MAC_SETUP.md` step by step: tools, SSH, clones with branches, memory folder, data
+  restore, explorer). Private: not for the shared Drive folder.
+- **Disk:** WWF OneDrive `PROJECTS\Global_NCP` and `Ref_Data\vector_basedata` set to online-only (73 GB of
+  it byte-identical to package files). The internal SSD logged 68 bad-block errors since 08-24.
+- **Later, on the Mac:** devstack-style data layout (`~/Files/base_data/...` as in global_invest_dev's
+  ProjectFlow, project data keeping our folder names), single data-root resolver in `R/paths.R` + a Python
+  helper, remove the hard-coded paths listed in the package README. Then the 10-20 list below from step 1.
 
 ## START HERE (Tue 2026-10-20): draft goes to co-authors, then a pause
 
