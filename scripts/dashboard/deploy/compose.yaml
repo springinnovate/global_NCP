@@ -1,0 +1,35 @@
+# Run:  EXPLORER_DATA=/path/to/explorer_data docker compose up -d --build   (from this folder)
+# The app listens on localhost:3838 only; put the server's reverse proxy (TLS) in front of it.
+
+services:
+  explorer:
+    image: gncp-explorer:2026-10
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "127.0.0.1:3838:3838"
+    volumes:
+      - ${EXPLORER_DATA:?set EXPLORER_DATA to the data folder}:/data:ro
+    environment:
+      # "true" shows the button that downloads the selected cells as CSV
+      EXPLORER_ALLOW_DOWNLOAD: "false"
+      # set when a web server serves <data>/tiles itself, e.g. https://example.org/explorer-tiles
+      # EXPLORER_TILE_URL: ""
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 4g
+    pids_limit: 256
+    restart: unless-stopped
+    healthcheck:
+      # healthy only if the page itself renders (HTTP 200) and the data folder is still readable (a data
+      # folder on a drive that was disconnected stays mounted but unreadable, and the maps go blank)
+      test: ["CMD", "Rscript", "-e", "s <- tryCatch(attr(curlGetHeaders('http://127.0.0.1:3838/'), 'status'), error = function(e) 0); quit(status = s != 200 || !file.exists('/data/tiles/abs_limits.csv'))"]
+      interval: 60s
+      timeout: 15s
+      start_period: 60s
