@@ -1,5 +1,109 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-10-14 to 2026-10-20 — phase 4 audit, change maps from native pixels, section 2.1 rewritten, draft ready for co-authors
+
+**Phase 4 (beneficiary masks) audited and rebuilt (10-14).** The 12 published Cliff's δ reproduce from current
+inputs (max diff 0.0016). Total GDP is a population proxy (GDP per capita δ +0.03 to +0.08), so "wealthier" was
+wrong. The mask Gini skew (+0.17 to +0.33) is between-country: within countries −0.18 to +0.08. Weighted by
+people, the connected 92% are better off than the rest (HDI δ +0.42, GDP pc +0.38) and in slightly less unequal
+places. Report rebuilt with data-driven charts (`docs/reports/phase4_beneficiary/`), scripts
+`analysis/beneficiary_mask_profile.R`, `analysis/ks_hotspots_stratified.R`.
+
+**The paper's Gini result is between-country.** Land-service hotspot Gini δ +0.22 to +0.31 pooled, −0.18 to
++0.01 within countries; Latin America holds 21–39% of these hotspots vs 8–14% of background cells. HDI reverses
+within countries (+0.16 to +0.20). WHO results, Discussion heading, Intro and Conclusions reworded (regions
+with higher Gini of disposable income; places, not people); new Supplement table. Data error: the Gini layer
+has Suriname and French Guiana = 1.39, Guyana ~0.78 (2,416 cells); effect on any δ < 0.005.
+
+**Change maps now from native pixels (10-19).** The paper described change "per 10 km cell" while the raw 300 m
+rasters (`data/raw/base_years/`) are now available. SPC needs no per-area conversion (same pixel both years;
+values are per-ha densities). Chain: `analysis/native_spc.py` (per-pixel SPC, 0.05-degree aggregates, native
+int16 rasters) -> `analysis/native_grid_lookup.R` -> `analysis/change_map_stats_native.R`; maps
+`scripts/mapping/make_native_change_maps.py` (one SPC scale for all services, square-root stretch, one
+favourable/adverse legend; the ggplot version took >1 h and was replaced), insets
+`scripts/mapping/make_native_change_insets.py` (areas ranked by `analysis/find_change_insets.py`, Chaco and SE
+China placed by `analysis/best_change_area.py`). Text statistics are shares of land AREA, which differ a lot
+from shares of cells (pollination changed on 5% of the area vs 28% of cells). A Latin America vs Africa
+nitrogen contrast in cropland-expansion cells turned out to be a cell-aggregation artifact and was dropped.
+Hotspots and everything downstream stay on the 10 km grid (Methods says so).
+
+**N and sediment export are modelled only between 56 S and 60 N.** The 10 km grid stores 0 (no change), not
+missing, for the 168,152 cells north of 60 N, so their 5% hotspot threshold equals 5.7% of modelled cells.
+Stated in Methods; input-data limit, left as is.
+
+**Section 2.1 rewritten (10-15 to 10-20) after PI feedback** ("describe what the maps show"): map first, then
+examples chosen by a stated rule (4-degree areas ranked by share of land with strong change), region bar chart
+in the main text, biome chart to the Supplement. Removed: ad hoc "landscapes", a cropland-expansion
+comparison (arbitrary 10% threshold), and visual interpretations (field-scale patches, plantation edges,
+steppe strips). The Paraguayan Chaco inset showed almost no pollination change despite cropland gain similar
+to Argentina (pollination zero in 92% of the area both years); likely the pollination model's crop data,
+unverified, so the inset stays in Argentina (highest overall change in the Chaco).
+
+**Sahel line corrected (10-20).** The 15–18 N band (N export up, sediment down) was first described as having
+almost no land cover change; that metric was the binary natural/transformed switch. Granular metrics show the
+largest grassland gain on the belt there (3–7% of land per degree band). Text and co-author note fixed
+(`analysis/sahel_profile.R`). Land cover method moved into Methods; overlap result now in Results.
+
+**Wording.** SPC defined by the initial year, not "1992"; ±200% = disappears / newly appears; 0 -> 0 treated as
+no change, as are differences < 1e-6. Introduction gap sentence narrowed (Kim et al. 2024 is a global trend
+analysis); section 3.1 softened (no ROI claim, no unsupported country list, no mechanism claim).
+
+**Late 10-20 (final read before sending).** Section 2.2.1 now led by World Bank regions (region hotspot figure
+in the main text, biome hotspot figure to the Supplement); "strong" defined once (pixel SPC >= 20% either
+direction, not the hotspot rule); Cliff's Delta defined at first use; exposure-by-overlap text rewritten
+around the estimates; Bullard (1990) replaced by Daw et al. (2011) and Sikor (2013); typology bullets no
+longer call land-service hotspots "lower-development" (HDI delta -0.01 to -0.08 is negligible); bold
+paragraph labels and em dashes removed from prose; Conclusions updated (strong change covers 2-7% of land,
+most widespread on agricultural frontiers). Explorer change maps rebuilt on native-pixel tiles
+(`scripts/dashboard/make_change_tiles.py`; SPC and absolute; coastal points; "Change by group" bar charts).
+
+**To do after the draft goes out:** consolidate the scripts added this week (see HANDOFF TODO); update the deck
+and the book to the native maps and the Gini wording; integration with `global_invest_dev` standards.
+
+### 2026-10-06 to 2026-10-09 — housekeeping, cell universe, exposure fix, deck, change explorer, book
+
+**Repo housekeeping (10-06/07).** Inventory and plan in `docs/repo_reorg_plan.md`. Rendered HTML/DOCX
+untracked (~240 MB), five archive folders merged into `archive/`, stale correspondence drafts deleted.
+Superseded data moved to `data/archive/superseded/` with READMEs; registry of current vs superseded in
+`docs/data_versions.md`. Branch `housekeeping` squash-merged into `main` on 10-09 (PR #27).
+
+**Paper (10-06 to 10-08), replaced in the shared folder 10-08:**
+- Global Hotspot Distribution restructured: land and coastal blocks, each pairing relative prevalence with
+  SPC within hotspots; income group moved to the WHO section; ratios moved out of Figure 1 into one
+  Supplement figure. Within-hotspot boxplots now built from the production hotspot set
+  (`make_hotspot_summary_figures.R`; they had re-derived a slightly different 5% per grouping).
+- **Cell universe settled** (`docs/cell_universe.md`, `analysis/verify_cell_universe.R`): 1,522,073 grid
+  cells, 1,372,621 evaluated (no Antarctica, open ocean, Lakes, Rock & Ice); every production hotspot lies
+  there; 189,932 hotspots = 13.8%. The old 14.6% / 1,302,099 came from an earlier table and is retired.
+  Prevalence rebuilt on the evaluated cells (group denominators no longer include Lakes / Rock & Ice):
+  lower-middle vs high-income OECD 2.4x -> 2.3x, a few biome values -0.1.
+- **Population exposure was from the wrong run.** The paper quoted the June beneficiary run on the old
+  8-variable hotspots (225,113 cells). Rich's 07-29 five-service run exists and matches the production
+  hotspots (189,918 of 189,932 cells; rest are pollination ties). Now: 2,367 M local residents (LandScan
+  2023), 7,383 M connected (92.5% of 7,982 M), 5,949 M downstream, 7,164 M travel, ~3.1x; income breakdown
+  recomputed (`scripts/exposure_by_income.R`). BC12 done: dumbbell replaced by two bar charts
+  (`scripts/mapping/make_exposure_bars.R`).
+- Introduction names the five services and why; native resolutions stated (300 m; 2 km nature access;
+  shoreline points for coastal risk) in intro, Methods and captions; two overclaims fixed ("declining
+  trend", "limited adaptive capacity"); GHSL and LandScan references added (LandScan DOI still to confirm).
+
+**Lab deck (10-06 to 10-09).** Restructured to the paper's three questions with the pipeline as the
+contribution; reviewed end to end with the user and sent to Becky 10-09. Contains three analyses not in the
+paper (pollination vs cropland expansion, SPC vs absolute hotspot profile with a sediment map, coastal
+windows chosen by population); coastal risk dropped from the SPC-vs-absolute overlap (bounded 1-5 index).
+
+**Change explorer (10-08/09).** Shiny app `scripts/dashboard/app.R` (data prepared by
+`prepare_dashboard_data.R`): hotspots for any country, region, income group or biome; services,
+threshold, decline/improvement/both, local vs global thresholds, SPC or absolute; change by service from
+the Path A tables. Bugs fixed: improvement drew nothing (a scalar 0 made `ifelse()` collapse to the first
+cell), CARTO basemaps now need a key (switched to Esri/OSM), antimeridian cells, zoom to the bulk of the
+selection. Lesson: testServer and headless screenshots missed real layout bugs; check in a real browser.
+
+**Book (10-09).** Branch `book-update`; plan in `docs/manuscript/book_audit.md`. The book renders again
+(ch06 June-run exposure images repointed to `archive/`), but most chapters are stale (still chart the
+ratios, predate the five-service, cell-universe and exposure updates). Chapter HTML files are 6-105 MB
+because of `embed-resources` in a book.
+
 ### 2026-10-05 — paper revision closed and sent to the PI (milestone)
 
 Becky's first-round comments closed except those needing her input. Main changes:

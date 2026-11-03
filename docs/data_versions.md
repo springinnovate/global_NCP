@@ -18,7 +18,8 @@ and what replaced it. Cell counts and denominators: `docs/cell_universe.md`.
 | Exposure tables | `outputs/tables/exposure_by_overlap.csv`, `exposure_by_income.csv` | 10-07 | From the 07-29 run + LandScan 2023 |
 | Within-hotspot change | `outputs/tables/hotspot_spc_within_hotspots.csv` | 10-06 | |
 | KS tests (hotspot vs background) | `data/processed/tables/ks_results_hot_vs_non.csv` | 09-08 | |
-| Beneficiary-mask KS (phase 4) | `data/processed/tables/ks_results_beneficiary_masks*.csv`, `beneficiary_mask_coverage_10km.csv` | 08-07/10 | Masks come from the 07-29 run, so the hotspot set is current; covariates unchanged since. Recheck before citing, but a rerun is likely unnecessary. |
+| Beneficiary-mask KS (phase 4) | `data/processed/tables/beneficiary_mask_coverage_10km.csv` + `intersection_mask_coverage_10km.csv` (inputs, 08-07/10); results in `outputs/tables/beneficiary_masks/` | 10-14 | Rebuilt by `analysis/beneficiary_mask_profile.R`; the 08-07 `ks_results_beneficiary_masks*.csv` reproduce within 0.002 and are superseded. Masks from the 07-29 run (hotspot set current). |
+| Hotspot KS by geography | `outputs/tables/ks_hotspots_stratified.csv` | 10-14 | `analysis/ks_hotspots_stratified.R`: WHO-section deltas pooled / within region / within country |
 | LCC overlap (Supplement) | `data/processed/tables/lcc_*.csv`, `lc_grid_fid_to_master_fid_crosswalk.csv` | 09-03 / 07-08 | |
 | Population (exposure) | `~/data/global_ncp/Raw/Beneficiaries/Landscan/landscan-global-2023-assets/landscan-global-2023.tif` | | World total 7,982 M |
 

@@ -11,6 +11,8 @@
   --accent-in:   #d1382f;   /* inside beneficiary mask */
   --accent-out:  #2a6ca8;   /* outside beneficiary mask */
   --band-tick:   #b9b7ae;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;                   /* categorical slots 1-3 */
+  --o1: #86b6ef; --o2: #3987e5; --o3: #1c5cab; --o4: #0d366b;    /* ordinal blue, overlap tiers */
 }
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
@@ -26,6 +28,8 @@
     --accent-in:   #e2685f;
     --accent-out:  #5b9bd6;
     --band-tick:   #4a4a46;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --o1: #184f95; --o2: #2a78d6; --o3: #6da7ec; --o4: #b7d3f6;
   }
 }
 :root[data-theme="dark"] {
@@ -41,6 +45,8 @@
   --accent-in:   #e2685f;
   --accent-out:  #5b9bd6;
   --band-tick:   #4a4a46;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --o1: #184f95; --o2: #2a78d6; --o3: #6da7ec; --o4: #b7d3f6;
 }
 
 body {
@@ -148,3 +154,12 @@ code { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 11p
 
 /* quiet quarto's default chrome we don't want */
 #quarto-margin-sidebar, nav.quarto-secondary-nav, #quarto-header { display: none !important; }
+
+/* data-driven dot charts (generated in the qmd from outputs/tables/) */
+.chart-card { margin-top: 14px; padding: 14px 16px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 3px; }
+.chart-grid .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 12px 12px 6px; }
+.grp-label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; fill: var(--muted); }
+.axis-label { font-size: 10.5px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+svg g:hover circle + circle { stroke: var(--ink); }
+table.results caption { caption-side: top; text-align: left; font-size: 12px; color: var(--muted); padding-bottom: 6px; }
+@media (max-width: 720px) { .chart-grid { grid-template-columns: 1fr; } body { padding: 16px 16px 60px; } }

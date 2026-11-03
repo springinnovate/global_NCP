@@ -1,8 +1,12 @@
 ---
-title: "Who benefits? Socioeconomic profile of ecosystem-service beneficiary areas"
-subtitle: "HDI, Gini and GDP disproportionality test on the beneficiary buffer masks — Phase 4 of the 5-variable change hotspot redesign."
+title: "Who is connected to ecosystem-service hotspots?"
+subtitle: "Socioeconomic profile of the serviceshed masks, with a geographic check of the paper's socioeconomic results"
 date: last-modified
 date-format: "D MMMM YYYY"
+execute:
+  echo: false
+  warning: false
+  message: false
 format:
   html:
     css: phase4_report_styles.css
@@ -13,83 +17,136 @@ format:
     minimal: true
 ---
 
-<div class="eyebrow">Global NCP Hotspot Analysis — Memo</div>
+```{r}
+#| label: setup
+library(dplyr)
+library(readr)
+library(purrr)
+
+tab_dir <- here::here("outputs", "tables")
+cells   <- read_csv(file.path(tab_dir, "beneficiary_masks", "cells.csv"), show_col_types = FALSE)
+people  <- read_csv(file.path(tab_dir, "beneficiary_masks", "people.csv"), show_col_types = FALSE)
+strata  <- read_csv(file.path(tab_dir, "beneficiary_masks", "strata.csv"), show_col_types = FALSE)
+checks  <- read_csv(file.path(tab_dir, "beneficiary_masks", "checks.csv"), show_col_types = FALSE)
+by_reg  <- read_csv(file.path(tab_dir, "beneficiary_masks", "by_region.csv"), show_col_types = FALSE)
+lac_gini <- by_reg$gini_median[by_reg$mask == "tier_1plus" & by_reg$region_wb == "Latin America & Caribbean"]
+landscan_pct <- read_csv(file.path(tab_dir, "exposure_by_overlap.csv"), show_col_types = FALSE) |>
+  filter(level == "1+") |> pull(pct_world)
+hot     <- read_csv(file.path(tab_dir, "ks_hotspots_stratified.csv"), show_col_types = FALSE) |>
+  filter(var != "gini") |> mutate(var = if_else(var == "gini_clean", "gini", var))
+
+# number formatting: signed deltas with a true minus sign
+d2  <- function(x) gsub("-", "−", sprintf("%+.2f", x))
+rng <- function(x) paste0(d2(min(x)), " to ", d2(max(x)))
+pct <- function(x, k = 1) paste0(formatC(x, format = "f", digits = k), "%")
+num <- function(x) formatC(x, format = "d", big.mark = ",")
+
+cv <- function(m, v, col = "delta") cells[[col]][cells$mask %in% m & cells$var %in% v]
+st <- function(m, v, col) strata[[col]][strata$mask %in% m & strata$var %in% v]
+pp <- function(m, v, col) people[[col]][people$mask %in% m & people$var %in% v]
+ck <- function(i) checks$value[i]
+
+tiers <- c("tier_1plus", "tier_2plus", "tier_3plus", "tier_4plus")
+land_hot <- c("N_export", "Sed_export", "Pollination", "Nature_Access")
+hv <- function(s, v, col) hot[[col]][hot$service %in% s & hot$var %in% v]
+
+mask_label <- c(tier_1plus = "1+ services", tier_2plus = "2+ services", tier_3plus = "3+ services",
+                tier_4plus = "4+ services", combined_cross = "Water + access in one cell",
+                water = "Water hotspots, downstream", access = "Access hotspots, travel time")
+svc_label <- c(N_export = "Nitrogen export", Sed_export = "Sediment export", Pollination = "Pollination",
+               Nature_Access = "Nature access", C_Risk = "Coastal risk")
+var_label <- c(pop = "Population", gdp = "GDP (total)", gdp_pc = "GDP per capita", hdi = "HDI", gini = "Gini")
+
+# ---- inline SVG dot charts (CSS colour tokens, so light/dark follow the page) ----------------
+# d: rows with group, label, series, value, tip. Rows keep their order of appearance.
+svg_dots <- function(d, series_css, xlim, lollipop = FALSE, label_w = 200, plot_w = 500,
+                     row_h = 22, head_h = 34, aria = "") {
+  sx <- function(v) label_w + (v - xlim[1]) / diff(xlim) * plot_w
+  rows <- distinct(d, group, label)
+  y <- 6; out <- character(); prev_group <- NULL
+  for (i in seq_len(nrow(rows))) {
+    g <- rows$group[i]
+    if (!identical(g, prev_group) && !is.na(g) && nzchar(g)) {
+      y <- y + if (is.null(prev_group)) 14 else head_h
+      out <- c(out, sprintf('<text x="0" y="%.1f" class="grp-label">%s</text>', y, g))
+      y <- y - 2
+    }
+    prev_group <- g
+    y <- y + row_h
+    r <- filter(d, group == g | (is.na(group) & is.na(g)), label == rows$label[i])
+    out <- c(out, sprintf('<text x="%d" y="%.1f" class="bar-label">%s</text>',
+                          if (is.na(g) || !nzchar(g)) 0 else 10, y + 4, rows$label[i]))
+    v <- r$value[is.finite(r$value)]
+    if (lollipop && length(v)) {
+      out <- c(out, sprintf('<line x1="%.1f" x2="%.1f" y1="%.1f" y2="%.1f" stroke="var(--baseline)" stroke-width="2"/>',
+                            sx(0), sx(v[1]), y, y))
+    } else if (length(v) > 1) {
+      out <- c(out, sprintf('<line x1="%.1f" x2="%.1f" y1="%.1f" y2="%.1f" stroke="var(--baseline)" stroke-width="2"/>',
+                            sx(min(v)), sx(max(v)), y, y))
+    }
+    for (j in seq_len(nrow(r))) if (is.finite(r$value[j])) {
+      out <- c(out, sprintf(
+        '<g><title>%s</title><circle cx="%.1f" cy="%.1f" r="10" fill="transparent"/><circle cx="%.1f" cy="%.1f" r="5" fill="var(%s)" stroke="var(--surface)" stroke-width="2"/></g>',
+        r$tip[j], sx(r$value[j]), y, sx(r$value[j]), y, series_css[[r$series[j]]]))
+    }
+  }
+  h <- y + 30
+  refs <- c(-0.47, -0.33, -0.15, 0.15, 0.33, 0.47)
+  refs <- refs[refs > xlim[1] & refs < xlim[2]]
+  grid_lines <- c(
+    sprintf('<line x1="%.1f" x2="%.1f" y1="4" y2="%.1f" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>',
+            sx(refs), sx(refs), h - 22),
+    sprintf('<line x1="%.1f" x2="%.1f" y1="4" y2="%.1f" stroke="var(--baseline)" stroke-width="1.5"/>', sx(0), sx(0), h - 22))
+  ticks <- seq(ceiling(xlim[1] * 5) / 5, floor(xlim[2] * 5) / 5, by = 0.2)
+  axis <- sprintf('<text x="%.1f" y="%.1f" class="axis-label" text-anchor="middle">%s</text>',
+                  sx(ticks), h - 6, gsub("-", "−", sprintf("%.1f", ticks)))
+  sprintf('<svg viewBox="0 0 %d %.0f" width="100%%" role="img" aria-label="%s">%s</svg>',
+          label_w + plot_w + 12, h, aria, paste(c(grid_lines, out, axis), collapse = ""))
+}
+legend_html <- function(series_css, extra = NULL) {
+  items <- sprintf('<div class="item"><span class="swatch" style="background:var(%s)"></span>%s</div>',
+                   unname(series_css), names(series_css))
+  paste0('<div class="chart-legend">', paste(c(items, extra), collapse = ""), '</div>')
+}
+thr_note <- '<div class="item" style="color:var(--muted)">Dashed: ±0.15 / 0.33 / 0.47 (small / medium / large)</div>'
+```
+
+<div class="eyebrow">Global NCP Hotspot Analysis · Memo</div>
 <div class="meta">
   <span>Prepared by Jerónimo Rodríguez Escobar</span>
   <span>Global Science, WWF</span>
-  <span>{{< meta date >}}</span>
 </div>
 
 ## Key findings
 
 ::: {.findings}
 ::: {.finding}
-**Wealth & density.** Beneficiary areas are **substantially wealthier and more densely populated** than the rest of the landscape, consistently across all three category definitions tested. *(Cliff's δ 0.48–0.53, large effect — roughly 3–5× GDP, 2.5–3.5× population per cell.)*
+**Places.** Serviceshed land is populated land: population and total GDP are far higher inside the masks than outside (δ `r rng(cv(tiers, "pop"))`). Per person it is not richer or more developed: GDP per capita δ `r rng(cv(tiers, "gdp_pc"))`, HDI δ `r rng(cv(tiers, "hdi"))` across the overlap tiers.
 :::
 ::: {.finding}
-**Inequality.** Beneficiary areas skew toward **more unequal (higher-Gini)** regions — and that skew gets **stronger**, not weaker, in the most compound-risk cells (4+ services). *(δ 0.22 at combined-cross/3+, rising to 0.33 at 4+.)*
+**Inequality.** Serviceshed land sits in more unequal places (Gini δ `r d2(cv("tier_1plus", "gini"))` at 1+, rising to `r d2(cv("tier_4plus", "gini"))` at 4+), but this is a between-country pattern. Within countries δ is `r rng(st(c(tiers[c(1,3,4)], "combined_cross"), "gini", "within_country_cells"))`: the masks fall in high-inequality countries, mostly in Latin America, not in the more unequal provinces of each country.
 :::
 ::: {.finding}
-**Development.** HDI shows **no meaningful relationship** in either direction — beneficiary status isn't tied to human development level. *(δ 0.04–0.10, negligible–small.)*
+**People.** Counted by people instead of land, the `r pct(pp("tier_1plus", "hdi", "pct_pop_in"), 0)` of the world population connected to at least one hotspot is better off than the rest (HDI δ `r d2(pp("tier_1plus", "hdi", "delta_people"))`, GDP per capita δ `r d2(pp("tier_1plus", "gdp_pc", "delta_people"))`) and lives in slightly less unequal places (Gini δ `r d2(pp("tier_1plus", "gini", "delta_people"))`). The people left out are mostly remote rural populations beyond the 1 h travel reach.
+:::
+::: {.finding}
+**The paper's socioeconomic test.** The same decomposition applies to the hotspot cells in the WHO section: Gini δ `r rng(hv(land_hot, "gini", "pooled"))` for the four land services pooled, `r rng(hv(land_hot, "gini", "within_country"))` within countries. Within countries, nitrogen export, nature access and pollination hotspots sit in the more developed regions (HDI δ `r rng(hv(c("N_export", "Nature_Access", "Pollination"), "hdi", "within_country"))`).
 :::
 :::
 
-## Question
-
-> Apply the union coverage masks to the HDI, Gini, and GDP rasters to test whether beneficiary areas — combined cross-category, or the 3+/4+ hotspot tiers — are disproportionately high or low compared to outside.
-
-## Analysis Performed
+## Data and method
 
 | | |
 |---|---|
-| **Combined cross-category** | Cells that are simultaneously a water-pathway hotspot (nitrogen *or* sediment export) *and* an access-pathway hotspot (nature access, pollination, *or* coastal risk). The 23.6% figure below is the **reach/beneficiary footprint** — land within 50km downstream or 1hr travel of one of these cells — not the hotspot cells themselves, which cover a much smaller 3.5% of land (see the paper draft abstract). The two are consistent, not contradictory: a buffer zone around a set of cells is always larger than the cells themselves. Both use the same underlying ~4.1B reach-population figure. |
-| **3+ / 4+ services** | Cells where 3 (or 4) or more of the 5 tracked services hit extreme change at once — 12.8% / 4.4% of land, reaching ~2.3B / ~872M people respectively. |
-| **Coverage rule** | A 10km cell counts as "inside" a beneficiary area if at least half its area falls within the downstream (50km) or travel-time (1 hour) buffer around a hotspot. |
-| **Test** | Two-sample Kolmogorov–Smirnov test, comparing the full distribution of each variable inside vs. outside the mask, plus Cliff's delta as the effect-size measure (0 = no difference, 1 = complete separation). |
+| **Masks** | Land within 50 km downstream (river network) or 1 h travel (2019 friction surface) of hotspot cells, from the 2026-07-29 beneficiary run (LandScan 2023). Its input hotspots match the production set (189,918 of 189,932 cells). |
+| **Categories** | Overlap tiers 1+ to 4+ (hotspot for at least *k* of the five services, both pathways), water and access hotspot in the same cell (both pathways), and two service-specific masks: water hotspots routed downstream only, access hotspots (nature access, pollination, coastal risk) by travel time only. The 5-service tier (about 0.03% of land) is too small to profile. |
+| **Grid** | The `r num(1372621)` evaluated 10 km cells. A cell is inside a mask when at least half of its area is covered. |
+| **Variables** | Population (GHS-POP 2020, cell sum), GDP 2020 (Kummu et al. 2025, cell total), GDP per capita (GDP / GHS-POP, cells with at least one person), HDI 2020 (Sherman et al. 2026), sub-national Gini of disposable income 2020 (source to confirm). |
+| **Places** | Two-sample KS test and Cliff's δ, inside vs outside: δ = P(inside cell higher) − P(inside cell lower). Thresholds 0.15 / 0.33 / 0.47 (Romano et al. 2006). All BH-adjusted KS p-values are below 10^−250^. |
+| **People** | The same δ with every cell weighted by its population: a random person inside a mask compared with a random person outside it. |
+| **Geography** | δ computed within each World Bank region or each country and combined with weights *n*~inside~ × *n*~outside~ (the pairs each stratum contributes). A pooled δ that vanishes within countries comes from which countries the cells are in. |
 
-: {.terms tbl-colwidths="[25,75]"}
-
-**Beneficiary categories.** 8 possible categories exist.
-
-| Category | What it means | Used here? |
-|---|---|---|
-| Water-overlap | Cell has a water-pathway hotspot (sediment or nitrogen export) | No |
-| Access-overlap | Cell has an access-pathway hotspot (nature access, pollination, or coastal risk) | No |
-| **Combined cross-category** | Cell has *both* a water-pathway *and* an access-pathway hotspot at once | **Yes** |
-| 1+ services | Cell has at least 1 of the 5 tracked services in extreme change | No |
-| 2+ services | Cell has at least 2 of the 5 tracked services in extreme change | No |
-| **3+ services** | Cell has at least 3 of the 5 tracked services in extreme change | **Yes** |
-| **4+ services** | Cell has at least 4 of the 5 tracked services in extreme change | **Yes** |
-| 5 services (all) | Cell has all 5 tracked services in extreme change at once | No — also nearly empty, 364 cells worldwide |
-
-: {.results}
-
-Population figures in this report (4.1B / 2.3B / 872M "people reached") come from **LandScan Global 2023** — a different population dataset than `GHS_POP_E2020_GLOBE_sum`, the population variable used in the HDI/Gini/GDP statistical test. 
-
-**Combined cross-category** — at least 1 of the 2 water services *and* at least 1 of the 3 access services. The underlying extraction function (`derive_cross_combo()`, `R/get_hotspots.R`) can cross *any* named service groups with AND/OR logic, at any threshold.
-
-**How a cell qualifies, step by step.** Two independent stages, each with its own AND/OR — easy to conflate "which services" with "which buffer." Diagram below shows the **union** version specifically — Stage 2's final gate is OR. The intersection alternative (see below) swaps that one gate to AND; Stage 1 is identical either way.
-
-::: {.diagram-card}
-![Two-stage AND/OR flowchart for the union definition: Stage 1 defines which cells are hotspots by service. In this case, Stage 2's final OR operator means "reached by either buffer" — the intersection alternative swaps this gate to AND (intersection of both buffers)](diagram_category_logic.png)
-:::
-
-**What "reach" means.** For each category, a person counts as reached if they're within 50km downstream (river network) *or* within 1 hour's travel (roads) of any qualifying cell — either buffer counts, not both. 4.1B / 2.3B / 872M are this same "either buffer" reach applied to combined-cross-category / 3+ / 4+ cells respectively.
-
-
-::: {.validation-note}
-**Union ("either buffer") vs. intersection ("both buffers") — how much smaller is "both"?**
-
-| Category | Union: land % / cells | Intersection: land % / cells | Intersection ÷ union |
-|---|---|---|---|
-| Combined cross-cat. | 23.6% / 321K | 10.2% / 139K | 43% |
-| 3+ services | 12.8% / 174K | 5.2% / 71K | 41% |
-| 4+ services | 4.4% / 60K | 1.6% / 22K | 37% |
-
-Intersection is roughly 40% the size across all three categories — a consistent pattern. Whether the *statistical* results hold up under this stricter definition too is checked in the Effect size section below.
-:::
-
-**Extracted masks.** Combined cross-category, all 4 mask types, shown at their **source resolution (~0.93km / 30 arcsec)** Global extent (decimated for display) + zoomed Amazon/Andes inset (native resolution) for each.
+: {.terms tbl-colwidths="[22,78]"}
 
 ```{=html}
 <div class="map-tabs">
@@ -98,312 +155,164 @@ Intersection is roughly 40% the size across all three categories — a consisten
   <input type="radio" name="masktab" id="tab-un">
   <input type="radio" name="masktab" id="tab-in">
   <div class="tab-labels">
-    <label for="tab-ds">Downstream (50km)</label>
-    <label for="tab-tt">Travel-time (1hr)</label>
+    <label for="tab-ds">Downstream (50 km)</label>
+    <label for="tab-tt">Travel time (1 h)</label>
     <label for="tab-un">Union (either)</label>
     <label for="tab-in">Intersection (both)</label>
   </div>
   <div class="panels">
     <div class="tab-panel panel-ds">
       <div class="map-card"><img src="map_downstream_global.png" alt="Downstream mask, global"></div>
-      <div class="map-card"><img src="map_downstream_inset.png" alt="Downstream mask, Amazon/Andes inset"></div>
+      <div class="map-card"><img src="map_downstream_inset.png" alt="Downstream mask, Amazon and Andes inset"></div>
     </div>
     <div class="tab-panel panel-tt">
       <div class="map-card"><img src="map_traveltime_global.png" alt="Travel-time mask, global"></div>
-      <div class="map-card"><img src="map_traveltime_inset.png" alt="Travel-time mask, Amazon/Andes inset"></div>
+      <div class="map-card"><img src="map_traveltime_inset.png" alt="Travel-time mask, Amazon and Andes inset"></div>
     </div>
     <div class="tab-panel panel-un">
       <div class="map-card"><img src="map_union_global.png" alt="Union mask, global"></div>
-      <div class="map-card"><img src="map_union_inset.png" alt="Union mask, Amazon/Andes inset"></div>
+      <div class="map-card"><img src="map_union_inset.png" alt="Union mask, Amazon and Andes inset"></div>
     </div>
     <div class="tab-panel panel-in">
       <div class="map-card"><img src="map_intersection_global.png" alt="Intersection mask, global"></div>
-      <div class="map-card"><img src="map_intersection_inset.png" alt="Intersection mask, Amazon/Andes inset"></div>
+      <div class="map-card"><img src="map_intersection_inset.png" alt="Intersection mask, Amazon and Andes inset"></div>
     </div>
   </div>
 </div>
+<p class="map-caption">Mask for cells with both a water and an access hotspot, at the source resolution (30 arcsec). Global extent decimated for display; inset at native resolution.</p>
 ```
 
-## Effect size by variable
+The masks are large. The 1+ mask covers `r pct(pp("tier_1plus", "hdi", "pct_cells_in"), 0)` of the evaluated land and `r pct(pp("tier_1plus", "hdi", "pct_pop_in"), 1)` of GHS-POP (`r pct(landscan_pct, 1)` of LandScan in the exposure count); the 4+ mask covers `r pct(pp("tier_4plus", "hdi", "pct_cells_in"), 1)` of the land and `r pct(pp("tier_4plus", "hdi", "pct_pop_in"), 1)` of the people.
 
-Cliff's delta for each category, on a 0–1 scale. Reference ticks mark the conventional small / medium / large thresholds.
+## 1. Which places the servicesheds cover
 
-<!-- These 4 SVG panels are generated from data/processed/tables/ks_results_beneficiary_masks.csv —
-     if the underlying numbers change, regenerate rather than hand-edit the coordinates. -->
-```{=html}
-<div class="chart-grid">
-  <div class="panel">
-    <div class="panel-title">GDP</div>
-    <div class="panel-sub">rast_gdpTot_2020, cell sum</div>
-    <svg viewBox="0 0 460 130" width="100%" role="img" aria-label="GDP Cliff's delta: Combined cross-category 0.53, 3+ services 0.53, 4+ services 0.49">
-      <line x1="170" y1="0" x2="170" y2="120" stroke="var(--baseline)" stroke-width="1"/>
-      <line x1="231" y1="0" x2="231" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <line x1="308" y1="0" x2="308" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <line x1="368" y1="0" x2="368" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <text x="170" y="128" class="bar-label">Combined cross-cat.</text>
-      <rect x="170" y="14" width="222.1" height="20" rx="4" fill="var(--accent-in)"><title>Combined cross-category, GDP: δ=0.533</title></rect>
-      <text x="0" y="28" class="bar-label">Combined cross-cat.</text>
-      <text x="398" y="28" class="bar-value">0.53</text>
-      <text x="0" y="68" class="bar-label">3+ services</text>
-      <rect x="170" y="54" width="221.3" height="20" rx="4" fill="var(--accent-in)"><title>3+ services, GDP: δ=0.531</title></rect>
-      <text x="398" y="68" class="bar-value">0.53</text>
-      <text x="0" y="108" class="bar-label">4+ services</text>
-      <rect x="170" y="94" width="203.8" height="20" rx="4" fill="var(--accent-in)"><title>4+ services, GDP: δ=0.489</title></rect>
-      <text x="398" y="108" class="bar-value">0.49</text>
-    </svg>
-  </div>
-
-  <div class="panel">
-    <div class="panel-title">Population</div>
-    <div class="panel-sub">GHS_POP 2020, cell sum</div>
-    <svg viewBox="0 0 460 130" width="100%" role="img" aria-label="Population Cliff's delta: Combined cross-category 0.52, 3+ services 0.52, 4+ services 0.48">
-      <line x1="170" y1="0" x2="170" y2="120" stroke="var(--baseline)" stroke-width="1"/>
-      <line x1="231" y1="0" x2="231" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <line x1="308" y1="0" x2="308" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <line x1="368" y1="0" x2="368" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <text x="0" y="28" class="bar-label">Combined cross-cat.</text>
-      <rect x="170" y="14" width="217.9" height="20" rx="4" fill="var(--accent-in)"><title>Combined cross-category, Population: δ=0.523</title></rect>
-      <text x="398" y="28" class="bar-value">0.52</text>
-      <text x="0" y="68" class="bar-label">3+ services</text>
-      <rect x="170" y="54" width="215.4" height="20" rx="4" fill="var(--accent-in)"><title>3+ services, Population: δ=0.517</title></rect>
-      <text x="398" y="68" class="bar-value">0.52</text>
-      <text x="0" y="108" class="bar-label">4+ services</text>
-      <rect x="170" y="94" width="200.0" height="20" rx="4" fill="var(--accent-in)"><title>4+ services, Population: δ=0.480</title></rect>
-      <text x="398" y="108" class="bar-value">0.48</text>
-    </svg>
-  </div>
-
-  <div class="panel">
-    <div class="panel-title">Gini</div>
-    <div class="panel-sub">rast_adm1_gini_disp_2020, cell mean</div>
-    <svg viewBox="0 0 460 130" width="100%" role="img" aria-label="Gini Cliff's delta: Combined cross-category 0.22, 3+ services 0.22, 4+ services 0.33">
-      <line x1="170" y1="0" x2="170" y2="120" stroke="var(--baseline)" stroke-width="1"/>
-      <line x1="231" y1="0" x2="231" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <line x1="308" y1="0" x2="308" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <line x1="368" y1="0" x2="368" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <text x="0" y="28" class="bar-label">Combined cross-cat.</text>
-      <rect x="170" y="14" width="90.4" height="20" rx="4" fill="var(--accent-in)"><title>Combined cross-category, Gini: δ=0.217</title></rect>
-      <text x="398" y="28" class="bar-value">0.22</text>
-      <text x="0" y="68" class="bar-label">3+ services</text>
-      <rect x="170" y="54" width="90.4" height="20" rx="4" fill="var(--accent-in)"><title>3+ services, Gini: δ=0.217</title></rect>
-      <text x="398" y="68" class="bar-value">0.22</text>
-      <text x="0" y="108" class="bar-label">4+ services</text>
-      <rect x="170" y="94" width="136.7" height="20" rx="4" fill="var(--accent-in)"><title>4+ services, Gini: δ=0.328</title></rect>
-      <text x="398" y="108" class="bar-value">0.33</text>
-    </svg>
-  </div>
-
-  <div class="panel">
-    <div class="panel-title">HDI</div>
-    <div class="panel-sub">hdi_raster_predictions_2020, cell mean</div>
-    <svg viewBox="0 0 460 130" width="100%" role="img" aria-label="HDI Cliff's delta: Combined cross-category 0.08, 3+ services 0.10, 4+ services 0.04">
-      <line x1="170" y1="0" x2="170" y2="120" stroke="var(--baseline)" stroke-width="1"/>
-      <line x1="231" y1="0" x2="231" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <line x1="308" y1="0" x2="308" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <line x1="368" y1="0" x2="368" y2="120" stroke="var(--band-tick)" stroke-width="1" stroke-dasharray="2,3"/>
-      <text x="0" y="28" class="bar-label">Combined cross-cat.</text>
-      <rect x="170" y="14" width="35.0" height="20" rx="4" fill="var(--accent-in)"><title>Combined cross-category, HDI: δ=0.084</title></rect>
-      <text x="398" y="28" class="bar-value">0.08</text>
-      <text x="0" y="68" class="bar-label">3+ services</text>
-      <rect x="170" y="54" width="43.3" height="20" rx="4" fill="var(--accent-in)"><title>3+ services, HDI: δ=0.104</title></rect>
-      <text x="398" y="68" class="bar-value">0.10</text>
-      <text x="0" y="108" class="bar-label">4+ services</text>
-      <rect x="170" y="94" width="14.6" height="20" rx="4" fill="var(--accent-in)"><title>4+ services, HDI: δ=0.035</title></rect>
-      <text x="398" y="108" class="bar-value">0.04</text>
-    </svg>
-  </div>
-</div>
-<div class="chart-legend">
-  <div class="item"><span class="swatch" style="background:var(--accent-in)"></span> Cliff's delta (beneficiary higher than outside)</div>
-  <div class="item" style="color:var(--muted)">Dashed ticks: 0.15 / small · 0.33 / medium · 0.47 / large</div>
-</div>
+```{r}
+#| results: asis
+tier_css <- c("1+ services" = "--o1", "2+ services" = "--o2", "3+ services" = "--o3", "4+ services" = "--o4")
+d1 <- cells |>
+  filter(mask %in% tiers, var %in% c("pop", "gdp", "gdp_pc", "hdi", "gini")) |>
+  mutate(group = var_label[var], label = mask_label[mask], series = label, value = delta,
+         tip = sprintf("%s, %s: δ = %s (median inside %s, outside %s)", group, label, d2(delta),
+                       signif(median_in, 3), signif(median_out, 3))) |>
+  arrange(match(var, c("pop", "gdp", "gdp_pc", "hdi", "gini")), mask)
+cat('<div class="chart-card">',
+    svg_dots(d1, tier_css, xlim = c(-0.2, 0.7), lollipop = TRUE,
+             aria = "Cliff's delta inside vs outside the serviceshed masks, by variable and overlap tier"),
+    legend_html(tier_css, thr_note), '</div>', sep = "")
 ```
 
-::: {.validation-note}
-**Robustness check: same deltas under the intersection definition?** (See "What was tested" for the area comparison this follows up on.)
+Population and total GDP separate the masks from the rest of the land (δ about 0.5), largely by construction: the travel pathway follows roads and settlements, and the empty land of deserts, boreal forest and the interior Amazon falls outside. Total GDP adds nothing beyond population. Once divided by population, GDP barely differs (median per capita `r paste0("$", formatC(cv("tier_1plus", "gdp_pc", "median_in"), format = "d", big.mark = ","))` inside the 1+ mask, `r paste0("$", formatC(cv("tier_1plus", "gdp_pc", "median_out"), format = "d", big.mark = ","))` outside), and neither does HDI. Gini is the one variable that rises with the overlap tier.
 
-| Variable | Union δ | Intersection δ | Robust? |
-|---|---|---|---|
-| GDP | 0.49–0.53 | 0.51–0.54 | Yes |
-| Population | 0.48–0.52 | 0.50–0.54 | Yes |
-| Gini | 0.22–0.33 | 0.22–0.38 | Yes — stronger |
-| HDI | 0.04–0.10 | −0.01–0.04 | No — sign flips at 4+ |
+## 2. The inequality signal is between countries
 
-GDP, Population, and Gini: essentially unchanged between union and intersection. HDI: already the smallest effect under union (δ 0.04–0.10); it shrinks toward zero and crosses to slightly negative at the 4+ tier. A real null effect would look like this — small and inconsistent in sign — so this is what "no relationship" confirmed a second way looks like, not a new or different finding.
-
-Full numbers: `data/processed/tables/union_vs_intersection_comparison.csv`.
-:::
-
-## Distribution comparison
-
-What the KS test actually compares — the middle 80% (q10-q90) of each group's values, not just the summary Cliff's delta. Thick line = range, tick = median.
-
-<!-- Generated from ks_results_beneficiary_masks.csv's q10/median/q90 columns — regenerate, don't hand-edit. -->
-```{=html}
-<div class="chart-grid">
-  <div class="panel">
-    <div class="panel-title">GDP</div>
-    <div class="panel-sub">log scale — q10-q90 range, tick = median</div>
-    <svg viewBox="0 0 460 112" width="100%" role="img" aria-label="GDP distribution comparison, inside vs outside beneficiary mask">
-      <line x1="266.6" y1="13" x2="398.4" y2="13" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="351.4" y1="8" x2="351.4" y2="18" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="150.0" y1="27" x2="372.7" y2="27" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="255.6" y1="22" x2="255.6" y2="32" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="17" class="bar-label">Combined cross-cat.</text>
-      <text x="408" y="17" class="bar-value" style="font-size:9.5px;">$7.2M</text>
-      <text x="408" y="31" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">$4K</text>
-      <line x1="293.1" y1="47" x2="400.0" y2="47" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="355.5" y1="42" x2="355.5" y2="52" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="150.0" y1="61" x2="377.8" y2="61" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="280.9" y1="56" x2="280.9" y2="66" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="51" class="bar-label">3+ services</text>
-      <text x="408" y="51" class="bar-value" style="font-size:9.5px;">$9.8M</text>
-      <text x="408" y="65" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">$29K</text>
-      <line x1="297.9" y1="81" x2="400.0" y2="81" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="354.6" y1="76" x2="354.6" y2="86" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="150.0" y1="95" x2="381.3" y2="95" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="294.4" y1="90" x2="294.4" y2="100" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="85" class="bar-label">4+ services</text>
-      <text x="408" y="85" class="bar-value" style="font-size:9.5px;">$9.2M</text>
-      <text x="408" y="99" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">$82K</text>
-    </svg>
-  </div>
-
-  <div class="panel">
-    <div class="panel-title">Population</div>
-    <div class="panel-sub">log scale — q10-q90 range, tick = median</div>
-    <svg viewBox="0 0 460 112" width="100%" role="img" aria-label="Population distribution comparison, inside vs outside beneficiary mask">
-      <line x1="150.0" y1="13" x2="397.0" y2="13" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="316.3" y1="8" x2="316.3" y2="18" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="150.0" y1="27" x2="357.6" y2="27" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="150.0" y1="22" x2="150.0" y2="32" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="17" class="bar-label">Combined cross-cat.</text>
-      <text x="408" y="17" class="bar-value" style="font-size:9.5px;">849.3</text>
-      <text x="408" y="31" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">0.2</text>
-      <line x1="195.6" y1="47" x2="398.5" y2="47" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="323.0" y1="42" x2="323.0" y2="52" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="150.0" y1="61" x2="366.0" y2="61" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="169.5" y1="56" x2="169.5" y2="66" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="51" class="bar-label">3+ services</text>
-      <text x="408" y="51" class="bar-value" style="font-size:9.5px;">1,116</text>
-      <text x="408" y="65" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">2.2</text>
-      <line x1="205.1" y1="81" x2="400.0" y2="81" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="322.2" y1="76" x2="322.2" y2="86" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="150.0" y1="95" x2="371.4" y2="95" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="197.7" y1="90" x2="197.7" y2="100" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="85" class="bar-label">4+ services</text>
-      <text x="408" y="85" class="bar-value" style="font-size:9.5px;">1,080</text>
-      <text x="408" y="99" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">6.9</text>
-    </svg>
-  </div>
-
-  <div class="panel">
-    <div class="panel-title">Gini</div>
-    <div class="panel-sub">linear scale — q10-q90 range, tick = median</div>
-    <svg viewBox="0 0 460 112" width="100%" role="img" aria-label="Gini distribution comparison, inside vs outside beneficiary mask">
-      <line x1="199.3" y1="13" x2="361.4" y2="13" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="249.4" y1="8" x2="249.4" y2="18" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="176.7" y1="27" x2="338.1" y2="27" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="230.1" y1="22" x2="230.1" y2="32" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="17" class="bar-label">Combined cross-cat.</text>
-      <text x="408" y="17" class="bar-value" style="font-size:9.5px;">0.355</text>
-      <text x="408" y="31" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">0.321</text>
-      <line x1="201.7" y1="47" x2="361.4" y2="47" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="251.7" y1="42" x2="251.7" y2="52" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="179.0" y1="61" x2="339.9" y2="61" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="230.7" y1="56" x2="230.7" y2="66" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="51" class="bar-label">3+ services</text>
-      <text x="408" y="51" class="bar-value" style="font-size:9.5px;">0.359</text>
-      <text x="408" y="65" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">0.322</text>
-      <line x1="207.4" y1="81" x2="361.9" y2="81" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="268.7" y1="76" x2="268.7" y2="86" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="179.5" y1="95" x2="340.3" y2="95" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="234.1" y1="90" x2="234.1" y2="100" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="85" class="bar-label">4+ services</text>
-      <text x="408" y="85" class="bar-value" style="font-size:9.5px;">0.389</text>
-      <text x="408" y="99" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">0.328</text>
-    </svg>
-  </div>
-
-  <div class="panel">
-    <div class="panel-title">HDI</div>
-    <div class="panel-sub">linear scale — q10-q90 range, tick = median</div>
-    <svg viewBox="0 0 460 112" width="100%" role="img" aria-label="HDI distribution comparison, inside vs outside beneficiary mask">
-      <line x1="186.3" y1="13" x2="367.1" y2="13" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="286.1" y1="8" x2="286.1" y2="18" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="174.8" y1="27" x2="352.9" y2="27" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="280.2" y1="22" x2="280.2" y2="32" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="17" class="bar-label">Combined cross-cat.</text>
-      <text x="408" y="17" class="bar-value" style="font-size:9.5px;">0.674</text>
-      <text x="408" y="31" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">0.661</text>
-      <line x1="196.1" y1="47" x2="368.8" y2="47" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="287.5" y1="42" x2="287.5" y2="52" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="175.7" y1="61" x2="355.0" y2="61" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="281.0" y1="56" x2="281.0" y2="66" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="51" class="bar-label">3+ services</text>
-      <text x="408" y="51" class="bar-value" style="font-size:9.5px;">0.677</text>
-      <text x="408" y="65" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">0.663</text>
-      <line x1="223.5" y1="81" x2="351.9" y2="81" stroke="var(--accent-in)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="280.9" y1="76" x2="280.9" y2="86" stroke="var(--accent-in)" stroke-width="2"/>
-      <line x1="176.9" y1="95" x2="357.9" y2="95" stroke="var(--accent-out)" stroke-width="6" stroke-linecap="round" opacity="0.85"/>
-      <line x1="282.4" y1="90" x2="282.4" y2="100" stroke="var(--accent-out)" stroke-width="2"/>
-      <text x="0" y="85" class="bar-label">4+ services</text>
-      <text x="408" y="85" class="bar-value" style="font-size:9.5px;">0.663</text>
-      <text x="408" y="99" class="bar-value" style="font-size:9.5px;fill:var(--muted);font-weight:400;">0.666</text>
-    </svg>
-  </div>
-</div>
-<div class="chart-legend">
-  <div class="item"><span class="swatch" style="background:var(--accent-in)"></span> Inside beneficiary mask</div>
-  <div class="item"><span class="swatch" style="background:var(--accent-out)"></span> Outside beneficiary mask</div>
-</div>
+```{r}
+#| results: asis
+geo_css <- c("Pooled" = "--s1", "Within WB region" = "--s2", "Within country" = "--s3")
+geo_long <- function(v) {
+  h <- hot |> filter(var == v) |>
+    transmute(group = "Hotspot cells (paper, WHO section)", label = svc_label[service],
+              pooled, within_region, within_country)
+  m <- strata |> filter(var == v, mask %in% c("tier_1plus", "tier_3plus", "tier_4plus", "combined_cross")) |>
+    transmute(group = "Serviceshed masks", label = mask_label[mask],
+              pooled = pooled_cells, within_region = within_region_cells, within_country = within_country_cells)
+  bind_rows(h, m) |>
+    tidyr::pivot_longer(c(pooled, within_region, within_country), names_to = "k", values_to = "value") |>
+    mutate(series = c(pooled = "Pooled", within_region = "Within WB region", within_country = "Within country")[k],
+           tip = sprintf("%s, %s: %s δ = %s", label, toupper(v), tolower(series), d2(value)))
+}
+for (v in c("gini", "hdi")) {
+  cat('<div class="chart-card"><div class="panel-title">', c(gini = "Gini", hdi = "HDI")[v],
+      '</div><div class="panel-sub">Cliff\'s δ, hotspot or mask cells vs background cells</div>',
+      svg_dots(geo_long(v), geo_css, xlim = c(-0.3, 0.4),
+               aria = paste(toupper(v), "Cliff's delta pooled, within region and within country")),
+      legend_html(geo_css, thr_note), '</div>', sep = "")
+}
 ```
 
-## Output numbers
+Within a country, the Gini layer varies only between sub-national units, so the within-country δ asks whether hotspots and servicesheds fall in the more unequal provinces of their own country. They do not: δ is near zero or negative for every service and mask. The pooled signal comes from where the cells are on the world map. Latin America, the region with the highest sub-national Gini (median `r sprintf("%.2f", lac_gini)` on the grid), holds `r pct(hv("Sed_export", "gini", "pct_hot_in_lac"), 0)` of sediment export hotspots, `r pct(hv("Pollination", "gini", "pct_hot_in_lac"), 0)` of pollination, `r pct(hv("N_export", "gini", "pct_hot_in_lac"), 0)` of nitrogen export and `r pct(hv("Nature_Access", "gini", "pct_hot_in_lac"), 0)` of nature access hotspots, against `r pct(min(hv(land_hot, "gini", "pct_bg_in_lac")), 0)` to `r pct(max(hv(land_hot, "gini", "pct_bg_in_lac")), 0)` of the background cells. Within World Bank regions part of the signal remains (other high-Gini countries within each region), within countries it does not.
 
-Median value per 10km cell, inside the beneficiary mask vs. outside it. GDP and population totals are extensive (summed per cell), so medians read low relative to the totals above — most cells are small, a few are enormous.
+HDI shows the reverse. Pooled, the land-service hotspots lean slightly toward less developed places (δ `r rng(hv(land_hot, "hdi", "pooled"))`); within countries nitrogen export, nature access and pollination hotspots sit in the more developed regions (δ `r rng(hv(c("N_export", "Nature_Access", "Pollination"), "hdi", "within_country"))`; sediment export `r d2(hv("Sed_export", "hdi", "within_country"))`). Hotspots concentrate in middle-income countries, and inside those countries in their more developed, more accessible regions.
 
-| Variable | Category | Median, inside | Median, outside | Cliff's δ |
-|---|---|---|---|---|
-| GDP | Combined cross-cat. | $7.16M | $3.9K | **0.53** |
-| | 3+ services | $9.83M | $28.5K | **0.53** |
-| | 4+ services | $9.19M | $81.9K | **0.49** |
-| Population | Combined cross-cat. | 849 | 0.19 | **0.52** |
-| | 3+ services | 1,116 | 2.2 | **0.52** |
-| | 4+ services | 1,080 | 6.9 | **0.48** |
-| Gini | Combined cross-cat. | 0.355 | 0.321 | **0.22** |
-| | 3+ services | 0.359 | 0.322 | **0.22** |
-| | 4+ services | 0.389 | 0.328 | **0.33** |
-| HDI | Combined cross-cat. | 0.674 | 0.661 | **0.08** |
-| | 3+ services | 0.677 | 0.663 | **0.10** |
-| | 4+ services | 0.663 | 0.666 | **0.04** |
+The 4+ mask keeps a small residual: within-country Gini δ `r d2(st("tier_4plus", "gini", "within_country_cells"))`, and `r d2(st("tier_4plus", "gini", "admin_units_delta"))` when each sub-national Gini unit is counted once (`r num(st("tier_4plus", "gini", "n_admin_units"))` units). Both are below the 0.15 threshold.
 
-: {.results}
+## 3. Which people are connected
 
-All 12 differences are statistically significant at p < 0.001 (two-sided KS test, Benjamini–Hochberg corrected) — sample sizes range from ~60K to ~320K beneficiary cells against ~1.0–1.3M non-beneficiary cells, so even the smaller HDI effect is not noise.
+```{r}
+#| results: asis
+pc_css <- c("Land cells" = "--s1", "People" = "--s2")
+d3 <- strata |>
+  filter(var %in% c("gdp_pc", "hdi", "gini"), mask %in% names(mask_label)) |>
+  transmute(group = var_label[var], label = mask_label[mask], var, mask,
+            `Land cells` = pooled_cells, People = pooled_people) |>
+  tidyr::pivot_longer(c(`Land cells`, People), names_to = "series", values_to = "value") |>
+  mutate(tip = sprintf("%s, %s: δ = %s (%s)", group, label, d2(value), tolower(series))) |>
+  arrange(match(var, c("gdp_pc", "hdi", "gini")),
+          match(mask, c("tier_1plus", "tier_3plus", "tier_4plus", "combined_cross", "water", "access")))
+cat('<div class="chart-card">',
+    svg_dots(d3, pc_css, xlim = c(-0.3, 0.5),
+             aria = "Cliff's delta by land cell and by person, inside vs outside each mask"),
+    legend_html(pc_css, thr_note), '</div>', sep = "")
+```
 
-## Discussion
+Weighting by population changes the comparison from land to people, and the answer changes with it. The people inside the masks have higher HDI and GDP per capita than the people outside, and Gini drops to near zero or below. The weighted δ holds within countries too (HDI `r d2(st("tier_1plus", "hdi", "within_country_people"))`, GDP per capita `r d2(st("tier_1plus", "gdp_pc", "within_country_people"))` at 1+), so it is an accessibility gradient inside countries, not a rich-country effect. The water mask, which follows rivers rather than roads, shows the weakest gradient.
 
-**GDP and population** are the strongest signals by a wide margin (δ ≈ 0.48–0.53, the "large effect" band) — beneficiary cells roughly 3–5× higher in per-cell GDP and 2.5–3.5× higher in per-cell population than the rest. These masks already cover a large share of total land area. Buffers are built around where hotspots are, and hotspots concentrate around where people already live and build economic activity.
+```{r}
+#| results: asis
+fmt_money <- function(x) paste0("$", formatC(round(x, -2), format = "d", big.mark = ","))
+tb <- people |>
+  filter(mask %in% c("tier_1plus", "tier_3plus", "tier_4plus", "combined_cross", "water", "access")) |>
+  select(mask, var, pct_pop_in, wmedian_in, wmedian_out, delta_people) |>
+  tidyr::pivot_wider(names_from = var, values_from = c(wmedian_in, wmedian_out, delta_people)) |>
+  arrange(match(mask, c("tier_1plus", "tier_3plus", "tier_4plus", "combined_cross", "water", "access"))) |>
+  transmute(Mask = mask_label[mask], `People inside` = pct(pct_pop_in),
+            `GDP per capita, inside / outside` = paste(fmt_money(wmedian_in_gdp_pc), "/", fmt_money(wmedian_out_gdp_pc)),
+            `HDI, inside / outside` = sprintf("%.3f / %.3f", wmedian_in_hdi, wmedian_out_hdi),
+            `Gini, inside / outside` = sprintf("%.3f / %.3f", wmedian_in_gini, wmedian_out_gini))
+cat(knitr::kable(tb, format = "html", table.attr = 'class="results"', escape = FALSE,
+                 caption = "Population-weighted medians (the value for the median person), GHS-POP 2020."), sep = "")
+```
 
-**Gini** is the least obvious result but probably the most useful: beneficiary areas skew toward more unequal regions, not less, and — unlike GDP and population — that effect *grows* at the most exclusive tier (δ 0.22 at combined-cross and 3+, rising to 0.33 at 4+). The people gaining the most concentrated ecosystem-service benefit are disproportionately in places with more internal inequality, not fewer.
+## 4. Robustness
 
-**Why GDP flattens while Gini keeps climbing, at the same tier.** GDP measures average wealth level; Gini measures how unequally that wealth is distributed within a place — different dimensions. GDP's gap doesn't grow at the 4+ tier (δ 0.53 → 0.49) — the wealth relationship is already near its ceiling by "combined cross" / "3+," and the most severe compound-risk cells aren't concentrated *even more* in rich places. Gini's gap does grow (0.22 → 0.33) at that same tier. So the story isn't "compound risk concentrates in rich places" — GDP alone would show that as a strengthening trend too, and it doesn't. It's specifically "compound risk concentrates in unequal places," a distinct, more distributional signal that GDP by itself would miss entirely.
+**Union vs intersection.** Requiring both pathways (intersection) instead of either (union) shrinks the masks to about 40% of their area. The δ values barely move:
 
-**HDI** shows essentially no relationship (δ ≈ 0.04–0.10, negligible to small) — human development level doesn't meaningfully predict beneficiary status either way.
+```{r}
+#| results: asis
+ui <- cells |>
+  filter(mask %in% c("combined_cross", "tier_3plus", "tier_4plus",
+                     "combined_cross_inter", "tier_3plus_inter", "tier_4plus_inter"),
+         var %in% c("pop", "gdp_pc", "hdi", "gini")) |>
+  mutate(kind = if_else(grepl("_inter$", mask), "inter", "union"), base = sub("_inter$", "", mask)) |>
+  select(base, var, kind, delta, n_in) |>
+  tidyr::pivot_wider(names_from = kind, values_from = c(delta, n_in))
+ui_tab <- ui |>
+  group_by(var) |>
+  summarise(Union = rng(delta_union), Intersection = rng(delta_inter), .groups = "drop") |>
+  arrange(match(var, c("pop", "gdp_pc", "hdi", "gini"))) |>
+  transmute(Variable = var_label[var], Union, Intersection)
+cat(knitr::kable(ui_tab, format = "html", table.attr = 'class="results"', escape = FALSE,
+                 caption = "Cliff's δ by land cell, range over the water + access, 3+ and 4+ masks."), sep = "")
+```
 
-This is a co-occurrence pattern, not a causal claim — the test says where these buffers geographically land relative to wealth, population, inequality, and development, not why. It doesn't imply the ecosystem service itself is delivered unequally by design; it says the buffers currently fall in places that are already wealthier, denser, and more unequal than the rest of the landscape.
+**Coverage rule.** The 50% coverage threshold for a 10 km cell has not been varied.
 
-## Scope & caveats
+## Data notes
 
 | | |
 |---|---|
-| **Coverage threshold** | ≥50% of a cell's area is a modeling choice (majority rule). Not sensitivity-tested this round — happy to re-run at a different threshold if it matters for the paper. |
-| **Categories tested** | Combined cross-category and the 3+/4+ compound tiers only, per your ask. Water-only and access-only masks weren't run through this test but the same pipeline extends to them directly if useful. |
-| **Spatial extent** | Rich's buffer rasters stop at ~77°N — a small amount of high-Arctic land falls outside their extent and is treated as "not covered." Negligible effect on the results given how little land that represents. |
+| **Gini layer** | Suriname and French Guiana carry a Gini of 1.39 and Guyana about 0.78, impossible or implausible values that spill into neighbouring Brazilian cells. `r num(ck(2))` cells are set to missing here. The effect on any δ in this memo or the paper is below 0.005, but the layer needs fixing at the source (the cell maximum becomes `r sprintf("%.2f", ck(4))` once they are removed). |
+| **HDI coverage** | HDI is missing for `r num(ck(5))` cells, nearly all unpopulated (`r pct(ck(7))` of the population lives in them), so HDI comparisons are in effect among populated cells. |
+| **Two population sources** | GHS-POP 2020 for weights and tests, LandScan 2023 for the exposure counts. They agree on the share connected (`r pct(pp("tier_1plus", "hdi", "pct_pop_in"))` vs `r pct(landscan_pct)` at 1+). |
+| **Reproduction** | The twelve δ values of the August version of this memo reproduce from the current grid and masks to within `r sprintf("%.3f", ck(1))`. |
 
-: {.terms tbl-colwidths="[25,75]"}
+: {.terms tbl-colwidths="[22,78]"}
+
+## What this means for the paper
+
+1. The WHO section says land-service hotspots "are associated with substantially higher income inequality". The evidence supports a country-level statement: land-service hotspots are concentrated in countries with high income inequality, above all in Latin America, and within countries they do not fall in the more unequal regions. The HDI reversal (slightly negative pooled, positive within countries) belongs in the same paragraph.
+2. Connected beneficiaries are not a random sample of the world population. The travel pathway reaches accessible, better-off people; the remote rural population is underrepresented. This qualifies the 7.4 billion figure as a count of reach, not of vulnerability.
+3. For the serviceshed section: the place-based profile of the masks (populated, not richer per person, between-country inequality) and the people-based profile (better off than the unconnected) fit in a Supplement paragraph with the decomposition figure above.
 
 <div class="report-footer">
-Full results table: `data/processed/tables/ks_results_beneficiary_masks.csv` &nbsp;·&nbsp; Notebook: `analysis/KS_tests_beneficiary_masks.qmd` &nbsp;·&nbsp; Plots: `outputs/plots/ks_beneficiary_masks/`
+Scripts: `analysis/beneficiary_mask_profile.R` (masks), `analysis/ks_hotspots_stratified.R` (hotspot cells) &nbsp;·&nbsp; Tables: `outputs/tables/beneficiary_masks/`, `outputs/tables/ks_hotspots_stratified.csv` &nbsp;·&nbsp; Mask extraction: `Python_scripts/zonal_extract_beneficiary_masks.py`
 </div>

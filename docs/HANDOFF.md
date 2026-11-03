@@ -5,8 +5,458 @@ session. When resuming or wrapping up, edit this doc directly — update stale s
 new findings, don't create `HANDOFF_<date>.md`. Paste this whole file into a fresh Claude Code
 session in `c:\projects\global_NCP` to resume.
 
-*Last updated: 2026-10-09. Start with START HERE just below, then OPEN ITEMS. The user's WWF contract ends
-~2026-10-23 (last working day); access to springinnovate's git is expected to continue afterwards.*
+*Last updated: 2026-10-22 evening (clean data package built and being uploaded to the PI's SharePoint
+folder; everything copied to the LaCie; work continues on the user's MacBook). Start with START HERE
+(10-22) just below. WWF contract ends 2026-10-23; laptop returned Tue 10-27; access to springinnovate's
+git is expected to continue (confirm in the first days).*
+
+## START HERE (Thu 2026-10-22): where everything is now
+
+- **Data, shared:** clean package `global_NCP_data_2026-10/` (131 GB, 1,624 files + README + checksums):
+  `data/` = the repo's `data/` layout, current files only, one copy each (superseded runs, older versions,
+  duplicates and unused layers left out; per-file reasons in the build manifest), plus
+  `summary_pipeline_workspace_ha/` (the zonal synthesis `process_data.qmd` reads). Uploaded to the PI's
+  SharePoint folder (Global Science Team > Initiatives > NatCap > NatCap 2024-26). Its README has the
+  current-files table, the public dataset list and the known gaps. Access to that folder probably ends
+  with the WWF account.
+- **Data, the user's own:** LaCie `LACIE_WORK` (exFAT): `projects/` = all of `C:\projects` (repos with
+  history, untracked files, the old full 172 GB package, the clean package, the Mac kit);
+  `claude_home_windows/` (Claude memory, settings, transcripts; no login token);
+  `onedrive_global_NCP_archive/` (intermediates and work products from the WWF OneDrive). Work on the
+  Mac from the clean package so results match the SharePoint copy.
+- **Code:** all repos pushed (list in the 10-21 block below). `book-update` (3cfeb70 + handoff commits)
+  still to squash-merge into `main`.
+- **Mac setup:** `projects/mac_migration_kit/MAC_SETUP.md` (copy route first: line endings, venv, data,
+  Docker on Apple Silicon).
+- **Found while packaging:** `data/raw/LandCovers/landcover_gl_1992.tif` is byte-identical to the 1992 N
+  export raster (mislabelled; `analysis/LC_change_rasters.qmd` reads it). The home-folder
+  `10k_change_calc.gpkg` was the April version on the legacy grid (1,691,819 rows, 37 columns).
+  `scripts/merge_sediment_and_coastal_via_crosswalk.py` hard-codes `C:\projects\...` paths.
+
+## STILL TO DO BEFORE THE LAPTOP GOES BACK
+
+- **Fri 10-23 (last contract day):** co-author email; move the docx off the WWF OneDrive (its shared link
+  and comments die with the account); confirm the SharePoint upload is complete (1,626 files, ~131 GB;
+  re-upload `README.md`, `checksums_sha256.txt` and `summary_pipeline_workspace_ha/` if the upload
+  started before their final versions); CV update (needs the user's current CV and profile text).
+- **Mon 10-26 (last, after the LaCie copy is verified):** delete local data and packages; personal files
+  (personal/Temple OneDrive sign-out, Downloads, Desktop); credentials: `~/.ssh` keys (remove the key
+  from GitHub too), Windows Credential Manager (git), browser profiles and saved passwords, Google
+  sign-in, `.gitconfig`; Claude Code logout last (`~/.claude/.credentials.json`).
+
+## ROADMAP ON THE MACBOOK (agreed 10-22; no deadline except co-author comments by Fri 11-20)
+
+Keep data changes to a minimum: the PI's SharePoint copy cannot be updated by the user after 10-23. If a
+fix changes data, collect the changes and send one updated set with a note.
+1. Set up from the LaCie (MAC_SETUP.md); confirm GitHub access to springinnovate; install `gh`.
+2. Squash-merge `book-update` into `main` (one name-free message).
+3. **Reproducibility branch** (code and docs only): `REPRODUCE.md` (ordered steps from the data package
+   to every output, each with an expected check: 1,522,073 grid cells, 1,372,621 evaluated, 189,932
+   hotspots, key paper numbers); fix the hard-coded paths (list in the package README + the merge
+   script); update root README, `docs/runbook.md`, `docs/pipeline_reference.md`, the qmds; commit
+   `requirements.txt` and an R package list. Test with the LaCie data (verify script, hotspot step, one
+   figure, the explorer) before the PR. Proof: a fresh Claude Code session reproduces the hotspot count
+   and one figure from the docs alone.
+4. **Repo cleanup branch:** move external-venue material (Colombia/ECLAC, IDB-WWF, CLEC decks, plots,
+   scripts) to the user's personal repo, remove it from springinnovate; consolidate the 10-14 to 10-20
+   scripts (TODO block below).
+5. **Account of the work** (doc only, can run alongside): a coherent narrative from `analysis/WORKLOG.md`,
+   this file and the research notes (decisions, what changed and why). Feeds the paper revision, the book
+   and the portfolio.
+6. **Alignment with `global_invest_dev`:** document the differences and a plan first; implement through a
+   data-root resolver so the current `data/` layout (and the SharePoint copy) keeps working.
+7. Paper revision when co-author comments arrive (takes priority over 3-6 then).
+
+## START HERE (Wed 2026-10-21): backups and the move to the MacBook
+
+- **Repos all pushed.** global_NCP `book-update` (3cfeb70; squash-merge to `main` still to do, no `gh` on
+  the WWF laptop), swy_parameterization `main`, LC_orinoquia `phase0-package-hardening`, inspring fork
+  branch `fix/setup-py-packaging`, zonal_stats_toolkit fork `main` (Cumaribo; a trial merge of
+  springinnovate's 10 newer commits conflicts in `.gitignore`, `runner.py` and
+  `run_configs/global_ncp_change_analysis_accountforfinite.yml`: resolve on the Mac), dissertation deck in a
+  new private repo `Cumaribo/dissertation_defense_vic`.
+- **Data package** `C:\projects\global_NCP_data_package_2026-10\` (~172 GB, same structure as now:
+  `repo_data/` = repo `data/`, `home_data_global_ncp/` = `~/data/global_ncp`, explorer tiles as one
+  `tiles.tar`; README + `checksums_sha256.txt`, every file read back without errors). Superseded on
+  10-22 by the clean package (see START HERE 10-22); this full version stays on the LaCie as the archive.
+- **Mac kit** `C:\projects\mac_migration_kit\` (Claude memory, CLAUDE.md files, settings, R/Python
+  package lists, `MAC_SETUP.md` step by step: tools, SSH, clones with branches, memory folder, data
+  restore, explorer). Private: not for the shared Drive folder.
+- **Disk:** WWF OneDrive `PROJECTS\Global_NCP` and `Ref_Data\vector_basedata` set to online-only (73 GB of
+  it byte-identical to package files). The internal SSD logged 68 bad-block errors since 08-24.
+- **Later, on the Mac:** devstack-style data layout (`~/Files/base_data/...` as in global_invest_dev's
+  ProjectFlow, project data keeping our folder names), single data-root resolver in `R/paths.R` + a Python
+  helper, remove the hard-coded paths listed in the package README. Then the 10-20 list below from step 1.
+
+## START HERE (Tue 2026-10-20): draft goes to co-authors, then a pause
+
+**First thing in the next session: commit and push** (user asks). Uncommitted since `48937fc`:
+- Paper: "strong" defined once (pixel SPC >= 20% either direction, not the hotspot rule) in Results and
+  Methods; coastal-risk opening sentence; relative-prevalence sentence; section 2.2.1 led by World Bank
+  regions (region hotspot figure in the main text, biome hotspot figure to Supplement "Hotspots by
+  Biome"); land cover overlap paragraph moved to the end of "Land-Based Services"; Cliff's Delta defined
+  at first use in the WHO results; exposure-by-overlap text in Results and Discussion rewritten around the
+  estimates; Bullard (1990) replaced by Daw et al. (2011) and Sikor (2013), added to the reference list
+  and to `docs/manuscript/literature_review_novelty_claim.ris` (verify both citations before submission).
+- Explorer: `scripts/dashboard/app.R` (native-pixel change maps, SPC/absolute, coastal points, "Change by
+  group" bar charts) and `scripts/dashboard/make_change_tiles.py` (tiles are git-ignored, see the explorer
+  block below).
+- Style sweep done: bold paragraph labels and em dashes removed from all prose (kept: author line, Keywords,
+  WHAT/WHERE/WHO list labels, reference titles). Typology bullets fixed (no "lower-development" label);
+  Conclusions updated to the native-pixel results. Docx final as of 10-20 evening.
+- Keep out of commits: root `CLAUDE.md` (names, public repo) and `outputs/plots/maps/native_check/`.
+Docx rendered 10-20 late afternoon with all edits; the user sends it with the cover note.
+
+Paper (`docs/manuscript/paper_draft_5service.qmd`) is final for the co-author round; HTML and docx rendered
+10-20. The user sends it with the cover note (drafted in the 10-19 session; ~1 month for comments, by Fri
+2026-11-20; explorer link "to follow"; add a personal email since the WWF address ends 10-23). Details of the
+week in `analysis/WORKLOG.md` (2026-10-14 to 10-20) and the 10-19/10-20 blocks below.
+
+**Before Fri 10-23 (contract end), user-side:** the co-author email (final text in the 10-20 chat: subject
+"Draft for your comments: Global change in ecosystem services, 1992-2020 (by 20 Nov)", replies to
+jeronimo.rescobar@gmail.com). The docx is shared as a WWF OneDrive link: move it to a location not owned by
+the user's WWF account (the PI's OneDrive or a shared project folder) or ask WWF IT to transfer ownership,
+otherwise the link and co-authors' comments may disappear when the account is closed. The email links the
+GitHub repo: latest work is on `book-update`, not `main` (squash-merge to `main` or link the branch).
+
+Next sessions, in order (user, 10-21), then park the project while the integration is thought through:
+
+0. **Commit and push** the uncommitted work listed above; then squash-merge `book-update` into `main` with one
+   name-free message (repo CLAUDE.md rule), so the repo link in the email shows the current state.
+1. **Clean the repo**: remove presentations and material that do not belong here (external-venue decks and
+   their plots: Sandra/Colombia, IDB-WWF, CLEC; see `docs/repo_reorg_plan.md` stage 4) and move them to the
+   user's own repo; consolidate the scripts added 10-14 to 10-20 (TODO block below); then the older reorg
+   backlog. Inventory first, grep for references before deleting.
+2. **Fork to the user's personal GitHub account** (springinnovate keeps the original; access there is
+   expected to continue). Outward-facing: do it only when the user says so, from his account.
+3. **Review the book** (`docs/manuscript/`, `docs/manuscript/book_audit.md`): bring it to the paper's current
+   state (native-pixel maps and insets, region-first framing, Gini as between-country, Sahel grassland line,
+   SPC wording, land cover in Methods); fix the embed-resources size issue noted 10-09.
+4. **README and the deck**: rewrite the root README (pipeline, native-pixel chain, explorer, data setup,
+   .venv/Docker) and update `docs/presentations/presentation.qmd` the same way as the book (the deck's
+   frequency-vs-severity slide still uses biomes; lead with regions, see memory "regions over biomes").
+5. **Explorer hosting**: decide (see the explorer block below: ~4.8 GB of SPC tiles + similar for absolute
+   at native resolution; zoom 8 is ~1/4; object storage or local only are the alternatives; private,
+   co-authors only until publication).
+6. **Compatibility with `C:\projects\global_invest_dev`**: read its standards, document the differences and a
+   plan (no refactor yet), then park.
+
+Open with the PI / model authors (no answers yet): climate inputs of the 1992/2020 runs; which land cover
+each model used; how the pollination model treats new cropland (Paraguayan Chaco); Gini source citation and
+the Guiana Shield values; explorer hosting (private, co-authors only).
+
+## Explorer change maps rebuilt on native pixels (10-20, uncommitted; not deployed)
+
+`scripts/dashboard/app.R` "Change maps" tab: Leaflet maps of pre-rendered tiles from the native rasters
+(`scripts/dashboard/make_change_tiles.py <service|all> [spc|abs] [max_zoom]`, tiles in
+`data/processed/dashboard/tiles/`, git-ignored). Sub-tabs "All services" (five maps, panning one moves all)
+and one per service; SPC with the paper's Figure 1 scale and shared legend, Absolute (sidebar switch) with a
+legend per service (limits in `tiles/abs_limits.csv`); coastal risk as the coastal points with |SPC| >= 1%
+on its own +-14% scale (`coastal_points.rds`, built on first run). Zooms to the selected unit. Test with
+`Rscript <scratch>/run_app.R` style launch on another port if 4683 is busy.
+**Hosting decision pending (user, next days):** tiles to native resolution (zoom 9; nature access 7) are
+large: SPC ~4.8 GB (sediment 2.7, nitrogen 1.4, pollination 0.7, nature access 0.05) plus about the same
+for absolute change. Options: stop at zoom 8 (~1/4 the size; Leaflet enlarges tiles beyond it), host tiles
+on object storage, or local use only. The tiler had one transient write error and one pool hang between
+services: run services one per process.
+
+## TODO after the draft goes out: consolidate the analysis scripts added 10-14 to 10-20 (user, 10-20)
+
+Not now. Many helper scripts were added in quick succession; they overlap and are not yet fit for a
+published repo. Consolidate into a small number of documented pipeline steps (shared helpers in `R/`), one
+place for the cell-universe filter, the crosswalk join and the strong-change definition, and remove what
+the paper no longer uses. Inventory:
+
+- Native-pixel change (used by the paper): `analysis/native_spc.py`, `analysis/native_grid_lookup.R`,
+  `analysis/change_map_stats_native.R`, `analysis/find_change_insets.py`, `analysis/best_change_area.py`,
+  `analysis/sahel_profile.R`, `scripts/mapping/make_native_change_maps.py`,
+  `scripts/mapping/make_native_change_insets.py`, `R/landscapes.R` (now unused by the paper).
+- Cell-based versions, superseded by the native ones: `analysis/change_map_stats.R`,
+  `analysis/change_geography.R` (and their outputs in `outputs/tables/change_map_stats/`).
+- Socioeconomic checks: `analysis/ks_hotspots_stratified.R` (paper Supplement table),
+  `analysis/beneficiary_mask_profile.R` (phase 4 report).
+- Overlaps to resolve: the LC crosswalk join is repeated in 5+ scripts; the `plt_long` cleanup rules (dust,
+  Inf clamp) are repeated; the Cliff's delta helper exists in three versions; mixed R/Python for one chain.
+
+## Mon 2026-10-19: send the draft to co-authors today (last week of the contract)
+
+Met Becky Fri 10-16. Agreed: send the draft to co-authors ASAP with the change explorer; ~1 month for their
+feedback (they read the draft and use the app to look at their own places/cases); integrate; submission-ready
+by year's end. Her main comment: 2.1 must describe what the maps show, the geography of change in broad terms
+(e.g. agricultural frontiers in South America vs Africa, Southeast Asia), not disconnected statistics.
+Done 10-19 (uncommitted): 2.1 now leads with the map, organised by theme rather than by continent (user: SA vs
+Africa is context, not the frame): where adverse change is most intense (Chaco, Indonesia/Malaysia, Amazon), which
+service leads where (sediment in 10/14 landscapes, nature access in drylands), where decline and improvement sit
+side by side, what runs against expectation (Europe/South Asia net improvement, boreal sediment without cropland,
+Cerrado less marked), then a cropland-expansion comparison across regions (new cropland >= 10% of cell: sediment up and nature access down
+everywhere, 72-94% of cells; pollination 57% loss / 7% gain in LAC vs 26% / 38% in SSA; N export 77% LAC vs 36%
+SSA), then the biome bars and short per-service biome/region paragraphs. New Supplement section "Geography of
+Change" with @tbl-landscapes and @tbl-frontier (read from CSVs). Script: `analysis/change_geography.R`
+(landscapes approximated from country x biome x latitude; cropland via the LC crosswalk). HTML + docx rendered.
+Open before sending: explorer hosting (needs the user's account; private, co-authors only); cover note.
+**Gini precision (user, an economist: be exact):** applied 10-19. WHO results now say hotspots lie in REGIONS
+with higher Gini of disposable income (admin-1), add the between-country paragraph (within-country δ −0.18 to
++0.01; LAC 21-39% of hotspots vs 8-14% of background; HDI reverses within countries), GDP per capita line; new
+Supplement @tbl-gini-strata; Discussion heading -> "Decline Concentrates in Countries with High Income
+Inequality", places-not-people caveat; Intro and Conclusions sentences reworded.
+**SPC wording (user):** the issue is the initial year t0 (conventional % change divides by t0), not "1992";
+both SPC passages reworded, incl. the cost of the ±200% bound (15-16% of pollination/nature access hotspots).
+**Native-resolution change maps (user, long avoided):** the paper says change is assessed per 10 km cell;
+raw 300 m rasters now in `data/raw/base_years/` (47 GB; nature access 2 km Eckert IV). SPC needs no per-ha
+conversion (same pixel both years). `analysis/native_spc.py <service>` streams both years and writes a 0.05 deg
+aggregate (mean of pixel SPC, SPC of sums, share strong adverse/favourable, n) to `data/processed/native_spc/`.
+Testing on sed_export first; decide map basis after comparing; the app should use the same basis.
+**DONE 10-19 (option A, user):** maps and all 2.1 map statistics now from native pixels (shares of land
+AREA in the evaluated universe); hotspots and downstream stay on the 10 km grid (Methods says so, plus the
+56S-60N coverage of N/sed export and its 5.7% threshold consequence). Chain: `analysis/native_spc.py`
+(per service; also writes native int16 SPC `<svc>_spc_native.tif` for insets/app) ->
+`analysis/native_grid_lookup.R` (block -> grid_fid) -> `analysis/change_map_stats_native.R`
+(`outputs/tables/change_map_stats_native/`) ; figures `scripts/mapping/make_native_change_maps.py`
+(Fig 1 + Supplement abs; the R/ggplot version took >1 h and was replaced) and
+`make_native_change_insets.py` (new Fig 2, windows from `analysis/find_change_insets.py`). Landscapes in
+`R/landscapes.R` (shared). Pixel numbers differ a lot from cell numbers (pollination 5% of area changed vs
+28% of cells); the N-export LAC-vs-SSA cropland contrast was a cell artifact and was dropped. Cell-based
+`analysis/change_map_stats.R` / `change_geography.R` outputs are no longer used by the paper.
+Next: user reads 2.1; app change-map tab on the native rasters (tabs per service + combined view, zoom).
+**Later 10-19 (user review of 2.1):** "landscapes" removed from the paper (ad hoc country x biome x latitude
+units, never defined elsewhere); examples now chosen by the 4-degree window ranking (Methods sentence +
+Supplement @tbl-windows). The cropland-expansion comparison (cells with >= 10% new cropland, by region; Table 6)
+was REMOVED (user: new framework, arbitrary threshold, not in Methods). Parked finding for the revision /
+land cover Supplement: on such land, pollination losses outweigh gains in LAC (17% vs 7% of area) and gains
+outweigh losses in SSA (21% vs 13%); sediment up and nature access down everywhere. Numbers in
+`outputs/tables/change_map_stats_native/frontier_by_region.csv`. **Sahel line (Becky's question):** 8-12 N =
+cropland expansion, change both ways; 15-18 N = N export up / sediment down with < 2.5% land cover change, so
+another model input (climate?) -> ask Becky with the climate-inputs question (`analysis/sahel_profile.R`).
+**Sahel line CORRECTED 10-20:** the "< 2.5% changed land cover class" metric was the binary natural vs
+transformed switch, which misses change within natural cover. Granular metrics: 15-18 N is the largest
+GRASSLAND GAIN on the belt (3-7% of land per degree band; cropland < 2%). Paper now says so; the co-author
+note now asks re-greening vs ESA CCI reclassification (+ climate inputs). `analysis/sahel_profile.R` writes
+`sahel_landcover_by_band.csv`. **Land cover method now in Methods** ("Land Cover Change") and the overlap
+result in Results ("Hotspots and Land Cover Conversion", end of 2.2); Supplement trimmed to point there.
+**Inset C: briefly moved to the Paraguayan Chaco, then BACK to the Argentine Chaco (28 S, 62.5 W)** = the
+Chaco window with the highest overall change (mean over 4 services of strong change either direction, 29%;
+`analysis/best_change_area.py`, then named chaco_window.py). Inset D added 10-19 = SE China (26.5 N, 114.5 E), the eastern-China area with the highest overall change (27%), same rule; insets now A Sumatra, B S Amazon, C Arg Chaco, D SE China, E Benin-Togo, F N Kazakhstan. User: the Paraguay pollination explanation is too speculative to put in front
+of co-authors now; the Methods question was removed again. Keep for later: the Paraguayan window shows almost
+no pollination change: Paraguayan and Argentine
+windows gained similar ESA cropland (10% / 11% of land), but pollination is zero in 92% of the Paraguayan
+window both years (28% Argentine). Likely the pollination model's crop-type data (which crops count as
+pollinator-dependent, possibly fixed at one date), NOT verified: added to the Methods provenance callout for
+Becky/the model author. Possible reviewer question on Fig 2; the paper makes no Chaco pollination claim.
+
+## Thu 2026-10-15: Becky's comment on the change maps; section 2.1 rewritten (uncommitted)
+
+Becky (Slack 10-15): the paper barely describes the global change maps; make the map Figure 1, then the
+biome bars; one metric in the main text, the other in the Supplement; but she may want to send to
+co-authors as is. Meeting with her 10-16 (calendar invite). Done, for the user to review before the meeting:
+"Global and Regional Trajectories" + "Global Pattern of Change" merged into one SPC-centred section
+"Global Patterns of Change": SPC map = Fig 1, SPC biome bars = Fig 2, coastal = Fig 3, then one paragraph per
+service, bounded by a hierarchy agreed with the user: biome first (Fig 2), then World Bank region (Supplement
+@fig-region-wb), countries only where the map shows a concentration the group totals hide. Absolute change (map, biome bars, the old abs-vs-SPC paragraphs) moved verbatim to a new Supplement
+section "Absolute Change". Numbers: `analysis/change_map_stats.R` -> `outputs/tables/change_map_stats/`;
+`make_combined_diffs.R` now also writes `<group>_spc.png` / `<group>_abs.png`. HTML renders clean; docx not
+re-rendered. Revert with `git checkout docs/manuscript/paper_draft_5service.qmd` if the as-is version goes out.
+
+## Wed 2026-10-14: phase 4 audited and rebuilt; the paper's Gini result is between-country
+
+Wrap-up scope (user, 10-14): wait for Becky's feedback on the draft; consolidate and clean the repo;
+README and docs; explorer hosting; align with `C:\projects\global_invest_dev` standards; phase 4.
+Done this session (all uncommitted, on `book-update`):
+
+- **Phase 4 report rebuilt** (`docs/reports/phase4_beneficiary/phase4_beneficiary_disproportionality_report.qmd`,
+  renders clean, light and dark checked). Every number and chart now comes from CSVs at render time
+  (inline R + generated SVG dot charts); hand-coded SVG coordinates gone. Render from **Git Bash**:
+  quarto under PowerShell fails on any R chunk ("file name conversion problem", path encoding).
+- **New scripts:** `analysis/beneficiary_mask_profile.R` (~6 min; writes `outputs/tables/beneficiary_masks/`:
+  cells, people, strata, by_region, checks, reproduction) and `analysis/ks_hotspots_stratified.R` (~2 min;
+  `outputs/tables/ks_hotspots_stratified.csv`). Run both from PowerShell.
+- **Audit:** the 12 published δ reproduce from current inputs (max diff 0.0016); no rerun of the masks was
+  needed. All 8 mask categories were already extracted to the grid, so 1+, 2+, water-only and access-only
+  are now profiled too.
+- **Findings (see the report):** (1) total GDP is a population proxy; GDP per capita δ is only +0.03 to
+  +0.08 for the masks, so "wealthier" was wrong. (2) The mask Gini skew (+0.17 at 1+ to +0.33 at 4+) is
+  between-country: within countries −0.18 to +0.08 (4+ keeps a small residual, +0.08 / +0.10 per admin unit).
+  (3) Weighted by people, the connected 92% are better off than the rest (HDI δ +0.42, GDP pc +0.38, also
+  within countries) and in slightly LESS unequal places (Gini −0.17): connected = accessible. (4) **The same
+  holds for the paper's WHO test:** land-service hotspot Gini δ +0.22 to +0.31 pooled, −0.18 to +0.01 within
+  countries; LAC holds 21-39% of land-service hotspots vs 8-14% of background. HDI reverses: −0.08 to −0.01
+  pooled, +0.16 to +0.20 within countries (N export, nature access, pollination).
+- **Data errors:** Gini layer has Suriname and French Guiana = 1.39, Guyana ~0.78 (2,416 cells incl. blended
+  Brazilian border cells; explains the ECDF x-axis past 1.0). Effect on any δ < 0.005, but fix at the source
+  and mention to Becky with the Gini citation question. HDI missing on 395,912 cells, nearly all unpopulated.
+- **Paper (proposals, NOT applied; Becky has the draft):** WHO paragraph: "concentrated in countries with high
+  income inequality, above all Latin America; within countries not in the more unequal regions" + HDI reversal;
+  Discussion/Conclusions line "inequality, not only income level, marks where exposure concentrates" needs the
+  same qualification; 7.4 B is reach of accessible, better-off people, not vulnerability; Supplement paragraph +
+  decomposition figure for the serviceshed section. Decide with Becky whether phase 4 goes in (now yes in some
+  form: the people-vs-places contrast is the new result, the "Gini grows at 4+" point does not hold up).
+- **Deck (proposals, not applied):** slide 26/Discussion inequality boxes need "between countries"; slide 28
+  could gain the people-vs-land dot chart; slide 14 notes: δ within countries.
+
+Next in this block: user reads the report; decide whether to send it to Becky with the paper caveat.
+
+## START HERE (Tue 2026-10-13, after the lab talk)
+
+The lab talk happened 10-13 11:00 and went OK. Deck final on `book-update` (last commit fb09114), not
+pushed. User forgot to explain a couple of numbers: ask which ones and add them to the deck notes and to
+the paper checklist below (they are likely the paper's weak spots too). `docs/presentations/lab_deck_outline.md`
+removed (superseded by the deck).
+
+**Order agreed for the final stretch** (one fresh Claude session per block, starting from this file):
+
+1. **Smurfit mosaic packages (overdue, people waiting):** separate session in
+   `C:\projects\landcover-validation-toolkit`, its HANDOFF "Status 2026-10-12": AcATaMa test, threshold
+   rule, zip, PDF, send the drafted team message.
+2. **Message to Becky today:** send the deck (rendered `docs/presentations/presentation.html`) with a
+   short note: what changed since the version she saw, the open questions on the "Where I Would Like Your
+   Input" slide, and permission to host the explorer (unpublished results).
+3. **Paper: what is still missing** (consolidated checklist; details in the 10-12 block below):
+   - Exposure: reconcile method vs Methods text (both buffers on every hotspot vs one pathway per
+     service); expand the serviceshed section (how connected is computed, mask maps); decide on phase 4.
+   - Methods fixes: biomes come from `Biome.gpkg` (WWF ecoregions, Olson et al. 2001; verify the
+     citation), not the correspondence table; Gini source citation; one line each on how nature access
+     and coastal risk are modelled; SPC baseline is the mean of both years, not 1992.
+   - Wording: relative prevalence without "predict"; "21% of hotspot cells" is pooled over services;
+     pollination gain is concentrated in few cells (not typical behaviour); "30% lost it all" for
+     pollination refers to near-zero baselines.
+   - Numbers: 14.6% vs 13.8% denominator; numbers ledger + `analysis/verify_paper_numbers.py`; coastal
+     Gini δ +0.07 (heatmap) vs +0.08 (text).
+   - Robustness: Gini signal driven by a few large regions? (one value per admin unit / drop LAC).
+   - Waiting on Becky: climate inputs of the 1992/2020 runs, Gini citation, correspondence-table citation.
+4. **Phase 4 (beneficiary-mask socioeconomic test): is it worth adding?** What it adds: the profile of
+   the connected areas (people's places, not hotspot cells): wealthier and denser (δ ~0.5, close to
+   circular since buffers are built around people), HDI-neutral, more unequal, and the Gini skew GROWS
+   with hotspot overlap (0.22 -> 0.33 at 4+). Only the last point is new and interesting. Masks are from
+   the current 07-29 run, but the numbers (08-07) predate the 08-31/09-03 fixes: rerun
+   `analysis/KS_tests_beneficiary_masks.qmd` first. Suggested placement if it holds: one sentence in the
+   WHO results + a Supplement paragraph and figure; not a main-text section. Decide after the rerun.
+5. **SWY:** read `C:\projects\swy_parameterization` HANDOFF for its state (waiting on the model author).
+6. **Pipeline and repo, scoped to what fits before 10-23:** shared function for the `plt_long` cleanup
+   rules (fixes the explorer's 17 pollination cells); remove stray files (inventory first, grep for
+   references); README rewrite; one full rerun test. Alignment with `global_invest_dev`: document the
+   differences and a plan, not a full refactor.
+7. **Explorer hosting** (after Becky's OK): private Hugging Face Space (Docker, 16 GB RAM, free) now;
+   public later; or Spring's server if Rich agrees. Needs the ~350 MB `data/processed/dashboard/` files
+   with it (Space storage or a GitHub Release + download step). shinyapps.io free is too small;
+   Shinylive cannot hold the data.
+8. **Analysis idea (not started):** share of each service's total change inside its hotspots (see the
+   note further down).
+
+## Mon 2026-10-12: lab talk prep (DONE; kept for the findings)
+
+1. **Deck** (`docs/presentations/presentation.qmd`, the version reviewed 10-09 and committed in PR #27).
+   A VS Code save conflict on 10-12: the user's open buffer was the PRE-review text. Saved as
+   `docs/presentations/presentation_myedits.qmd`; a line-ending-insensitive diff showed NO new edits, only
+   older text (32-97% overlap with the coastal row, old frequency/severity wording, simple overlap table,
+   drivers slide in its old position, discussion slide visible). Pending user confirmation: delete
+   `presentation_myedits.qmd` and revert the editor to the reviewed file. Do not overwrite the reviewed
+   version. Then: re-read slides 19 (pollination vs cropland), 23 (frequency vs severity), 25 (SPC vs
+   absolute profile) for caveats; render; restart and test the change explorer before the meeting.
+   **DONE 10-13 morning: deck pass complete** (uncommitted, renders clean). Methods reordered to follow the
+   pipeline diagram (diagram updated: grouping polygons vs grid, routing box); click-through highlight boxes
+   on slides 23-24 (arrow keys, not mouse; CSS `.hl-*` in wwf_theme.css); new slide 28 "Who Is Connected to
+   a Hotspot" (phase 4 mask insets); slide 25 (metric overlap) and For Discussion HIDDEN; Discussion rebuilt
+   (Frequent or Severe, Inequality with number boxes, What the Analysis Cannot Say Yet); appendix gained
+   "Reading SPC Values" and "Implementation"; title slide: user as author, "In collaboration with" Rich and
+   Becky. Explorer: start from PowerShell with the Chrome command in the explorer slide notes.
+   **Later 10-12 (user):** the deck needs a sentence-by-sentence pass, part by part, until the user can
+   explain every slide in their own words (unsure whether the text is unclear or the reading is; either
+   way it is a risk for the talk). Checked so far for slides 19/23/25: numbers reproduce; slide 23's
+   "30% lost it all" (pollination, tropical coniferous) are cells with almost no pollination in 1992
+   (median 0.005 vs 3.98 people fed/ha for the biome, 0.24 M people), same wording in the paper (line
+   ~135, numbers-audit item); desert nature access total losses: 2,737 cells, 85 M people, 2/3 in MENA,
+   baselines typical for deserts (ESA CCI sparse/bare switching untested). Wording/notes edits proposed,
+   not applied. Also under discussion: the Discussion section is too thin (explorer slide is not
+   discussion; drivers slide is only a finding).
+   **Found 10-12, exposure method vs paper text (numbers audit, raise with Rich):** the headline
+   connected count (7,383 M; downstream 5,949 M, travel 7,164 M) comes from Rich's `hotspot_count_1plus`
+   run, which applies BOTH 50 km downstream and 1 h travel to EVERY hotspot cell regardless of service
+   (`data/jeronimo_2026_07_beneficiaries_analysis_configs/`). The paper's Methods says downstream for the
+   water services and travel for nature access and pollination. Service-specific runs exist: water
+   hotspots (N, sediment) -> downstream 3,087 M; access/coastal/pollination hotspots -> travel 7,055 M
+   (coastal risk is in the travel group, not mentioned in the paper). Either change the Methods wording or
+   compute a service-specific union (needs the two union rasters). Runner (`workflow_runner.py`) is in
+   Rich's code, not here; inputs: LandScan 2023, ASTER GDEM, HydroBASINS lev06, 2019 friction surface,
+   5 km buffer. Also: Path A biomes come from a separate `Biome.gpkg`, not the correspondence table as the
+   paper says (zonal_stats_toolkit `global_ncp_diff_consolidated.ini`). Checked 10-12: `Biome.gpkg` has
+   16 features with Olson codes 1-14, 98 Lakes, 99 Rock & Ice = WWF Terrestrial Ecoregions biomes; the
+   grid (`AOOGrid_10x10km_land_4326_clean.gpkg`) carries the same `BIOME`/`WWF_biome` fields plus iso3,
+   continent, region_un, region_wb, income_grp, subregion. TO DO in the paper (user, 10-12): fix the
+   Methods sentence in "Socioeconomic and Boundary Data" (biomes not from the correspondence table) and
+   cite Olson, D.M. et al. (2001) Terrestrial ecoregions of the world: a new map of life on Earth.
+   BioScience 51(11): 933-938. Deck already says so (Spatial Framework slide).
+   **Paper wording (10-13):** Results/Population Exposure say lower-middle-income countries hold "15.6% of the
+   land but 21% of hotspot cells". The 21% (and OECD's 15%) is pooled over the four land services, counting a
+   cell once per service it is a hotspot for (`hotspot_area_stats.csv`, income_grp rows summed); say "of
+   service hotspots" or give the per-service range (1.13-1.61 vs 0.36-0.81). Deck slide 26 reworded.
+   **Paper wording (small, user 10-12):** relative prevalence should not say "predict": paper line ~128
+   ("as many hotspots as its size would predict") -> "a share of hotspots equal to its share of the area"
+   (a share ratio, not a prediction; deck already reworded).
+   **Paper wording (small):** Hotspot Identification (line ~437) says SPC hotspots mark change "relative
+   to what the cell provided in 1992"; SPC's denominator is the mean of 1992 and 2020, so say "relative
+   to the cell's own baseline (mean of 1992 and 2020)", as the deck now does.
+   **Pollination gain is concentrated (found 10-12, affects deck slide 19 and the paper's Discussion):** on
+   the 10 km grid 65% of cells have no pollination change, 19% gain, 16% lose; the top 1% of cells hold
+   75% of all gains. Only the MEAN absolute change rises with cropland gain; median ~0 and SPC slightly
+   negative with more cropland. So "cropland expanding next to remaining habitat raises pollination" is
+   an aggregate effect driven by few cells, not typical behaviour: say so in the paper (Discussion
+   paragraph on realized pollination). Deck slide 19 reworded and its notes carry the numbers.
+   **Analysis idea (user, 10-13, not started):** what share of each service's total change happens inside
+   its hotspots? Per service on the 10 km grid (equal-area cells, per-ha means, so cell sums are
+   comparable): sum of absolute change in hotspot cells ÷ sum over all evaluated cells, reported for the
+   adverse direction (gross) and for the net change. Quick from `grid_dashboard.rds` or `plt_long`; would
+   give a "5% of cells carry X% of the decline" headline (pollination already shows gains are
+   concentrated: top 1% of cells hold 75% of gains). Note SPC hotspots favour low baselines, so the share
+   of absolute change could be small; compare with the absolute-change hotspot set too.
+   **Explorer vs pipeline cleanup rules (found 10-13):** `analysis/hotspot_extraction.qmd` builds `plt_long`
+   (long reshape of `10k_change_calc.gpkg`, cached as `data/processed/plt_long.rds`) and applies two rules:
+   Inf SPC -> ±200, and SPC -> 0 where |abs change| < 1e-6 ("floating point dust"). The explorer
+   (`scripts/dashboard/prepare_dashboard_data.R`) reads the wide gpkg and applies neither: no Inf exist, but
+   17 dust cells enter its pollination hotspot set (others identical). Fix after the talk: apply the dust rule
+   in the prep script and rerun. For the pipeline restructure: one shared function (read the gpkg, apply the
+   cleanup rules, return long or wide) used by notebooks, figure scripts and the explorer. Caching stays a
+   speed choice (the explorer caches too: `grid_dashboard.rds`); what matters is that the rules live in one
+   place. The `plt_long` code holds the validated rules (dust scrub, Inf clamp, service-name normalization)
+   and is where the shared function should come from.
+   **Presenter support (user, 10-12):** revisit the Cliff's δ / KS / FDR explanations given in the 10-12
+   session (what δ computes, why δ + KS, thresholds, ties) and fold them into the speaker notes of slides
+   14 and 28, or into a short companion text to keep at hand while presenting. Partly done 10-12: notes for
+   slides 1-14 checked and updated (slide 13 had none; slide 14 now has δ computation, thresholds, ties,
+   KS D on the ECDF, FDR). Gini citation now "source to confirm" on both slides 8 and 11.
+   **KS/ECDF checks (found 10-12):** the Gini ECDF x-axis (`outputs/plots/ks/ecdf/ecdf_rast_adm1_gini_disp_2020_mean.png`)
+   runs past 1.0, so some cells may have Gini > 1 (impossible): check the layer/aggregation. The red
+   (hotspot) curves show large vertical steps (e.g. sediment export at ~0.55): many hotspot cells share one
+   admin-1 Gini value, so a few large unequal regions may drive the Gini δ; worth a robustness check
+   (e.g. drop LAC, or one value per admin unit). GDP in the tests is TOTAL GDP (`rast_gdpTot`), largely a
+   population proxy: avoid "richer" in text (deck slide 14 fixed). Deck slide 14 now shows a crop of the
+   sediment-export panel (`docs/presentations/images/ecdf_gini_sed_export.png`).
+   **After the talk, small figure fix:** `outputs/plots/maps/global_socioeconomic_context_map.png` (deck
+   slide 11, paper @fig-socioeconomic-context): population density legend runs 1e-11 to 1e+01 and GDP
+   1e-02 to 1e+06 with no units (likely per m2 or a units slip in the plotting script); add units, check
+   the scaling. Also make the Gini citation consistent (deck slide 8 still says "Kummu et al.", slide 11
+   says "source to confirm").
+2. **Explorer hosting (after the talk):** app is in the public repo (`scripts/dashboard/`), data is not
+   (~350 MB in `data/processed/dashboard/`). Plan: publish the prepared data as a GitHub Release + a
+   download step and README so others can run it locally; ask Rich whether Spring can host it (Shiny
+   Server / Posit Connect / Docker); Posit Connect Cloud or shinyapps.io free tiers may be tight on memory.
+3. **Smurfit** (toolkit HANDOFF "Next steps"): mosaic-split sessions for zones 1 and 3 to test and send; NOT today (user, 10-12), after the lab talk.
+4. Book update (branch `book-update`), workflow end-to-end across the pipeline qmds, README rewrite, job
+   search and laptop migration as in the blocks below.
+
+## UPDATE 2026-10-09 (evening): book renders again
+
+- `quarto render` in `docs/manuscript/` works: output `docs/manuscript/_book/index.html` (git-ignored, so
+  VS Code hides it). Only broken links were six June-run exposure images in ch06; repointed to
+  `archive/outputs/2026-06_exposure_8var/plots/` with an updated flag box (uncommitted, branch `book-update`).
+- The book content is still old in many places: it still charts the retention/reduction ratios, and several
+  chapters predate the five-service, cell-universe and exposure updates. `cache: true` may hide chunks
+  that read moved files until their cache is cleared.
+- Chapter HTML files are 6 MB to 105 MB (`embed-resources: true` in a book embeds cumulatively); fix
+  before sharing (drop embed-resources for the book, or render to a site folder).
+- Next, agreed with the user: (1) book cleanup chapter by chapter (`docs/manuscript/book_audit.md`), drop
+  the ratio charts; (2) make sure the analysis workflow is correct end to end across the pipeline qmds
+  (process_data -> hotspot_extraction -> hotspot_synthesis -> KS tests, plus the paper scripts that now
+  bypass parts of it, e.g. `analysis/rebuild_hotspot_area_stats.R`); (3) rewrite the root README, which
+  is badly out of date (paths, pipeline, .venv/Docker setup, cell universe, explorer).
 
 ## START HERE (end of 2026-10-09 session)
 
@@ -152,6 +602,13 @@ archived files: `docs/data_versions.md`. Book chapters 02 and 06 point at archiv
   numbers (08-07) predate the 08-31 sediment/coastal fix and the 09-03 export/risk reversal, and
   the masks came from an earlier hotspot set: rerun `analysis/KS_tests_beneficiary_masks.qmd` (and
   check whether the masks need rebuilding) before citing it.
+  **Upgraded 10-13 (user): not optional any more.** The paper needs an expanded serviceshed section,
+  not just the one Methods paragraph: (1) how connected beneficiaries are computed (50 km downstream
+  along rivers, 1 h travel, LandScan 2023, union counted once; inputs DEM, HydroBASINS lev06, 2019
+  friction surface; run by Rich), illustrated with the phase 4 mask maps (deck slide 28 uses the
+  Amazon/Andes insets); (2) reconcile the per-service vs all-hotspots buffer question (see "exposure
+  method vs paper text" above); (3) the phase 4 socioeconomic test on the masks, after the rerun.
+  Phase 4 report re-rendered 10-13 (`docs/reports/phase4_beneficiary/...html`).
 - Waiting on Becky: climate inputs / model-run provenance (affects the Discussion's climate
   mechanism); Gini citation; correspondence-table citation (draft to the model author ready:
   `docs/manuscript/justin_ee_correspondence_provenance_2026-08-31.draft.md`, unsent).
@@ -166,7 +623,7 @@ archived files: `docs/data_versions.md`. Book chapters 02 and 06 point at archiv
 **Presentations**
 - [ ] **Lab deck, DUE Tue 2026-10-13, 11:00 Bogotá time** (`docs/presentations/presentation.qmd`):
   restructure to the paper as sent (three questions WHAT/WHERE/WHO; land cover as future work);
-  slide outline (30 min, explore the findings) in `docs/presentations/lab_deck_outline.md`,
+  slide outline (30 min, explore the findings) in `docs/presentations/lab_deck_outline.md` (removed 10-13, in git history),
   using the paper's figure files; add a beneficiary-mask slide only if the phase 4 rerun is done.
   Paper edits resume 10-07 in parallel; BC12 and the 14.6/13.8% choice feed the deck.
   **10-06: first full revision done, uncommitted** (built on the existing deck, 39 slides incl.
