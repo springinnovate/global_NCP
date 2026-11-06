@@ -137,6 +137,21 @@ LC_INFO <- paste(
   "The charts average the selection's cells; the cells have equal area, so the averages are shares of",
   "its area. Transition metrics of Pontius and colleagues (R package diffeR), computed in",
   "`analysis/LC_change.qmd` and `analysis/LC_change_granular.qmd`.")
+# land cover maps (make_landcover_tiles.py): 9 classes as in analysis/LC_change.qmd, and the main ESA classes
+LC9_LEGEND <- c(Cropland = "#f6e05e", Forest = "#2d6a2e", `Grassland and shrubland` = "#d8b365",
+                `Sparse vegetation` = "#c9b99a", Wetland = "#4fb3a9", Urban = "#c0392b", Bare = "#efe3c4",
+                `Snow and ice` = "#bed7eb")
+ESA_LEGEND <- c(`Cropland, rainfed` = "#ffff64", `Cropland, irrigated` = "#aaf0f0",
+                `Mosaic cropland / natural vegetation` = "#dcf064", `Mosaic natural vegetation / cropland` = "#c8c864",
+                `Tree cover, broadleaved, evergreen` = "#006400", `Tree cover, broadleaved, deciduous` = "#00a000",
+                `Tree cover, needleleaved, evergreen` = "#003c00", `Tree cover, needleleaved, deciduous` = "#285000",
+                `Tree cover, mixed leaf type` = "#788200", `Mosaic tree and shrub / herbaceous` = "#8ca000",
+                `Mosaic herbaceous / tree and shrub` = "#be9600", Shrubland = "#966400", Grassland = "#ffb432",
+                `Lichens and mosses` = "#ffdcd2", `Sparse vegetation` = "#ffebaf",
+                `Tree cover, flooded, fresh or brackish` = "#00785a", `Tree cover, flooded, saline` = "#009678",
+                `Shrub or herbaceous cover, flooded` = "#00dc82", Urban = "#c31400", Bare = "#fff5d7",
+                `Permanent snow and ice` = "#ffffff")
+LC_TILE_MAXZOOM <- 9
 LC_COLOURS <- c(Forest = "#2d6a2e", `Grassland and shrubland` = "#d8b365", Cropland = "#f6e05e",
                 Urban = "#c0392b", Other = "#bdbdbd")
 
@@ -180,6 +195,7 @@ fmt_pop <- function(x) ifelse(x >= 1e6, sprintf("%.1f M", x / 1e6), sprintf("%s"
 
 ui <- page_sidebar(
   title = "Ecosystem service change explorer (1992-2020)",
+  tags$head(tags$style(".lc-legend { font-size: 10.5px; line-height: 13px; } .lc-legend i { width: 12px; height: 12px; }")),
   sidebar = sidebar(
     width = 320,
     selectInput("unit_type", "Unit", UNIT_TYPES, selected = "nev_name"),
@@ -211,12 +227,22 @@ ui <- page_sidebar(
     nav_panel("Hotspot map", leafletOutput("map", height = 620), textOutput("map_note")),
     nav_panel("Summary", uiOutput("headline"), tableOutput("summary")),
     nav_panel("By sub-unit", textOutput("sub_note"), tableOutput("subunits")),
-    nav_panel("Change in hotspots", plotOutput("box", height = 420)),
+    nav_panel("Change in hotspots", plotOutput("box", height = 420),
+              div(style = "font-size:13px;max-width:900px;", markdown(paste(
+                "**How to read this chart.** Each box shows how much a service changed in its hotspot cells",
+                "(1992-2020): the line is the median, the box the middle half of the cells, the whiskers the",
+                "rest. Orange = decline, teal = improvement. Each service has its own scale, so read each row",
+                "on its own.")))),
     nav_panel("Land cover change",
               if (is.null(lc)) p("Land cover data not found: run scripts/dashboard/prepare_landcover_data.R") else tagList(
                 div(style = "display:flex;align-items:flex-end;gap:16px;",
                     selectInput("lc_var", "Land cover change, 1992-2020 (% of each 10 km cell)", LC_VARS,
                                 selected = "natural_loss", width = "420px"),
+                    radioButtons("lc_layer", "Map", c("Change (10 km cells)" = "change", "Land cover 1992" = "1992",
+                                                      "Land cover 2020" = "2020"), inline = TRUE),
+                    conditionalPanel("input.lc_layer != 'change'",
+                                     radioButtons("lc_scheme", "Legend", c("9 classes" = "9class", "ESA classes" = "esa"),
+                                                  inline = TRUE)),
                     div(style = "margin-bottom:1rem;", actionLink("lc_info", "What do the variables mean?"))),
                 layout_columns(col_widths = c(8, 4),
                                div(leafletOutput("lc_map", height = 680), textOutput("lc_note")),
@@ -568,6 +594,22 @@ server <- function(input, output, session) {
     list(s = s, note = note)
   })
   output$lc_map <- renderLeaflet({
+    req(one_of(input$lc_layer, c("change", "1992", "2020")))
+    if (input$lc_layer != "change") {
+      req(one_of(input$lc_scheme, c("9class", "esa")))
+      b <- chg_bounds(); leg <- if (input$lc_scheme == "esa") ESA_LEGEND else LC9_LEGEND
+      return(leaflet(options = leafletOptions(worldCopyJump = TRUE)) |>
+        addProviderTiles(providers$Esri.WorldGrayCanvas, group = "Light") |>
+        addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") |>
+        addTiles(urlTemplate = paste0(tile_url, "/lc_", input$lc_scheme, "_", input$lc_layer, "/{z}/{x}/{y}.png"),
+                 group = "Land cover", options = tileOptions(maxNativeZoom = LC_TILE_MAXZOOM, maxZoom = 13, noWrap = TRUE)) |>
+        addLegend("bottomright", colors = unname(leg), labels = names(leg), opacity = 1,
+                  title = paste("Land cover", input$lc_layer), className = "info legend lc-legend") |>
+        addLayersControl(baseGroups = c("Light", "Satellite"), overlayGroups = "Land cover",
+                         options = layersControlOptions(collapsed = TRUE)) |>
+        addScaleBar(position = "bottomleft") |>
+        fitBounds(b[1], b[2], b[3], b[4]))
+    }
     d <- lc_draw(); s <- d$s; var <- input$lc_var; b <- chg_bounds()
     kind <- sub("^[a-z]+_", "", var)
     # colour scale capped at the 99th percentile of the changed cells, so a few cells do not wash it out
@@ -596,6 +638,10 @@ server <- function(input, output, session) {
   observeEvent(input$lc_info, showModal(modalDialog(markdown(LC_INFO), title = "Land cover change: the variables",
                                                     easyClose = TRUE, size = "l", footer = modalButton("Close"))))
   output$lc_note <- renderText({
+    if (!identical(input$lc_layer, "change"))
+      return(paste("ESA CCI (1992) and C3S (2020) land cover, 300 m; zoomed out, each screen pixel shows the most",
+                   "common class of the area it covers. Water is not drawn. The charts and the variable menu refer",
+                   "to the change view."))
     r <- lc_rows()
     paste0(fmt_n(length(r)), " of ", fmt_n(length(sel_rows())), " cells in the selection have land cover values. ",
            "Cells without change are not drawn. ", lc_draw()$note)

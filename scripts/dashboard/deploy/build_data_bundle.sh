@@ -16,7 +16,8 @@ done
 mkdir -p "$out/path_a"
 cp "$dash/grid_dashboard.rds" "$dash/coastal_points.rds" "$dash/landcover_grid.rds" "$out/"
 cp "$pa"/{country,region_wb,income_grp,biome}_map_data.csv "$out/path_a/"
-rsync -a --delete --exclude '._*' "$dash/tiles/" "$out/tiles/"
+# *.empty: markers make_landcover_tiles.py leaves for tile positions with nothing to draw (to resume)
+rsync -a --delete --exclude '._*' --exclude '*.empty' "$dash/tiles/" "$out/tiles/"
 # macOS writes AppleDouble "._" companions for files with extended attributes on non-Apple filesystems
 # (exFAT, network shares); they are not data
 find "$out" -name '._*' -type f -delete

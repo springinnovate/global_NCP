@@ -1,5 +1,46 @@
 # Worklog — Global NCP Hotspots (v1.3.4)
 
+### 2026-10-21 to 2026-11-04 — co-author round, move to a new machine, explorer packaged for a server, land cover tab
+
+**Paper to the co-authors (10-21).** Draft sent; comments due 11-20. `book-update` squash-merged into `main`
+as PR #28 (11-03).
+
+**Data package and move (10-21 to 10-26).** Clean package `global_NCP_data_2026-10/` (131 GB, current files
+only, README + checksums) shared with the PI; it and the earlier workspace are also on an external drive
+(the earlier full 172 GB package is not there). The work moved to a macOS laptop: Python 3.14 venv pinned to the earlier package versions,
+GDAL from the rasterio / pyogrio / sf / terra wheels, data from the clean package. Checks passed:
+`verify_cell_universe.R` ("all checks passed"), the explorer runs.
+
+**Explorer packaged for a server (10-26 to 11-03, `scripts/dashboard/deploy/`).** Hosting options assessed
+(free Connect Cloud apps are public, so a project server behind access control was proposed). Docker image:
+`rocker/r-ver:4.5.1` pinned by digest, binary packages from a dated P3M snapshot, every installed namespace
+loaded at build. Two runtime failures found that way: `fs` needed `libuv` (the page returned 500 while the
+healthcheck passed), and ragg spaced DejaVu glyphs unevenly (plots now use Cairo). Container: non-root,
+read-only filesystem, no capabilities, memory and process limits, data read-only, port on localhost only.
+App: inputs validated against the offered values, unit name escaped, errors sanitized. The healthcheck now
+also requires `/data` to be readable: after the external drive holding the data was reconnected, the
+container kept a stale mount and served blank maps while reporting healthy. Data bundle (`build_data_bundle.sh`,
+SHA256SUMS) shared on the project drive; code in PR #29 (`explorer-deploy`).
+
+**Land cover change tab (11-03).** `scripts/dashboard/prepare_landcover_data.R` joins the two diffeR metric
+sets (`10k_lcc_metrics.gpkg`, `10k_lcc_granular_metrics.gpkg`, legacy grid) to the explorer grid through
+`lc_grid_fid_to_master_fid_crosswalk.csv`: 99.3% of the 1,372,621 cells get values. Kept: persistence, loss
+and gain of natural land, forest, grassland/shrubland, cropland and urban (% of cell; NA = class absent = 0),
+stored in tenths of a percent (79 MB). Consistency checks on the metrics: forest dir_ch = gain - loss in
+every cell, forest gain = non-forest loss, P_F + P_NF + L_F + G_F = 100; forest 29.4% of cells in 1992,
+29.1% in 2020. Pitfall: `pyogrio.read_dataframe(columns=...)` returns columns in file order, not the
+requested order; relabelling them positionally scrambles the metrics (caught, no effect on any output).
+Tab: map of one variable on the 10 km cells (large selections averaged on 0.5 or 1 degree squares),
+composition 1992 vs 2020 and gross loss/gain for the selection, variable definitions in a pop-up.
+
+**Land cover maps (11-03/04).** `scripts/dashboard/make_landcover_tiles.py` builds XYZ tiles from the
+original ESA CCI 1992 (v2.0.7) and C3S 2020 (v2.1.1) NetCDFs, not from `landcover_gl_1992.tif` (mislabelled,
+a copy of the 1992 N export raster). Each year goes to a tiled GeoTIFF with mode overviews first, so
+zoomed-out tiles show the dominant class. Four sets (full ESA legend and 9 classes, 1992 and 2020), z0-9,
+water transparent: 150,736-150,741 tiles each, 1.7 GB in total, about 16 minutes per year on 12 cores.
+Orientation checked at known places (Sahara bare, Greenland ice, Manaus urban). Shown in the land cover tab
+with a 1992 / 2020 and ESA / 9-class selector.
+
 ### 2026-10-14 to 2026-10-20 — phase 4 audit, change maps from native pixels, section 2.1 rewritten, draft ready for co-authors
 
 **Phase 4 (beneficiary masks) audited and rebuilt (10-14).** The 12 published Cliff's δ reproduce from current

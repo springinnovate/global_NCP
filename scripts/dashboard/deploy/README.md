@@ -9,7 +9,7 @@ country, region, income group or biome. This folder runs it as a container.
 | Part | Where | Size |
 |---|---|---|
 | Image: R 4.5.1 (`rocker/r-ver`), packages from a dated Posit Package Manager snapshot, `app.R` | built from this repo | 504 MB compressed, 1.8 GB unpacked |
-| Data: `grid_dashboard.rds`, `coastal_points.rds`, `landcover_grid.rds`, `path_a/*.csv`, `tiles/` (224k PNGs) | a folder on the host, mounted read-only at `/data` | 8.3 GB |
+| Data: `grid_dashboard.rds`, `coastal_points.rds`, `landcover_grid.rds`, `path_a/*.csv`, `tiles/` (about 825k PNGs: service change maps and the 1992 and 2020 land cover maps) | a folder on the host, mounted read-only at `/data` | about 10 GB |
 
 The data stays out of the image: it holds unpublished results, and it changes independently of the code.
 
@@ -77,9 +77,13 @@ On a machine with the repo and its `data/` (see the data package README), from t
 scripts/dashboard/deploy/build_data_bundle.sh /path/to/explorer_data
 ```
 
-It copies the files above, writes `VERSION` (build time, commit) and `SHA256SUMS`. To move it to a
-server, send it as one archive (`tar -cf explorer_data.tar -C <dir> .`) or with `rsync`: 224k small files
-copy slowly one by one, and on exFAT or FAT drives they take far more space than their 8 GB.
+The inputs come from four scripts, run once (or when their data changes): `prepare_dashboard_data.R` and
+`prepare_landcover_data.R` (the 10 km grid tables), `make_change_tiles.py` (service change maps) and
+`make_landcover_tiles.py` (land cover maps 1992 and 2020, from the original ESA CCI and C3S NetCDFs, about
+35 minutes on 12 cores). The bundle script then copies the files above, writes `VERSION` (build time,
+commit) and `SHA256SUMS`. To move it to a server, send it as one archive (`tar -cf explorer_data.tar -C
+<dir> .`) or with `rsync`: about 825k small files copy slowly one by one, and on exFAT or FAT drives they
+take far more space than their 10 GB.
 
 ## Known limitations
 
