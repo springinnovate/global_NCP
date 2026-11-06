@@ -40,9 +40,8 @@ wwf_dark_green <- "#004D1E"
 wwf_orange     <- "#F07D00"
 wwf_teal       <- "#009191"
 
-# REVERSAL (2026-09-02/03): Becky overrode Steve's retention/protection suggestion -- back to
-# export/risk residuals as the hotspot-defining amounts (see R/service_config.R's own REVERSAL
-# note and docs/manuscript/becky_steve_feedback_plan.md). Nitrogen/sediment export are "low"
+# REVERSAL (2026-09-02/03): back to export/risk residuals as the hotspot-defining amounts
+# (see R/service_config.R's REVERSAL note). Nitrogen/sediment export are "low"
 # direction (an increase is the adverse direction); pollination/nature access stay "high".
 # Fixed 2026-08-31 after finding this script (unlike make_native_change_figure.R, which is a
 # deliberately separate all-8-service reference figure) was the actual generator behind the paper's
