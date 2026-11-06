@@ -23,18 +23,14 @@
 # should build its local CFG list by referencing the objects/functions below, not by
 # re-typing service names.
 
-# REVERSAL (2026-09-02/03): Becky overrode Steve's retention/protection suggestion via
-# Slack -- "the change in export is the thing people actually experience... the
-# retention can have changes happen on other pixels ... without anything changing on
-# the pixel -- so it's very confusing." Reverted SERVICE_AMOUNTS back to export/risk
-# residuals (the pre-2026-08-28 scheme); N_retention/Sed_retention/C_Prot_service
-# demoted to SERVICE_LEGACY_RAW (still computed, no longer hotspot-defining or
-# reported directly). SERVICE_RATIOS unchanged throughout -- ratios were secondary/
-# non-hotspot-defining both before and after Steve's suggestion, only the *amounts*
-# flipped. See docs/manuscript/becky_steve_feedback_plan.md's "REVERSAL, 2026-09-02"
-# section and memory project_sediment_retention_demand_artifact.md (the sediment/USLE
-# demand-inflation finding, which is the same class of problem as Becky's objection --
-# kept as supporting evidence, not deleted).
+# REVERSAL (2026-09-02/03): back to export/risk residuals as the hotspot-defining
+# amounts (the pre-2026-08-28 scheme), after a short trial of retention/protection
+# amounts. Export is the change people experience; retention on a pixel can change
+# because of what happens upstream, with nothing changing on the pixel itself.
+# N_retention/Sed_retention/C_Prot_service are kept in SERVICE_LEGACY_RAW (still
+# computed, no longer hotspot-defining or reported directly). SERVICE_RATIOS were
+# unchanged throughout; only the amounts flipped. Related: the sediment retention
+# amount also inflates with land-conversion erosion pressure, the same class of problem.
 
 # ---- The 5 real hotspot-defining services (export/risk residuals) -----------------
 # good_direction: "high" means an increase is favorable, "low" means a DEcrease is

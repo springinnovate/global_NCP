@@ -5,7 +5,7 @@ status: "Written 2026-08-31 during the 5-service sediment/coastal rerun, to make
   living checklist, not a one-time snapshot."
 ---
 
-**REVERSAL, 2026-09-03**: Becky overrode Steve's retention/protection suggestion — the whole
+**REVERSAL, 2026-09-03**: back from retention/protection to export/risk amounts. The whole
 B-chain below was rerun under the reverted export/risk definition (`R/service_config.R`'s
 `SERVICE_AMOUNTS` flipped back to N_export/Sed_export/C_Risk/Pollination/Nature_Access). Rows
 below still describe the retention-era run in detail because that architecture/incident history
@@ -13,8 +13,7 @@ below still describe the retention-era run in detail because that architecture/i
 their **numbers and current-status flags are superseded**. Current real numbers: **189,932**
 hotspot cells (was 219,138), **63.3%** attribution gap (was 63.77%), region_wb ranking flipped
 back to Latin America & Caribbean leading (1.58×, was East Asia & Pacific 1.20×). See
-`docs/manuscript/becky_steve_feedback_plan.md`'s "REVERSAL" section and
-`docs/manuscript/paper_draft_5service.qmd`'s own status banner for the full history. Rows updated
+`docs/manuscript/paper_draft_5service.qmd`'s status banner for the history. Rows updated
 inline below where the reversal changed the actual status, not just the numbers.
 
 One row per pipeline stage: what it does, what tool runs it, what it reads and writes, and where
